@@ -1,3 +1,4 @@
+- [PS000125_OFFICIAL.md](PS000125_OFFICIAL.md) — official problem statement (locked) · [REQUIREMENT_MAPPING.md](REQUIREMENT_MAPPING.md) — 12 points + 14 outcomes → built/roadmap · [INFRASTRUCTURE_ROADMAP.md](INFRASTRUCTURE_ROADMAP.md) — hardware/DR proposal tiers
 # Docs index
 - [DEMO_SCRIPT.md](DEMO_SCRIPT.md) — 3–5 minute demo / synopsis-video flow
 - [ARCHITECTURE.md](ARCHITECTURE.md) — as-built architecture (Lite)

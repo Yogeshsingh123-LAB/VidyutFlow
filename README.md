@@ -14,8 +14,11 @@
 [![Tests](https://img.shields.io/badge/tests-3_passing-16a34a?style=for-the-square)](#-testing--qa)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-square)](LICENSE)
 
-*Seva First Innovation Challenge · Problem Statement **PS000125** ·
-Uttar Gujarat Vij Company Limited (UGVCL) · Synopsis due 6 Nov 2026 · Grand Finale 2 Dec 2026*
+*Seva First Innovation Challenge · **PS000125 — Future-Ready, Secure and Intelligent IT Infrastructure &
+User-Friendly ERP/Portal Ecosystem** · Uttar Gujarat Vij Company Limited (UGVCL) ·
+Resource person: hmtcotech2@ugvcl.com · Synopsis due 6 Nov 2026 · Grand Finale 2 Dec 2026*
+📋 Official statement: [docs/PS000125_OFFICIAL.md](docs/PS000125_OFFICIAL.md) · Requirement-by-requirement
+mapping (built/lite/roadmap, with evidence): [docs/REQUIREMENT_MAPPING.md](docs/REQUIREMENT_MAPPING.md)
 
 **Product definition.** VidyutOS is **not an operating system**. It is the **control plane** for a
 utility's cloud-to-edge operations: the cloud side manages, monitors and intelligence-checks every
