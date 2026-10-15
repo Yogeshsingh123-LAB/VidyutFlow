@@ -7,3 +7,4 @@
 - [DECK_OUTLINE.md](DECK_OUTLINE.md) — 12-slide deck outline (PDF ≤ 20 MB)
 - [CODE_REVIEW.md](CODE_REVIEW.md) — review pack: tree, core snippets, checklist (fixed vs open findings)
 - [QUICK_AUDIT.md](QUICK_AUDIT.md) — copy-paste audit pack (README + tree + Makefile) for reviewers who cannot open the repo
+- [TEAM_ROLES.md](TEAM_ROLES.md) — 5-role team split: owners per module, RACI, checklists to Nov 6 / Dec 2

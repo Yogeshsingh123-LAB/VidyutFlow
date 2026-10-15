@@ -345,6 +345,14 @@ Detail: [docs/ROADMAP.md](docs/ROADMAP.md) · UX-upgrade provenance: [docs/VIDYU
 
 ---
 
+## 👥 Team — 5 Roles
+
+Work is split by repo module so every file has one owner — **Backend & Workflow · Frontend & PWA ·
+ML & AI · DevOps/Security/QA · Docs/Demo/Product** — with deliverables, RACI, hand-offs, smaller-team
+merges and the Nov 6 / Dec 2 checklists in [docs/TEAM_ROLES.md](docs/TEAM_ROLES.md).
+*(Names to be filled in by 17 Oct, by strength: Python logic → Role 1, screens → Role 2, data → Role 3,
+servers/security → Role 4, writing/presenting → Role 5.)*
+
 ## 📜 License
 
 MIT — see [LICENSE](LICENSE). Built for the Seva First Innovation Challenge 2026 (PS000125, UGVCL);
