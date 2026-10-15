@@ -1,11 +1,14 @@
 from datetime import datetime, timedelta, timezone
-from passlib.context import CryptContext
+import bcrypt
 from jose import jwt, JWTError
 from .config import settings
 
-pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
-def hash_password(p: str) -> str: return pwd.hash(p)
-def verify_password(p: str, h: str) -> bool: return pwd.verify(p, h)
+def hash_password(p: str) -> str:
+    # bcrypt operates on <=72 bytes; encode explicitly so long passwords fail predictably instead of silently truncating in callers
+    return bcrypt.hashpw(p.encode()[:72], bcrypt.gensalt()).decode()
+def verify_password(p: str, h: str) -> bool:
+    try: return bcrypt.checkpw(p.encode()[:72], h.encode())
+    except (ValueError, TypeError): return False
 def create_token(user_id: str, role: str) -> str:
     exp = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_minutes)
     return jwt.encode({"sub": user_id, "role": role, "exp": exp}, settings.secret_key, algorithm=settings.algorithm)

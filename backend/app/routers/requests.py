@@ -61,13 +61,18 @@ def update_status(request_id: str, body: StatusUpdate, db: Session = Depends(get
     if body.status not in allowed: raise HTTPException(400, f"Status must be one of {sorted(allowed)}")
     r = db.get(ConnectionRequest, request_id)
     if not r: raise HTTPException(404, "Request not found")
+    if u.role == "engineer" and r.assigned_engineer_id and r.assigned_engineer_id != u.id:
+        raise HTTPException(403, "Request is assigned to another engineer")
     r.status = body.status
     if body.notes: r.validation_notes = body.notes
     audit(db, u, "STATUS_UPDATED", "request", r.id, body.status); db.commit(); db.refresh(r); return out(r)
 
 @router.get("/kpis/summary")
 def kpis(db: Session = Depends(get_db), u: User = Depends(current_user)):
-    rows = db.query(ConnectionRequest).all()
+    q = db.query(ConnectionRequest)  # scoped like GET /requests - aggregates must not leak other users' cases
+    if u.role == "consumer": q = q.filter(ConnectionRequest.consumer_id == u.id)
+    elif u.role == "engineer": q = q.filter(ConnectionRequest.assigned_engineer_id == u.id)
+    rows = q.all()
     total = len(rows); completed = sum(r.status=="COMPLETED" for r in rows)
     high = [r for r in rows if r.sla_breach_risk >= 0.7 and r.status not in ("COMPLETED","REJECTED")]
     open_rows = [r for r in rows if r.status not in ("COMPLETED","REJECTED")]
@@ -92,6 +97,8 @@ def field_sync(body: FieldSync, db: Session = Depends(get_db), u: User = Depends
     if existing: return {"duplicate": True, "synced": False, "field_update_id": existing.id, "message": "Already synced — duplicate ignored"}
     r = db.get(ConnectionRequest, body.request_id)
     if not r: raise HTTPException(404, "Request not found")
+    if u.role == "engineer" and r.assigned_engineer_id and r.assigned_engineer_id != u.id:
+        raise HTTPException(403, "Request is assigned to another engineer")
     fu = FieldUpdate(client_uuid=body.client_uuid, request_id=body.request_id, engineer_id=u.id,
                      task_status=body.task_status, notes=body.notes, meter_serial=body.meter_serial, created_offline_at=body.created_offline_at)
     db.add(fu); r.status = body.task_status

@@ -44,7 +44,7 @@ UX upgrade notes vs the VidyutOne reference UI: [docs/VIDYUTONE_UPGRADE.md](docs
 backend/    FastAPI app (app/), ML (app/ml/), policy docs (data/), tests/
 frontend/   React PWA — Shell/sidebar, role portals, wizard, drawers (src/components/), service worker (public/)
 docs/       Demo script, architecture, ML report, roadmap, synopsis, deck — start at docs/README.md
-scripts/    demo_reset.sh        .github/workflows/ci.yml   docker-compose.yml
+scripts/    demo_reset.sh        docker-compose.yml        LICENSE (MIT)
 ```
 ML model binaries are **not** committed — they retrain from synthetic data on first start
 (`backend/scripts/train_models.py`); the tracked results live in `backend/app/ml/models/metrics.json`.

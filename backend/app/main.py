@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .db import Base, engine, SessionLocal
@@ -6,9 +7,11 @@ from .routers import auth, requests, assistant
 from .ml.predict import ensure_models
 from .security import hash_password
 from .workflow import run_workflow
+from .config import settings
 
-app = FastAPI(title="VidyutOS Lite", description="PS000125 demo: one end-to-end new-connection flow. ML trained on SYNTHETIC data only.", version="0.1.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+if settings.secret_key.startswith(("dev-only", "change-me")):
+    print("[security] WARNING: default SECRET_KEY in use - set a long random SECRET_KEY outside local demos.")
 
 DEMO = [
  ("admin@vidyut.local","Admin User","admin","North","Admin@123"),
@@ -46,12 +49,16 @@ def seed_requests():
         db.commit()
     finally: db.close()
 
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(_app):
     Base.metadata.create_all(bind=engine)
     try: ensure_models()
     except Exception as e: print(f"[warn] model training skipped: {e}")
     seed(); seed_requests()
+    yield
+
+app = FastAPI(title="VidyutOS Lite", description="PS000125 demo: one end-to-end new-connection flow. ML trained on SYNTHETIC data only.", version="0.1.0", lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 @app.get("/health")
 def health(): return {"status": "ok", "service": "VidyutOS Lite", "data_notice": "Demo uses synthetic data only."}

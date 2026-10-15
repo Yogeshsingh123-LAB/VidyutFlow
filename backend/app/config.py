@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     # SQLite fallback makes the demo run anywhere; Docker Compose sets PostgreSQL.
     database_url: str = "sqlite:///./vidyutos.db"
     redis_url: str = ""
+    # Comma-separated browser origins allowed to call the API (never "*" with credentials in production)
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     model_dir: str = "app/ml/models"
 
     class Config:

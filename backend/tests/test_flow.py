@@ -30,6 +30,9 @@ def test_end_to_end_and_dedup():
         p = c.post("/assistant/chat", headers=officer, json={"question":"What is the procedure for a new connection?"})
         assert "new" in p.json()["answer"].lower()
         # 3-4 engineer offline sync, sent TWICE -> no duplicate
+        south = login(c, "engineer@example.com", "Engineer@123")
+        other = {"client_uuid": str(uuid.uuid4()), "request_id": req["id"], "task_status":"COMPLETED", "notes":"not mine"}
+        assert c.post("/requests/field-sync", headers=south, json=other).status_code == 403  # assignment-level authorisation
         payload = {"client_uuid": str(uuid.uuid4()), "request_id": req["id"], "task_status":"COMPLETED",
                    "notes":"Meter installed","meter_serial":"MTR-TEST-1","created_offline_at":"2026-10-15T10:00:00Z"}
         s1 = c.post("/requests/field-sync", headers=engineer, json=payload); assert s1.json()["synced"] is True
