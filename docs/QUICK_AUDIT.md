@@ -18,7 +18,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-square&logo=fastapi&logoColor=white)](#-technology-stack)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-square&logo=react&logoColor=black)](#-technology-stack)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-ML-F7931E?style=for-the-square&logo=scikitlearn&logoColor=white)](#-what-the-bundled-models-show)
-[![Tests](https://img.shields.io/badge/tests-2_passing-16a34a?style=for-the-square)](#-testing--qa)
+[![Tests](https://img.shields.io/badge/tests-3_passing-16a34a?style=for-the-square)](#-testing--qa)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-square)](LICENSE)
 
 *Seva First Innovation Challenge · Problem Statement **PS000125** ·
@@ -109,6 +109,21 @@ TF-IDF retrieval over policy documents (`backend/data/policies/`) **plus live da
 Welcome role-picker → **Consumer / Officer / Engineer / Admin** workspaces with sidebar shell,
 **Ctrl-K command palette**, dark mode, live alerts (high SLA risk, needs-correction, pending sync),
 KPI bento and charts (by status / zone / category / severity, SLA-risk buckets).
+
+### 8. Full Portal Suites (VidyutOne feature parity, on real data)
+- **Global:** skippable cinematic intro (replayable), role-welcome modal, **switch-demo-role** (real
+  re-login), interactive **5-step workflow visualizer**, AI-assistant drawer, notifications with
+  read/unread state, `#/tab` deep links, toasts.
+- **Consumer:** My Connections (meter serial from the real field sync), **demo-estimate bills** with
+  slab breakdown + pay/receipt (labelled simulated), payment history, **Complaint Desk** (real —
+  ML-triaged & routed), notifications, profile/activity.
+- **Officer:** application queue, consumer ledger (derived live), complaint queue, approval center,
+  department coordination, **real CSV exports** (requests/audit) + print.
+- **Field:** work orders, detailed inspection (reading, seal, terminal, tamper, R/Y/B voltages,
+  photo), feeder-patrol checklist, offline-queue manager (inspect/discard/sync), completed-jobs history.
+- **Admin/Management:** executive cockpit, SLA-redressal list (overdue-first), **live system status**
+  (`GET /system/status`), user directory (`GET /auth/users`, admin-only), RBAC access matrix, settings.
+  Feeder/AT&C-style surfaces stay **SIMULATED-labelled** until real telemetry exists.
 
 ---
 
@@ -236,6 +251,8 @@ Interactive docs at **`/docs`**. Base path is proxied as `/api` by the frontend.
 | `GET` | `/requests/audit/logs` | Latest 100 audit entries | officer, admin |
 | `POST` | `/assistant/chat` | Policy RAG + live SLA/data answers | any role |
 | `GET` | `/assistant/ml-metrics` | Tracked model metrics | any role |
+| `GET` | `/auth/users` | User directory (never returns hashes) | admin |
+| `GET` | `/system/status` | Live service/DB/ML/RAG status + counts | officer, admin |
 
 <sub>*Engineers only on cases assigned to them (403 otherwise, tested).</sub>
 
@@ -282,7 +299,7 @@ VidyutOS/
 ## 🧪 Testing & QA
 
 ```bash
-make test          # 2 passed — backend/tests/test_flow.py
+make test          # 3 passed — backend/tests/test_flow.py
 make build         # frontend production build
 ```
 
@@ -292,6 +309,7 @@ make build         # frontend production build
 | **De-duplication** | The same offline UUID synced **twice** ⇒ second response `duplicate: true`, still one record |
 | Authorisation | Consumer cannot field-sync (403); South engineer cannot touch a North case (403) |
 | ML honesty gate | Both models must **beat their majority baselines** on held-out data, and metrics must carry the synthetic-data notice |
+| Admin surfaces | `/auth/users` exposes no hashes and 403s non-admins; `/system/status` reports real DB/ML/RAG checks |
 
 ## 🛡️ Security Posture
 

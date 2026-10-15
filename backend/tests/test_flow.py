@@ -39,7 +39,8 @@ def test_end_to_end_and_dedup():
         s2 = c.post("/requests/field-sync", headers=engineer, json=payload); assert s2.json()["duplicate"] is True
         # 5 consumer sees status
         mine = c.get("/requests", headers=consumer).json()
-        assert [x for x in mine if x["id"]==req["id"]][0]["status"] == "COMPLETED"
+        done = [x for x in mine if x["id"]==req["id"]][0]
+        assert done["status"] == "COMPLETED" and done["meter_serial"] == "MTR-TEST-1"  # connection shows installed meter
         # RBAC: consumer cannot sync field work
         assert c.post("/requests/field-sync", headers=consumer, json=payload).status_code == 403
 
@@ -50,3 +51,14 @@ def test_classifier_and_metrics():
         assert "SYNTHETIC" in m["data_notice"]
         assert m["category_classifier"]["accuracy"] > m["category_classifier"]["majority_baseline"]
         assert m["sla_breach_predictor"]["accuracy"] > m["sla_breach_predictor"]["majority_baseline"]
+
+
+def test_admin_directory_and_system_status():
+    with TestClient(app) as c:
+        admin = login(c, "admin@vidyut.local", "Admin@123"); consumer = login(c, "consumer@vidyut.local", "Consumer@123")
+        users = c.get("/auth/users", headers=admin); assert users.status_code == 200
+        assert users.json() and "hashed_password" not in str(users.json()) and all("email" in x for x in users.json())
+        assert c.get("/auth/users", headers=consumer).status_code == 403
+        s = c.get("/system/status", headers=admin); assert s.status_code == 200, s.text
+        body = s.json(); assert body["database"]["ok"] and body["counts"]["users"] >= 6 and len(body["services"]) == 6
+        assert c.get("/system/status", headers=consumer).status_code == 403

@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .db import Base, engine, SessionLocal
 from . import models  # noqa
-from .routers import auth, requests, assistant
+from .routers import auth, requests, assistant, system
 from .ml.predict import ensure_models
 from .security import hash_password
 from .workflow import run_workflow
@@ -63,4 +63,4 @@ app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_credentials=Tru
 @app.get("/health")
 def health(): return {"status": "ok", "service": "VidyutOS Lite", "data_notice": "Demo uses synthetic data only."}
 
-app.include_router(auth.router); app.include_router(requests.router); app.include_router(assistant.router)
+app.include_router(auth.router); app.include_router(requests.router); app.include_router(assistant.router); app.include_router(system.router)

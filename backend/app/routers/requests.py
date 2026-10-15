@@ -102,6 +102,7 @@ def field_sync(body: FieldSync, db: Session = Depends(get_db), u: User = Depends
     fu = FieldUpdate(client_uuid=body.client_uuid, request_id=body.request_id, engineer_id=u.id,
                      task_status=body.task_status, notes=body.notes, meter_serial=body.meter_serial, created_offline_at=body.created_offline_at)
     db.add(fu); r.status = body.task_status
+    if body.meter_serial: r.meter_serial = body.meter_serial
     audit(db, u, "FIELD_SYNC", "request", r.id, f"{body.task_status} uuid={body.client_uuid}")
     db.commit(); return {"duplicate": False, "synced": True, "field_update_id": fu.id, "request_status": r.status}
 

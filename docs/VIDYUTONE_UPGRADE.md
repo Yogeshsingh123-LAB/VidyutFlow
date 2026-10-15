@@ -15,3 +15,18 @@ This repo keeps its real FastAPI + PostgreSQL/SQLite backend, JWT/RBAC, trained 
 
 Deliberately **not** adopted: in-browser mock datasets, fake payment/billing flows, and any simulated figure
 presented as live — every number in this app comes from the API except the clearly-labelled feeder panel.
+
+## Feature-parity pass (all VidyutOne features)
+Every feature found in the reference repo is now present. Where the reference used in-browser mock
+data, the feature here is either wired to the real API or explicitly labelled DEMO/SIMULATED in the UI:
+cinematic intro (skippable, once/session, replay) · welcome role cards · role-welcome + role-switch
+modals (real re-login) · app shell/sidebar/mobile nav · dark mode · command palette (Ctrl-K) ·
+notification drawer + notifications page with read state · case drawer · 5-step workflow visualizer ·
+AI-assistant drawer · deep links (`#/tab`) · consumer dashboard/connections/bills(slab, pay, receipt —
+demo estimate)/payments/complaint desk (real)/requests/notifications/profile · employee ERP overview,
+application queue, consumer ledger, complaint queue, approval center, dept coordination, CSV reports ·
+field console, work orders, detailed site inspection, feeder patrol, offline queue manager, completed
+history · management executive cockpit, SLA redressal, feeder radar (SIMULATED), AI insights, exports ·
+admin system overview (live `/system/status`), users & roles (live `/auth/users`), RBAC matrix,
+integrations, audit trail, settings. Not ported as-is: the reference's invented financial/persona
+datasets — replaced by live request data or labelled demo estimates.

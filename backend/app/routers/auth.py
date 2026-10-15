@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import User
 from ..security import hash_password, verify_password, create_token
-from ..deps import current_user
+from ..deps import current_user, require
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 class Register(BaseModel):
@@ -28,3 +28,9 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
 @router.get("/me")
 def me(u: User = Depends(current_user)):
     return {"id": u.id, "email": u.email, "name": u.name, "role": u.role, "zone": u.zone}
+
+@router.get("/users")
+def list_users(db: Session = Depends(get_db), u: User = Depends(require("admin"))):
+    """Admin user directory (VidyutOne Admin > Users & Roles). Never returns password hashes."""
+    return [{"id": x.id, "email": x.email, "name": x.name, "role": x.role, "zone": x.zone, "is_active": x.is_active}
+            for x in db.query(User).order_by(User.role, User.name).all()]

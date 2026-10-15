@@ -37,6 +37,7 @@ class ConnectionRequest(Base):
     phase: Mapped[str] = mapped_column(String, default="1-Phase")
     premises_type: Mapped[str] = mapped_column(String, default="Owned")
     document_name: Mapped[str] = mapped_column(String, default="")
+    meter_serial: Mapped[str] = mapped_column(String, default="")  # set by field sync; shown on My Connections
     # ML outputs (synthetic-trained models — see docs/ML_REPORT.md)
     category: Mapped[str] = mapped_column(String, default="NEW_CONNECTION")
     severity: Mapped[str] = mapped_column(String, default="LOW")
