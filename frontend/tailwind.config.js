@@ -1,1 +1,1 @@
-export default { content: ["./index.html", "./src/**/*.{js,jsx}"], theme: { extend: {} }, plugins: [] }
+export default { darkMode: 'class', content: ["./index.html", "./src/**/*.{js,jsx}"], theme: { extend: { fontFamily: { sans: ["'Plus Jakarta Sans'","system-ui","sans-serif"], mono: ["'JetBrains Mono'","monospace"] } } }, plugins: [] }

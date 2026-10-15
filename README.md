@@ -24,9 +24,11 @@ Demo logins (seeded; change before any real use):
 | Admin | admin@vidyut.local | Admin@123 |
 
 ## Demo (3–5 min)
-Consumer submits (+ document) → auto validate/route/assign with SLA-risk flag → officer dashboard →
-engineer completes the task in airplane mode → reconnect sync (UUID de-duplication) → consumer sees
-COMPLETED → assistant answers *“Which requests are likely to breach SLA?”*. Full script: [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
+Consumer submits via the 3-step wizard (+ document) → auto validate/route/assign with SLA-risk flag →
+officer dashboard (charts, alerts, Ctrl-K command palette) → engineer completes an inspection in airplane
+mode → reconnect sync (UUID de-duplication) → consumer sees COMPLETED → assistant answers
+*“Which requests are likely to breach SLA?”*. Full script: [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
+UX upgrade notes vs the VidyutOne reference UI: [docs/VIDYUTONE_UPGRADE.md](docs/VIDYUTONE_UPGRADE.md)
 
 ## Built vs roadmap
 | Built now | Roadmap only |
@@ -40,7 +42,7 @@ COMPLETED → assistant answers *“Which requests are likely to breach SLA?”*
 ## Repo map
 ```
 backend/    FastAPI app (app/), ML (app/ml/), policy docs (data/), tests/
-frontend/   React PWA (src/), service worker + manifest (public/)
+frontend/   React PWA — Shell/sidebar, role portals, wizard, drawers (src/components/), service worker (public/)
 docs/       Demo script, architecture, ML report, roadmap, synopsis, deck — start at docs/README.md
 scripts/    demo_reset.sh        .github/workflows/ci.yml   docker-compose.yml
 ```

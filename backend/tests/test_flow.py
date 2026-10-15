@@ -17,9 +17,12 @@ def test_end_to_end_and_dedup():
         # 1 consumer submits
         r = c.post("/requests", headers=consumer, json={"applicant_name":"Test User","phone":"9876543210",
             "address":"Mehsana Gujarat","zone":"North","request_type":"new_connection",
-            "description":"need new electricity connection for my home","requested_load_kw":3,"document_name":"id_proof.pdf"})
+            "description":"need new electricity connection for my home","requested_load_kw":3,"document_name":"id_proof.pdf","tariff_category":"Commercial (NRGP)","phase":"3-Phase","premises_type":"Rented"})
         assert r.status_code == 201, r.text; req = r.json()
         assert req["status"] in ("ASSIGNED","ROUTED") and req["category"] and req["sla_due_at"]
+        assert req["tariff_category"] == "Commercial (NRGP)" and req["phase"] == "3-Phase"
+        k = c.get("/requests/kpis/summary", headers=officer).json()
+        assert "by_zone" in k and "by_category" in k and set(k["risk_buckets"]) == {"low_<0.4","watch_0.4-0.7","high_>=0.7"}
         # 2 officer sees it + assistant SLA query works
         assert any(x["id"]==req["id"] for x in c.get("/requests", headers=officer).json())
         a = c.post("/assistant/chat", headers=officer, json={"question":"Which requests are likely to breach SLA?"})

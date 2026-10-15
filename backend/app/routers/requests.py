@@ -18,6 +18,7 @@ def out(r: ConnectionRequest):
 class CreateReq(BaseModel):
     applicant_name: str; phone: str; address: str; zone: str = "North"; pin_code: str = ""
     request_type: str = "new_connection"; description: str = ""; requested_load_kw: float = 1.0; document_name: str = ""
+    tariff_category: str = "Residential (RGPU)"; phase: str = "1-Phase"; premises_type: str = "Owned"
 
 @router.post("", status_code=201)
 def create(body: CreateReq, db: Session = Depends(get_db), u: User = Depends(current_user)):
@@ -28,12 +29,14 @@ def create(body: CreateReq, db: Session = Depends(get_db), u: User = Depends(cur
 @router.post("/with-document", status_code=201)
 async def create_with_doc(applicant_name: str = Form(...), phone: str = Form(...), address: str = Form(...),
     zone: str = Form("North"), pin_code: str = Form(""), request_type: str = Form("new_connection"),
-    description: str = Form(""), requested_load_kw: float = Form(1.0), document: UploadFile = File(None),
+    description: str = Form(""), requested_load_kw: float = Form(1.0), tariff_category: str = Form("Residential (RGPU)"),
+    phase: str = Form("1-Phase"), premises_type: str = Form("Owned"), document: UploadFile = File(None),
     db: Session = Depends(get_db), u: User = Depends(current_user)):
     # Lite: store document name/metadata only (object storage is roadmap). Never log file contents.
     name = document.filename if document else ""
     r = ConnectionRequest(consumer_id=u.id, applicant_name=applicant_name, phone=phone, address=address, zone=zone,
-        pin_code=pin_code, request_type=request_type, description=description, requested_load_kw=requested_load_kw, document_name=name)
+        pin_code=pin_code, request_type=request_type, description=description, requested_load_kw=requested_load_kw, document_name=name,
+        tariff_category=tariff_category, phase=phase, premises_type=premises_type)
     db.add(r); db.flush(); run_workflow(db, r); audit(db, u, "REQUEST_CREATED_WITH_DOC", "request", r.id, r.status)
     db.commit(); db.refresh(r); return out(r)
 
@@ -67,9 +70,18 @@ def kpis(db: Session = Depends(get_db), u: User = Depends(current_user)):
     rows = db.query(ConnectionRequest).all()
     total = len(rows); completed = sum(r.status=="COMPLETED" for r in rows)
     high = [r for r in rows if r.sla_breach_risk >= 0.7 and r.status not in ("COMPLETED","REJECTED")]
+    open_rows = [r for r in rows if r.status not in ("COMPLETED","REJECTED")]
+    def count_by(attr):
+        keys = sorted({getattr(r, attr) for r in rows})
+        return {k: sum(getattr(r, attr)==k for r in rows) for k in keys}
     return {"total_requests": total, "completed": completed, "pending": total-completed,
             "high_sla_risk": len(high), "needs_correction": sum(r.status=="NEEDS_CORRECTION" for r in rows),
-            "by_status": {s: sum(r.status==s for r in rows) for s in sorted({r.status for r in rows})}}
+            "avg_sla_risk": round(sum(r.sla_breach_risk for r in open_rows)/len(open_rows), 3) if open_rows else 0.0,
+            "risk_buckets": {"low_<0.4": sum(r.sla_breach_risk < .4 for r in open_rows),
+                             "watch_0.4-0.7": sum(.4 <= r.sla_breach_risk < .7 for r in open_rows),
+                             "high_>=0.7": sum(r.sla_breach_risk >= .7 for r in open_rows)},
+            "by_status": count_by("status"), "by_zone": count_by("zone"),
+            "by_category": count_by("category"), "by_severity": count_by("severity")}
 
 class FieldSync(BaseModel):
     client_uuid: str; request_id: str; task_status: str; notes: str = ""; meter_serial: str = ""; created_offline_at: str = ""

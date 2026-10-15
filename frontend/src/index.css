@@ -1,2 +1,8 @@
 @tailwind base; @tailwind components; @tailwind utilities;
-body { font-family: Inter, system-ui, sans-serif; }
+:root { --navy:#101c35; --blue:#2563eb; --teal:#0d9488; }
+body { font-family:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif; }
+::-webkit-scrollbar { width:6px; height:6px; } ::-webkit-scrollbar-thumb { background:rgba(148,163,184,.45); border-radius:3px; }
+.tabular { font-variant-numeric: tabular-nums; }
+@keyframes dashmove { to { stroke-dashoffset:-24; } }
+.electric-line { stroke-dasharray:6 6; animation:dashmove 1.2s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .electric-line { animation:none; } }
