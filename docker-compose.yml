@@ -1,0 +1,23 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment: { POSTGRES_USER: vidyut, POSTGRES_PASSWORD: [SECURITY_DATA], POSTGRES_DB: vidyutos }
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U vidyut"], interval: 5s, timeout: 3s, retries: 10 }
+  redis:
+    image: redis:7-alpine
+    # Lite: reserved for queue/cache wiring; app runs without it. Full use is roadmap.
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: "postgresql+psycopg://vidyut:vidyut@db:5432/vidyutos"
+      SECRET_KEY: "change-me-in-production-use-a-long-random-secret"
+    depends_on: { db: { condition: service_healthy } }
+    ports: ["8000:8000"]
+    volumes: ["./backend/app/ml/models:/code/app/ml/models"]
+  frontend:
+    build: ./frontend
+    depends_on: [backend]
+    ports: ["5173:5173"]
+    environment: { VITE_PROXY_TARGET: "http://backend:8000" }
+volumes: { pgdata: {} }

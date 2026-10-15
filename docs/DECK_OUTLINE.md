@@ -1,0 +1,2 @@
+# Deck outline (12 slides, PDF ≤ 20 MB) — per final plan
+1 Problem & PS000125 context · 2 Pain points (gap analysis, assumptions labelled) · 3 VidyutOS Lite: Enter Once, Use Everywhere · 4 Architecture (built highlighted, roadmap greyed) · 5 Workflow demo screenshots · 6 Offline sync & de-duplication · 7 AI assistant + two ML models · 8 Security (login/roles/audit) · 9 Results on synthetic data (labelled) · 10 Requirement→solution mapping (built vs roadmap) · 11 Roadmap & scale-up (Kafka, K8s, multi-AZ, Flutter) · 12 Team & next steps

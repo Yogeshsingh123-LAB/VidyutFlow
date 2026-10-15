@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+node_modules/
+dist/
+.vite/
+*.db
+backups/
+.DS_Store
+# NOTE: backend/app/ml/models/*.joblib + metrics.json ARE committed on purpose (demo must run offline without retraining)
