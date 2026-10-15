@@ -1,0 +1,64 @@
+# Mail to UGVCL Resource Person — draft & question bank
+
+**To:** hmtcotech2@ugvcl.com · **Send:** after locking PS000125 on the portal, by ~20 Oct 2026 (one mail, from the team-lead SPOC only) · **Follow-up:** one polite reminder after 7 days, then stop. Every answer received must be reflected in `REQUIREMENT_MAPPING.md` (replace assumptions with confirmed facts, citing "per UGVCL resource person, <date>").
+
+## Why mail at all
+The build currently assumes: SLA timelines (24/48/72/120 h by severity), complaint categories, a simplified org chain (officer → engineer → admin), two zones, and synthetic scale figures. Six short answers from UGVCL retire most of that risk before the synopsis (6 Nov) and the finale defence (2 Dec).
+
+## Ready-to-send draft (fill the [brackets])
+
+> **Subject:** Seva First Innovation Challenge — PS000125: Student team seeking brief guidance on scope & validation
+>
+> Respected Sir/Madam,
+>
+> We are [Team Name] from [Institute], participating in the Seva First Innovation Challenge. We have selected Problem Statement **PS000125** (Future-Ready, Secure and Intelligent IT Infrastructure & User-Friendly ERP/Portal Ecosystem) and are building a working prototype: a unified role-based portal for new connections and complaints with automated workflow routing, SLA tracking, an AI assistant over policy documents, and offline field-work sync for low-connectivity areas. We use **synthetic data only** and are not seeking any production access or real consumer data.
+>
+> To align our synopsis (due 6 Nov) with UGVCL's actual priorities, we would be grateful for brief guidance on:
+>
+> 1. Which of the problem areas (duplicate data entry, portal integration, offline field work, SLA follow-up, dashboards) is the highest priority for UGVCL today?
+> 2. The typical steps and official timelines/SLAs for a new connection request, and the complaint categories used in your current system.
+> 3. The approval hierarchy (Corporate/Circle/Division/Subdivision) a request passes through, and which staff roles handle it at each level.
+> 4. Field conditions: devices used by field staff and areas with poor connectivity, so our offline design is realistic.
+> 5. Any public SOPs/circulars (e.g., new-connection procedure) we may reference, and any sample *formats* (blank forms/report layouts) you can share — structure only, no real data.
+> 6. For the infrastructure part of the statement: is a phased modernization *proposal* expected, and are there hosting/security preferences (cloud/on-premise, SSO) we should design for?
+> 7. Approximate scale we should design for (subdivisions, consumers, requests per day).
+>
+> Written replies to any subset, or a short 20-minute call at your convenience, would help us greatly. We would also welcome the opportunity to show the prototype to your team before the Grand Finale (2 Dec) if that is feasible.
+>
+> Thank you for your time and for posing this problem statement.
+>
+> [Team Lead Name] · [Team Name] · [Institute] · [Phone] · [Email]
+
+## Question bank (if a call happens — pick in this order)
+
+**Validate the build (highest value)**
+- [ ] Priority ranking of the 12 problem points
+- [ ] Real SLA hours per category/severity vs our assumed 24/48/72/120
+- [ ] Official complaint/request taxonomy vs our ML categories
+- [ ] Approval chain & role names (do "officer/engineer" map to JE/DE/EE?)
+- [ ] Scale: subdivisions, daily request volume, peak load
+
+**Resources that would materially help**
+- [ ] Blank/redacted forms or report formats (structure only)
+- [ ] Public SOPs/circulars the assistant may quote
+- [ ] List of current ERP modules/portals + any existing API layer
+- [ ] Field-device reality (Android? BYOD? worst-connectivity areas)
+- [ ] Language needs: Gujarati UI needed for consumers/field staff?
+
+**Scope & expectations**
+- [ ] Hardware point: proposal-only or costing expected? Existing standards?
+- [ ] Hosting/security preferences: cloud vs on-prem, SSO, DPDP/audit needs
+- [ ] Secondary users: do contractors/agencies or govt departments need logins in scope?
+- [ ] Finale expectations: live prototype vs slides; pilot subdivision possible?
+- [ ] Any visit/demo opportunity before 2 Dec
+
+## Never ask / never do
+- No real consumer data, credentials, or production access (state synthetic-only up front — done in the draft).
+- No questions answerable from public sources (tariffs, company profile).
+- No repeat nudges beyond one reminder; no mailing other UGVCL addresses found online.
+- Don't promise features in the mail that are ◻️ roadmap in `REQUIREMENT_MAPPING.md`.
+
+## After replies arrive
+1. Update `REQUIREMENT_MAPPING.md` statuses/notes with confirmed facts + date.
+2. If SLA hours/categories differ, Role 1 (backend) + Role 3 (ML) adjust `workflow.py`/taxonomy and retrain (`make train`) — this is why the contract freeze is 24 Oct.
+3. Quote *one* confirmed fact in the synopsis problem section ("per UGVCL…") — judges reward validated problems.

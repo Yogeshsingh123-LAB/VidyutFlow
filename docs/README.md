@@ -1,3 +1,4 @@
+- [MAIL_TO_UGVCL.md](MAIL_TO_UGVCL.md) — resource-person mail draft, question bank, and don'ts (send by ~20 Oct)
 - [PS000125_OFFICIAL.md](PS000125_OFFICIAL.md) — official problem statement (locked) · [REQUIREMENT_MAPPING.md](REQUIREMENT_MAPPING.md) — 12 points + 14 outcomes → built/roadmap · [INFRASTRUCTURE_ROADMAP.md](INFRASTRUCTURE_ROADMAP.md) — hardware/DR proposal tiers
 # Docs index
 - [DEMO_SCRIPT.md](DEMO_SCRIPT.md) — 3–5 minute demo / synopsis-video flow
