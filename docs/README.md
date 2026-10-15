@@ -6,3 +6,4 @@
 - [SYNOPSIS_ABSTRACT.md](SYNOPSIS_ABSTRACT.md) — draft portal abstract (verify vs full PS000125 text)
 - [DECK_OUTLINE.md](DECK_OUTLINE.md) — 12-slide deck outline (PDF ≤ 20 MB)
 - [CODE_REVIEW.md](CODE_REVIEW.md) — review pack: tree, core snippets, checklist (fixed vs open findings)
+- [QUICK_AUDIT.md](QUICK_AUDIT.md) — copy-paste audit pack (README + tree + Makefile) for reviewers who cannot open the repo
