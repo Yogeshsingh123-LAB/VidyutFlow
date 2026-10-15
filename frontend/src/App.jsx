@@ -96,7 +96,7 @@ export default function App() {
     {label:'Open workflow visualizer',hint:'5-stage interactive workflow',run:()=>setWorkflowOpen(true)},
     {label:'Switch demo role',hint:'Real re-login as another seeded role',run:()=>setSwitchOpen(true)},
     {label:'Replay welcome intro',hint:'Skippable animated splash (Esc)',run:()=>setIntro(true)},
-    ...((NAV_TABS[user.role]||[]).map(([id,label])=>({label:`Go to ${label}`,hint:'Role workspace',run:()=>setTab(id)})))];
+    ...((NAV_TABS[user?.role]||[]).map(([id,label])=>({label:`Go to ${label}`,hint:'Role workspace',run:()=>setTab(id)})))];
 
   if (!user) return (<main className="min-h-screen bg-[#101C35] text-white">
     <div className="max-w-6xl mx-auto px-4 py-10 grid lg:grid-cols-2 gap-10 items-center min-h-screen">
