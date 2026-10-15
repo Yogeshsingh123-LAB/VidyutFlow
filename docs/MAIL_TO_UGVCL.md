@@ -62,3 +62,31 @@ The build currently assumes: SLA timelines (24/48/72/120 h by severity), complai
 1. Update `REQUIREMENT_MAPPING.md` statuses/notes with confirmed facts + date.
 2. If SLA hours/categories differ, Role 1 (backend) + Role 3 (ML) adjust `workflow.py`/taxonomy and retrain (`make train`) — this is why the contract freeze is 24 Oct.
 3. Quote *one* confirmed fact in the synopsis problem section ("per UGVCL…") — judges reward validated problems.
+
+## Plan A — if UGVCL never replies (role-wise: fully doable without their help)
+
+The prototype already runs end-to-end on synthetic data. No role is blocked.
+
+| Role | Can finish without UGVCL | How the assumption risk is contained |
+| :--- | :--- | :--- |
+| **R1 Backend & Workflow** | Entire workflow, routing, SLA clocks, audit, all APIs, seed data | Keep SLA hours, categories and zones as **config values** (`config.py`), so a late correction is a one-line change, not a refactor |
+| **R2 Frontend & PWA** | All four portals, offline queue/sync, notifications, reports | Role labels stay generic ("Officer/Engineer"); an i18n-ready structure means Gujarati strings can drop in later without layout changes |
+| **R3 ML & AI** | Both models trained on labelled synthetic data; assistant answers from clearly-labelled demo policy extracts | Taxonomy lives in one list — relabelling = edit + `make train` (minutes, not days) |
+| **R4 DevOps/Security/QA** | Docker, Makefile, backups, tests, security defaults, audit pack | Defaults follow public best practice (JWT/RBAC/bcrypt/CORS); any UGVCL-specific policy would be config/SSO work, not redesign |
+| **R5 Docs/Demo/Product** | Synopsis, deck, demo, mapping docs — complete today | Every assumption is **labelled as an assumption** in `REQUIREMENT_MAPPING.md`; honest framing scores better than silent guessing |
+
+**Rule:** after the 24 Oct contract freeze, no role waits for the mail. The demo on 2 Dec works with zero UGVCL input.
+
+## Plan B — after resources/replies arrive (role-wise: plug-in upgrades)
+
+Treat every reply as a drop-in replacement for an assumption — budget ~1–2 days total, none of it structural.
+
+| Role | Upgrade unlocked | Effort |
+| :--- | :--- | :--- |
+| **R1 Backend & Workflow** | Real SLA matrix + approval hierarchy (JE/DE/EE titles, circle/division tree) into config + seed roles | Config/seed edit + tests still green |
+| **R2 Frontend & PWA** | Real form fields & report formats; official role names; Gujarati labels if UGVCL wants them | Label/field swaps on existing screens |
+| **R3 ML & AI** | Retrain on the **official complaint taxonomy**; replace demo policy extracts with real public SOPs/circulars in the assistant (RAG source swap) | Same pipeline — `make train`, documents folder swap |
+| **R4 DevOps/Security/QA** | Align to stated hosting (cloud/on-prem), SSO, DPDP/audit-retention expectations; size infra tiers with real scale numbers | Settings + `INFRASTRUCTURE_ROADMAP.md` update with confirmed figures |
+| **R5 Docs/Demo/Product** | Synopsis quotes confirmed facts ("per UGVCL resource person…"); mapping rows flip from *assumption* to *validated*; if offered, schedule the pre-finale demo/visit | Doc edits + demo-script tweak; biggest marks gain per hour spent |
+
+**Deadline logic:** replies before **24 Oct** → fold into the synopsis draft directly. Replies **after 24 Oct** → apply only config/label swaps (Plans above), nothing structural, per the freeze. No reply at all → Plan A, and the mail itself is still evidence of stakeholder outreach in the deck.
