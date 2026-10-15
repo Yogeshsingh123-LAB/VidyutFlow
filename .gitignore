@@ -1,10 +1,18 @@
+# secrets & local env
 .env
+.env.*
+!.env.example
+# python
 __pycache__/
 *.pyc
+.pytest_cache/
+# databases & backups (local demo state)
+*.db
+backups/
+# ML binaries are retrained on startup (see backend/scripts/train_models.py); metrics.json stays tracked
+backend/app/ml/models/*.joblib
+# node / frontend build
 node_modules/
 dist/
 .vite/
-*.db
-backups/
 .DS_Store
-# NOTE: backend/app/ml/models/*.joblib + metrics.json ARE committed on purpose (demo must run offline without retraining)
