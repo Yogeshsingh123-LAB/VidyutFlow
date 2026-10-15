@@ -102,7 +102,7 @@ export default function App() {
     <div className="max-w-6xl mx-auto px-4 py-10 grid lg:grid-cols-2 gap-10 items-center min-h-screen">
       <div><div className="flex items-center gap-2 text-teal-300 font-bold">⚡ VidyutOS Lite <span className="text-xs bg-white/10 rounded-full px-2 py-1 text-slate-200">UGVCL · PS000125</span></div>
         <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mt-5">Enter Once,<br/><span className="text-teal-300">Use Everywhere.</span></h1>
-        <p className="text-slate-300 mt-4 max-w-md text-sm leading-6">One real end-to-end new-connection flow: FastAPI workflow, two scikit-learn models, policy-RAG assistant and an offline field app with UUID de-duplication. Synthetic demo data only.</p>
+        <p className="text-slate-300 mt-4 max-w-md text-sm leading-6">A cloud-to-edge orchestration platform: a FastAPI control plane managing every request, AI policy validation (two scikit-learn models), and edge field clients that work through intermittent connectivity with UUID de-duplicated sync. Synthetic demo data only.</p>
         <svg viewBox="0 0 420 90" className="mt-8 w-full max-w-md"><path d="M10 55 H130 L155 25 L185 70 L210 55 H410" fill="none" stroke="#2dd4bf" strokeWidth="2.5" className="electric-line"/><circle cx="155" cy="25" r="5" fill="#38bdf8"/><circle cx="185" cy="70" r="5" fill="#f59e0b"/><circle cx="10" cy="55" r="4" fill="#fff"/><circle cx="410" cy="55" r="4" fill="#fff"/></svg>
         <div className="grid grid-cols-3 gap-3 mt-6 max-w-md text-center">{[['Auto','routing'],['SLA-risk','ML flags'],['Offline','sync, no dupes']].map(([a,b])=><div key={b} className="rounded-xl bg-white/5 p-3"><p className="font-extrabold">{a}</p><p className="text-xs text-slate-400">{b}</p></div>)}</div></div>
       <form onSubmit={login} className="bg-white text-slate-900 rounded-3xl shadow-2xl p-6 space-y-4">
@@ -145,7 +145,7 @@ export default function App() {
       {tab==='requests' && <RequestTable rows={requests} onOpen={setSelected}/>}
 
       {['field','inspections'].includes(tab) && <div className="space-y-4">
-        <Card className="p-5 flex flex-wrap gap-3 items-center"><HardHat className="text-amber-500"/><div><h2 className="font-bold">Field Operations Console</h2>
+        <Card className="p-5 flex flex-wrap gap-3 items-center"><HardHat className="text-amber-500"/><div><h2 className="font-bold">Edge Field Console — control interface for intermittent connectivity</h2>
           <p className="text-sm text-slate-400">{offline?'✈ Offline — inspections queue on this device with a UUID':'Online — inspections sync immediately'} · Queue: {queue.length} · Open: {requests.filter(r=>r.status!=='COMPLETED').length} · Done today: {requests.filter(r=>r.status==='COMPLETED').length}</p></div>
           <button className="ml-auto bg-teal-600 text-white rounded-lg px-4 py-2 text-sm font-bold" onClick={syncQueue}>Sync queue</button></Card>
         {requests.filter(r=>r.status!=='COMPLETED').map(r=><Card key={r.id} className="p-5">
@@ -192,7 +192,7 @@ export default function App() {
       {tab==='settings' && <SettingsPanel dark={dark} setDark={setDark} airplane={airplane} setAirplane={setAirplane} onReplayIntro={()=>setIntro(true)} toast={toast}/>}
       {tab==='assistant' && <AssistantPanel chat={chat} question={question} setQuestion={setQuestion} onAsk={ask}/>}
       {tab==='insights' && <div className="space-y-4">
-        <Card className="p-5"><h2 className="font-bold">ML models — synthetic data only</h2>
+        <Card className="p-5"><h2 className="font-bold">Edge Intelligence Simulation — policy validation (synthetic data only)</h2>
           {metrics?.category_classifier ? <div className="grid sm:grid-cols-3 gap-3 mt-4">
             {[['Complaint / fault classifier',metrics.category_classifier],['Severity classifier',metrics.severity_classifier],['SLA-breach predictor',metrics.sla_breach_predictor]].map(([name,m])=>(
               <div key={name} className="rounded-2xl bg-slate-50 dark:bg-slate-900 p-4"><p className="text-xs font-bold text-slate-400 uppercase">{name}</p>
@@ -247,7 +247,7 @@ function IntroSplash({ onSkip }) {
   return (<div className="fixed inset-0 z-[95] bg-[#101C35] text-white grid place-items-center px-4">
     <button className="absolute top-5 right-5 rounded-lg bg-white/10 px-3 py-2 text-xs font-bold" onClick={onSkip}>Skip intro (Esc)</button>
     <div className="text-center max-w-lg"><p className="text-5xl">⚡</p><h1 className="text-4xl font-extrabold mt-4">VidyutOS <span className="text-teal-300">Lite</span></h1>
-    <p className="text-slate-300 mt-2 text-sm">Enter Once, Use Everywhere — the intelligent operating layer for UGVCL services.</p>
+    <p className="text-slate-300 mt-2 text-sm">Enter Once, Use Everywhere — the control plane for cloud-to-edge utility operations.</p>
     <svg viewBox="0 0 420 90" className="mt-8 w-full"><path d="M10 55 H130 L155 25 L185 70 L210 55 H410" fill="none" stroke="#2dd4bf" strokeWidth="2.5" className="electric-line"/><circle cx="155" cy="25" r="5" fill="#38bdf8"/><circle cx="185" cy="70" r="5" fill="#f59e0b"/></svg>
     <button className="mt-6 bg-blue-600 rounded-xl px-6 py-3 font-bold" onClick={onSkip}>Enter platform →</button>
     <p className="text-[11px] text-slate-500 mt-4">Synthetic demo data · Skippable · Shows once per session</p></div></div>);

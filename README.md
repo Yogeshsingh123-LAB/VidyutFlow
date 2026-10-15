@@ -2,8 +2,9 @@
 
 # ⚡ VidyutOS Lite
 
-**An intelligent utility ERP & portal for new electricity connections —**
-**“Enter Once, Use Everywhere.”**
+**A Cloud-to-Edge Orchestration Platform for power-utility services —**
+**the control plane for managing, monitoring, and deploying AI policies to field edge clients.**
+*“Enter Once, Use Everywhere.”*
 
 [![Problem Statement](https://img.shields.io/badge/PS-PS000125-blue?style=for-the-square)](#-the-problem)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-square&logo=python&logoColor=white)](#-technology-stack)
@@ -15,6 +16,13 @@
 
 *Seva First Innovation Challenge · Problem Statement **PS000125** ·
 Uttar Gujarat Vij Company Limited (UGVCL) · Synopsis due 6 Nov 2026 · Grand Finale 2 Dec 2026*
+
+**Product definition.** VidyutOS is **not an operating system**. It is the **control plane** for a
+utility's cloud-to-edge operations: the cloud side manages, monitors and intelligence-checks every
+service request, while the **edge** — field engineers' devices, which must keep working with no
+network — executes against it autonomously and syncs back. In this Lite build the edge client is the
+engineer PWA; “AI policies” are the classification, routing and SLA-risk policies validated centrally
+today and designed to be pushed to edge devices as they are onboarded (roadmap).
 
 > [!IMPORTANT]
 > **Core product principle:** VidyutOS is an **AI-assisted workflow & decision-support platform**.
@@ -62,6 +70,16 @@ else as an explicitly labelled scale-up roadmap:
 For **every** request the platform can answer, with evidence: *what was checked, which model said
 what and why, who owns it now, and when its SLA expires.*
 
+### Product goals → how this build maps to them
+
+| Official goal | VidyutOS framing | Implemented as (status) |
+| :--- | :--- | :--- |
+| Centralised **control plane** | Manage, monitor & orchestrate every request from one place | FastAPI workflow + audit log + KPI control API (**built**) |
+| **Edge Intelligence Simulation / Policy Validation** | Validate AI policies (classify, route, SLA-risk) before they ever reach a device | Two scikit-learn models + reasons, centrally served (**built, synthetic-trained**) |
+| **Autonomy at the edge** | Edge clients keep working through **intermittent connectivity** | Engineer PWA offline queue + UUID sync (**built**) |
+| **Fleet Management Console** | One console over all “fleet” activity — cases, zones, field staff, risk | Admin/Officer dashboards, SLA redressal, live system status (**built**); device telemetry (**simulated/roadmap**) |
+| Deploy policies **to edge devices** | Versioned policy push to onboarded edge hardware | Contract-shaped today (`/assistant`, model metrics); on-device inference & OTA policy rollout (**roadmap**) |
+
 ---
 
 ## 🚀 Key Features
@@ -76,10 +94,10 @@ review & submit. One entry is reused by officer, engineer and admin — **no man
 SLA clocks by severity: **CRITICAL 24 h · HIGH 48 h · MEDIUM 72 h · LOW 120 h**. Incomplete
 requests become `NEEDS_CORRECTION` **with the reason shown to the consumer**, never a silent 500.
 
-### 3. Two Small ML Models (scikit-learn, inside the same service)
-- **Complaint/fault classifier** — TF-IDF + Logistic Regression reads the request text, sets
+### 3. Edge Intelligence Simulation — Policy Validation (two scikit-learn models, control-plane side)
+- **Policy: complaint/fault classification** — TF-IDF + Logistic Regression reads the request text, sets
   **category + severity**, and drives routing priority (P1–P4).
-- **SLA-breach risk predictor** — Random Forest over load, documents, zone workload, weekend and
+- **Policy: SLA-breach risk** — Random Forest over load, documents, zone workload, weekend and
   severity; returns a **probability + human-readable top reasons** (never a bare score).
 
 ### 4. Evidence-First Case View
@@ -87,7 +105,7 @@ Click any request: 6-step **workflow stepper**, ML category/severity, SLA-risk c
 reasons, assigned officer/engineer, document, SLA due time — *what was checked, where, result,
 when, and what to do next*.
 
-### 5. Offline Field Operations (PWA)
+### 5. Control Interface for Intermittent Connectivity (offline field PWA — the edge client)
 Engineer toggles **airplane mode**, records meter serial + inspection remarks offline; entries
 queue on-device with a **UUIDv4**. On reconnect they sync — and syncing twice is safe:
 the server accepts each UUID **once** (UNIQUE constraint), so duplicates are impossible.
@@ -97,7 +115,7 @@ TF-IDF retrieval over policy documents (`backend/data/policies/`) **plus live da
 *“Which requests are likely to breach SLA?”* · *“What is the procedure for a new connection?”* ·
 *“How does offline field work sync?”* — answers cite the policy file they came from.
 
-### 7. Role-Based Portals & Executive View
+### 7. Fleet Management Console (role-based portals & executive view)
 Welcome role-picker → **Consumer / Officer / Engineer / Admin** workspaces with sidebar shell,
 **Ctrl-K command palette**, dark mode, live alerts (high SLA risk, needs-correction, pending sync),
 KPI bento and charts (by status / zone / category / severity, SLA-risk buckets).

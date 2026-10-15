@@ -1,4 +1,7 @@
 # Architecture (Lite — as built)
+**Cloud-to-edge reading:** the React PWA on field devices is the **edge client** (offline queue = edge
+autonomy), FastAPI is the **control plane** (workflow, monitoring, policy validation), and the ML
+models are the **AI policies** validated centrally today — on-device inference/policy push is roadmap.
 ```
 Consumer / Officer / Engineer / Admin  (React PWA, Tailwind)
         │  /api  (Vite proxy — browser code never calls a backend host directly)
