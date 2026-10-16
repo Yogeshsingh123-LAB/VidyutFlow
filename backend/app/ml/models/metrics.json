@@ -1,18 +1,141 @@
 {
   "data_notice": "SYNTHETIC data only \u2014 not UGVCL real-world performance.",
+  "evaluation": {
+    "classifier_split": "held-out source templates; wording variants from each held-out template stay out of training",
+    "sla_split": "stratified random split of synthetic rows"
+  },
   "category_classifier": {
-    "accuracy": 1.0,
-    "majority_baseline": 0.1667,
-    "test_size": 144
+    "accuracy": 0.7333,
+    "balanced_accuracy": 0.7443,
+    "precision_macro": 0.7718,
+    "recall_macro": 0.7443,
+    "f1_macro": 0.7189,
+    "labels": [
+      "BILLING",
+      "METER_FAULT",
+      "NEW_CONNECTION",
+      "OTHER",
+      "OUTAGE",
+      "SAFETY"
+    ],
+    "confusion_matrix": [
+      [
+        28,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        36,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        24,
+        2,
+        0,
+        0
+      ],
+      [
+        21,
+        0,
+        0,
+        13,
+        0,
+        2
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        36,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        27,
+        0,
+        6
+      ]
+    ],
+    "test_size": 195,
+    "majority_baseline": 0.1846
   },
   "severity_classifier": {
-    "accuracy": 1.0,
-    "majority_baseline": 0.3333,
-    "test_size": 144
+    "accuracy": 0.8462,
+    "balanced_accuracy": 0.774,
+    "precision_macro": 0.9202,
+    "recall_macro": 0.774,
+    "f1_macro": 0.7612,
+    "labels": [
+      "CRITICAL",
+      "HIGH",
+      "LOW",
+      "MEDIUM"
+    ],
+    "confusion_matrix": [
+      [
+        5,
+        0,
+        28,
+        0
+      ],
+      [
+        0,
+        34,
+        2,
+        0
+      ],
+      [
+        0,
+        0,
+        64,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        62
+      ]
+    ],
+    "test_size": 195,
+    "majority_baseline": 0.3282
   },
   "sla_breach_predictor": {
     "accuracy": 0.7937,
-    "majority_baseline": 0.625,
-    "test_size": 160
+    "balanced_accuracy": 0.7583,
+    "precision_macro": 0.7918,
+    "recall_macro": 0.7583,
+    "f1_macro": 0.7683,
+    "labels": [
+      0,
+      1
+    ],
+    "confusion_matrix": [
+      [
+        90,
+        10
+      ],
+      [
+        23,
+        37
+      ]
+    ],
+    "test_size": 160,
+    "breach_precision": 0.7872,
+    "breach_recall": 0.6167,
+    "breach_f1": 0.6916,
+    "majority_baseline": 0.625
   }
 }

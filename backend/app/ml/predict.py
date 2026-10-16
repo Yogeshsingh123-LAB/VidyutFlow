@@ -3,6 +3,12 @@ import joblib
 from ..config import settings
 
 _cache = {}
+SAFETY_CRITICAL_TERMS = (
+    "live wire", "sparking", "electric shock", "electrocution", "short circuit",
+    "exposed cable", "wire hanging", "pole leaning", "fire risk", "electrical fire",
+    "fire in meter box",
+)
+
 def _load(name):
     if name not in _cache:
         p = os.path.join(settings.model_dir, name)
@@ -14,7 +20,13 @@ def ensure_models():
         from .train import train; train(settings.model_dir)
 
 def classify_text(text: str):
-    ensure_models(); text = (text or "").strip()
+    text = (text or "").strip()
+    normalized = text.casefold()
+    # Safety signals get a conservative deterministic escalation because the
+    # synthetic text classifier has weak recall on unseen safety phrasing.
+    if any(term in normalized for term in SAFETY_CRITICAL_TERMS):
+        return "SAFETY", "CRITICAL"
+    ensure_models()
     cat_m, sev_m = _load("category_model.joblib"), _load("severity_model.joblib")
     if not text or cat_m is None:
         return "NEW_CONNECTION", "MEDIUM"

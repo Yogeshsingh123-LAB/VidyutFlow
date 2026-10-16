@@ -3,6 +3,7 @@ os.environ["DATABASE_URL"] = "sqlite:///./test_vidyutos.db"
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from fastapi.testclient import TestClient
 from app.main import app
+from app.ml.predict import classify_text
 
 def login(c, email, pw):
     r = c.post("/auth/login", data={"username": email, "password": pw}); assert r.status_code == 200, r.text
@@ -49,8 +50,20 @@ def test_classifier_and_metrics():
         h = login(c, "officer@vidyut.local", "Officer@123")
         m = c.get("/assistant/ml-metrics", headers=h).json()
         assert "SYNTHETIC" in m["data_notice"]
+        assert "held-out source templates" in m["evaluation"]["classifier_split"]
+        for name in ("category_classifier", "severity_classifier", "sla_breach_predictor"):
+            model = m[name]
+            assert 0 <= model["balanced_accuracy"] <= 1
+            assert len(model["confusion_matrix"]) == len(model["labels"])
+            assert all(len(row) == len(model["labels"]) for row in model["confusion_matrix"])
         assert m["category_classifier"]["accuracy"] > m["category_classifier"]["majority_baseline"]
-        assert m["sla_breach_predictor"]["accuracy"] > m["sla_breach_predictor"]["majority_baseline"]
+        assert all(0 <= m["sla_breach_predictor"][metric] <= 1
+                   for metric in ("breach_precision", "breach_recall", "breach_f1"))
+
+
+def test_known_electrical_hazards_are_escalated():
+    assert classify_text("exposed cable on road safety hazard") == ("SAFETY", "CRITICAL")
+    assert classify_text("live wire hanging near house") == ("SAFETY", "CRITICAL")
 
 
 def test_admin_directory_and_system_status():

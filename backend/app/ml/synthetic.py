@@ -27,12 +27,14 @@ def make_classifier_rows(n_per_class=120, seed=42):
     fillers = ["please help", "urgent", "at my address", "kindly resolve", "from yesterday", ""]
     for cat, templates in CATEGORIES.items():
         for _ in range(n_per_class):
-            text = rng.choice(templates)
+            template_index = rng.randrange(len(templates))
+            text = templates[template_index]
             if rng.random() < .5: text += " " + rng.choice(fillers)
             sev = SEVERITY_HINTS[cat]
             # inject severity signal words sometimes
             if rng.random() < .4: text += " " + rng.choice(SEV_WORDS.get(sev, [""]))
-            rows.append({"text": text.strip(), "category": cat, "severity": sev})
+            rows.append({"text": text.strip(), "category": cat, "severity": sev,
+                         "template_group": f"{cat}:{template_index}"})
     rng.shuffle(rows); return rows
 
 def make_sla_rows(n=800, seed=42):
