@@ -1,12 +1,11 @@
 # Team Roles — VidyutOS Lite in 5 Roles
 
-**Assigned 16 Oct 2026.** GitHub IDs verified 16 Oct against the repo **collaborators list** (owner view):
-accepted collaborators are **@Yogeshsingh123-LAB** (owner), **@utsavmandalia-01** (Utsav),
-**@1006coder** (Aakash Kumar Singh — ML commit `029b116`) and **@SANDIP29072007** (Kushwaha Sandip).
-The public contributors graph only shows members who have committed (@Yogeshsingh123-LAB, @1006coder).
-**Arnav is the only member not yet an accepted collaborator** — if his invite is sitting in
-*Settings → Collaborators → Pending invitations*, he needs to accept the email/GitHub invite; then add
-his username here (before registration closes, 17 Oct).
+**Assigned 16 Oct 2026 — all 5 roles filled.** GitHub IDs: **@Yogeshsingh123-LAB** (Yogesh Kumar Singh, owner),
+**@utsavmandalia-01** (Utsav), **@1006coder** (Aakash Kumar Singh — ML commit `029b116`), **@SANDIP29072007**
+(Kushwaha Sandip) and **@coderAJ22** (Arnav, ID confirmed by the team lead, 16 Oct).
+Note: the public contributors graph only lists members who have committed so far (@Yogeshsingh123-LAB,
+@1006coder) — Utsav, Sandip and Arnav will appear there after their first commits. If any invite still
+shows as pending under *Settings → Collaborators*, accept it before registration closes (17 Oct).
 
 Repo checked **15 Oct 2026** at commit `d8e7a1b` (healthy: `make setup && make test` → **3 passed**,
 `make build` → clean). The work is divided below by **actual modules in this repo**, so every file
@@ -20,7 +19,7 @@ like data/maths → Role 3 · like servers/security → Role 4 · like writing/p
 | 2 | **Frontend & PWA** | `frontend/src/`, `frontend/public/` | **Utsav** · [@utsavmandalia-01](https://github.com/utsavmandalia-01) (VidyutOne author; repo collaborator ✓) | Portal tour + wizard |
 | 3 | **ML & AI** | `backend/app/ml/`, `backend/app/assistant/`, `backend/data/policies/` | **Aakash** · [@1006coder](https://github.com/1006coder) | SLA-risk + assistant Q&A |
 | 4 | **DevOps, Security & QA** | `docker-compose.yml`, `Makefile`, Dockerfiles, `security.py`, `deps.py`, tests | **Sandip** · [@SANDIP29072007](https://github.com/SANDIP29072007) (repo collaborator ✓) | Offline sync + security |
-| 5 | **Docs, Demo & Product** | `README.md`, `docs/`, deck, video, synopsis | **Arnav** · GitHub ID: _pending — not yet an accepted collaborator (check Settings → Collaborators → Pending invitations)_ | Problem framing + roadmap close |
+| 5 | **Docs, Demo & Product** | `README.md`, `docs/`, deck, video, synopsis | **Arnav** · [@coderAJ22](https://github.com/coderAJ22) | Problem framing + roadmap close |
 
 ---
 

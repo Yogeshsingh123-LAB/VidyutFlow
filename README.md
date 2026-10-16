@@ -377,7 +377,7 @@ smaller-team merges and the Nov 6 / Dec 2 checklists in [docs/TEAM_ROLES.md](doc
 | 2 · Frontend & PWA | **Utsav** | [@utsavmandalia-01](https://github.com/utsavmandalia-01) ✓ collaborator |
 | 3 · ML & AI | **Aakash** | [@1006coder](https://github.com/1006coder) |
 | 4 · DevOps, Security & QA | **Sandip** | [@SANDIP29072007](https://github.com/SANDIP29072007) ✓ collaborator |
-| 5 · Docs, Demo & Product | **Arnav** | _invite acceptance pending_ |
+| 5 · Docs, Demo & Product | **Arnav** | [@coderAJ22](https://github.com/coderAJ22) ✓ collaborator |
 
 ## 📜 License
 
