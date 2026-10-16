@@ -8,6 +8,8 @@
 ````markdown
 <div align="center">
 
+<img src="assets/banner.svg" alt="VidyutOS Lite — Cloud-to-Edge Orchestration Platform for Power-Utility Services (UGVCL · PS000125)" width="100%">
+
 # ⚡ VidyutOS Lite
 
 **A Cloud-to-Edge Orchestration Platform for power-utility services —**
@@ -21,6 +23,11 @@
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-ML-F7931E?style=for-the-square&logo=scikitlearn&logoColor=white)](#-what-the-bundled-models-show)
 [![Tests](https://img.shields.io/badge/tests-4_passing-16a34a?style=for-the-square)](#-testing--qa)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-square)](LICENSE)
+
+[![Contributors](https://img.shields.io/github/contributors/Yogeshsingh123-LAB/VidyutOS?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutOS/graphs/contributors)
+[![Last commit](https://img.shields.io/github/last-commit/Yogeshsingh123-LAB/VidyutOS?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutOS/commits/main)
+[![Repo size](https://img.shields.io/github/repo-size/Yogeshsingh123-LAB/VidyutOS?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutOS)
+[![Stars](https://img.shields.io/github/stars/Yogeshsingh123-LAB/VidyutOS?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutOS/stargazers)
 
 *Seva First Innovation Challenge · **PS000125 — Future-Ready, Secure and Intelligent IT Infrastructure &
 User-Friendly ERP/Portal Ecosystem** · Uttar Gujarat Vij Company Limited (UGVCL) ·
@@ -46,6 +53,16 @@ today and designed to be pushed to edge devices as they are onboarded (roadmap).
 > “always guessing the most common answer”. They are **not** UGVCL real-world performance.
 
 </div>
+
+## 📑 Contents
+
+- [The Problem](#-the-problem) · [What VidyutOS Lite Does](#-what-vidyutos-lite-does) · [Key Features](#-key-features) · [Core Invariants](#-core-invariants-enforced-not-just-described)
+- [Real vs Synthetic vs Simulated](#-real-vs-synthetic-vs-simulated--disclosure) · [Architecture](#️-architecture) · [Quickstart](#-quickstart) · [Model Results](#-what-the-bundled-models-show)
+- [Backend REST API](#-backend-rest-api) · [Frontend Modules](#️-frontend-modules) · [Technology Stack](#️-technology-stack) · [Repository Layout](#️-repository-layout)
+- [Testing & QA](#-testing--qa) · [Security Posture](#️-security-posture) · [Scientific Honesty](#️-scientific-honesty) · [Roadmap](#️-roadmap--production-integration)
+- [Documentation](#-documentation-quick-links) · [Team — 5 Roles](#-team--5-roles) · [License](#-license)
+
+> **Contributing:** see [CONTRIBUTING.md](CONTRIBUTING.md) · **Security:** [SECURITY.md](SECURITY.md) · **Changes:** [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
@@ -395,6 +412,15 @@ synthetic demo data provided for demonstration and evaluation. Not an official U
 
 ## 2. Directory structure (`tree`, tracked files only)
 ```
+├── .github
+│   ├── ISSUE_TEMPLATE
+│   │   ├── bug_report.md
+│   │   ├── config.yml
+│   │   └── feature_request.md
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   └── dependabot.yml
+├── assets
+│   └── banner.svg
 ├── backend
 │   ├── app
 │   │   ├── assistant
@@ -481,9 +507,13 @@ synthetic demo data provided for demonstration and evaluation. Not an official U
 │   └── demo_reset.sh
 ├── .editorconfig
 ├── .gitignore
+├── CHANGELOG.md
+├── CODE_OF_CONDUCT.md
+├── CONTRIBUTING.md
 ├── LICENSE
 ├── Makefile
 ├── README.md
+├── SECURITY.md
 └── docker-compose.yml
 ```
 
