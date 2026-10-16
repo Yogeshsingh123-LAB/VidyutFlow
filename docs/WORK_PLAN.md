@@ -1,0 +1,62 @@
+# Work Plan — Remaining Work, Divided Role-Wise
+
+**Team:** R1 Yogesh Kumar Singh 👑 Leader · R2 Utsav · R3 Aakash Kumar Singh · R4 Sandip Kumar · R5 Arnav (details: [TEAM_ROLES.md](TEAM_ROLES.md))
+**Milestones:** 🔴 **17 Oct** registration lock · 🟠 **24 Oct** API contract freeze · 🟡 **6 Nov** synopsis due · 🟢 **2 Dec** Grand Finale
+**Rule:** a task is done when its *evidence* exists (file, green test, screenshot, or link) — not when it's "almost ready". Tick boxes here; the leader reviews every Friday.
+
+---
+
+## Phase 0 — Registration lock (by 17 Oct) 🔴
+
+| # | Task | Owner | Evidence when done |
+| :--- | :--- | :--- | :--- |
+| 0.1 | Accept GitHub invite (if pending) & make first small commit (e.g. fix a typo in own doc) so he appears on contributors | **Arnav** (@coderAJ22) | Username on contributors graph |
+| 0.2 | Utsav & Sandip Kumar: first commit each in own module (README touch/label fix is fine) | **Utsav, Sandip Kumar** | Contributors graph shows all 5 |
+| 0.3 | **Lock PS000125 on the portal** (permanent — double-check ID before confirming) + set GitHub About/topics (repo Settings ⚙️; text ready in the "professional repo" commit notes) | **Yogesh Kumar Singh** (only owner can) | Portal confirmation screenshot in team chat |
+| 0.4 | Fill team/institute details into the synopsis + mail drafts (replace `[brackets]`) | **Arnav** | No `[ ]` placeholders left in `docs/SYNOPSIS_ABSTRACT.md`, `docs/MAIL_TO_UGVCL.md` |
+| 0.5 | Send the UGVCL mail (optional but recommended; one mail, leader's name) | **Yogesh Kumar Singh** sends, Arnav drafts | Sent-mail screenshot; replies → `REQUIREMENT_MAPPING.md` per Plan B |
+
+## Phase 1 — Freeze-ready build (by 24 Oct) 🟠
+
+| # | Task | Owner | Depends on | Evidence |
+| :--- | :--- | :--- | :--- | :--- |
+| 1.1 | Run `docker compose up --build` end-to-end; fix whatever breaks; note it in README QA table | **Sandip Kumar** | — | Compose log + README line "verified" |
+| 1.2 | Add CI via GitHub web UI (`.github/workflows/ci.yml`: `make test` + `make build`) — token can't push workflows, owner adds it | **Yogesh Kumar Singh** (adds), Sandip Kumar (writes YAML) | — | Green Actions run on `main` |
+| 1.3 | API contract freeze: final review of endpoints/response shapes; no breaking changes after this date | **Yogesh Kumar Singh** | 1.1 | Freeze note in `CHANGELOG.md` |
+| 1.4 | Frontend polish pass: loading/empty states, Gujarati label readiness (i18n structure only), accessibility (labels/contrast) | **Utsav** | 1.3 (shapes frozen) | Build green; screenshots for deck |
+| 1.5 | ML final pack: retrain (`make train`), export metrics + 2 charts (confusion matrix, risk distribution) for the deck; keep SYNTHETIC labels | **Aakash Kumar Singh** | — | `docs/ML_REPORT.md` updated; chart images in `docs/assets/` |
+| 1.6 | If UGVCL replied: apply Plan B swaps (SLA hours/taxonomy/role names) — config/label changes only | R1+R3 (data), R2 (labels) | 0.5 | `REQUIREMENT_MAPPING.md` rows marked *validated* |
+| 1.7 | Security quick wins within freeze: login rate-limit note or simple throttle; officer zone-scoping **decision** (build or defer to roadmap — record it) | **Sandip Kumar** + Yogesh Kumar Singh | 1.3 | Decision recorded in `docs/CODE_REVIEW.md` |
+
+## Phase 2 — Synopsis (by 6 Nov) 🟡
+
+| # | Task | Owner | Depends on | Evidence |
+| :--- | :--- | :--- | :--- | :--- |
+| 2.1 | Final synopsis text (problem → architecture → impact, assumptions labelled) and portal submission | **Arnav** (writes), Yogesh Kumar Singh (approves) | 0.4, 1.5, 1.6 | Submitted confirmation |
+| 2.2 | One architecture diagram (built vs roadmap visually distinct) for synopsis + deck | **Yogesh Kumar Singh** | 1.3 | Image in `docs/assets/` |
+| 2.3 | Synopsis numbers audit: every figure labelled measured/synthetic/target — no orphan percentages | **Aakash Kumar Singh** (ML figs), Arnav (rest) | 1.5 | Checklist signed in `docs/REQUIREMENT_MAPPING.md` §D |
+
+## Phase 3 — Finale pack (by 2 Dec) 🟢
+
+| # | Task | Owner | Depends on | Evidence |
+| :--- | :--- | :--- | :--- | :--- |
+| 3.1 | Build the actual 12-slide deck (`.pptx`, from `docs/DECK_OUTLINE.md`) | **Arnav** | 1.4 screenshots, 1.5 charts, 2.2 diagram | `docs/deck/VidyutOS_PS000125.pptx` (≤20 MB) |
+| 3.2 | Demo screenshots pack (one per role view + offline-sync sequence) | **Utsav** | 1.4 | Images in `docs/assets/` |
+| 3.3 | Record 3–5 min demo video following `docs/DEMO_SCRIPT.md` (each role narrates own segment) | **All** (Arnav edits) | 3.2 | Video file/link in README |
+| 3.4 | Full rehearsal ×3 with timing; backup plan: recorded video + offline DB snapshot if venue Wi-Fi fails | **Yogesh Kumar Singh** (runs), all attend | 3.1, 3.3 | Rehearsal log in team chat |
+| 3.5 | Defence Q&A drill: every member can answer "where is PS point N?" from `REQUIREMENT_MAPPING.md` + the 7 invariants | **All** (Sandip Kumar quizzes) | — | Drill done ×2 |
+| 3.6 | Freeze code 30 Nov; only demo-critical fixes after (label issues `demo-critical`) | **Yogesh Kumar Singh** | 3.4 | Tag `v1.0-finale` on `main` |
+
+## Backlog (only if time remains — never before Phase 1–2)
+
+| Task | Owner | Note |
+| :--- | :--- | :--- |
+| Frontend smoke tests (login + one flow per role) | Utsav + Sandip Kumar | Currently zero frontend tests — known gap |
+| Simple load check (100 req) to replace "unbenchmarked" with a measured local figure | Sandip Kumar | Must be labelled *local, synthetic* if quoted |
+| Gujarati UI strings | Utsav | Only if UGVCL asks (Plan B) |
+| Contractor/govt read-only role | Yogesh Kumar Singh + Utsav | Only if UGVCL confirms it's in scope |
+
+## Critical path (what actually blocks the finale)
+
+`0.3 registration lock` → `1.1 Compose verify` → `1.3 freeze` → `1.4/1.5 screenshots & ML pack` → `2.1 synopsis` → `3.1 deck` → `3.3 video` → `3.4 rehearsal`.
+Everything else can slip; these cannot. If a role is stuck >24 h, the leader reassigns — silence is the only real blocker.

@@ -1,3 +1,4 @@
+- [WORK_PLAN.md](WORK_PLAN.md) — remaining work divided role-wise (Phases 0–3, owners, deadlines, evidence)
 - [MAIL_TO_UGVCL.md](MAIL_TO_UGVCL.md) — resource-person mail draft, question bank, and don'ts (send by ~20 Oct)
 - [PS000125_OFFICIAL.md](PS000125_OFFICIAL.md) — official problem statement (locked) · [REQUIREMENT_MAPPING.md](REQUIREMENT_MAPPING.md) — 12 points + 14 outcomes → built/roadmap · [INFRASTRUCTURE_ROADMAP.md](INFRASTRUCTURE_ROADMAP.md) — hardware/DR proposal tiers
 # Docs index

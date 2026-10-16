@@ -491,7 +491,8 @@ synthetic demo data provided for demonstration and evaluation. Not an official U
 │   ├── ROADMAP.md
 │   ├── SYNOPSIS_ABSTRACT.md
 │   ├── TEAM_ROLES.md
-│   └── VIDYUTONE_UPGRADE.md
+│   ├── VIDYUTONE_UPGRADE.md
+│   └── WORK_PLAN.md
 ├── frontend
 │   ├── public
 │   │   ├── manifest.webmanifest

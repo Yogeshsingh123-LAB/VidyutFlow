@@ -139,3 +139,4 @@ deck file · demo video · portal submission · this file
 - Labels: `role:backend` `role:frontend` `role:ml-ai` `role:devops` `role:docs` + `demo-critical`
 - One issue per unchecked box above, assigned to the role owner; milestone **“Synopsis – Nov 6”** and **“Finale – Dec 2”**
 - Fill in the name column in this file in the same PR that creates the first issue
+**Remaining work, task-by-task with deadlines:** [WORK_PLAN.md](WORK_PLAN.md) (Phases 0–3: registration lock → freeze → synopsis → finale).
