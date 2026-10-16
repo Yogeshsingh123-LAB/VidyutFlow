@@ -374,10 +374,10 @@ smaller-team merges and the Nov 6 / Dec 2 checklists in [docs/TEAM_ROLES.md](doc
 | Role | Owner | GitHub |
 | :--- | :--- | :--- |
 | 1 · Backend & Workflow | **Yogesh** | [@Yogeshsingh123-LAB](https://github.com/Yogeshsingh123-LAB) |
-| 2 · Frontend & PWA | **Utsav** | [@utsavmandalia-01](https://github.com/utsavmandalia-01) |
+| 2 · Frontend & PWA | **Utsav** | [@utsavmandalia-01](https://github.com/utsavmandalia-01) ✓ collaborator |
 | 3 · ML & AI | **Aakash** | [@1006coder](https://github.com/1006coder) |
-| 4 · DevOps, Security & QA | **Sandip** | _invite + username pending_ |
-| 5 · Docs, Demo & Product | **Arnav** | _invite + username pending_ |
+| 4 · DevOps, Security & QA | **Sandip** | [@SANDIP29072007](https://github.com/SANDIP29072007) ✓ collaborator |
+| 5 · Docs, Demo & Product | **Arnav** | _invite acceptance pending_ |
 
 ## 📜 License
 

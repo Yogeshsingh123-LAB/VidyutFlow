@@ -1,11 +1,12 @@
 # Team Roles — VidyutOS Lite in 5 Roles
 
-**Assigned 16 Oct 2026.** GitHub IDs verified against the repo **contributors list**
-([github.com/Yogeshsingh123-LAB/VidyutOS/graphs/contributors](https://github.com/Yogeshsingh123-LAB/VidyutOS/graphs/contributors)):
-as of today it shows **@Yogeshsingh123-LAB** (repo owner, 14 commits) and **@1006coder — Aakash**
-(ML evaluation commit `029b116`). @utsavmandalia-01 is the VidyutOne author and still needs a repo
-invite; **Sandip and Arnav have no commits/invite yet — the repo owner should invite both and add
-their usernames here before registration closes (17 Oct).**
+**Assigned 16 Oct 2026.** GitHub IDs verified 16 Oct against the repo **collaborators list** (owner view):
+accepted collaborators are **@Yogeshsingh123-LAB** (owner), **@utsavmandalia-01** (Utsav),
+**@1006coder** (Aakash Kumar Singh — ML commit `029b116`) and **@SANDIP29072007** (Kushwaha Sandip).
+The public contributors graph only shows members who have committed (@Yogeshsingh123-LAB, @1006coder).
+**Arnav is the only member not yet an accepted collaborator** — if his invite is sitting in
+*Settings → Collaborators → Pending invitations*, he needs to accept the email/GitHub invite; then add
+his username here (before registration closes, 17 Oct).
 
 Repo checked **15 Oct 2026** at commit `d8e7a1b` (healthy: `make setup && make test` → **3 passed**,
 `make build` → clean). The work is divided below by **actual modules in this repo**, so every file
@@ -16,10 +17,10 @@ like data/maths → Role 3 · like servers/security → Role 4 · like writing/p
 | # | Role | Owns (repo paths) | Name | Demo segment (1 min each) |
 | :--- | :--- | :--- | :--- | :--- |
 | 1 | **Backend & Workflow** | `backend/app/` core + `routers/requests.py`, `workflow.py` | **Yogesh** · [@Yogeshsingh123-LAB](https://github.com/Yogeshsingh123-LAB) (repo owner) | Submit → auto-route |
-| 2 | **Frontend & PWA** | `frontend/src/`, `frontend/public/` | **Utsav** · [@utsavmandalia-01](https://github.com/utsavmandalia-01) (VidyutOne author; invite to this repo pending) | Portal tour + wizard |
+| 2 | **Frontend & PWA** | `frontend/src/`, `frontend/public/` | **Utsav** · [@utsavmandalia-01](https://github.com/utsavmandalia-01) (VidyutOne author; repo collaborator ✓) | Portal tour + wizard |
 | 3 | **ML & AI** | `backend/app/ml/`, `backend/app/assistant/`, `backend/data/policies/` | **Aakash** · [@1006coder](https://github.com/1006coder) | SLA-risk + assistant Q&A |
-| 4 | **DevOps, Security & QA** | `docker-compose.yml`, `Makefile`, Dockerfiles, `security.py`, `deps.py`, tests | **Sandip** · GitHub ID: _to be added — not yet in contributors list_ | Offline sync + security |
-| 5 | **Docs, Demo & Product** | `README.md`, `docs/`, deck, video, synopsis | **Arnav** · GitHub ID: _to be added — not yet in contributors list_ | Problem framing + roadmap close |
+| 4 | **DevOps, Security & QA** | `docker-compose.yml`, `Makefile`, Dockerfiles, `security.py`, `deps.py`, tests | **Sandip** · [@SANDIP29072007](https://github.com/SANDIP29072007) (repo collaborator ✓) | Offline sync + security |
+| 5 | **Docs, Demo & Product** | `README.md`, `docs/`, deck, video, synopsis | **Arnav** · GitHub ID: _pending — not yet an accepted collaborator (check Settings → Collaborators → Pending invitations)_ | Problem framing + roadmap close |
 
 ---
 
