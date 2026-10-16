@@ -5,6 +5,16 @@ this project is a hackathon prototype, so versions track milestones rather than 
 
 ## [Unreleased]
 
+### Fixed
+- **Approval bypass via field sync:** `POST /requests/field-sync` accepted any `task_status`,
+  letting an engineer set `APPROVED`/`REJECTED` (or corrupt states) and bypass the officer-decision
+  invariant. Sync now accepts only `FIELD_VERIFIED`/`COMPLETED`/`BLOCKED` (400 otherwise), and a
+  concurrent duplicate retry resolves to `duplicate: true` instead of a 500. Regression test:
+  `test_field_sync_cannot_decide_approvals` (suite: 5 passing).
+
+### Changed
+- README Core Invariants rewritten as an auditable table (invariant → enforcement point → verification).
+
 ### Added
 - Community & professionalism pack: `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`,
   issue/PR templates, Dependabot config, README banner, table of contents, GitHub About/topics.

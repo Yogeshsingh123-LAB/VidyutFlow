@@ -66,6 +66,27 @@ def test_known_electrical_hazards_are_escalated():
     assert classify_text("live wire hanging near house") == ("SAFETY", "CRITICAL")
 
 
+def test_field_sync_cannot_decide_approvals():
+    """Core Invariant 6: field sync reports field outcomes only. APPROVED/REJECTED are officer
+    decisions via PATCH /status — an engineer must not reach them (or garbage states) via sync."""
+    with TestClient(app) as c:
+        consumer = login(c, "consumer@vidyut.local", "Consumer@123")
+        engineer = login(c, "engineer@vidyut.local", "Engineer@123")
+        r = c.post("/requests", headers=consumer, json={"applicant_name":"Invariant User","phone":"9876543210",
+            "address":"Mehsana Gujarat","zone":"North","request_type":"new_connection",
+            "description":"need new electricity connection for my home","requested_load_kw":3,"document_name":"id_proof.pdf"})
+        assert r.status_code == 201, r.text; rid = r.json()["id"]; before = r.json()["status"]
+        for bad in ("APPROVED", "REJECTED", "GARBAGE_STATUS"):
+            s = c.post("/requests/field-sync", headers=engineer, json={"client_uuid": str(uuid.uuid4()),
+                "request_id": rid, "task_status": bad, "notes": "bypass attempt"})
+            assert s.status_code == 400, (bad, s.text)
+            assert c.get(f"/requests/{rid}", headers=consumer).json()["status"] == before  # unchanged
+        ok = c.post("/requests/field-sync", headers=engineer, json={"client_uuid": str(uuid.uuid4()),
+            "request_id": rid, "task_status": "COMPLETED", "notes": "Meter installed", "meter_serial": "MTR-INV-1"})
+        assert ok.status_code == 200 and ok.json()["synced"] is True
+        assert c.get(f"/requests/{rid}", headers=consumer).json()["status"] == "COMPLETED"
+
+
 def test_admin_directory_and_system_status():
     with TestClient(app) as c:
         admin = login(c, "admin@vidyut.local", "Admin@123"); consumer = login(c, "consumer@vidyut.local", "Consumer@123")

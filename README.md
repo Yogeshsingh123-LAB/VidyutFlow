@@ -13,7 +13,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-square&logo=fastapi&logoColor=white)](#-technology-stack)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-square&logo=react&logoColor=black)](#-technology-stack)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-ML-F7931E?style=for-the-square&logo=scikitlearn&logoColor=white)](#-what-the-bundled-models-show)
-[![Tests](https://img.shields.io/badge/tests-4_passing-16a34a?style=for-the-square)](#-testing--qa)
+[![Tests](https://img.shields.io/badge/tests-5_passing-16a34a?style=for-the-square)](#-testing--qa)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-square)](LICENSE)
 
 [![Contributors](https://img.shields.io/github/contributors/Yogeshsingh123-LAB/VidyutOS?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutOS/graphs/contributors)
@@ -159,14 +159,27 @@ KPI bento and charts (by status / zone / category / severity, SLA-risk buckets).
 
 ## 📐 Core Invariants (enforced, not just described)
 
-1. **Enter once:** one `ConnectionRequest` row is the single source read by every role —
-   $$\text{consumer entry} = \text{officer view} = \text{engineer task} = \text{admin KPI source}$$
-2. **Idempotent sync:** for any field entry, $$\text{applied}(\text{client\_uuid}) \le 1$$ —
-   re-sending the same UUID returns `{"duplicate": true}` and writes **no** second row.
-3. **No silent scores:** every SLA-risk value is stored **with** its reasons list; the UI always renders both.
-4. **Auditable decisions:** every create / status change / field sync writes an `AuditLog` row
-   (actor, role, action, detail, timestamp). ML never writes an approval.
-5. **Fail with reasons:** validation problems ⇒ `NEEDS_CORRECTION` + consumer-visible notes, not exceptions.
+These are the guarantees every other claim in this README rests on. Each one names **where it is
+enforced in code** and **how it is verified** — if an invariant ever fails, the test suite fails first.
+
+$$
+\text{consumer entry} = \text{officer view} = \text{engineer task} = \text{admin KPI source}
+\qquad\text{and}\qquad \text{applied}(\text{client\_uuid}) \le 1
+$$
+
+| # | Invariant | Enforced in | Verified by |
+| :--- | :--- | :--- | :--- |
+| 1 | **Enter once, use everywhere.** One `ConnectionRequest` row is the single source of truth — consumer tracking, officer queue, engineer task list and admin KPIs all read the same row. Nothing is re-typed between roles. | `models.py` (one table) · `routers/requests.py` (`out()`, list, KPI aggregation over the same query) | End-to-end test: a field-synced `COMPLETED` + meter serial appears on the *consumer's* connection (`test_end_to_end_and_dedup`) |
+| 2 | **Idempotent offline sync.** A field entry is applied at most once: re-sending a `client_uuid` returns `{"duplicate": true}`, writes **no** second row and changes **no** state — even if two retries race. | `FieldUpdate.client_uuid` `UniqueConstraint` (`models.py`) · de-dup check + `IntegrityError`→duplicate (`routers/requests.py`) | Same sync payload sent twice in `test_end_to_end_and_dedup` |
+| 3 | **No silent scores.** Every SLA-risk value is stored **with** its reasons list (JSON), and the UI renders the score and its reasons together (request drawer, risk notifications). | `workflow.run_workflow` (stores risk + reasons atomically) · `RequestDrawer.jsx` | Response-shape checks; reasons visible in demo step 3 |
+| 4 | **Auditable decisions.** Every create, status change and field sync writes an `AuditLog` row (actor, role, action, entity, detail, timestamp). The trail is append-only from the API's side — no endpoint edits or deletes it. | `audit.py` · called by create / with-document / status / field-sync handlers | Audit-trail tab (officer/admin, real API); log assertions in the demo script |
+| 5 | **Humans decide; ML advises.** Models classify, prioritise and flag risk — they never approve, reject, or complete anything. Only an officer/admin status action can approve or reject, and field sync can only report field outcomes (`FIELD_VERIFIED` / `COMPLETED` / `BLOCKED`). | `PATCH /requests/{id}/status` (role-gated, allow-listed) · `FIELD_TASK_STATUSES` guard on `/field-sync` | `test_field_sync_cannot_decide_approvals` — sync attempts with `APPROVED`/`REJECTED`/garbage return **400** and leave the status untouched *(regression test for a real bug found in review, Oct 2026)* |
+| 6 | **Scoped, not just logged-in.** A token proves identity; it does not grant reach. Consumers see only their own requests, engineers only their assigned work — including inside KPI aggregates. | `deps.py` (RBAC) · per-role query scoping in list/get/KPIs · assignment checks on status & sync | Cross-engineer sync → **403** and consumer-sync → **403** in `test_end_to_end_and_dedup`; admin-only routes → 403 for consumers |
+| 7 | **Fail with reasons, never silently.** Validation problems produce `NEEDS_CORRECTION` with consumer-visible notes listing every problem — not a bare 500 or a vanished submission. Invalid enum values (status, task status) are rejected **400** with the allowed set in the message. | `workflow.validate` → `validation_notes` · allow-list checks in status/field-sync handlers | Needs-correction flow (demo step 1 variant); 400-path assertions in the approval-bypass test |
+
+> **Reading the roadmap honestly:** invariants 1–7 hold for the Lite build today. They are necessary,
+> not sufficient, for production — rate limiting, zone-scoped officer actions, and object storage are
+> tracked in [§Security Posture](#️-security-posture), not hidden here.
 
 ## 🔀 Real vs Synthetic vs Simulated — Disclosure
 
@@ -329,7 +342,7 @@ VidyutOS/
 ## 🧪 Testing & QA
 
 ```bash
-make test          # 4 passed — backend/tests/test_flow.py
+make test          # 5 passed — backend/tests/test_flow.py
 make build         # frontend production build
 ```
 

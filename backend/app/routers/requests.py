@@ -2,6 +2,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from ..db import get_db
 from ..models import User, ConnectionRequest, FieldUpdate, AuditLog
 from ..deps import current_user, require
@@ -90,9 +91,15 @@ def kpis(db: Session = Depends(get_db), u: User = Depends(current_user)):
 
 class FieldSync(BaseModel):
     client_uuid: str; request_id: str; task_status: str; notes: str = ""; meter_serial: str = ""; created_offline_at: str = ""
+# Field work may only report field outcomes. APPROVED/REJECTED are officer decisions and must go
+# through PATCH /requests/{id}/status — never through sync (Core Invariant 6, README).
+FIELD_TASK_STATUSES = {"FIELD_VERIFIED", "COMPLETED", "BLOCKED"}
+
 @router.post("/field-sync")
 def field_sync(body: FieldSync, db: Session = Depends(get_db), u: User = Depends(require("engineer","officer","admin"))):
     """Offline sync endpoint. Same client_uuid twice -> duplicate:true, no second row (de-duplication)."""
+    if body.task_status not in FIELD_TASK_STATUSES:
+        raise HTTPException(400, f"task_status must be one of {sorted(FIELD_TASK_STATUSES)}")
     existing = db.query(FieldUpdate).filter(FieldUpdate.client_uuid == body.client_uuid).first()
     if existing: return {"duplicate": True, "synced": False, "field_update_id": existing.id, "message": "Already synced — duplicate ignored"}
     r = db.get(ConnectionRequest, body.request_id)
@@ -104,7 +111,15 @@ def field_sync(body: FieldSync, db: Session = Depends(get_db), u: User = Depends
     db.add(fu); r.status = body.task_status
     if body.meter_serial: r.meter_serial = body.meter_serial
     audit(db, u, "FIELD_SYNC", "request", r.id, f"{body.task_status} uuid={body.client_uuid}")
-    db.commit(); return {"duplicate": False, "synced": True, "field_update_id": fu.id, "request_status": r.status}
+    try:
+        db.commit()
+    except IntegrityError:
+        # A concurrent retry with the same client_uuid hit the unique constraint first:
+        # that is a duplicate, not an error (Core Invariant 2).
+        db.rollback()
+        existing = db.query(FieldUpdate).filter(FieldUpdate.client_uuid == body.client_uuid).first()
+        return {"duplicate": True, "synced": False, "field_update_id": existing.id if existing else "", "message": "Already synced — duplicate ignored"}
+    return {"duplicate": False, "synced": True, "field_update_id": fu.id, "request_status": r.status}
 
 @router.get("/audit/logs")
 def logs(db: Session = Depends(get_db), u: User = Depends(require("officer","admin"))):
