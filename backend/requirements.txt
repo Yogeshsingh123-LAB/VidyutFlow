@@ -9,6 +9,6 @@ bcrypt==4.2.1
 python-multipart==0.0.20
 scikit-learn==1.6.0
 joblib==1.4.2
-redis==5.2.1
+redis==8.1.0
 email-validator==2.2.0
 pandas>=2.2.0
