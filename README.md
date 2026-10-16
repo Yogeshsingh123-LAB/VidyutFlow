@@ -11,7 +11,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-square&logo=fastapi&logoColor=white)](#-technology-stack)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-square&logo=react&logoColor=black)](#-technology-stack)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-ML-F7931E?style=for-the-square&logo=scikitlearn&logoColor=white)](#-what-the-bundled-models-show)
-[![Tests](https://img.shields.io/badge/tests-3_passing-16a34a?style=for-the-square)](#-testing--qa)
+[![Tests](https://img.shields.io/badge/tests-4_passing-16a34a?style=for-the-square)](#-testing--qa)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-square)](LICENSE)
 
 *Seva First Innovation Challenge · **PS000125 — Future-Ready, Secure and Intelligent IT Infrastructure &
