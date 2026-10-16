@@ -320,7 +320,7 @@ VidyutOS/
 ## 🧪 Testing & QA
 
 ```bash
-make test          # 3 passed — backend/tests/test_flow.py
+make test          # 4 passed — backend/tests/test_flow.py
 make build         # frontend production build
 ```
 
@@ -376,11 +376,16 @@ Detail: [docs/ROADMAP.md](docs/ROADMAP.md) · UX-upgrade provenance: [docs/VIDYU
 
 ## 👥 Team — 5 Roles
 
-Work is split by repo module so every file has one owner — **Backend & Workflow · Frontend & PWA ·
-ML & AI · DevOps/Security/QA · Docs/Demo/Product** — with deliverables, RACI, hand-offs, smaller-team
-merges and the Nov 6 / Dec 2 checklists in [docs/TEAM_ROLES.md](docs/TEAM_ROLES.md).
-*(Names to be filled in by 17 Oct, by strength: Python logic → Role 1, screens → Role 2, data → Role 3,
-servers/security → Role 4, writing/presenting → Role 5.)*
+Work is split by repo module so every file has one owner, with deliverables, RACI, hand-offs,
+smaller-team merges and the Nov 6 / Dec 2 checklists in [docs/TEAM_ROLES.md](docs/TEAM_ROLES.md).
+
+| Role | Owner | GitHub |
+| :--- | :--- | :--- |
+| 1 · Backend & Workflow | **Yogesh** | [@Yogeshsingh123-LAB](https://github.com/Yogeshsingh123-LAB) |
+| 2 · Frontend & PWA | **Utsav** | [@utsavmandalia-01](https://github.com/utsavmandalia-01) |
+| 3 · ML & AI | **Aakash** | [@1006coder](https://github.com/1006coder) |
+| 4 · DevOps, Security & QA | **Sandip** | _invite + username pending_ |
+| 5 · Docs, Demo & Product | **Arnav** | _invite + username pending_ |
 
 ## 📜 License
 
@@ -437,6 +442,8 @@ synthetic demo data provided for demonstration and evaluation. Not an official U
 │   ├── DECK_OUTLINE.md
 │   ├── DEMO_SCRIPT.md
 │   ├── INFRASTRUCTURE_ROADMAP.md
+│   ├── MAIL_TO_UGVCL.md
+│   ├── MAIL_TO_UGVCL.pdf
 │   ├── ML_REPORT.md
 │   ├── PS000125_OFFICIAL.md
 │   ├── QUICK_AUDIT.md
