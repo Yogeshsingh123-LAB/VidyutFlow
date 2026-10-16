@@ -1,6 +1,6 @@
 # Team Roles — VidyutOS Lite in 5 Roles
 
-**Assigned 16 Oct 2026 — all 5 roles filled.** GitHub IDs: **@Yogeshsingh123-LAB** (Yogesh Kumar Singh, owner),
+**Assigned 16 Oct 2026 — all 5 roles filled. Team Leader: Yogesh (Role 1); Aakash Kumar Singh, Utsav, Sandip, Arnav: Collaborators.** GitHub IDs: **@Yogeshsingh123-LAB** (Yogesh Kumar Singh, owner),
 **@utsavmandalia-01** (Utsav), **@1006coder** (Aakash Kumar Singh — ML commit `029b116`), **@SANDIP29072007**
 (Kushwaha Sandip) and **@coderAJ22** (Arnav, ID confirmed by the team lead, 16 Oct).
 Note: the public contributors graph only lists members who have committed so far (@Yogeshsingh123-LAB,
@@ -15,11 +15,11 @@ like data/maths → Role 3 · like servers/security → Role 4 · like writing/p
 
 | # | Role | Owns (repo paths) | Name | Demo segment (1 min each) |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | **Backend & Workflow** | `backend/app/` core + `routers/requests.py`, `workflow.py` | **Yogesh** · [@Yogeshsingh123-LAB](https://github.com/Yogeshsingh123-LAB) (repo owner) | Submit → auto-route |
-| 2 | **Frontend & PWA** | `frontend/src/`, `frontend/public/` | **Utsav** · [@utsavmandalia-01](https://github.com/utsavmandalia-01) (VidyutOne author; repo collaborator ✓) | Portal tour + wizard |
-| 3 | **ML & AI** | `backend/app/ml/`, `backend/app/assistant/`, `backend/data/policies/` | **Aakash** · [@1006coder](https://github.com/1006coder) | SLA-risk + assistant Q&A |
-| 4 | **DevOps, Security & QA** | `docker-compose.yml`, `Makefile`, Dockerfiles, `security.py`, `deps.py`, tests | **Sandip** · [@SANDIP29072007](https://github.com/SANDIP29072007) (repo collaborator ✓) | Offline sync + security |
-| 5 | **Docs, Demo & Product** | `README.md`, `docs/`, deck, video, synopsis | **Arnav** · [@coderAJ22](https://github.com/coderAJ22) | Problem framing + roadmap close |
+| 1 | **Backend & Workflow** | `backend/app/` core + `routers/requests.py`, `workflow.py` | **Yogesh Kumar Singh — 👑 Team Leader** · [@Yogeshsingh123-LAB](https://github.com/Yogeshsingh123-LAB) (repo owner) | Submit → auto-route |
+| 2 | **Frontend & PWA** | `frontend/src/`, `frontend/public/` | **Utsav** · [@utsavmandalia-01](https://github.com/utsavmandalia-01) (Collaborator ✓ · VidyutOne author) | Portal tour + wizard |
+| 3 | **ML & AI** | `backend/app/ml/`, `backend/app/assistant/`, `backend/data/policies/` | **Aakash Kumar Singh — Collaborator** · [@1006coder](https://github.com/1006coder) (Collaborator ✓ · contributor) | SLA-risk + assistant Q&A |
+| 4 | **DevOps, Security & QA** | `docker-compose.yml`, `Makefile`, Dockerfiles, `security.py`, `deps.py`, tests | **Sandip** · [@SANDIP29072007](https://github.com/SANDIP29072007) (Collaborator ✓) | Offline sync + security |
+| 5 | **Docs, Demo & Product** | `README.md`, `docs/`, deck, video, synopsis | **Arnav** · [@coderAJ22](https://github.com/coderAJ22) (Collaborator ✓) | Problem framing + roadmap close |
 
 ---
 

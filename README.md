@@ -371,13 +371,13 @@ Detail: [docs/ROADMAP.md](docs/ROADMAP.md) · UX-upgrade provenance: [docs/VIDYU
 Work is split by repo module so every file has one owner, with deliverables, RACI, hand-offs,
 smaller-team merges and the Nov 6 / Dec 2 checklists in [docs/TEAM_ROLES.md](docs/TEAM_ROLES.md).
 
-| Role | Owner | GitHub |
-| :--- | :--- | :--- |
-| 1 · Backend & Workflow | **Yogesh** | [@Yogeshsingh123-LAB](https://github.com/Yogeshsingh123-LAB) |
-| 2 · Frontend & PWA | **Utsav** | [@utsavmandalia-01](https://github.com/utsavmandalia-01) ✓ collaborator |
-| 3 · ML & AI | **Aakash** | [@1006coder](https://github.com/1006coder) |
-| 4 · DevOps, Security & QA | **Sandip** | [@SANDIP29072007](https://github.com/SANDIP29072007) ✓ collaborator |
-| 5 · Docs, Demo & Product | **Arnav** | [@coderAJ22](https://github.com/coderAJ22) ✓ collaborator |
+| Role | Owner | GitHub | Designation |
+| :--- | :--- | :--- | :--- |
+| 1 · Backend & Workflow | **Yogesh Kumar Singh** | [@Yogeshsingh123-LAB](https://github.com/Yogeshsingh123-LAB) | 👑 **Team Leader** (repo owner) |
+| 2 · Frontend & PWA | **Utsav** | [@utsavmandalia-01](https://github.com/utsavmandalia-01) | Collaborator |
+| 3 · ML & AI | **Aakash Kumar Singh** | [@1006coder](https://github.com/1006coder) | Collaborator |
+| 4 · DevOps, Security & QA | **Sandip** | [@SANDIP29072007](https://github.com/SANDIP29072007) | Collaborator |
+| 5 · Docs, Demo & Product | **Arnav** | [@coderAJ22](https://github.com/coderAJ22) | Collaborator |
 
 ## 📜 License
 
