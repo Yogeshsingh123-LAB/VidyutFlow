@@ -2,7 +2,7 @@
 
 <img src="assets/banner.svg" alt="VidyutFlow — Cloud-to-Edge Orchestration Platform for Power-Utility Services (UGVCL · PS000125)" width="100%">
 
-# ⚡ VidyutFlow — Formerly VidyutOS Lite
+# ⚡ VidyutFlow 
 
 *The control plane for UGVCL field operations*
 
