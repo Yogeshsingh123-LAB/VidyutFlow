@@ -60,3 +60,22 @@
 
 `0.3 registration lock` → `1.1 Compose verify` → `1.3 freeze` → `1.4/1.5 screenshots & ML pack` → `2.1 synopsis` → `3.1 deck` → `3.3 video` → `3.4 rehearsal`.
 Everything else can slip; these cannot. If a role is stuck >24 h, the leader reassigns — silence is the only real blocker.
+
+## R1 progress — 17 Oct 2026
+
+- Backend step 1 implemented locally: engineer permission review and sync duplicate authorization; `make test`: **6 passed**. Details: `CODE_REVIEW.md`.
+- Phase 1.3 is **not frozen**; Compose verification and remaining security decisions are pending.
+
+- Backend step 2 implemented locally: officer zone-scoping built (prototype policy), shared visibility rules, assistant leak fixed, same-zone active routing. `make test`: **7 passed**. Phase 1.7 is only partially complete: login throttle remains pending. Next: login protection, then API contracts and Compose verification.
+
+- Backend step 3 implemented locally: configurable process-local login throttle, consumer-only public registration, inactive-login denial. `make test`: **10 passed**. Phase 1.7 implementation and decision evidence now recorded in `CODE_REVIEW.md`; production distributed limits remain roadmap. API contract review and Compose verification still block Phase 1.3 freeze.
+
+- Backend step 4 implemented locally: `API_CONTRACT.md`, generated `api/openapi.json`, export script and schema drift test. **11 tests passed**. Inventory correction: 16 HTTP operations across 15 paths. Freeze remains pending; see contract review gates. Docker executable is absent from this sandbox, so Compose runtime verification remains blocked here (not passed).
+
+- Compose readiness pack prepared locally: `COMPOSE_VERIFICATION.md`, `scripts/verify_compose.py`, backend/frontend `.dockerignore`. Script syntax/help checks passed. Docker/Podman/socket absent here; full runtime, browser offline and persistence verification remain **pending**, so Phase 1.1 is not complete.
+
+- API review decisions implemented locally: admin-only system status; consumer-only creation (both forms); consistent pending KPI/assistant semantics; frontend aligned. **12 backend tests passed**, frontend build passed. Remaining freeze gates are listed in `API_CONTRACT.md`; Docker runtime still unavailable here.
+
+- Lifecycle protection implemented locally: state graph, terminal-state guards and status/timestamp conditional writes; field retry semantics preserved. **17 backend tests passed**, frontend build passed. See `STATUS_TRANSITIONS.md`. Next coding task: typed response contracts; Docker runtime and final team acceptance remain freeze gates.
+
+- **17 Oct verification update:** Phase 1.1 technical runtime evidence now exists: Docker stack built/started after configuration/readiness fixes, PostgreSQL smoke + restart persistence passed. Real Chromium scripted offline conflict and normal sync passed; 17 backend tests + container frontend build passed. `verification/README.md` supersedes earlier sandbox-blocked notes. R4/team manual sign-off and remaining API freeze gates still pending.

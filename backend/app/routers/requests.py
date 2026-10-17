@@ -8,6 +8,8 @@ from ..models import User, ConnectionRequest, FieldUpdate, AuditLog
 from ..deps import current_user, require
 from ..workflow import run_workflow
 from ..audit import audit
+from ..access import visible_requests, require_request_access
+from ..transitions import apply_transition
 
 router = APIRouter(prefix="/requests", tags=["requests"])
 def out(r: ConnectionRequest):
@@ -22,7 +24,7 @@ class CreateReq(BaseModel):
     tariff_category: str = "Residential (RGPU)"; phase: str = "1-Phase"; premises_type: str = "Owned"
 
 @router.post("", status_code=201)
-def create(body: CreateReq, db: Session = Depends(get_db), u: User = Depends(current_user)):
+def create(body: CreateReq, db: Session = Depends(get_db), u: User = Depends(require("consumer"))):
     r = ConnectionRequest(consumer_id=u.id, **body.model_dump())
     db.add(r); db.flush(); run_workflow(db, r); audit(db, u, "REQUEST_CREATED", "request", r.id, f"{r.status} {r.category}/{r.severity} risk={r.sla_breach_risk}")
     db.commit(); db.refresh(r); return out(r)
@@ -32,7 +34,7 @@ async def create_with_doc(applicant_name: str = Form(...), phone: str = Form(...
     zone: str = Form("North"), pin_code: str = Form(""), request_type: str = Form("new_connection"),
     description: str = Form(""), requested_load_kw: float = Form(1.0), tariff_category: str = Form("Residential (RGPU)"),
     phase: str = Form("1-Phase"), premises_type: str = Form("Owned"), document: UploadFile = File(None),
-    db: Session = Depends(get_db), u: User = Depends(current_user)):
+    db: Session = Depends(get_db), u: User = Depends(require("consumer"))):
     # Lite: store document name/metadata only (object storage is roadmap). Never log file contents.
     name = document.filename if document else ""
     r = ConnectionRequest(consumer_id=u.id, applicant_name=applicant_name, phone=phone, address=address, zone=zone,
@@ -43,17 +45,20 @@ async def create_with_doc(applicant_name: str = Form(...), phone: str = Form(...
 
 @router.get("")
 def list_requests(db: Session = Depends(get_db), u: User = Depends(current_user)):
-    q = db.query(ConnectionRequest)
-    if u.role == "consumer": q = q.filter(ConnectionRequest.consumer_id == u.id)
-    elif u.role == "engineer": q = q.filter(ConnectionRequest.assigned_engineer_id == u.id)
+    q = visible_requests(db, u)
     return [out(r) for r in q.order_by(ConnectionRequest.created_at.desc()).all()]
 
 @router.get("/{request_id}")
 def get_one(request_id: str, db: Session = Depends(get_db), u: User = Depends(current_user)):
     r = db.get(ConnectionRequest, request_id)
     if not r: raise HTTPException(404, "Request not found")
+    require_request_access(db, u, r)
     if u.role == "consumer" and r.consumer_id != u.id: raise HTTPException(403, "Not your request")
+    if u.role == "engineer" and r.assigned_engineer_id != u.id:
+        raise HTTPException(403, "Request is not assigned to you")
     return out(r)
+
+ENGINEER_STATUSES = {"IN_PROGRESS", "FIELD_VERIFIED", "COMPLETED"}
 
 class StatusUpdate(BaseModel): status: str; notes: str = ""
 @router.patch("/{request_id}/status")
@@ -62,17 +67,18 @@ def update_status(request_id: str, body: StatusUpdate, db: Session = Depends(get
     if body.status not in allowed: raise HTTPException(400, f"Status must be one of {sorted(allowed)}")
     r = db.get(ConnectionRequest, request_id)
     if not r: raise HTTPException(404, "Request not found")
-    if u.role == "engineer" and r.assigned_engineer_id and r.assigned_engineer_id != u.id:
+    require_request_access(db, u, r)
+    if u.role == "engineer" and r.assigned_engineer_id != u.id:
         raise HTTPException(403, "Request is assigned to another engineer")
-    r.status = body.status
-    if body.notes: r.validation_notes = body.notes
+    if u.role == "engineer" and body.status not in ENGINEER_STATUSES:
+        raise HTTPException(403, "Engineers may only update field-work statuses")
+    changes = {"validation_notes": body.notes} if body.notes else {}
+    apply_transition(db, r, body.status, **changes)
     audit(db, u, "STATUS_UPDATED", "request", r.id, body.status); db.commit(); db.refresh(r); return out(r)
 
 @router.get("/kpis/summary")
 def kpis(db: Session = Depends(get_db), u: User = Depends(current_user)):
-    q = db.query(ConnectionRequest)  # scoped like GET /requests - aggregates must not leak other users' cases
-    if u.role == "consumer": q = q.filter(ConnectionRequest.consumer_id == u.id)
-    elif u.role == "engineer": q = q.filter(ConnectionRequest.assigned_engineer_id == u.id)
+    q = visible_requests(db, u)
     rows = q.all()
     total = len(rows); completed = sum(r.status=="COMPLETED" for r in rows)
     high = [r for r in rows if r.sla_breach_risk >= 0.7 and r.status not in ("COMPLETED","REJECTED")]
@@ -80,7 +86,7 @@ def kpis(db: Session = Depends(get_db), u: User = Depends(current_user)):
     def count_by(attr):
         keys = sorted({getattr(r, attr) for r in rows})
         return {k: sum(getattr(r, attr)==k for r in rows) for k in keys}
-    return {"total_requests": total, "completed": completed, "pending": total-completed,
+    return {"total_requests": total, "completed": completed, "pending": len(open_rows),
             "high_sla_risk": len(high), "needs_correction": sum(r.status=="NEEDS_CORRECTION" for r in rows),
             "avg_sla_risk": round(sum(r.sla_breach_risk for r in open_rows)/len(open_rows), 3) if open_rows else 0.0,
             "risk_buckets": {"low_<0.4": sum(r.sla_breach_risk < .4 for r in open_rows),
@@ -100,16 +106,29 @@ def field_sync(body: FieldSync, db: Session = Depends(get_db), u: User = Depends
     """Offline sync endpoint. Same client_uuid twice -> duplicate:true, no second row (de-duplication)."""
     if body.task_status not in FIELD_TASK_STATUSES:
         raise HTTPException(400, f"task_status must be one of {sorted(FIELD_TASK_STATUSES)}")
-    existing = db.query(FieldUpdate).filter(FieldUpdate.client_uuid == body.client_uuid).first()
-    if existing: return {"duplicate": True, "synced": False, "field_update_id": existing.id, "message": "Already synced — duplicate ignored"}
     r = db.get(ConnectionRequest, body.request_id)
     if not r: raise HTTPException(404, "Request not found")
-    if u.role == "engineer" and r.assigned_engineer_id and r.assigned_engineer_id != u.id:
+    require_request_access(db, u, r)
+    if u.role == "engineer" and r.assigned_engineer_id != u.id:
         raise HTTPException(403, "Request is assigned to another engineer")
+    existing = db.query(FieldUpdate).filter(FieldUpdate.client_uuid == body.client_uuid).first()
+    if existing:
+        if existing.request_id != body.request_id or existing.engineer_id != u.id:
+            raise HTTPException(409, "client_uuid belongs to another sync operation")
+        return {"duplicate": True, "synced": False, "field_update_id": existing.id, "message": "Already synced — duplicate ignored"}
+    changes = {"meter_serial": body.meter_serial} if body.meter_serial else {}
+    try:
+        apply_transition(db, r, body.task_status, **changes)
+    except HTTPException as conflict:
+        # A concurrent same-UUID retry may have committed while this request was reading.
+        db.rollback()
+        existing = db.query(FieldUpdate).filter(FieldUpdate.client_uuid == body.client_uuid).first()
+        if existing and existing.request_id == body.request_id and existing.engineer_id == u.id:
+            return {"duplicate": True, "synced": False, "field_update_id": existing.id, "message": "Already synced — duplicate ignored"}
+        raise conflict
     fu = FieldUpdate(client_uuid=body.client_uuid, request_id=body.request_id, engineer_id=u.id,
                      task_status=body.task_status, notes=body.notes, meter_serial=body.meter_serial, created_offline_at=body.created_offline_at)
-    db.add(fu); r.status = body.task_status
-    if body.meter_serial: r.meter_serial = body.meter_serial
+    db.add(fu)
     audit(db, u, "FIELD_SYNC", "request", r.id, f"{body.task_status} uuid={body.client_uuid}")
     try:
         db.commit()
@@ -118,10 +137,18 @@ def field_sync(body: FieldSync, db: Session = Depends(get_db), u: User = Depends
         # that is a duplicate, not an error (Core Invariant 2).
         db.rollback()
         existing = db.query(FieldUpdate).filter(FieldUpdate.client_uuid == body.client_uuid).first()
-        return {"duplicate": True, "synced": False, "field_update_id": existing.id if existing else "", "message": "Already synced — duplicate ignored"}
+        if existing is None:
+            raise
+        if existing.request_id != body.request_id or existing.engineer_id != u.id:
+            raise HTTPException(409, "client_uuid belongs to another sync operation")
+        return {"duplicate": True, "synced": False, "field_update_id": existing.id, "message": "Already synced — duplicate ignored"}
     return {"duplicate": False, "synced": True, "field_update_id": fu.id, "request_status": r.status}
 
 @router.get("/audit/logs")
 def logs(db: Session = Depends(get_db), u: User = Depends(require("officer","admin"))):
+    q = db.query(AuditLog)
+    if u.role == "officer":
+        visible_ids = visible_requests(db, u).with_entities(ConnectionRequest.id)
+        q = q.filter(AuditLog.entity == "request", AuditLog.entity_id.in_(visible_ids))
     return [{"id": x.id, "actor_id": x.actor_id, "actor_role": x.actor_role, "action": x.action,
-             "entity_id": x.entity_id, "detail": x.detail, "created_at": x.created_at} for x in db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(100)]
+             "entity_id": x.entity_id, "detail": x.detail, "created_at": x.created_at} for x in q.order_by(AuditLog.created_at.desc()).limit(100)]

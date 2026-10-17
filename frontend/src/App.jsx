@@ -43,7 +43,10 @@ export default function App() {
 
   const refresh = useCallback(async () => { if (!token()) return;
     try { const [r,k,m] = await Promise.all([api('/requests'), api('/requests/kpis/summary'), api('/assistant/ml-metrics')]); setRequests(r); setKpis(k); setMetrics(m);
-      if (user && (user.role==='officer'||user.role==='admin')) { setLogs(await api('/requests/audit/logs')); setSysStatus(await api('/system/status')); }
+      if (user && (user.role==='officer'||user.role==='admin')) { setLogs(await api('/requests/audit/logs')); }
+      else setLogs([]);
+      if (user?.role==='admin') setSysStatus(await api('/system/status'));
+      else setSysStatus(null);
       if (user?.role==='admin') setUsersList(await api('/auth/users')); } catch(e){ toast(e.message,'error'); } },[user, toast]);
   useEffect(()=>{ refresh(); },[user]); // eslint-disable-line
   useEffect(()=>{ const on=()=>setOnline(true), off=()=>setOnline(false); window.addEventListener('online',on); window.addEventListener('offline',off);
@@ -67,10 +70,13 @@ export default function App() {
     const item={ client_uuid:crypto.randomUUID(), request_id:req.id, task_status:'COMPLETED', notes:`Inspection — reading ${insp.reading||'—'} kWh; seal ${insp.seal===false?'NOT intact':'intact'}; terminal ${insp.terminal||'Normal'}; tamper ${insp.tamper?'DETECTED':'none'}; phase V R/Y/B ${insp.vr||'—'}/${insp.vy||'—'}/${insp.vb||'—'}; photo ${insp.photo?'uploaded':'not uploaded'}. ${insp.notes||'Site verified, meter installed'}`, meter_serial:insp.serial||('MTR-'+Math.floor(Math.random()*9000+1000)), created_offline_at:new Date().toISOString() };
     if (offline){ const q=[...loadQueue(),item]; saveQueue(q); setQueue(q); toast(`✈ Offline — inspection queued on device (${item.client_uuid.slice(0,8)}…).`,'warn'); return; }
     try{ const r=await api('/requests/field-sync', json('POST',item)); toast(r.duplicate?'Duplicate ignored — already synced':'Inspection synced to server'); refresh(); }
-    catch{ const q=[...loadQueue(),item]; saveQueue(q); setQueue(q); toast('Network failed — queued for sync','warn'); } }
+    catch(e){
+      if (e.status && e.status < 500) { toast(`Not synced: ${e.message}. Refresh and review the case.`, 'error'); refresh(); return; }
+      const q=[...loadQueue(),item]; saveQueue(q); setQueue(q); toast('Connection/server failure — queued for retry','warn');
+    } }
 
   async function syncQueue(){ const q=loadQueue(); if(!q.length) return toast('Offline queue is empty');
-    let done=0; for(const item of q){ try{ await api('/requests/field-sync', json('POST',item)); done++; }catch{ break; } }
+    let done=0; for(const item of q){ try{ await api('/requests/field-sync', json('POST',item)); done++; }catch(e){ toast(e.status===409 ? `Sync conflict: ${e.message}. Entry retained for review; do not create a new UUID to bypass it.` : `Sync paused: ${e.message}. Unsent entries retained.`, 'error'); break; } }
     const rest=q.slice(done); saveQueue(rest); setQueue(rest); toast(`Synced ${done} queued entr${done===1?'y':'ies'} · ${rest.length} remaining · UUID de-duplication prevents duplicates`); refresh(); }
 
   async function ask(e){ e?.preventDefault(); if(!question.trim()) return;
@@ -141,14 +147,14 @@ export default function App() {
         {(user.role==='admin') && <FeederPanel/>}
       </div>}
 
-      {tab==='new' && <NewConnectionWizard onSubmit={submit}/>}
+      {tab==='new' && user.role==='consumer' && <NewConnectionWizard onSubmit={submit}/>}
       {tab==='requests' && <RequestTable rows={requests} onOpen={setSelected}/>}
 
       {['field','inspections'].includes(tab) && <div className="space-y-4">
         <Card className="p-5 flex flex-wrap gap-3 items-center"><HardHat className="text-amber-500"/><div><h2 className="font-bold">Edge Field Console — control interface for intermittent connectivity</h2>
-          <p className="text-sm text-slate-400">{offline?'✈ Offline — inspections queue on this device with a UUID':'Online — inspections sync immediately'} · Queue: {queue.length} · Open: {requests.filter(r=>r.status!=='COMPLETED').length} · Done today: {requests.filter(r=>r.status==='COMPLETED').length}</p></div>
+          <p className="text-sm text-slate-400">{offline?'✈ Offline — inspections queue on this device with a UUID':'Online — inspections sync immediately'} · Queue: {queue.length} · Open: {requests.filter(r=>['ASSIGNED','IN_PROGRESS','FIELD_VERIFIED','APPROVED','BLOCKED'].includes(r.status)).length} · Done today: {requests.filter(r=>r.status==='COMPLETED').length}</p></div>
           <button className="ml-auto bg-teal-600 text-white rounded-lg px-4 py-2 text-sm font-bold" onClick={syncQueue}>Sync queue</button></Card>
-        {requests.filter(r=>r.status!=='COMPLETED').map(r=><Card key={r.id} className="p-5">
+        {requests.filter(r=>['ASSIGNED','IN_PROGRESS','FIELD_VERIFIED','APPROVED','BLOCKED'].includes(r.status)).map(r=><Card key={r.id} className="p-5">
           <div className="flex flex-wrap gap-3 items-start"><div><p className="font-bold">{r.applicant_name}</p><p className="text-xs text-slate-400">{r.address} · {r.requested_load_kw} kW · {r.tariff_category} · {r.phase}</p></div>
           <button className="ml-auto text-sm text-blue-600 font-bold" onClick={()=>setSelected(r)}>Open case →</button></div>
           <div className="grid sm:grid-cols-3 gap-3 mt-4">
@@ -158,7 +164,7 @@ export default function App() {
             {[['seal','Seal intact',true],['tamper','Tamper detected',false],['photo','Photo captured',false]].map(([k,label])=><label key={k} className="flex items-center gap-2"><input type="checkbox" checked={!!meter[r.id]?.[k]} onChange={e=>setMeter(m=>({...m,[r.id]:{...m[r.id],[k]:e.target.checked}}))}/>{label}</label>)}
             <select className="rounded-lg border px-2 py-1.5 text-sm dark:bg-[#0B1120]" value={meter[r.id]?.terminal||'Normal'} onChange={e=>setMeter(m=>({...m,[r.id]:{...m[r.id],terminal:e.target.value}}))}><option>Normal</option><option>Burnt</option><option>Loose</option></select></div>
           <button className="mt-4 bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-bold" onClick={()=>completeTask(r)}>{offline?'Save inspection offline':'Submit inspection & complete'}</button></Card>)}
-        {!requests.some(r=>r.status!=='COMPLETED') && <Card className="p-6 text-sm text-slate-400">No open field tasks. 🎉</Card>}
+        {!requests.some(r=>['ASSIGNED','IN_PROGRESS','FIELD_VERIFIED','APPROVED','BLOCKED'].includes(r.status)) && <Card className="p-6 text-sm text-slate-400">No open field tasks. 🎉</Card>}
       </div>}
 
       {tab==='history' && <Card className="p-5"><h3 className="font-bold mb-3">Completed jobs ({requests.filter(r=>r.status==='COMPLETED').length})</h3>
@@ -185,8 +191,8 @@ export default function App() {
       {tab==='coordination' && <CoordinationPanel requests={requests}/>}
       {tab==='reports' && <ReportsPanel requests={requests} kpis={kpis} logs={logs} toast={toast}/>}
       {tab==='sla' && <SLAPanel requests={requests} onOpen={setSelected}/>}
-      {tab==='system' && <SystemPanel status={sysStatus}/>}
-      {tab==='integrations' && <SystemPanel status={sysStatus}/>}
+      {tab==='system' && user.role==='admin' && <SystemPanel status={sysStatus}/>}
+      {tab==='integrations' && user.role==='admin' && <SystemPanel status={sysStatus}/>}
       {tab==='users' && <UsersPanel users={usersList}/>}
       {tab==='access' && <AccessPanel/>}
       {tab==='settings' && <SettingsPanel dark={dark} setDark={setDark} airplane={airplane} setAirplane={setAirplane} onReplayIntro={()=>setIntro(true)} toast={toast}/>}

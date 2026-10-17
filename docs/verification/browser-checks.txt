@@ -1,0 +1,15 @@
+PASS: Consumer API fixture login
+PASS: Conflict fixture created
+PASS: Normal fixture created
+PASS: Offline browser saved intended UUID/request
+PASS: Officer rejects in a separate browser session
+PASS: Reconnect auto-sync returns 409
+PASS: Conflict retains original queue entry and UUID
+PASS: Explicit retry still rejects stale terminal update
+PASS: Rejected record unchanged after both attempts
+PASS: Explicit local discard resolves blocked queue; server record unaffected
+PASS: Normal offline work syncs after reconnect
+PASS: Already-completed UUID retry is idempotent
+PASS: Consumer API sees correct completed meter
+PASS: No uncaught browser JavaScript exceptions
+BROWSER CONFLICT AND NORMAL SYNC CHECKS PASSED

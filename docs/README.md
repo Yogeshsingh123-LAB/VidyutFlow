@@ -11,3 +11,10 @@
 - [CODE_REVIEW.md](CODE_REVIEW.md) — review pack: tree, core snippets, checklist (fixed vs open findings)
 - [QUICK_AUDIT.md](QUICK_AUDIT.md) — copy-paste audit pack (README + tree + Makefile) for reviewers who cannot open the repo
 - [TEAM_ROLES.md](TEAM_ROLES.md) — 5-role team split: owners per module, RACI, checklists to Nov 6 / Dec 2
+
+## API contract review
+- [API contract and freeze gates](API_CONTRACT.md)
+- [Generated OpenAPI snapshot](api/openapi.json)
+- Regenerate with `cd backend && python scripts/export_openapi.py`; review changes before accepting schema drift.
+- [Docker Compose verification runbook](COMPOSE_VERIFICATION.md) — R4 commands, smoke test and evidence checklist; runtime verification passed; see [dated evidence](verification/README.md).
+- [Request lifecycle / stale-sync policy](STATUS_TRANSITIONS.md) — prototype graph, terminal rules, retry behavior and limitations.

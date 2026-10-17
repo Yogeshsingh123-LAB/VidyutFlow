@@ -2,7 +2,7 @@
 
 <img src="assets/banner.svg" alt="VidyutFlow — Cloud-to-Edge Orchestration Platform for Power-Utility Services (UGVCL · PS000125)" width="100%">
 
-# ⚡ VidyutFlow 
+# ⚡ VidyutFlow
 
 *The control plane for UGVCL field operations*
 
@@ -16,7 +16,7 @@ Display brand: **VidyutFlow** (formerly VidyutOS Lite). The GitHub repository re
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-square&logo=fastapi&logoColor=white)](#-technology-stack)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-square&logo=react&logoColor=black)](#-technology-stack)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-ML-F7931E?style=for-the-square&logo=scikitlearn&logoColor=white)](#-what-the-bundled-models-show)
-[![Tests](https://img.shields.io/badge/tests-5_passing-16a34a?style=for-the-square)](#-testing--qa)
+[![Tests](https://img.shields.io/badge/tests-17_passing-16a34a?style=for-the-square)](#-testing--qa)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-square)](LICENSE)
 
 [![Contributors](https://img.shields.io/github/contributors/Yogeshsingh123-LAB/VidyutOS?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutOS/graphs/contributors)
@@ -177,11 +177,11 @@ $$
 | 3 | **No silent scores.** Every SLA-risk value is stored **with** its reasons list (JSON), and the UI renders the score and its reasons together (request drawer, risk notifications). | `workflow.run_workflow` (stores risk + reasons atomically) · `RequestDrawer.jsx` | Response-shape checks; reasons visible in demo step 3 |
 | 4 | **Auditable decisions.** Every create, status change and field sync writes an `AuditLog` row (actor, role, action, entity, detail, timestamp). The trail is append-only from the API's side — no endpoint edits or deletes it. | `audit.py` · called by create / with-document / status / field-sync handlers | Audit-trail tab (officer/admin, real API); log assertions in the demo script |
 | 5 | **Humans decide; ML advises.** Models classify, prioritise and flag risk — they never approve, reject, or complete anything. Only an officer/admin status action can approve or reject, and field sync can only report field outcomes (`FIELD_VERIFIED` / `COMPLETED` / `BLOCKED`). | `PATCH /requests/{id}/status` (role-gated, allow-listed) · `FIELD_TASK_STATUSES` guard on `/field-sync` | `test_field_sync_cannot_decide_approvals` — sync attempts with `APPROVED`/`REJECTED`/garbage return **400** and leave the status untouched *(regression test for a real bug found in review, Oct 2026)* |
-| 6 | **Scoped, not just logged-in.** A token proves identity; it does not grant reach. Consumers see only their own requests, engineers only their assigned work — including inside KPI aggregates. | `deps.py` (RBAC) · per-role query scoping in list/get/KPIs · assignment checks on status & sync | Cross-engineer sync → **403** and consumer-sync → **403** in `test_end_to_end_and_dedup`; admin-only routes → 403 for consumers |
+| 6 | **Scoped, not just logged-in.** A token proves identity; it does not grant reach. Consumers see only their own requests, engineers only their assigned work, and officers only their zone — including KPI aggregates and assistant live-data answers. | `deps.py` (RBAC) · per-role query scoping in list/get/KPIs · assignment checks on status & sync | Cross-engineer sync → **403** and consumer-sync → **403** in `test_end_to_end_and_dedup`; admin-only routes → 403 for consumers |
 | 7 | **Fail with reasons, never silently.** Validation problems produce `NEEDS_CORRECTION` with consumer-visible notes listing every problem — not a bare 500 or a vanished submission. Invalid enum values (status, task status) are rejected **400** with the allowed set in the message. | `workflow.validate` → `validation_notes` · allow-list checks in status/field-sync handlers | Needs-correction flow (demo step 1 variant); 400-path assertions in the approval-bypass test |
 
 > **Reading the roadmap honestly:** invariants 1–7 hold for the Lite build today. They are necessary,
-> not sufficient, for production — rate limiting, zone-scoped officer actions, and object storage are
+> not sufficient, for production — distributed rate limiting and object storage are
 > tracked in [§Security Posture](#️-security-posture), not hidden here.
 
 ## 🔀 Real vs Synthetic vs Simulated — Disclosure
@@ -298,7 +298,7 @@ Interactive docs at **`/docs`**. Base path is proxied as `/api` by the frontend.
 | `POST` | `/assistant/chat` | Policy RAG + live SLA/data answers | any role |
 | `GET` | `/assistant/ml-metrics` | Tracked model metrics | any role |
 | `GET` | `/auth/users` | User directory (never returns hashes) | admin |
-| `GET` | `/system/status` | Live service/DB/ML/RAG status + counts | officer, admin |
+| `GET` | `/system/status` | Live service/DB/ML/RAG status + counts | admin |
 
 <sub>*Engineers only on cases assigned to them (403 otherwise, tested).</sub>
 
@@ -345,7 +345,7 @@ VidyutOS/
 ## 🧪 Testing & QA
 
 ```bash
-make test          # 5 passed — backend/tests/test_flow.py
+make test          # 17 passed — backend/tests/
 make build         # frontend production build
 ```
 
@@ -355,6 +355,8 @@ make build         # frontend production build
 | **De-duplication** | The same offline UUID synced **twice** ⇒ second response `duplicate: true`, still one record |
 | Authorisation | Consumer cannot field-sync (403); South engineer cannot touch a North case (403) |
 | ML honesty gate | Both models must **beat their majority baselines** on held-out data, and metrics must carry the synthetic-data notice |
+| Docker Compose | Build/start, PostgreSQL-backed flow, proxy and restart persistence **verified 17 Oct 2026** — [evidence](docs/verification/README.md) |
+| Browser conflict | Real Chromium scripted offline → officer rejection → 409 → retained queue; normal sync and dedup also passed. Human-manual acceptance pending. |
 | Admin surfaces | `/auth/users` exposes no hashes and 403s non-admins; `/system/status` reports real DB/ML/RAG checks |
 
 ## 🛡️ Security Posture
@@ -364,7 +366,7 @@ make build         # frontend production build
 - **CORS:** exact origin allowlist (`CORS_ORIGINS`), never `*` with credentials; the app prints a warning if the default `SECRET_KEY` is still set.
 - **Audit:** append-only log of every mutation with actor + role; audit entries are written in the same transaction as the change.
 - **Offline integrity:** server-side UUID uniqueness is the de-dup authority — the client queue can retry freely.
-- **Accepted demo trade-offs (production homework, stated plainly):** JWT in `localStorage` (→ httpOnly cookie), no login rate-limiting yet, uploads store filename only (→ validated object storage), officer actions not zone-scoped.
+- **Accepted demo trade-offs (production homework, stated plainly):** JWT in `localStorage` (→ httpOnly cookie), process-local login throttling only (20 attempts/IP/60s by default; shared production enforcement pending), uploads store filename only (→ validated object storage). Officer requests, KPIs, assistant answers and audit views are zone-scoped (prototype policy; UGVCL validation pending).
 
 ## ⚖️ Scientific Honesty
 
@@ -416,3 +418,10 @@ smaller-team merges and the Nov 6 / Dec 2 checklists in [docs/TEAM_ROLES.md](doc
 
 MIT — see [LICENSE](LICENSE). Built for the Seva First Innovation Challenge 2026 (PS000125, UGVCL);
 synthetic demo data provided for demonstration and evaluation. Not an official UGVCL system.
+
+### API contract review candidate
+
+[API contract](docs/API_CONTRACT.md) · [OpenAPI snapshot](docs/api/openapi.json).
+16 HTTP operations across 15 paths; snapshot drift is tested. Compose runtime verification passed; freeze still awaits the remaining contract/team review gates. Officer request KPIs are zone-scoped; `/system/status` is admin-only. Request creation is consumer-only, and pending counts exclude completed/rejected cases.
+
+[Request lifecycle policy](docs/STATUS_TRANSITIONS.md): completed/rejected requests reject fresh updates; authorized UUID retries remain idempotent. Prototype rules, not validated UGVCL SOP.

@@ -12,7 +12,7 @@ router = APIRouter(prefix="/system", tags=["system"])
 _started = time.time()
 
 @router.get("/status")
-def status(db: Session = Depends(get_db), u: User = Depends(require("officer", "admin"))):
+def status(db: Session = Depends(get_db), u: User = Depends(require("admin"))):
     try:
         db.execute(text("SELECT 1")); db_ok = True
     except Exception:

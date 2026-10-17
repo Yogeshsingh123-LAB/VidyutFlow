@@ -20,8 +20,8 @@ export function RequestDrawer({ req, user, onClose, onApprove, onReject, onCompl
         <ul className="list-disc ml-5 text-sm space-y-1">{(req.sla_risk_reasons||[]).map((r,i)=><li key={i}>{r}</li>)}</ul>
         <p className="text-xs text-slate-400 mt-3">Model trained on synthetic data — see Insights tab.</p></Card>
       <div className="flex flex-wrap gap-2">
-        {(user.role==='officer'||user.role==='admin') && <><button className="px-3 py-2 rounded-lg bg-teal-600 text-white text-sm" onClick={()=>onApprove(req)}>Approve</button><button className="px-3 py-2 rounded-lg bg-red-600 text-white text-sm" onClick={()=>onReject(req)}>Reject</button></>}
-        {(user.role==='engineer'||user.role==='admin') && req.status!=='COMPLETED' && <button className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm" onClick={()=>onComplete(req)}>Complete field task</button>}
+        {(user.role==='officer'||user.role==='admin') && !['COMPLETED','REJECTED'].includes(req.status) && <>{['ROUTED','ASSIGNED','IN_PROGRESS','FIELD_VERIFIED','APPROVED'].includes(req.status) && <button className="px-3 py-2 rounded-lg bg-teal-600 text-white text-sm" onClick={()=>onApprove(req)}>Approve</button>}{req.status!=='APPROVED' && <button className="px-3 py-2 rounded-lg bg-red-600 text-white text-sm" onClick={()=>onReject(req)}>Reject</button>}</>}
+        {(user.role==='engineer'||user.role==='admin') && ['ASSIGNED','IN_PROGRESS','FIELD_VERIFIED','APPROVED','BLOCKED'].includes(req.status) && <button className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm" onClick={()=>onComplete(req)}>Complete field task</button>}
       </div>
     </aside></div>);
 }

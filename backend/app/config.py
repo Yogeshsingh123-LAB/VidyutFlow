@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import Field
 
 class Settings(BaseSettings):
     app_name: str = "VidyutOS Lite"
@@ -10,6 +11,8 @@ class Settings(BaseSettings):
     redis_url: str = ""
     # Comma-separated browser origins allowed to call the API (never "*" with credentials in production)
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    login_max_attempts: int = Field(default=20, ge=1, le=1000)
+    login_window_seconds: int = Field(default=60, ge=1, le=3600)
     model_dir: str = "app/ml/models"
 
     class Config:

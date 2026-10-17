@@ -39,9 +39,9 @@ def run_workflow(db: Session, req: ConnectionRequest) -> ConnectionRequest:
         req.status, req.validation_notes = "NEEDS_CORRECTION", "; ".join(problems)
         return req
     req.validation_notes, req.status = "Validated automatically", "ROUTED"
-    # Routing rule: zone -> first active officer/engineer in that zone (fallback: any)
-    officer = db.query(User).filter(User.role=="officer", User.zone==req.zone).first() or db.query(User).filter(User.role=="officer").first()
-    engineer = db.query(User).filter(User.role=="engineer", User.zone==req.zone).first() or db.query(User).filter(User.role=="engineer").first()
+    # Route only to active staff in the same zone; no cross-zone fallback.
+    officer = db.query(User).filter(User.role=="officer", User.zone==req.zone, User.is_active.is_(True)).first()
+    engineer = db.query(User).filter(User.role=="engineer", User.zone==req.zone, User.is_active.is_(True)).first()
     if officer: req.assigned_officer_id = officer.id
     if engineer: req.assigned_engineer_id = engineer.id
     req.status = "ASSIGNED" if engineer else "ROUTED"

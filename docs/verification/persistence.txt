@@ -1,0 +1,5 @@
+PASS: PostgreSQL and backend restarted; request state, meter and field/audit counts unchanged.
+id,status,meter_serial,field_rows,audit_rows
+7f5355c3-e55f-4f77-b48e-1d2d816bcc0f,REJECTED,,0,2
+ef8baadb-4f24-451b-8bdb-7c5f3792ef4e,COMPLETED,BROWSER-GOOD-METER,1,2
+(2 rows)

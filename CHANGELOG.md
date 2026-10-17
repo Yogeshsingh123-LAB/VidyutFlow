@@ -6,6 +6,12 @@ this project is a hackathon prototype, so versions track milestones rather than 
 ## [Unreleased]
 
 ### Fixed
+- Compose runtime blockers: corrected demo PostgreSQL password YAML type and healthcheck database name; added API/proxy readiness checks and frontend dependency gating. Compose/PostgreSQL flow, restart persistence and scripted Chromium offline/conflict checks passed (17 Oct 2026); evidence in docs/verification.
+- Terminal request protection: status PATCH and fresh field sync cannot overwrite COMPLETED/REJECTED cases. Lifecycle policy plus status/timestamp conditional writes reject stale updates; existing authorized UUID retries remain idempotent. Frontend preserves queued conflicts for review and no longer labels HTTP 4xx as network failure. 17 tests pass locally; frontend builds.
+- Public registration can no longer create staff/admin accounts; inactive users cannot obtain login tokens.
+- Login now has a bounded, thread-safe process-local IP throttle with HTTP 429 and Retry-After (configurable; not distributed protection). Security regression suite: 10 passing locally.
+- Backend permission review: engineer status decisions and detail access hardened; sync deduplication now follows authorization and checks actor/request ownership.
+- Officer zone scope enforced across requests, actions, KPIs, assistant queries and audit views. Assistant live-data queries now respect every caller's scope. Routing excludes inactive/cross-zone fallback staff. Local suite: 7 passing.
 - **Approval bypass via field sync:** `POST /requests/field-sync` accepted any `task_status`,
   letting an engineer set `APPROVED`/`REJECTED` (or corrupt states) and bypass the officer-decision
   invariant. Sync now accepts only `FIELD_VERIFIED`/`COMPLETED`/`BLOCKED` (400 otherwise), and a
@@ -13,9 +19,11 @@ this project is a hackathon prototype, so versions track milestones rather than 
   `test_field_sync_cannot_decide_approvals` (suite: 5 passing).
 
 ### Changed
+- API review: system status is admin-only; both request creation endpoints are consumer-only; KPI pending excludes completed/rejected requests. Frontend no longer fetches system status for officers. These tighten access without changing successful response keys; 12 tests pass locally and frontend builds.
 - README Core Invariants rewritten as an auditable table (invariant → enforcement point → verification).
 
 ### Added
+- API contract review candidate, generated OpenAPI snapshot/export script and drift regression test (11 passing locally). Freeze pending explicit review gates and Compose verification.
 - Community & professionalism pack: `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`,
   issue/PR templates, Dependabot config, README banner, table of contents, GitHub About/topics.
 - Team designations: Yogesh Kumar Singh (Team Leader), Aakash Kumar Singh/Utsav/Sandip/Arnav (Collaborators).
