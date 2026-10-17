@@ -20,12 +20,17 @@ directly; there are no supported release branches.
 ## Current posture (honest)
 
 Implemented: bcrypt password hashing, JWT auth with RBAC + assignment-level checks, restricted CORS,
-audit logging of officer actions, no password hashes exposed via the API.
+zone-scoped officer access, login throttling, audit logging of officer actions, and no password hashes
+exposed via the API. Registration rejects passwords exceeding bcrypt's 72-byte UTF-8 limit rather
+than silently truncating them.
 
 Known prototype limitations (documented in README §Security Posture — do not deploy as-is):
-JWT in `localStorage`, no login rate limiting, document uploads store metadata only, officer actions
-not yet zone-scoped, default seeded credentials. Production hardening (SSO, secret vault, multi-AZ,
-WAF) is roadmap — see `docs/ROADMAP.md` and `docs/INFRASTRUCTURE_ROADMAP.md`.
+JWT in `localStorage`, process-local login throttling, document uploads store metadata only, and
+demo credentials are intentionally seeded in development mode. Production mode requires a
+non-placeholder `SECRET_KEY`, does not seed demo users or requests, and refuses to start if
+the database already contains those demo accounts. Production hardening (SSO,
+secret vault, shared rate limiting, multi-AZ, WAF) is roadmap — see `docs/ROADMAP.md` and
+`docs/INFRASTRUCTURE_ROADMAP.md`.
 
 ## Secrets
 

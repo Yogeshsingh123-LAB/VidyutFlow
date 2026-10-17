@@ -16,7 +16,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-square&logo=fastapi&logoColor=white)](#-technology-stack)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-square&logo=react&logoColor=black)](#-technology-stack)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-ML-F7931E?style=for-the-square&logo=scikitlearn&logoColor=white)](#-what-the-bundled-models-show)
-[![Tests](https://img.shields.io/badge/tests-17_passing-16a34a?style=for-the-square)](#-testing--qa)
+[![Tests](https://img.shields.io/badge/tests-21_passing-16a34a?style=for-the-square)](#-testing--qa)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-square)](LICENSE)
 
 [![Contributors](https://img.shields.io/github/contributors/Yogeshsingh123-LAB/VidyutFlow?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutFlow/graphs/contributors)
@@ -233,7 +233,15 @@ Full design notes: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Reviewer pack
 
 ## 🚀 Quickstart
 
+For Docker Compose, first copy `.env.example` to `.env` and replace `SECRET_KEY` with a
+random value of at least 32 characters. The example selects `development` so the synthetic
+demo accounts are seeded. Use `APP_ENV=production` for a deployment; production startup
+rejects development secrets, skips demo seeding, and refuses to start against a database
+that already contains the seeded demo accounts. Never commit `.env`.
+
 ```bash
+cp .env.example .env
+# Replace SECRET_KEY in .env with a securely generated random value before starting Compose.
 make setup && make backend     # terminal 1 — API :8000 (SQLite fallback, auto-seeds demo data)
 make frontend                  # terminal 2 — web app :5173
 # — or the full stack in one command —
@@ -345,7 +353,7 @@ VidyutFlow/
 ## 🧪 Testing & QA
 
 ```bash
-make test          # 17 passed — backend/tests/
+make test          # 21 passed — backend/tests/
 make build         # frontend production build
 ```
 
@@ -362,8 +370,10 @@ make build         # frontend production build
 ## 🛡️ Security Posture
 
 - **Passwords:** bcrypt (direct, per-user salt); demo passwords are seeded, documented, and demo-only.
+- **Deployment defaults:** Compose requires an explicitly supplied `SECRET_KEY` and defaults to production mode, which rejects placeholder keys, disables demo account/request seeding, and refuses databases already containing those demo accounts. Set `APP_ENV=development` only for the synthetic demo.
+- **Password length:** registration rejects passwords longer than bcrypt's 72-byte UTF-8 limit; verification never truncates.
 - **Tokens:** JWT with role claim; route-level RBAC **plus** assignment-level checks; KPI aggregates are role-scoped (no cross-user leakage).
-- **CORS:** exact origin allowlist (`CORS_ORIGINS`), never `*` with credentials; the app prints a warning if the default `SECRET_KEY` is still set.
+- **CORS:** exact origin allowlist (`CORS_ORIGINS`), never `*` with credentials; development mode warns when the placeholder `SECRET_KEY` is used.
 - **Audit:** append-only log of every mutation with actor + role; audit entries are written in the same transaction as the change.
 - **Offline integrity:** server-side UUID uniqueness is the de-dup authority — the client queue can retry freely.
 - **Accepted demo trade-offs (production homework, stated plainly):** JWT in `localStorage` (→ httpOnly cookie), process-local login throttling only (20 attempts/IP/60s by default; shared production enforcement pending), uploads store filename only (→ validated object storage). Officer requests, KPIs, assistant answers and audit views are zone-scoped (prototype policy; UGVCL validation pending).

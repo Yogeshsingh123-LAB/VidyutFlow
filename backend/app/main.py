@@ -11,7 +11,7 @@ from .config import settings
 
 _origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 if settings.secret_key.startswith(("dev-only", "change-me")):
-    print("[security] WARNING: default SECRET_KEY in use - set a long random SECRET_KEY outside local demos.")
+    print("[security] WARNING: development SECRET_KEY in use; production startup rejects this default.")
 
 DEMO = [
  ("admin@vidyut.local","Admin User","admin","North","Admin@123"),
@@ -22,6 +22,8 @@ DEMO = [
  ("consumer@vidyut.local","Demo Consumer","consumer","North","Consumer@123"),
 ]
 def seed():
+    if settings.app_env == "production":
+        return
     db = SessionLocal()
     try:
         for email, name, role, zone, pw in DEMO:
@@ -31,6 +33,8 @@ def seed():
     finally: db.close()
 
 def seed_requests():
+    if settings.app_env == "production":
+        return
     # Synthetic sample rows so the officer dashboard / SLA assistant are not empty on first login.
     db = SessionLocal()
     try:
@@ -49,12 +53,27 @@ def seed_requests():
         db.commit()
     finally: db.close()
 
+def reject_seeded_demo_accounts():
+    demo_emails = [email for email, *_ in DEMO]
+    db = SessionLocal()
+    try:
+        if db.query(models.User).filter(models.User.email.in_(demo_emails)).first():
+            raise RuntimeError(
+                "Production database contains seeded demo accounts; remove them "
+                "before starting with APP_ENV=production"
+            )
+    finally:
+        db.close()
+
 @asynccontextmanager
 async def lifespan(_app):
     Base.metadata.create_all(bind=engine)
     try: ensure_models()
     except Exception as e: print(f"[warn] model training skipped: {e}")
-    seed(); seed_requests()
+    if settings.app_env == "production":
+        reject_seeded_demo_accounts()
+    else:
+        seed(); seed_requests()
     yield
 
 app = FastAPI(title="VidyutFlow", description="PS000125 demo: one end-to-end new-connection flow. ML trained on SYNTHETIC data only.", version="0.1.0", lifespan=lifespan)

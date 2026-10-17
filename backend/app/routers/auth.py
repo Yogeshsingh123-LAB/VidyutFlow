@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import User
@@ -11,6 +11,13 @@ from ..login_limit import enforce_login_limit
 router = APIRouter(prefix="/auth", tags=["auth"])
 class Register(BaseModel):
     email: EmailStr; name: str; password: str; role: str = "consumer"; zone: str = "North"
+
+    @field_validator("password")
+    @classmethod
+    def password_fits_bcrypt(cls, password: str) -> str:
+        if len(password.encode("utf-8")) > 72:
+            raise ValueError("Password must be at most 72 bytes when encoded as UTF-8")
+        return password
 
 @router.post("/register", status_code=201)
 def register(body: Register, db: Session = Depends(get_db)):

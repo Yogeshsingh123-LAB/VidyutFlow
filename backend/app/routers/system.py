@@ -2,6 +2,7 @@
 import glob, os, time
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from ..db import get_db, engine
 from ..models import User, ConnectionRequest, FieldUpdate, AuditLog
@@ -14,16 +15,24 @@ _started = time.time()
 @router.get("/status")
 def status(db: Session = Depends(get_db), u: User = Depends(require("admin"))):
     try:
-        db.execute(text("SELECT 1")); db_ok = True
-    except Exception:
+        db.execute(text("SELECT 1"))
+        counts = {
+            "users": db.query(User).count(),
+            "requests": db.query(ConnectionRequest).count(),
+            "field_updates": db.query(FieldUpdate).count(),
+            "audit_logs": db.query(AuditLog).count(),
+        }
+        db_ok = True
+    except SQLAlchemyError:
+        db.rollback()
         db_ok = False
+        counts = None
     m = metrics()
     policies = len(glob.glob(os.path.join(os.path.dirname(__file__), "..", "..", "data", "policies", "*.md")))
     return {
         "service": "VidyutFlow API", "status": "ok" if db_ok else "degraded",
         "database": {"dialect": engine.dialect.name, "ok": db_ok},
-        "counts": {"users": db.query(User).count(), "requests": db.query(ConnectionRequest).count(),
-                   "field_updates": db.query(FieldUpdate).count(), "audit_logs": db.query(AuditLog).count()},
+        "counts": counts,
         "ml": {"models_trained": "category_classifier" in m, "metrics": m},
         "assistant": {"policy_documents": policies, "engine": "TF-IDF RAG + live queries (no external LLM)"},
         "process_uptime_seconds": int(time.time() - _started),

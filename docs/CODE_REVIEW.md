@@ -1,10 +1,12 @@
 # Code review pack — for a reviewer who cannot browse the repo
+> **Current-state note (17 Oct 2026):** This pack includes historical snapshots. The dated notes below record findings as they stood at the time; later entries and the repository's current source take precedence. Current security limitations and environment setup are summarized in `SECURITY.md` and the root `README.md`.
+
 **Scope correction:** VidyutFlow is not a kernel/OS — there is no `kernel.c`, GDT/IDT or QEMU target.
 "OS" is the product metaphor for a utility platform (*like an operating system for the DISCOM*). The kernel-equivalent
 core under review is the **workflow engine** (`backend/app/workflow.py`), the **data layer** (`models.py`/`db.py`)
 and the **offline sync contract** (`POST /requests/field-sync`). Build system equivalent: Docker Compose + `pip`/`npm` lockfiles.
 
-## 1. Directory structure (61 tracked files)
+## 1. Directory structure (historical, abridged snapshot; current repository has 115 tracked files)
 ```
 ├── backend
 │   ├── app
@@ -92,7 +94,7 @@ and the **offline sync contract** (`POST /requests/field-sync`). Build system eq
 - **Security** — `backend/app/security.py` (bcrypt direct, JWT) + `deps.py` (RBAC) + assignment-level checks in `requests.py`.
 - **ML contract** — `backend/app/ml/{synthetic,train,predict}.py`; metrics in `models/metrics.json` (synthetic data, majority-baseline comparison).
 
-## 3. Checklist (reviewed Oct 15, 2026 — items marked FIXED were changed in the same commit as this file)
+## 3. Historical checklist (reviewed Oct 15, 2026; superseded where noted below)
 ### Documentation
 - [x] README: goal, stack, quick-start (Compose + local), demo logins, demo script, built-vs-roadmap table
 - [x] **LICENSE added (MIT)** — was missing
@@ -106,12 +108,12 @@ and the **offline sync contract** (`POST /requests/field-sync`). Build system eq
 - [x] **Authorisation gap FIXED:** an engineer can no longer field-sync or status-update another engineer's case (403, tested); KPI aggregates are now role-scoped like the list endpoint
 - [x] **CORS FIXED:** was `allow_origins=["*"]` with credentials → now an allowlist from `CORS_ORIGINS` env; app warns on the default `SECRET_KEY`
 - [x] **Deprecated stack FIXED:** `on_event` → lifespan handler; passlib (broken warning with bcrypt 4.x) → direct `bcrypt`
-- [ ] Open (accepted for demo, roadmap): JWT kept in `localStorage` (XSS trade-off — move to httpOnly cookie for production); no login rate-limiting; document upload stores filename only (no type/size validation or object storage); officer actions are not zone-scoped
+- [x] Later implemented: process-local login throttling and officer zone-scoped request access. Passwords over bcrypt's 72-byte UTF-8 limit are rejected. Remaining accepted demo limitations: JWT in `localStorage`, document upload stores filename only (no type/size validation or object storage), and rate-limit state is not shared across workers/replicas.
 - [x] Naming/comments: snake_case Python, PascalCase React components; non-obvious rules commented (routing, SLA, sync)
 ### DevOps & testing
 - [x] Backend tests: `pytest` end-to-end (auth/RBAC → submit → route → assistant → offline sync ×2 → status), ML > baseline
 - [x] Frontend production build verified (`npm run build`)
-- [ ] CI: workflow YAML was prepared/validated locally but GitHub rejected it — the repo token lacks `workflow` scope. Add via GitHub web UI (Actions → New workflow) or a `workflow`-scoped token. Frontend unit tests also still to add.
+- [ ] CI: no CI workflow is currently tracked. Frontend unit tests were added after this historical checklist.
 ## 4. How to reproduce this review
 ```bash
 cd backend && pip install -r requirements.txt -r requirements-dev.txt && pytest -q

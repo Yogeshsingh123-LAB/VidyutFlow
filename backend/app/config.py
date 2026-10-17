@@ -1,8 +1,10 @@
+from typing import Literal
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings
-from pydantic import Field
 
 class Settings(BaseSettings):
     app_name: str = "VidyutFlow"
+    app_env: Literal["development", "production"] = "development"
     secret_key: str = "dev-only-change-me-in-production-please-32-chars"
     algorithm: str = "HS256"
     access_token_minutes: int = 60 * 24
@@ -17,5 +19,18 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+
+    @model_validator(mode="after")
+    def validate_production_secret(self):
+        secret = self.secret_key.casefold()
+        if self.app_env == "production" and (
+            len(self.secret_key) < 32
+            or secret.startswith(("dev-only", "change-me", "replace-with", "your-"))
+        ):
+            raise ValueError(
+                "Production requires a SECRET_KEY of at least 32 characters "
+                "that is not a development placeholder"
+            )
+        return self
 
 settings = Settings()

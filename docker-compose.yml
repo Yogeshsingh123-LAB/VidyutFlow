@@ -11,7 +11,8 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: "postgresql+psycopg://vidyut:vidyut@db:5432/vidyutos"
-      SECRET_KEY: "change-me-in-production-use-a-long-random-secret"
+      APP_ENV: ${APP_ENV:-production}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in the root .env file}
     depends_on: { db: { condition: service_healthy } }
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]

@@ -4,10 +4,14 @@ from jose import jwt, JWTError
 from .config import settings
 
 def hash_password(p: str) -> str:
-    # bcrypt operates on <=72 bytes; encode explicitly so long passwords fail predictably instead of silently truncating in callers
-    return bcrypt.hashpw(p.encode()[:72], bcrypt.gensalt()).decode()
+    password = p.encode()
+    if len(password) > 72:
+        raise ValueError("Password must be at most 72 bytes when encoded as UTF-8")
+    return bcrypt.hashpw(password, bcrypt.gensalt()).decode()
 def verify_password(p: str, h: str) -> bool:
-    try: return bcrypt.checkpw(p.encode()[:72], h.encode())
+    try:
+        password = p.encode()
+        return len(password) <= 72 and bcrypt.checkpw(password, h.encode())
     except (ValueError, TypeError): return False
 def create_token(user_id: str, role: str) -> str:
     exp = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_minutes)

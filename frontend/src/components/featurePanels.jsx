@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Card, Field, inputCls, Chip, RiskChip, StatusChip, Bars } from './ui';
 import { fmtDate, isOverdue } from '../lib/format';
+import { toCsv } from '../lib/csv';
 
 const inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
 export function downloadCsv(name, rows) {
-  const csv = rows.map(r => r.map(c => `"${String(c ?? '').replaceAll('"','""')}"`).join(',')).join('\n');
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv' })); a.download = name; a.click(); URL.revokeObjectURL(a.href);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([toCsv(rows)], { type:'text/csv' })); a.download = name; a.click(); URL.revokeObjectURL(a.href);
 }
 
 /* Consumer: connections derived from real (completed) requests */
@@ -145,7 +145,8 @@ export function SLAPanel({ requests, onOpen }) {
 
 export function SystemPanel({ status }) {
   if (!status) return <Card className="p-6 text-sm text-slate-400">Loading system status… (officer/admin only)</Card>;
-  return (<div className="space-y-4"><div className="grid sm:grid-cols-4 gap-3">{[['API', status.status],['Database', status.database.dialect],['Users', status.counts.users],['Audit entries', status.counts.audit_logs]].map(([k,v]) => <Card key={k} className="p-4 text-center"><p className="text-lg font-extrabold capitalize">{v}</p><p className="text-xs text-slate-400">{k}</p></Card>)}</div>
+  const counts = status.counts || {};
+  return (<div className="space-y-4"><div className="grid sm:grid-cols-4 gap-3">{[['API', status.status],['Database', status.database.dialect],['Users', counts.users ?? '—'],['Audit entries', counts.audit_logs ?? '—']].map(([k,v]) => <Card key={k} className="p-4 text-center"><p className="text-lg font-extrabold capitalize">{v}</p><p className="text-xs text-slate-400">{k}</p></Card>)}</div>
     <Card className="p-5"><h3 className="font-bold mb-3">Service status (live checks)</h3>{status.services.map(s => <div key={s.name} className="flex items-center gap-3 py-2.5 border-b border-slate-100 dark:border-slate-800 text-sm"><span>{s.name}</span><span className="ml-auto"><Chip className={s.status==='Operational' ? 'bg-emerald-100 text-emerald-800' : s.status.startsWith('Simulated') ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}>{s.status}</Chip></span></div>)}
     <p className="text-xs text-slate-400 mt-3">Policy documents indexed: {status.assistant.policy_documents} · Process uptime (this server run): {status.process_uptime_seconds}s · No invented 90-day uptime — measured monitoring is roadmap (Prometheus).</p></Card></div>);
 }
