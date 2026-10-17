@@ -6,8 +6,8 @@
   </defs>
   <rect width="1200" height="300" fill="url(#g)"/>
   <g fill="#facc15"><path d="M120 62 L82 158 h26 L96 238 L168 128 h-28 L158 62 z"/></g>
-  <text x="200" y="140" font-family="Segoe UI, Arial, sans-serif" font-size="64" font-weight="700" fill="#ffffff">VidyutOS <tspan fill="#7dd3fc">Lite</tspan></text>
-  <text x="202" y="182" font-family="Segoe UI, Arial, sans-serif" font-size="24" fill="#bae6fd">Cloud-to-Edge Orchestration Platform for Power-Utility Services</text>
+  <text x="200" y="140" font-family="Segoe UI, Arial, sans-serif" font-size="64" font-weight="700" fill="#ffffff">Vidyut<tspan fill="#7dd3fc">Flow</tspan></text>
+  <text x="202" y="182" font-family="Segoe UI, Arial, sans-serif" font-size="24" fill="#bae6fd">The control plane for UGVCL field operations</text>
   <text x="202" y="218" font-family="Segoe UI, Arial, sans-serif" font-size="19" fill="#e2e8f0">&#8220;Enter Once, Use Everywhere&#8221; &#183; UGVCL &#183; PS000125</text>
   <g font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#0b1e3f">
     <rect x="202" y="238" width="118" height="28" rx="14" fill="#7dd3fc"/><text x="261" y="257" text-anchor="middle">FastAPI</text>

@@ -1,11 +1,14 @@
 <div align="center">
 
-<img src="assets/banner.svg" alt="VidyutOS Lite — Cloud-to-Edge Orchestration Platform for Power-Utility Services (UGVCL · PS000125)" width="100%">
+<img src="assets/banner.svg" alt="VidyutFlow — Cloud-to-Edge Orchestration Platform for Power-Utility Services (UGVCL · PS000125)" width="100%">
 
-# ⚡ VidyutOS Lite
+# ⚡ VidyutFlow — Formerly VidyutOS Lite
 
-**A Cloud-to-Edge Orchestration Platform for power-utility services —**
-**the control plane for managing, monitoring, and deploying AI policies to field edge clients.**
+*The control plane for UGVCL field operations*
+
+**Cloud-to-Edge Orchestration for Power Utilities.**
+
+Display brand: **VidyutFlow** (formerly VidyutOS Lite). The GitHub repository remains `VidyutOS`; existing links are unchanged.
 *“Enter Once, Use Everywhere.”*
 
 [![Problem Statement](https://img.shields.io/badge/PS-PS000125-blue?style=for-the-square)](#-the-problem)
@@ -27,7 +30,7 @@ Resource person: hmtcotech2@ugvcl.com · Synopsis due 6 Nov 2026 · Grand Finale
 📋 Official statement: [docs/PS000125_OFFICIAL.md](docs/PS000125_OFFICIAL.md) · Requirement-by-requirement
 mapping (built/lite/roadmap, with evidence): [docs/REQUIREMENT_MAPPING.md](docs/REQUIREMENT_MAPPING.md)
 
-**Product definition.** VidyutOS is **not an operating system**. It is the **control plane** for a
+**Product definition.** VidyutFlow is **not an operating system**. It is the **control plane** for a
 utility's cloud-to-edge operations: the cloud side manages, monitors and intelligence-checks every
 service request, while the **edge** — field engineers' devices, which must keep working with no
 network — executes against it autonomously and syncs back. In this Lite build the edge client is the
@@ -35,7 +38,7 @@ engineer PWA; “AI policies” are the classification, routing and SLA-risk pol
 today and designed to be pushed to edge devices as they are onboarded (roadmap).
 
 > [!IMPORTANT]
-> **Core product principle:** VidyutOS is an **AI-assisted workflow & decision-support platform**.
+> **Core product principle:** VidyutFlow is an **AI-assisted workflow & decision-support platform**.
 > The ML models classify, prioritise and flag SLA risk — they **never approve or reject a connection**.
 > Every final decision (approve / reject / correction) stays with the officer, and every action is audit-logged.
 
@@ -48,7 +51,7 @@ today and designed to be pushed to edge devices as they are onboarded (roadmap).
 
 ## 📑 Contents
 
-- [The Problem](#-the-problem) · [What VidyutOS Lite Does](#-what-vidyutos-lite-does) · [Key Features](#-key-features) · [Core Invariants](#-core-invariants-enforced-not-just-described)
+- [The Problem](#-the-problem) · [What VidyutFlow Does](#-what-vidyutflow-does) · [Key Features](#-key-features) · [Core Invariants](#-core-invariants-enforced-not-just-described)
 - [Real vs Synthetic vs Simulated](#-real-vs-synthetic-vs-simulated--disclosure) · [Architecture](#️-architecture) · [Quickstart](#-quickstart) · [Model Results](#-what-the-bundled-models-show)
 - [Backend REST API](#-backend-rest-api) · [Frontend Modules](#️-frontend-modules) · [Technology Stack](#️-technology-stack) · [Repository Layout](#️-repository-layout)
 - [Testing & QA](#-testing--qa) · [Security Posture](#️-security-posture) · [Scientific Honesty](#️-scientific-honesty) · [Roadmap](#️-roadmap--production-integration)
@@ -76,7 +79,7 @@ Work today is split across disconnected ERP, portal and field systems:
 <sub>*Baseline figures (routing time, lost-request %, ₹/connection, payback) are **planning assumptions from the
 design document, not UGVCL published numbers** — see [Scientific honesty](#-scientific-honesty).</sub>
 
-## 💡 What VidyutOS Lite Does
+## 💡 What VidyutFlow Does
 
 One working end-to-end flow — the **new-connection request** — on a real backend, with everything
 else as an explicitly labelled scale-up roadmap:
@@ -92,7 +95,7 @@ what and why, who owns it now, and when its SLA expires.*
 
 ### Product goals → how this build maps to them
 
-| Official goal | VidyutOS framing | Implemented as (status) |
+| Official goal | VidyutFlow framing | Implemented as (status) |
 | :--- | :--- | :--- |
 | Centralised **control plane** | Manage, monitor & orchestrate every request from one place | FastAPI workflow + audit log + KPI control API (**built**) |
 | **Edge Intelligence Simulation / Policy Validation** | Validate AI policies (classify, route, SLA-risk) before they ever reach a device | Two scikit-learn models + reasons, centrally served (**built, synthetic-trained**) |
