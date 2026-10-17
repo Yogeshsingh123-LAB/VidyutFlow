@@ -2,7 +2,7 @@
 
 ## Scope
 
-VidyutOS Lite is a **hackathon prototype** (Seva First Innovation Challenge, PS000125) running on
+VidyutFlow is a **hackathon prototype** (Seva First Innovation Challenge, PS000125) running on
 synthetic data. It is not connected to any UGVCL production system and holds no real consumer data.
 
 ## Reporting a vulnerability

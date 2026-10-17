@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 from pydantic import Field
 
 class Settings(BaseSettings):
-    app_name: str = "VidyutOS Lite"
+    app_name: str = "VidyutFlow"
     secret_key: str = "dev-only-change-me-in-production-please-32-chars"
     algorithm: str = "HS256"
     access_token_minutes: int = 60 * 24

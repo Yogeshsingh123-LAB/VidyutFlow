@@ -1,5 +1,5 @@
 # Code review pack — for a reviewer who cannot browse the repo
-**Scope correction:** VidyutOS is not a kernel/OS — there is no `kernel.c`, GDT/IDT or QEMU target.
+**Scope correction:** VidyutFlow is not a kernel/OS — there is no `kernel.c`, GDT/IDT or QEMU target.
 "OS" is the product metaphor for a utility platform (*like an operating system for the DISCOM*). The kernel-equivalent
 core under review is the **workflow engine** (`backend/app/workflow.py`), the **data layer** (`models.py`/`db.py`)
 and the **offline sync contract** (`POST /requests/field-sync`). Build system equivalent: Docker Compose + `pip`/`npm` lockfiles.

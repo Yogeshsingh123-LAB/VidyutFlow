@@ -1,4 +1,4 @@
-# VidyutOS Lite — one-command build/run/test (no hardcoded local paths; run from repo root)
+# VidyutFlow — one-command build/run/test (no hardcoded local paths; run from repo root)
 .DEFAULT_GOAL := help
 .PHONY: help setup train backend frontend dev test build up down clean demo-reset
 

@@ -1,6 +1,6 @@
-# Contributing to VidyutOS
+# Contributing to VidyutFlow
 
-Thanks for helping build VidyutOS Lite (UGVCL · PS000125). This is a 5-member team repo — ownership is
+Thanks for helping build VidyutFlow (UGVCL · PS000125). This is a 5-member team repo — ownership is
 split by module in [docs/TEAM_ROLES.md](docs/TEAM_ROLES.md). Work inside your role's paths; cross-role
 changes need the owning role's review.
 

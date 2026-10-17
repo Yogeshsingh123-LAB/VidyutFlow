@@ -1,4 +1,4 @@
-# Team Roles — VidyutOS Lite in 5 Roles
+# Team Roles — VidyutFlow in 5 Roles
 
 **Assigned 16 Oct 2026 — all 5 roles filled. Team Leader: Yogesh (Role 1); Aakash Kumar Singh, Utsav, Sandip, Arnav: Collaborators.** GitHub IDs: **@Yogeshsingh123-LAB** (Yogesh Kumar Singh, owner),
 **@utsavmandalia-01** (Utsav), **@1006coder** (Aakash Kumar Singh — ML commit `029b116`), **@SANDIP29072007**

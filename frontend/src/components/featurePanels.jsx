@@ -124,8 +124,8 @@ export function CoordinationPanel({ requests }) {
 }
 
 export function ReportsPanel({ requests, kpis, logs, toast }) {
-  const exportRequests = () => { downloadCsv('vidyutos-requests.csv', [['id','applicant','phone','zone','tariff','load_kw','category','severity','status','sla_risk','sla_due','created'], ...requests.map(r => [r.id, r.applicant_name, r.phone, r.zone, r.tariff_category, r.requested_load_kw, r.category, r.severity, r.status, r.sla_breach_risk, r.sla_due_at, r.created_at])]); toast('Requests CSV exported (real data)'); };
-  const exportAudit = () => { downloadCsv('vidyutos-audit.csv', [['time','actor_role','action','detail'], ...logs.map(l => [l.created_at, l.actor_role, l.action, l.detail])]); toast('Audit CSV exported (real data)'); };
+  const exportRequests = () => { downloadCsv('vidyutflow-requests.csv', [['id','applicant','phone','zone','tariff','load_kw','category','severity','status','sla_risk','sla_due','created'], ...requests.map(r => [r.id, r.applicant_name, r.phone, r.zone, r.tariff_category, r.requested_load_kw, r.category, r.severity, r.status, r.sla_breach_risk, r.sla_due_at, r.created_at])]); toast('Requests CSV exported (real data)'); };
+  const exportAudit = () => { downloadCsv('vidyutflow-audit.csv', [['time','actor_role','action','detail'], ...logs.map(l => [l.created_at, l.actor_role, l.action, l.detail])]); toast('Audit CSV exported (real data)'); };
   return (<div className="space-y-4"><div className="grid sm:grid-cols-3 gap-3">{[['Requests', requests.length],['Completed', requests.filter(r => r.status==='COMPLETED').length],['Audit entries', logs.length]].map(([k,v]) => <Card key={k} className="p-4 text-center"><p className="text-2xl font-extrabold">{v}</p><p className="text-xs text-slate-400">{k}</p></Card>)}</div>
     <Card className="p-5"><h3 className="font-bold mb-2">Exports (generated in your browser from live API data)</h3><div className="flex flex-wrap gap-2">
     <button className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-bold" onClick={exportRequests}>⬇ Requests CSV</button>

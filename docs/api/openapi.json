@@ -358,7 +358,7 @@
   },
   "info": {
     "description": "PS000125 demo: one end-to-end new-connection flow. ML trained on SYNTHETIC data only.",
-    "title": "VidyutOS Lite",
+    "title": "VidyutFlow",
     "version": "0.1.0"
   },
   "openapi": "3.1.0",

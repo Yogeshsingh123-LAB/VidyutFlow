@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to VidyutOS Lite. Format follows [Keep a Changelog](https://keepachangelog.com);
+All notable changes to VidyutFlow. Format follows [Keep a Changelog](https://keepachangelog.com);
 this project is a hackathon prototype, so versions track milestones rather than releases.
 
 ## [Unreleased]
@@ -19,6 +19,7 @@ this project is a hackathon prototype, so versions track milestones rather than 
   `test_field_sync_cannot_decide_approvals` (suite: 5 passing).
 
 ### Changed
+- Standardized active branding as VidyutFlow across community docs, UI, API labels, PWA/package metadata, repository links and mail PDF. Persistent database/storage identifiers and historical verification evidence preserved; see docs/BRANDING.md.
 - API review: system status is admin-only; both request creation endpoints are consumer-only; KPI pending excludes completed/rejected requests. Frontend no longer fetches system status for officers. These tighten access without changing successful response keys; 12 tests pass locally and frontend builds.
 - README Core Invariants rewritten as an auditable table (invariant → enforcement point → verification).
 

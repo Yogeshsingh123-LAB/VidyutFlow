@@ -40,7 +40,7 @@
 
 | # | Task | Owner | Depends on | Evidence |
 | :--- | :--- | :--- | :--- | :--- |
-| 3.1 | Build the actual 12-slide deck (`.pptx`, from `docs/DECK_OUTLINE.md`) | **Arnav** | 1.4 screenshots, 1.5 charts, 2.2 diagram | `docs/deck/VidyutOS_PS000125.pptx` (≤20 MB) |
+| 3.1 | Build the actual 12-slide deck (`.pptx`, from `docs/DECK_OUTLINE.md`) | **Arnav** | 1.4 screenshots, 1.5 charts, 2.2 diagram | `docs/deck/VidyutFlow_PS000125.pptx` (≤20 MB) |
 | 3.2 | Demo screenshots pack (one per role view + offline-sync sequence) | **Utsav** | 1.4 | Images in `docs/assets/` |
 | 3.3 | Record 3–5 min demo video following `docs/DEMO_SCRIPT.md` (each role narrates own segment) | **All** (Arnav edits) | 3.2 | Video file/link in README |
 | 3.4 | Full rehearsal ×3 with timing; backup plan: recorded video + offline DB snapshot if venue Wi-Fi fails | **Yogesh Kumar Singh** (runs), all attend | 3.1, 3.3 | Rehearsal log in team chat |

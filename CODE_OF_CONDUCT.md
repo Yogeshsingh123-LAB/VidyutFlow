@@ -2,7 +2,7 @@
 
 ## Our pledge
 
-We are a 5-member student team building VidyutOS for the Seva First Innovation Challenge. We pledge a
+We are a 5-member student team building VidyutFlow for the Seva First Innovation Challenge. We pledge a
 respectful, harassment-free collaboration for everyone involved — in issues, pull requests, reviews,
 and team discussions — regardless of experience level or background.
 

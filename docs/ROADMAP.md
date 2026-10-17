@@ -1,4 +1,4 @@
-# Scale-up roadmap (slides only — NOT built in VidyutOS Lite)
+# Scale-up roadmap (slides only — NOT built in VidyutFlow)
 | Module | Built now (demo-ready) | Roadmap slide only |
 |---|---|---|
 | Unified dashboard | React, role-based views, login, live KPIs | GraphQL, GIS outage map, WebSockets |

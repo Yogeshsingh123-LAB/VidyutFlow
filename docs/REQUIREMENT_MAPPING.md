@@ -5,7 +5,7 @@ Source text: [PS000125_OFFICIAL.md](PS000125_OFFICIAL.md). Rule for the finale: 
 
 ## A. The 12 problem points
 
-| # | Problem (short) | VidyutOS answer | Status | Evidence in repo / demo step |
+| # | Problem (short) | VidyutFlow answer | Status | Evidence in repo / demo step |
 | :--- | :--- | :--- | :---: | :--- |
 | 1 | Repetitive data entry across systems | One `ConnectionRequest` record reused by consumer/officer/engineer/admin (“Enter Once, Use Everywhere”) | ✅ | `backend/app/models.py`; invariants in README; demo step 1–2 |
 | 2 | Limited ERP/portal integration, manual data movement | API-first backend — every capability is a REST endpoint; one data model for all portals | 🟡 | `backend/app/routers/`; legacy ERP adapters (billing/HR/SCADA wrappers) are ◻️ roadmap |

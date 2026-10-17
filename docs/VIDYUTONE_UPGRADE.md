@@ -2,7 +2,7 @@
 Reference reviewed: https://github.com/utsavmandalia-01/vidyutone (frontend-only demo, all data in-browser mock data, no backend/auth/tests).
 This repo keeps its real FastAPI + PostgreSQL/SQLite backend, JWT/RBAC, trained ML models, RAG assistant and server-side UUID de-duplication — and adopts the reference's **UX ideas** (re-implemented in this codebase, not its mock-data layer):
 
-| VidyutOne idea | VidyutOS implementation (real data) |
+| VidyutOne idea | VidyutFlow implementation (real data) |
 |---|---|
 | Welcome screen with role cards | Login hero with 4 role cards that autofill the seeded demo accounts |
 | AppShell: sidebar + top nav + mobile nav | `frontend/src/components/Shell.jsx` — role-aware sidebar, sticky top bar, mobile drawer |

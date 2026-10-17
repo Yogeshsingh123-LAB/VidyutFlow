@@ -1,7 +1,7 @@
 blank_issues_enabled: true
 contact_links:
   - name: PS000125 requirement mapping
-    url: https://github.com/Yogeshsingh123-LAB/VidyutOS/blob/main/docs/REQUIREMENT_MAPPING.md
+    url: https://github.com/Yogeshsingh123-LAB/VidyutFlow/blob/main/docs/REQUIREMENT_MAPPING.md
     about: Check whether the idea is Built / Lite / Roadmap before filing
   - name: Security issue (private)
     url: https://github.com/Yogeshsingh123-LAB

@@ -20,7 +20,7 @@ def status(db: Session = Depends(get_db), u: User = Depends(require("admin"))):
     m = metrics()
     policies = len(glob.glob(os.path.join(os.path.dirname(__file__), "..", "..", "data", "policies", "*.md")))
     return {
-        "service": "VidyutOS Lite API", "status": "ok" if db_ok else "degraded",
+        "service": "VidyutFlow API", "status": "ok" if db_ok else "degraded",
         "database": {"dialect": engine.dialect.name, "ok": db_ok},
         "counts": {"users": db.query(User).count(), "requests": db.query(ConnectionRequest).count(),
                    "field_updates": db.query(FieldUpdate).count(), "audit_logs": db.query(AuditLog).count()},

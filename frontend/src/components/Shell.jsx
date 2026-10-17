@@ -14,7 +14,7 @@ export function Shell({ user, tab, setTab, dark, setDark, airplane, setAirplane,
   const items = NAV[user.role] || NAV.consumer;
   const Sidebar = (<div className="flex h-full flex-col bg-[#101C35] text-slate-200 w-64 shrink-0">
     <div className="flex items-center gap-2 px-5 py-5 border-b border-white/10"><span className="p-2 rounded-xl bg-blue-600 text-white"><Zap size={18}/></span>
-      <div><p className="font-extrabold text-white leading-none">VidyutOS <span className="text-teal-300">Lite</span></p><p className="text-[11px] text-slate-400 mt-1">UGVCL · PS000125</p></div></div>
+      <div><p className="font-extrabold text-white leading-none">Vidyut<span className="text-teal-300">Flow</span></p><p className="text-[11px] text-slate-400 mt-1">UGVCL · PS000125</p></div></div>
     <nav className="p-3 space-y-1 flex-1 overflow-y-auto">{items.map(([id,label,Icon]) => (
       <button key={id} onClick={()=>{setTab(id); setMobile(false);}} className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${tab===id ? 'bg-blue-600 text-white' : 'hover:bg-white/10 text-slate-300'}`}><Icon size={17}/>{label}
         {id==='offline' && queueCount>0 && <span className="ml-auto rounded-full bg-amber-400 text-black text-[11px] px-2 py-0.5 font-bold">{queueCount}</span>}

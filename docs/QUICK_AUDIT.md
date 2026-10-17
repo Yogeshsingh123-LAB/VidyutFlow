@@ -1,8 +1,8 @@
 # QUICK AUDIT PACK — paste this whole file to a reviewer who cannot open the repo
-> Note for the reviewer: VidyutFlow (formerly VidyutOS Lite) is a **Cloud-to-Edge Orchestration Platform** for utility services
+> Note for the reviewer: VidyutFlow is a **Cloud-to-Edge Orchestration Platform** for utility services
 > (control plane + offline edge field clients), not a CPU kernel and not an IoT operating system. There is no bootloader/.asm/QEMU; the equivalents are: bootloader → app startup/seed
 > (`backend/app/main.py` lifespan), memory safety → DB transactions + UNIQUE constraints, interrupts → HTTP API +
-> audit log, build system → `Makefile` + Docker Compose below. Repo: https://github.com/Yogeshsingh123-LAB/VidyutOS (public)
+> audit log, build system → `Makefile` + Docker Compose below. Repo: https://github.com/Yogeshsingh123-LAB/VidyutFlow (public)
 
 ## 1. README.md
 ````markdown
@@ -16,7 +16,7 @@
 
 **Cloud-to-Edge Orchestration for Power Utilities.**
 
-Display brand: **VidyutFlow** (formerly VidyutOS Lite). The GitHub repository remains `VidyutOS`; existing links are unchanged.
+**Product and repository: VidyutFlow.** Cloud-to-Edge Orchestration for Power Utilities.
 *“Enter Once, Use Everywhere.”*
 
 [![Problem Statement](https://img.shields.io/badge/PS-PS000125-blue?style=for-the-square)](#-the-problem)
@@ -27,10 +27,10 @@ Display brand: **VidyutFlow** (formerly VidyutOS Lite). The GitHub repository re
 [![Tests](https://img.shields.io/badge/tests-17_passing-16a34a?style=for-the-square)](#-testing--qa)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-square)](LICENSE)
 
-[![Contributors](https://img.shields.io/github/contributors/Yogeshsingh123-LAB/VidyutOS?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutOS/graphs/contributors)
-[![Last commit](https://img.shields.io/github/last-commit/Yogeshsingh123-LAB/VidyutOS?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutOS/commits/main)
-[![Repo size](https://img.shields.io/github/repo-size/Yogeshsingh123-LAB/VidyutOS?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutOS)
-[![Stars](https://img.shields.io/github/stars/Yogeshsingh123-LAB/VidyutOS?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutOS/stargazers)
+[![Contributors](https://img.shields.io/github/contributors/Yogeshsingh123-LAB/VidyutFlow?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutFlow/graphs/contributors)
+[![Last commit](https://img.shields.io/github/last-commit/Yogeshsingh123-LAB/VidyutFlow?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutFlow/commits/main)
+[![Repo size](https://img.shields.io/github/repo-size/Yogeshsingh123-LAB/VidyutFlow?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutFlow)
+[![Stars](https://img.shields.io/github/stars/Yogeshsingh123-LAB/VidyutFlow?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutFlow/stargazers)
 
 *Seva First Innovation Challenge · **PS000125 — Future-Ready, Secure and Intelligent IT Infrastructure &
 User-Friendly ERP/Portal Ecosystem** · Uttar Gujarat Vij Company Limited (UGVCL) ·
@@ -337,7 +337,7 @@ Interactive docs at **`/docs`**. Base path is proxied as `/api` by the frontend.
 ## 🗂 Repository Layout
 
 ```
-VidyutOS/
+VidyutFlow/
 ├── backend/app/            # FastAPI: routers/ · ml/ · assistant/ · workflow.py · security.py
 ├── backend/data/policies/  # RAG policy extracts (Markdown)
 ├── backend/tests/          # pytest end-to-end suite
@@ -545,7 +545,7 @@ synthetic demo data provided for demonstration and evaluation. Not an official U
 
 ## 3. Makefile (run `make help`; verified: `make train`, `make test`, `make build` all pass)
 ```makefile
-# VidyutOS Lite — one-command build/run/test (no hardcoded local paths; run from repo root)
+# VidyutFlow — one-command build/run/test (no hardcoded local paths; run from repo root)
 .DEFAULT_GOAL := help
 .PHONY: help setup train backend frontend dev test build up down clean demo-reset
 

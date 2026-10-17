@@ -1,6 +1,6 @@
 # VidyutFlow API contract — review candidate
 
-Status: **documented, not frozen**. Reviewed 17 Oct 2026. Repository and API service identifiers remain VidyutOS Lite. This is the existing prototype API, not a new product scope.
+Status: **documented, not frozen**. Reviewed 17 Oct 2026. Product, repository and API display labels use VidyutFlow; persistent storage identifiers remain unchanged for compatibility. This is the existing prototype API, not a new product scope.
 
 ## Addressing and authentication
 

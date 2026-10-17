@@ -57,10 +57,10 @@ async def lifespan(_app):
     seed(); seed_requests()
     yield
 
-app = FastAPI(title="VidyutOS Lite", description="PS000125 demo: one end-to-end new-connection flow. ML trained on SYNTHETIC data only.", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="VidyutFlow", description="PS000125 demo: one end-to-end new-connection flow. ML trained on SYNTHETIC data only.", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 @app.get("/health")
-def health(): return {"status": "ok", "service": "VidyutOS Lite", "data_notice": "Demo uses synthetic data only."}
+def health(): return {"status": "ok", "service": "VidyutFlow", "data_notice": "Demo uses synthetic data only."}
 
 app.include_router(auth.router); app.include_router(requests.router); app.include_router(assistant.router); app.include_router(system.router)
