@@ -1,0 +1,1222 @@
+{
+  "version": "1.0.0",
+  "description": "VidyutFlow Deterministic Demo Data Baseline Snapshot (Pre-Migration / Step 3)",
+  "recordedAt": "2026-10-20T00:00:00.000Z",
+  "fingerprints": {
+    "DEFAULT_DEMO_ACCOUNTS": "602b15a7e77e46176aee77a85da0f128817240115b45a241b30cf44dabdf9d0d",
+    "ROLE_PROFILES": "ccc75211d3b9b127f1723faf543c2ae299f1785da12e8f314ab7888261db50be",
+    "INITIAL_CONNECTIONS": "1246eb454a78c64cf22f9b2be49c46bb98d0d36aebbc593dc6c1b1639ea2b2cf",
+    "INITIAL_BILLS": "d401d1f3af50c547dafc3a7ba1c26072d6fad491c1c40b4a8d3231cc6190237d",
+    "INITIAL_PAYMENTS": "9ea5992166a784ca07e4a73d36e016e276876bb64be9332a8a2dd8bee7aced4e",
+    "INITIAL_APPLICATIONS": "52f2d416d829ee6621b8958f7d41649ee4d8d43211ae5c23d15c9010ddc29282",
+    "INITIAL_COMPLAINTS": "18e38ae3bd60c20841722f70bd718e4a19e0cc0ee26f212465d858d9c2f11e42",
+    "INITIAL_WORK_ORDERS": "4ce193b8d0d87639915319017b80176f476ed3076d4ece075c510d86be2c4ce9",
+    "FEEDER_METRICS": "94f835a1cab78b62ed523a8575e9b59081e0d3ebd568c9c5867d7b270e0ff143",
+    "SYSTEM_SERVICES": "d904684533b61f75742a4bed5c8ce527658a5c8feec28752a4cee779f58d437e",
+    "AUDIT_LOGS": "275aae0a2fce10e4f8b6f9bff86c8f3f4f62c7e83a2ae4e3deb465c717be6cae",
+    "INITIAL_NOTIFICATIONS": "b455c6b6cfe71065f45a320688d77c5e5d4ebbfc5cbde4b5ae2bf8b19d16cdea",
+    "CONSUMPTION_HISTORY": "109dd6ac15e981d25674c39eb34ea57435a32545874295c4a9b992177459a8ff",
+    "EXECUTIVE_MONTHLY_METRICS": "2bfc9377bf707c91dc1dd04be95ea13474e48509c166b0746032e1ccb340d9d8",
+    "SUBDIVISION_PERFORMANCE": "2922cf3581e7415afa604c877ac1243e2645bcdf571c02d2343ec388842b7077",
+    "INITIAL_CONSUMERS": "8b9d8032429becabb2dfcc501d1e7db9e12371afccc17067b93a75720f7f2fcb",
+    "INITIAL_EMPLOYEES": "30d693b3783efb647cf5a2d6cc88c7e221fd9080e30de3ef2f5d868142141493",
+    "INITIAL_FIELD_ENGINEERS": "5941052cb6e41b30cd159aefc0282051a0fb06505b55079f8f570d9a0ae2a0f0"
+  },
+  "recordCounts": {
+    "DEFAULT_DEMO_ACCOUNTS": 5,
+    "ROLE_PROFILES": 5,
+    "INITIAL_CONNECTIONS": 2,
+    "INITIAL_BILLS": 4,
+    "INITIAL_PAYMENTS": 3,
+    "INITIAL_APPLICATIONS": 4,
+    "INITIAL_COMPLAINTS": 4,
+    "INITIAL_WORK_ORDERS": 4,
+    "FEEDER_METRICS": 4,
+    "SYSTEM_SERVICES": 6,
+    "AUDIT_LOGS": 5,
+    "INITIAL_NOTIFICATIONS": 5,
+    "CONSUMPTION_HISTORY": 6,
+    "EXECUTIVE_MONTHLY_METRICS": 6,
+    "SUBDIVISION_PERFORMANCE": 5,
+    "INITIAL_CONSUMERS": 3,
+    "INITIAL_EMPLOYEES": 3,
+    "INITIAL_FIELD_ENGINEERS": 3
+  },
+  "datasets": {
+    "DEFAULT_DEMO_ACCOUNTS": {
+      "consumer": {
+        "role": "consumer",
+        "roleLabel": "Consumer Portal",
+        "email": "consumer@vidyutflow.demo",
+        "password": "Demo@12345",
+        "name": "Smt. Meenaben Patel",
+        "designation": "Primary Account Holder & Domestic Consumer",
+        "department": "Consumer Services Division",
+        "division": "Mehsana Circle · North Subdivision",
+        "isPreconfigured": true,
+        "avatarInitials": "MP"
+      },
+      "employee": {
+        "role": "employee",
+        "roleLabel": "Office Employee ERP",
+        "email": "employee@vidyutflow.demo",
+        "password": "Demo@12345",
+        "name": "Priya Rathod",
+        "designation": "Deputy Executive Engineer (Commercial & Billing)",
+        "department": "Revenue & Meter Reading Operations",
+        "division": "Mehsana Corporate Circle",
+        "isPreconfigured": true,
+        "avatarInitials": "PR"
+      },
+      "field": {
+        "role": "field",
+        "roleLabel": "Field Engineer App",
+        "email": "field@vidyutflow.demo",
+        "password": "Demo@12345",
+        "name": "Vikram Zala",
+        "designation": "Senior Junior Engineer (Substations & Feeders)",
+        "department": "Distribution Line Maintenance & DTC Inspection",
+        "division": "Himatnagar Circle · 11kV Radial Feeder Ops",
+        "isPreconfigured": true,
+        "avatarInitials": "VZ"
+      },
+      "management": {
+        "role": "management",
+        "roleLabel": "Management Cockpit",
+        "email": "management@vidyutflow.demo",
+        "password": "Demo@12345",
+        "name": "Rajesh Solanki",
+        "designation": "Chief Engineer (Distribution & Power Flow)",
+        "department": "SCADA, APFC & AT&C Loss Minimization Desk",
+        "division": "UGVCL Headquarters, Mehsana",
+        "isPreconfigured": true,
+        "avatarInitials": "RS"
+      },
+      "admin": {
+        "role": "admin",
+        "roleLabel": "System Administrator",
+        "email": "admin@vidyutflow.demo",
+        "password": "Demo@12345",
+        "name": "Anand Patel",
+        "designation": "Principal IT Infrastructure & ERP Administrator",
+        "department": "Central Cyber Operations & Identity Governance",
+        "division": "Data Center & State Load Despatch Center Link",
+        "isPreconfigured": true,
+        "avatarInitials": "AP"
+      }
+    },
+    "ROLE_PROFILES": {
+      "consumer": {
+        "id": "consumer",
+        "label": "Consumer Portal",
+        "badge": "Citizen / LT Consumer",
+        "personaName": "Smt. Meenaben Patel",
+        "personaDesignation": "Primary Account Holder",
+        "personaAvatar": "MP",
+        "description": "Self-service digital billing, hassle-free new connection requests, smart meter tracking, and quick grievance redressal.",
+        "division": "Mehsana Circle (Subdivision North)",
+        "primaryFocus": "Billing, Usage Analytics, Service Requests, Complaints"
+      },
+      "employee": {
+        "id": "employee",
+        "label": "Office Employee ERP",
+        "badge": "Executive / Sub-Divisional Officer",
+        "personaName": "Rajesh V. Trivedi",
+        "personaDesignation": "Assistant Engineer (Commerce & Ops)",
+        "personaAvatar": "RT",
+        "description": "Sub-divisional ERP workspace for application verification, tariff sanction approvals, consumer records, and complaint routing.",
+        "division": "UGVCL Gandhinagar Sub-Division 2",
+        "primaryFocus": "Application Processing, Sanctions, Complaint Resolution, Revenue"
+      },
+      "field": {
+        "id": "field",
+        "label": "Field Engineer App",
+        "badge": "Mobile Field Operations",
+        "personaName": "Vikramaditya Solanki",
+        "personaDesignation": "Junior Engineer (Field & Vigilance)",
+        "personaAvatar": "VS",
+        "description": "Touch-friendly field console for site feasibility visits, meter inspections, distribution transformer maintenance, and offline queueing.",
+        "division": "Sabarmati & Mehsana Rural Feeder Wing",
+        "primaryFocus": "Site Inspections, Meter Audits, Fault Clearance, Work Orders"
+      },
+      "management": {
+        "id": "management",
+        "label": "Management Cockpit",
+        "badge": "UGVCL Executive & CGM Office",
+        "personaName": "Dr. Harita Joshi",
+        "personaDesignation": "Chief General Manager (Distribution & IT)",
+        "personaAvatar": "HJ",
+        "description": "High-level utility intelligence dashboard covering AT&C losses, billing efficiency, feeder health, SLA adherence, and AI predictive forecasts.",
+        "division": "UGVCL Corporate Headquarters, Mehsana",
+        "primaryFocus": "AT&C Loss Control, Operational Reliability, Policy, AI Insights"
+      },
+      "admin": {
+        "id": "admin",
+        "label": "System Administrator",
+        "badge": "IT & Cyber Security Console",
+        "personaName": "K. V. Sharma",
+        "personaDesignation": "Chief IT Infrastructure & Cyber Architect",
+        "personaAvatar": "KS",
+        "description": "Enterprise control plane managing role-based permissions, microservice integrations, real-time audit trails, and data center uptime.",
+        "division": "Gujarat State Data Center / UGVCL IT Cell",
+        "primaryFocus": "Security Matrix, API Integrations, Audit Streams, Infrastructure"
+      }
+    },
+    "INITIAL_CONNECTIONS": [
+      {
+        "consumerNo": "04281-99231",
+        "connectionId": "UG-MSN-RES-8821",
+        "consumerName": "Smt. Meenaben Patel",
+        "meterNo": "MTR-2024-884102",
+        "sanctionedLoadKw": 5,
+        "phase": "1-Phase",
+        "tariffCategory": "Residential (RGPU)",
+        "address": "14, Anand Nagar Society, Near Radhanpur Cross Road, Mehsana - 384002",
+        "subdivision": "Mehsana City North",
+        "feederName": "11kV Visnagar Road Feeder",
+        "status": "Active",
+        "connectedDate": "12-Aug-2019",
+        "lastReadingDate": "01-Oct-2026",
+        "currentReadingKwh": 14820,
+        "previousReadingKwh": 14460,
+        "averageMonthlyKwh": 380,
+        "securityDeposit": 3500,
+        "accountId": "demo_consumer",
+        "accountEmail": "consumer@vidyutflow.demo"
+      },
+      {
+        "consumerNo": "04281-77190",
+        "connectionId": "UG-MSN-COM-4109",
+        "consumerName": "Patel Engineering & Solar Fabrication",
+        "meterNo": "MTR-2023-339811",
+        "sanctionedLoadKw": 18,
+        "phase": "3-Phase",
+        "tariffCategory": "Commercial (NRGP)",
+        "address": "Plot 48/B, GIDC Phase II, Dediyasan, Mehsana - 384002",
+        "subdivision": "Mehsana Industrial GIDC",
+        "feederName": "11kV GIDC-2 Dedicated Feeder",
+        "status": "Active",
+        "connectedDate": "05-Feb-2022",
+        "lastReadingDate": "01-Oct-2026",
+        "currentReadingKwh": 48920,
+        "previousReadingKwh": 47210,
+        "averageMonthlyKwh": 1650,
+        "securityDeposit": 22000,
+        "accountId": "demo_consumer",
+        "accountEmail": "consumer@vidyutflow.demo"
+      }
+    ],
+    "INITIAL_BILLS": [
+      {
+        "billNo": "BILL-UG-2026-10-8821",
+        "consumerNo": "04281-99231",
+        "billMonth": "September 2026",
+        "billDate": "04-Oct-2026",
+        "dueDate": "22-Oct-2026",
+        "unitsConsumed": 360,
+        "energyCharges": 1420,
+        "fixedCharges": 180,
+        "fuelPriceAdjustment": 432,
+        "electricityDuty": 203,
+        "rebateOrSubsidy": 50,
+        "totalAmount": 2185,
+        "status": "Unpaid",
+        "slabBreakdown": [
+          {
+            "slab": "First 50 Units (0-50 kWh)",
+            "units": 50,
+            "rate": 3.05,
+            "amount": 152.5
+          },
+          {
+            "slab": "Next 50 Units (51-100 kWh)",
+            "units": 50,
+            "rate": 3.5,
+            "amount": 175
+          },
+          {
+            "slab": "Next 150 Units (101-250 kWh)",
+            "units": 150,
+            "rate": 4.15,
+            "amount": 622.5
+          },
+          {
+            "slab": "Above 250 Units (>250 kWh)",
+            "units": 110,
+            "rate": 5.2,
+            "amount": 572
+          }
+        ]
+      },
+      {
+        "billNo": "BILL-UG-2026-09-8821",
+        "consumerNo": "04281-99231",
+        "billMonth": "August 2026",
+        "billDate": "03-Sep-2026",
+        "dueDate": "21-Sep-2026",
+        "unitsConsumed": 410,
+        "energyCharges": 1680,
+        "fixedCharges": 180,
+        "fuelPriceAdjustment": 492,
+        "electricityDuty": 235,
+        "rebateOrSubsidy": 50,
+        "totalAmount": 2537,
+        "status": "Paid",
+        "paidDate": "15-Sep-2026",
+        "transactionRef": "TXN-UPI-9921448102",
+        "slabBreakdown": [
+          {
+            "slab": "First 50 Units",
+            "units": 50,
+            "rate": 3.05,
+            "amount": 152.5
+          },
+          {
+            "slab": "Next 50 Units",
+            "units": 50,
+            "rate": 3.5,
+            "amount": 175
+          },
+          {
+            "slab": "Next 150 Units",
+            "units": 150,
+            "rate": 4.15,
+            "amount": 622.5
+          },
+          {
+            "slab": "Above 250 Units",
+            "units": 160,
+            "rate": 5.2,
+            "amount": 832
+          }
+        ]
+      },
+      {
+        "billNo": "BILL-UG-2026-08-8821",
+        "consumerNo": "04281-99231",
+        "billMonth": "July 2026",
+        "billDate": "03-Aug-2026",
+        "dueDate": "21-Aug-2026",
+        "unitsConsumed": 395,
+        "energyCharges": 1605,
+        "fixedCharges": 180,
+        "fuelPriceAdjustment": 474,
+        "electricityDuty": 226,
+        "rebateOrSubsidy": 50,
+        "totalAmount": 2435,
+        "status": "Paid",
+        "paidDate": "12-Aug-2026",
+        "transactionRef": "TXN-NB-4481902231",
+        "slabBreakdown": [
+          {
+            "slab": "First 50 Units",
+            "units": 50,
+            "rate": 3.05,
+            "amount": 152.5
+          },
+          {
+            "slab": "Next 50 Units",
+            "units": 50,
+            "rate": 3.5,
+            "amount": 175
+          },
+          {
+            "slab": "Next 150 Units",
+            "units": 150,
+            "rate": 4.15,
+            "amount": 622.5
+          },
+          {
+            "slab": "Above 250 Units",
+            "units": 145,
+            "rate": 5.2,
+            "amount": 754
+          }
+        ]
+      },
+      {
+        "billNo": "BILL-UG-2026-10-77190",
+        "consumerNo": "04281-77190",
+        "billMonth": "September 2026",
+        "billDate": "04-Oct-2026",
+        "dueDate": "22-Oct-2026",
+        "unitsConsumed": 1710,
+        "energyCharges": 9832,
+        "fixedCharges": 1620,
+        "fuelPriceAdjustment": 2052,
+        "electricityDuty": 1350,
+        "rebateOrSubsidy": 0,
+        "totalAmount": 14854,
+        "status": "Unpaid",
+        "slabBreakdown": [
+          {
+            "slab": "Commercial Commercial Tariff Rate",
+            "units": 1710,
+            "rate": 5.75,
+            "amount": 9832
+          }
+        ]
+      }
+    ],
+    "INITIAL_PAYMENTS": [
+      {
+        "txId": "TXN-UPI-9921448102",
+        "consumerNo": "04281-99231",
+        "billNo": "BILL-UG-2026-09-8821",
+        "date": "15-Sep-2026 14:22",
+        "amount": 2537,
+        "paymentMethod": "UPI / BHIM",
+        "status": "Successful",
+        "bankReference": "SBI/UPI/6255109923"
+      },
+      {
+        "txId": "TXN-NB-4481902231",
+        "consumerNo": "04281-99231",
+        "billNo": "BILL-UG-2026-08-8821",
+        "date": "12-Aug-2026 11:05",
+        "amount": 2435,
+        "paymentMethod": "Net Banking",
+        "status": "Successful",
+        "bankReference": "HDFC/NB/882194881"
+      },
+      {
+        "txId": "TXN-DEB-1192837462",
+        "consumerNo": "04281-77190",
+        "billNo": "BILL-UG-2026-08-77190",
+        "date": "18-Aug-2026 16:40",
+        "amount": 15210,
+        "paymentMethod": "RTGS/NEFT",
+        "status": "Successful",
+        "bankReference": "BOB/RTGS/99231882"
+      }
+    ],
+    "INITIAL_APPLICATIONS": [
+      {
+        "id": "APP-2026-0842",
+        "applicantName": "Smt. Meenaben Patel",
+        "phone": "+91 98250 14820",
+        "email": "meenaben.patel@example.com",
+        "address": "14, Anand Nagar Society, Radhanpur Road, Mehsana",
+        "subdivision": "Mehsana City North",
+        "category": "Residential (RGPU)",
+        "requestedLoadKw": 8,
+        "phase": "3-Phase",
+        "premisesType": "Owned",
+        "status": "Site Inspection",
+        "appliedDate": "02-Oct-2026",
+        "targetCompletionDate": "18-Oct-2026",
+        "assignedOfficer": "Rajesh V. Trivedi (AE Ops)",
+        "assignedEngineer": "Vikramaditya Solanki (JE Field)",
+        "estimatedSanctionCost": 7850,
+        "documentsSubmitted": [
+          "Electricity Bill of Neighbor",
+          "Sale Deed / Registry",
+          "Aadhaar Card",
+          "Test Report Form"
+        ],
+        "workflowStep": 3,
+        "accountId": "demo_consumer",
+        "notesHistory": [
+          {
+            "timestamp": "02-Oct 10:15",
+            "author": "Consumer Portal",
+            "note": "Application filed online with documents."
+          },
+          {
+            "timestamp": "03-Oct 14:30",
+            "author": "Rajesh V. Trivedi",
+            "note": "Ownership deed verified. Assigned site inspection to JE Solanki."
+          }
+        ]
+      },
+      {
+        "id": "APP-2026-0843",
+        "applicantName": "Shri Jayeshbhai D. Prajapati",
+        "phone": "+91 97120 55102",
+        "email": "jayesh.prajapati@example.com",
+        "address": "Survey No. 112/A, Kadi Rural Road, Gandhinagar Circle",
+        "subdivision": "Gandhinagar Sub-Division 2",
+        "category": "Agricultural (AG)",
+        "requestedLoadKw": 12,
+        "phase": "3-Phase",
+        "premisesType": "Owned",
+        "status": "Document Verification",
+        "appliedDate": "06-Oct-2026",
+        "targetCompletionDate": "24-Oct-2026",
+        "assignedOfficer": "Rajesh V. Trivedi (AE Ops)",
+        "estimatedSanctionCost": 14500,
+        "documentsSubmitted": [
+          "7/12 Land Record",
+          "8-A Khata Certificate",
+          "Aadhaar Card"
+        ],
+        "workflowStep": 2,
+        "notesHistory": [
+          {
+            "timestamp": "06-Oct 09:20",
+            "author": "Consumer Portal",
+            "note": "Agricultural pump connection application submitted."
+          }
+        ]
+      },
+      {
+        "id": "APP-2026-0844",
+        "applicantName": "Torrent Precision Tools Pvt Ltd",
+        "phone": "+91 98980 44219",
+        "email": "admin@torrentprecision.example.com",
+        "address": "Shed C-19, Chhatral GIDC, Kalol Division",
+        "subdivision": "Kalol Industrial Division",
+        "category": "Industrial (LTMD)",
+        "requestedLoadKw": 45,
+        "phase": "3-Phase",
+        "premisesType": "Owned",
+        "status": "Sanction Approval",
+        "appliedDate": "26-Sep-2026",
+        "targetCompletionDate": "16-Oct-2026",
+        "assignedOfficer": "Rajesh V. Trivedi (AE Ops)",
+        "assignedEngineer": "Vikramaditya Solanki (JE Field)",
+        "estimatedSanctionCost": 38200,
+        "documentsSubmitted": [
+          "Factory License",
+          "Pollution Control NOC",
+          "Electrical Inspector Certificate",
+          "GST Certificate"
+        ],
+        "workflowStep": 4,
+        "notesHistory": [
+          {
+            "timestamp": "26-Sep 11:00",
+            "author": "Consumer Portal",
+            "note": "Industrial load sanction file submitted."
+          },
+          {
+            "timestamp": "29-Sep 16:00",
+            "author": "Vikramaditya Solanki",
+            "note": "Field inspection completed. 100kVA transformer has spare capacity."
+          },
+          {
+            "timestamp": "05-Oct 15:45",
+            "author": "Rajesh V. Trivedi",
+            "note": "Estimate generated and forwarded for Executive Sanction."
+          }
+        ]
+      },
+      {
+        "id": "APP-2026-0845",
+        "applicantName": "Sanjaybhai B. Parmar",
+        "phone": "+91 94260 88219",
+        "email": "sanjay.parmar@example.com",
+        "address": "Block 8, Shanti Nagar, Patan Highway, Mehsana",
+        "subdivision": "Mehsana City North",
+        "category": "Residential (RGPU)",
+        "requestedLoadKw": 3,
+        "phase": "1-Phase",
+        "premisesType": "Owned",
+        "status": "Meter Installed",
+        "appliedDate": "15-Sep-2026",
+        "targetCompletionDate": "30-Sep-2026",
+        "assignedOfficer": "Rajesh V. Trivedi (AE Ops)",
+        "assignedEngineer": "Vikramaditya Solanki (JE Field)",
+        "estimatedSanctionCost": 3850,
+        "documentsSubmitted": [
+          "Aadhaar Card",
+          "Tax Receipt",
+          "NOC from Society"
+        ],
+        "workflowStep": 5,
+        "notesHistory": [
+          {
+            "timestamp": "15-Sep 10:00",
+            "author": "Portal",
+            "note": "Application submitted."
+          },
+          {
+            "timestamp": "28-Sep 14:00",
+            "author": "Vikramaditya Solanki",
+            "note": "Smart meter installed and energized successfully."
+          }
+        ]
+      }
+    ],
+    "INITIAL_COMPLAINTS": [
+      {
+        "id": "CMP-8821",
+        "consumerNo": "04281-99231",
+        "consumerName": "Smt. Meenaben Patel",
+        "phone": "+91 98250 14820",
+        "category": "Voltage Fluctuation",
+        "description": "Frequent voltage drop below 180V during 19:00 to 22:00 causing appliances to trip. Suspected neutral wire loose at pole DP-14.",
+        "priority": "High",
+        "status": "Dispatched",
+        "subdivision": "Mehsana City North",
+        "feederName": "11kV Visnagar Road Feeder",
+        "filedAt": "14-Oct-2026 18:40",
+        "slaTargetHours": 24,
+        "slaDueTime": "15-Oct-2026 18:40",
+        "slaBreached": false,
+        "assignedTechnician": "Vikramaditya Solanki (JE Field)",
+        "timeline": [
+          {
+            "time": "14-Oct 18:40",
+            "stage": "Registered",
+            "actor": "Consumer via Portal",
+            "remark": "Complaint logged with smart meter voltage anomaly flag."
+          },
+          {
+            "time": "14-Oct 19:10",
+            "stage": "In Review",
+            "actor": "Automated Dispatcher",
+            "remark": "Cross-checked with feeder SCADA metrics. 4 other calls nearby."
+          },
+          {
+            "time": "15-Oct 08:30",
+            "stage": "Dispatched",
+            "actor": "Rajesh V. Trivedi",
+            "remark": "Assigned Work Order WO-4401 to JE Solanki for pole DP-14 inspection."
+          }
+        ]
+      },
+      {
+        "id": "CMP-8822",
+        "consumerNo": "04281-77190",
+        "consumerName": "Patel Engineering & Solar Fabrication",
+        "phone": "+91 98250 14820",
+        "category": "Meter Fault",
+        "description": "Digital display on electronic meter shows Error code E-04 and optical port flashing red since yesterday morning.",
+        "priority": "Medium",
+        "status": "In Review",
+        "subdivision": "Mehsana Industrial GIDC",
+        "feederName": "11kV GIDC-2 Dedicated Feeder",
+        "filedAt": "13-Oct-2026 11:20",
+        "slaTargetHours": 48,
+        "slaDueTime": "15-Oct-2026 11:20",
+        "slaBreached": false,
+        "assignedTechnician": "Ramesh Barot (Meter Tester)",
+        "timeline": [
+          {
+            "time": "13-Oct 11:20",
+            "stage": "Registered",
+            "actor": "Consumer Portal",
+            "remark": "Meter error reported with photo of display."
+          },
+          {
+            "time": "13-Oct 14:00",
+            "stage": "In Review",
+            "actor": "Rajesh V. Trivedi",
+            "remark": "Meter test squad requisition initiated."
+          }
+        ]
+      },
+      {
+        "id": "CMP-8819",
+        "consumerNo": "04281-33104",
+        "consumerName": "Hasmukhbhai C. Shah",
+        "phone": "+91 99090 12345",
+        "category": "Sparking / Hazardous Wire",
+        "description": "Overhead conductor touching neem tree branch near Sector 4 transformer. Visible sparking during gusty wind.",
+        "priority": "Critical",
+        "status": "In Progress",
+        "subdivision": "Gandhinagar Sub-Division 2",
+        "feederName": "11kV City-1 Feeder",
+        "filedAt": "15-Oct-2026 06:15",
+        "slaTargetHours": 4,
+        "slaDueTime": "15-Oct-2026 10:15",
+        "slaBreached": false,
+        "assignedTechnician": "Dinesh Vaghela (Emergency Line Squad)",
+        "timeline": [
+          {
+            "time": "15-Oct 06:15",
+            "stage": "Registered",
+            "actor": "Toll-free 19122",
+            "remark": "Safety emergency ticket created."
+          },
+          {
+            "time": "15-Oct 06:25",
+            "stage": "Dispatched",
+            "actor": "Control Room",
+            "remark": "Emergency line patrol van dispatched with tree trimmer squad."
+          },
+          {
+            "time": "15-Oct 07:05",
+            "stage": "In Progress",
+            "actor": "Dinesh Vaghela",
+            "remark": "Permit-to-work obtained from substation operator. Tree trimming underway."
+          }
+        ]
+      },
+      {
+        "id": "CMP-8815",
+        "consumerNo": "04281-55829",
+        "consumerName": "Kailashben V. Dave",
+        "phone": "+91 94270 99812",
+        "category": "Power Outage",
+        "description": "No supply in lane 3 since 2:00 AM after heavy rain.",
+        "priority": "High",
+        "status": "Resolved",
+        "subdivision": "Mehsana City North",
+        "feederName": "11kV Visnagar Road Feeder",
+        "filedAt": "12-Oct-2026 02:45",
+        "slaTargetHours": 12,
+        "slaDueTime": "12-Oct-2026 14:45",
+        "slaBreached": false,
+        "assignedTechnician": "Vikramaditya Solanki (JE Field)",
+        "resolutionRemarks": "Blown HT fuse on 200kVA Distribution Transformer replaced and phase load balanced.",
+        "resolvedAt": "12-Oct-2026 06:30",
+        "timeline": [
+          {
+            "time": "12-Oct 02:45",
+            "stage": "Registered",
+            "actor": "Consumer via App",
+            "remark": "Outage reported."
+          },
+          {
+            "time": "12-Oct 03:30",
+            "stage": "Dispatched",
+            "actor": "Substation Operator",
+            "remark": "Night emergency team mobilized."
+          },
+          {
+            "time": "12-Oct 06:30",
+            "stage": "Resolved",
+            "actor": "Vikramaditya Solanki",
+            "remark": "Supply restored. Informed consumer via SMS."
+          }
+        ]
+      }
+    ],
+    "INITIAL_WORK_ORDERS": [
+      {
+        "id": "WO-4401",
+        "title": "Site Rectification for Voltage Anomaly (CMP-8821)",
+        "type": "Feeder Patrol & Maintenance",
+        "subdivision": "Mehsana City North",
+        "feederName": "11kV Visnagar Road Feeder",
+        "location": "14, Anand Nagar & Pole DP-14, Radhanpur Road",
+        "gpsCoordinates": {
+          "lat": 23.6028,
+          "lng": 72.3984
+        },
+        "consumerNo": "04281-99231",
+        "consumerName": "Smt. Meenaben Patel",
+        "priority": "High",
+        "scheduledDate": "15-Oct-2026",
+        "status": "On Site",
+        "assignedTo": "Vikramaditya Solanki (JE Field)",
+        "materialsNeeded": [
+          "Digital Clamp Meter",
+          "Crimping Tool",
+          "Aluminium Lug 50 sq mm",
+          "Safety Helmet & Gloves"
+        ]
+      },
+      {
+        "id": "WO-4402",
+        "title": "Field Verification for New Connection (APP-2026-0842)",
+        "type": "New Connection Verification",
+        "subdivision": "Mehsana City North",
+        "feederName": "11kV Visnagar Road Feeder",
+        "location": "14, Anand Nagar Society, Mehsana",
+        "gpsCoordinates": {
+          "lat": 23.6031,
+          "lng": 72.3992
+        },
+        "consumerNo": "04281-99231",
+        "consumerName": "Smt. Meenaben Patel",
+        "priority": "Routine",
+        "scheduledDate": "15-Oct-2026",
+        "status": "Pending",
+        "assignedTo": "Vikramaditya Solanki (JE Field)",
+        "materialsNeeded": [
+          "Handheld GPS Terminal",
+          "Camera / Mobile App",
+          "Load Audit Sheet"
+        ]
+      },
+      {
+        "id": "WO-4403",
+        "title": "Distribution Transformer Thermal Scan & Oil Check",
+        "type": "Transformer Overload Inspection",
+        "subdivision": "Mehsana Industrial GIDC",
+        "feederName": "11kV GIDC-2 Dedicated Feeder",
+        "location": "DT-GIDC-08, Dediyasan Sub-station Yard",
+        "gpsCoordinates": {
+          "lat": 23.5872,
+          "lng": 72.4121
+        },
+        "priority": "Emergency",
+        "scheduledDate": "15-Oct-2026",
+        "status": "Pending",
+        "assignedTo": "Vikramaditya Solanki (JE Field)",
+        "materialsNeeded": [
+          "FLIR Thermal Camera",
+          "BDV Oil Tester",
+          "Silica Gel Breather Cartridge"
+        ]
+      },
+      {
+        "id": "WO-4398",
+        "title": "Smart Meter Installation & Seal Verification",
+        "type": "Meter Replacement",
+        "subdivision": "Gandhinagar Sub-Division 2",
+        "feederName": "11kV City-1 Feeder",
+        "location": "Sector 4/B, Near Swaminarayan Temple",
+        "gpsCoordinates": {
+          "lat": 23.2156,
+          "lng": 72.6369
+        },
+        "consumerNo": "04281-55109",
+        "consumerName": "Dharmeshbhai S. Joshi",
+        "priority": "Routine",
+        "scheduledDate": "14-Oct-2026",
+        "status": "Completed",
+        "assignedTo": "Vikramaditya Solanki (JE Field)",
+        "materialsNeeded": [
+          "Secure 3-Phase Smart Meter (4G)",
+          "Polycarbonate Holographic Seals (x2)"
+        ],
+        "inspectionReport": {
+          "meterSerialScanned": "GEN-SM-2026-9921",
+          "readingKwh": 0,
+          "sealIntact": true,
+          "terminalCondition": "Normal",
+          "tamperDetected": false,
+          "testedPhaseVoltage": {
+            "r": 234,
+            "y": 232,
+            "b": 236
+          },
+          "technicianRemarks": "Old electromechanical meter replaced with 4G AMR Smart Meter. Seal numbers #UGVCL-882191 and #UGVCL-882192 affixed.",
+          "photoUploaded": true
+        }
+      }
+    ],
+    "FEEDER_METRICS": [
+      {
+        "id": "FDR-11-MSN-01",
+        "name": "11kV Visnagar Road Feeder",
+        "subdivision": "Mehsana City North",
+        "voltageKv": 11,
+        "peakLoadAmps": 184,
+        "ratedCapacityAmps": 200,
+        "utilizationPct": 92,
+        "status": "Warning",
+        "transformersCount": 28,
+        "consumersConnected": 3420,
+        "trippingEventsPast30d": 4
+      },
+      {
+        "id": "FDR-11-GIDC-02",
+        "name": "11kV GIDC-2 Dedicated Feeder",
+        "subdivision": "Mehsana Industrial GIDC",
+        "voltageKv": 11,
+        "peakLoadAmps": 215,
+        "ratedCapacityAmps": 250,
+        "utilizationPct": 86,
+        "status": "Optimal",
+        "transformersCount": 16,
+        "consumersConnected": 184,
+        "trippingEventsPast30d": 1
+      },
+      {
+        "id": "FDR-11-KADI-04",
+        "name": "11kV Kadi-Rural Ag Feeder (Jyotigram)",
+        "subdivision": "Kadi Division",
+        "voltageKv": 11,
+        "peakLoadAmps": 238,
+        "ratedCapacityAmps": 220,
+        "utilizationPct": 108.2,
+        "status": "Critical Overload",
+        "transformersCount": 42,
+        "consumersConnected": 1890,
+        "trippingEventsPast30d": 9
+      },
+      {
+        "id": "FDR-11-GN-01",
+        "name": "11kV Gandhinagar City-1 Feeder",
+        "subdivision": "Gandhinagar Sub-Division 2",
+        "voltageKv": 11,
+        "peakLoadAmps": 132,
+        "ratedCapacityAmps": 200,
+        "utilizationPct": 66,
+        "status": "Optimal",
+        "transformersCount": 22,
+        "consumersConnected": 4120,
+        "trippingEventsPast30d": 0
+      }
+    ],
+    "SYSTEM_SERVICES": [
+      {
+        "name": "AMR / Smart Meter Head-End System (HES)",
+        "category": "Metering & AMR",
+        "status": "Operational",
+        "latencyMs": 42,
+        "uptime90d": 99.94,
+        "lastIncident": "None in past 30 days"
+      },
+      {
+        "name": "SAP-ISU Billing Engine Bridge",
+        "category": "Billing & Rev",
+        "status": "Operational",
+        "latencyMs": 88,
+        "uptime90d": 99.88,
+        "lastIncident": "Batch reconciliation delay (2-Oct-2026)"
+      },
+      {
+        "name": "Citizen Portal & Mobile Service Gateway",
+        "category": "Citizen Portals",
+        "status": "Operational",
+        "latencyMs": 28,
+        "uptime90d": 99.98,
+        "lastIncident": "Scheduled patch (28-Sep-2026)"
+      },
+      {
+        "name": "SCADA Substation Telemetry Ingestion (132/66/11kV)",
+        "category": "Core ERP",
+        "status": "Operational",
+        "latencyMs": 15,
+        "uptime90d": 99.99,
+        "lastIncident": "None in past 90 days"
+      },
+      {
+        "name": "Gujarat State Data Center Secured Tunnel (GSDC)",
+        "category": "Security",
+        "status": "Operational",
+        "latencyMs": 12,
+        "uptime90d": 99.99,
+        "lastIncident": "None in past 90 days"
+      },
+      {
+        "name": "Bharat Bill Payment System (BBPS) Real-time Sync",
+        "category": "Billing & Rev",
+        "status": "Operational",
+        "latencyMs": 110,
+        "uptime90d": 99.72,
+        "lastIncident": "External NPCI gateway timeout (11-Oct-2026)"
+      }
+    ],
+    "AUDIT_LOGS": [
+      {
+        "id": "AUD-88219",
+        "timestamp": "15-Oct-2026 06:12:44",
+        "actor": "rajesh.trivedi@ugvcl.gov.in",
+        "role": "Office Employee ERP",
+        "action": "SANCTION_ESTIMATE_APPROVED",
+        "resource": "APP-2026-0844 (Torrent Precision)",
+        "ipAddress": "10.142.18.24",
+        "status": "SUCCESS",
+        "metaDetail": "Sanction load of 45kW approved after JE feasibility clearance."
+      },
+      {
+        "id": "AUD-88218",
+        "timestamp": "15-Oct-2026 05:45:10",
+        "actor": "vikram.solanki@ugvcl.gov.in",
+        "role": "Field Engineer",
+        "action": "WORK_ORDER_STATUS_UPDATE",
+        "resource": "WO-4401 (CMP-8821)",
+        "ipAddress": "10.210.84.101",
+        "status": "SUCCESS",
+        "metaDetail": "Status changed from Pending to On Site at 14 Anand Nagar."
+      },
+      {
+        "id": "AUD-88217",
+        "timestamp": "15-Oct-2026 04:30:00",
+        "actor": "automated.cron@ugvcl.gov.in",
+        "role": "System Scheduler",
+        "action": "DAILY_BACKUP_EXECUTION",
+        "resource": "PostgreSQL_Cluster_UGVCL_Core",
+        "ipAddress": "127.0.0.1",
+        "status": "SUCCESS",
+        "metaDetail": "Full snapshot created. Size: 184.2 GB. Checksum verified."
+      },
+      {
+        "id": "AUD-88216",
+        "timestamp": "14-Oct-2026 23:18:02",
+        "actor": "unknown_host_gw",
+        "role": "External Gateway",
+        "action": "FAILED_PORTAL_LOGIN_ATTEMPT",
+        "resource": "Consumer Auth Gateway",
+        "ipAddress": "185.220.101.42",
+        "status": "WARNING",
+        "metaDetail": "3 invalid OTP attempts detected for mobile +91 94280XXXXX. IP throttled."
+      },
+      {
+        "id": "AUD-88215",
+        "timestamp": "14-Oct-2026 18:40:15",
+        "actor": "04281-99231 (Meenaben Patel)",
+        "role": "Consumer Portal",
+        "action": "GRIEVANCE_REGISTERED",
+        "resource": "CMP-8821",
+        "ipAddress": "103.24.188.77",
+        "status": "SUCCESS",
+        "metaDetail": "Voltage fluctuation complaint logged against 11kV Visnagar Road Feeder."
+      }
+    ],
+    "INITIAL_NOTIFICATIONS": [
+      {
+        "id": "NOTIF-01",
+        "title": "Urgent Work Order Dispatched: WO-4401",
+        "message": "Work order for voltage fluctuation at 14 Anand Nagar (CMP-8821) has been scheduled.",
+        "time": "15 mins ago",
+        "targetRole": "field",
+        "type": "alert",
+        "read": false,
+        "category": "Inspection"
+      },
+      {
+        "id": "NOTIF-02",
+        "title": "Electricity Bill Ready: September 2026",
+        "message": "Your bill of ₹2,185 for consumer no. 04281-99231 is due on 22-Oct-2026.",
+        "time": "1 hour ago",
+        "targetRole": "consumer",
+        "type": "info",
+        "read": false,
+        "category": "Billing"
+      },
+      {
+        "id": "NOTIF-03",
+        "title": "New Connection Verification Pending",
+        "message": "Application APP-2026-0842 for 8kW load extension requires sub-divisional sanction approval.",
+        "time": "2 hours ago",
+        "targetRole": "employee",
+        "type": "warning",
+        "read": false,
+        "category": "Approval"
+      },
+      {
+        "id": "NOTIF-04",
+        "title": "Peak Load Warning: 11kV Kadi-Rural Feeder",
+        "message": "Feeder utilization reached 108.2% of rated capacity. Load shedding or feeder segregation recommended.",
+        "time": "3 hours ago",
+        "targetRole": "management",
+        "type": "alert",
+        "read": false,
+        "category": "Outage"
+      },
+      {
+        "id": "NOTIF-05",
+        "title": "Automated Snapshot Succeeded",
+        "message": "UGVCL core enterprise database snapshot completed at 04:30 AM (184.2 GB).",
+        "time": "5 hours ago",
+        "targetRole": "admin",
+        "type": "success",
+        "read": true,
+        "category": "Security"
+      }
+    ],
+    "CONSUMPTION_HISTORY": [
+      {
+        "month": "May 2026",
+        "units": 480,
+        "amount": 3120,
+        "avgTempC": 41
+      },
+      {
+        "month": "Jun 2026",
+        "units": 520,
+        "amount": 3410,
+        "avgTempC": 42
+      },
+      {
+        "month": "Jul 2026",
+        "units": 395,
+        "amount": 2435,
+        "avgTempC": 34
+      },
+      {
+        "month": "Aug 2026",
+        "units": 410,
+        "amount": 2537,
+        "avgTempC": 32
+      },
+      {
+        "month": "Sep 2026",
+        "units": 360,
+        "amount": 2185,
+        "avgTempC": 33
+      },
+      {
+        "month": "Oct 2026 (Est)",
+        "units": 340,
+        "amount": 2040,
+        "avgTempC": 31
+      }
+    ],
+    "EXECUTIVE_MONTHLY_METRICS": [
+      {
+        "month": "Apr",
+        "billedMUs": 142.5,
+        "collectedCr": 68.4,
+        "atcLossPct": 13.8
+      },
+      {
+        "month": "May",
+        "billedMUs": 168.2,
+        "collectedCr": 81.2,
+        "atcLossPct": 13.2
+      },
+      {
+        "month": "Jun",
+        "billedMUs": 174,
+        "collectedCr": 84.5,
+        "atcLossPct": 12.9
+      },
+      {
+        "month": "Jul",
+        "billedMUs": 152.1,
+        "collectedCr": 74,
+        "atcLossPct": 12.6
+      },
+      {
+        "month": "Aug",
+        "billedMUs": 158.4,
+        "collectedCr": 77.8,
+        "atcLossPct": 12.5
+      },
+      {
+        "month": "Sep",
+        "billedMUs": 161.9,
+        "collectedCr": 79.6,
+        "atcLossPct": 12.4
+      }
+    ],
+    "SUBDIVISION_PERFORMANCE": [
+      {
+        "name": "Mehsana City North",
+        "complaints": 142,
+        "resolvedPct": 96.4,
+        "avgTatHours": 8.2,
+        "atcLossPct": 11.8
+      },
+      {
+        "name": "Mehsana Industrial GIDC",
+        "complaints": 38,
+        "resolvedPct": 98.2,
+        "avgTatHours": 4.1,
+        "atcLossPct": 8.4
+      },
+      {
+        "name": "Gandhinagar Sub-Div 2",
+        "complaints": 94,
+        "resolvedPct": 97.1,
+        "avgTatHours": 6.5,
+        "atcLossPct": 10.2
+      },
+      {
+        "name": "Kadi Rural (Ag)",
+        "complaints": 210,
+        "resolvedPct": 88.5,
+        "avgTatHours": 18.4,
+        "atcLossPct": 17.6
+      },
+      {
+        "name": "Patan Industrial Zone",
+        "complaints": 52,
+        "resolvedPct": 95,
+        "avgTatHours": 7.8,
+        "atcLossPct": 12.1
+      }
+    ],
+    "INITIAL_CONSUMERS": [
+      {
+        "consumerNo": "04281-99231",
+        "name": "Smt. Meenaben Patel",
+        "phone": "+91 98250 14820",
+        "email": "meenaben.patel@example.com",
+        "address": "14, Anand Nagar Society, Visnagar Road, Mehsana",
+        "subdivision": "Mehsana City North",
+        "aadhaarMasked": "XXXX-XXXX-8421",
+        "panMasked": "ABCDE1234F",
+        "totalConnections": 2
+      },
+      {
+        "consumerNo": "04281-77190",
+        "name": "Patel Engineering Works (Prop: Smt. Meenaben Patel)",
+        "phone": "+91 98250 14820",
+        "email": "accounts@patelengineering.in",
+        "address": "Plot 48, GIDC Phase-II, Mehsana",
+        "subdivision": "Mehsana Industrial GIDC",
+        "aadhaarMasked": "XXXX-XXXX-8421",
+        "panMasked": "ABCDE1234F",
+        "totalConnections": 2
+      },
+      {
+        "consumerNo": "04281-66512",
+        "name": "Shri Arvindbhai Prajapati",
+        "phone": "+91 98980 55123",
+        "email": "arvind.prajapati@example.com",
+        "address": "22 Krishna Bungalows, Randheja Road, Gandhinagar",
+        "subdivision": "Gandhinagar Sub-Division 2",
+        "aadhaarMasked": "XXXX-XXXX-3312",
+        "panMasked": "PQRSS9921D",
+        "totalConnections": 1
+      }
+    ],
+    "INITIAL_EMPLOYEES": [
+      {
+        "id": "EMP-UG-1042",
+        "name": "Rajesh V. Trivedi",
+        "designation": "Assistant Engineer (Commerce & Ops)",
+        "department": "Sub-Divisional Operations & Sanctions",
+        "subdivision": "Mehsana City North",
+        "email": "rajesh.trivedi@ugvcl.gujarat.gov.in",
+        "phone": "+91 94285 11042",
+        "activeCases": 4
+      },
+      {
+        "id": "EMP-UG-1088",
+        "name": "Pooja Shah",
+        "designation": "Deputy Executive Engineer",
+        "department": "Revenue & Metering Cell",
+        "subdivision": "Gandhinagar Circle",
+        "email": "pooja.shah@ugvcl.gujarat.gov.in",
+        "phone": "+91 94285 11088",
+        "activeCases": 2
+      },
+      {
+        "id": "EMP-UG-1102",
+        "name": "Kamlesh K. Barot",
+        "designation": "Accounts Officer",
+        "department": "Billing & Collection",
+        "subdivision": "Mehsana Circle",
+        "email": "kamlesh.barot@ugvcl.gujarat.gov.in",
+        "phone": "+91 94285 11102",
+        "activeCases": 3
+      }
+    ],
+    "INITIAL_FIELD_ENGINEERS": [
+      {
+        "id": "FLD-UG-201",
+        "name": "Vikramaditya Solanki",
+        "designation": "Junior Engineer (Field & Vigilance)",
+        "assignedFeeder": "11kV Visnagar Road Feeder",
+        "subdivision": "Mehsana City North",
+        "phone": "+91 94285 22201",
+        "status": "On Site",
+        "activeWorkOrders": 3,
+        "completedToday": 2
+      },
+      {
+        "id": "FLD-UG-204",
+        "name": "Dharmesh P. Chaudhari",
+        "designation": "Line Inspector & Field Feasibility Officer",
+        "assignedFeeder": "11kV Kadi-Rural Ag Feeder",
+        "subdivision": "Kadi Division",
+        "phone": "+91 94285 22204",
+        "status": "Available",
+        "activeWorkOrders": 1,
+        "completedToday": 3
+      },
+      {
+        "id": "FLD-UG-209",
+        "name": "Hitesh N. Vaghela",
+        "designation": "Substation Technician Grade-I",
+        "assignedFeeder": "11kV GIDC-2 Dedicated Feeder",
+        "subdivision": "Mehsana Industrial GIDC",
+        "phone": "+91 94285 22209",
+        "status": "Available",
+        "activeWorkOrders": 2,
+        "completedToday": 1
+      }
+    ]
+  }
+}

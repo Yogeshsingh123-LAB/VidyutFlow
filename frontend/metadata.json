@@ -1,0 +1,8 @@
+{
+  "name": "VidyutOne - Intelligent Utility ERP & Portal",
+  "description": "Next-generation, secure and intelligent IT infrastructure and user-friendly ERP/portal ecosystem for Uttar Gujarat Vij Company Limited (UGVCL).",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
