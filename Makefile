@@ -21,6 +21,9 @@ frontend: ## Run web app locally on :5173 (proxies /api to :8000)
 test: ## Backend test suite (end-to-end flow, RBAC, offline de-dup, ML)
 	cd backend && python -m pytest -q
 
+test-frontend: ## Frontend test suite (auth, session, AI resilience, data integrity)
+	cd frontend && npm test
+
 build: ## Production frontend build
 	cd frontend && npm run build
 

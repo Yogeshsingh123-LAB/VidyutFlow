@@ -1,8 +1,124 @@
-@tailwind base; @tailwind components; @tailwind utilities;
-:root { --navy:#101c35; --blue:#2563eb; --teal:#0d9488; }
-body { font-family:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif; }
-::-webkit-scrollbar { width:6px; height:6px; } ::-webkit-scrollbar-thumb { background:rgba(148,163,184,.45); border-radius:3px; }
-.tabular { font-variant-numeric: tabular-nums; }
-@keyframes dashmove { to { stroke-dashoffset:-24; } }
-.electric-line { stroke-dasharray:6 6; animation:dashmove 1.2s linear infinite; }
-@media (prefers-reduced-motion: reduce) { .electric-line { animation:none; } }
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --primary-navy: #071329;
+    --action-blue: #1d4ed8;
+    --ugvcl-magenta: #c2185b;
+    --ugvcl-magenta-dark: #9c1258;
+    --warning-amber: #f59e0b;
+    --action-orange: #f97316;
+    --light-canvas: #f8fafc;
+    --surface-white: #ffffff;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    color: #0f172a;
+    background-color: #f8fafc;
+    overflow-x: hidden;
+  }
+
+  .font-gujarati {
+    font-family: 'Noto Sans Gujarati', 'Shruti', 'Gujarati Sangam MN', system-ui, -apple-system, sans-serif;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Custom scrollbars for enterprise data viewports */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Electricity & Smart Grid Animations */
+@keyframes electricPulseDash {
+  0% {
+    stroke-dashoffset: 400;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes nodeGlowPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.85;
+    filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.6));
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+    filter: drop-shadow(0 0 16px rgba(56, 189, 248, 0.95));
+  }
+}
+
+@keyframes sparkTravel {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes ambientGridWave {
+  0%, 100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+
+.animate-electric-pulse {
+  animation: electricPulseDash 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.animate-node-glow {
+  animation: nodeGlowPulse 2.8s ease-in-out infinite;
+}
+
+.animate-grid-wave {
+  animation: ambientGridWave 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-electric-pulse,
+  .animate-node-glow,
+  .animate-grid-wave {
+    animation: none !important;
+  }
+}
