@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { LiveWorkflowKpis } from '../common/LiveWorkflowKpis';
 import {
   SYSTEM_SERVICES
 } from '../../data/mockData';
@@ -131,6 +132,8 @@ export const AdminPortal: React.FC = () => {
       {/* VIEW 1: SYSTEM OVERVIEW & INTEGRATIONS */}
       {(activeTab === 'overview' || activeTab === 'integrations') && (
         <div className="space-y-4 sm:space-y-6">
+          {/* Live Workflow KPIs — wired to the VidyutFlow FastAPI backend (auto-refresh 45s) */}
+          <LiveWorkflowKpis />
           {/* Bento Health Strip */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">

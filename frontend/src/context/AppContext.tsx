@@ -54,6 +54,7 @@ import {
   verifyServerSessionApi,
   logoutServerSessionApi
 } from '../utils/authClient';
+import { syncBackendSession, clearBackendSession } from '../utils/backendSession';
 
 export type { ActiveUserIdentity, AuthMode };
 export { getInitialsFromName };
@@ -988,6 +989,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       pendingConsumerTabRef.current = null;
 
       setDemoSession(verifiedSession);
+      // Acquire the backend JWT for live API panels (fire-and-forget; degrades silently)
+      void syncBackendSession(email, password, assignedRole);
       setCurrentRoleState(assignedRole);
       setActiveTabState(targetTab);
       setHasEnteredPlatformState(true);
@@ -1046,6 +1049,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setStoredDemoSession(newSession);
       setDemoSession(newSession);
       setCurrentRoleState(defaultAcc.role);
+      void syncBackendSession(email, password, defaultAcc.role);
       try {
         localStorage.setItem('vidyutone_role', defaultAcc.role);
       } catch {}
@@ -1105,6 +1109,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         window.history.pushState(null, '', `/consumer/${targetTab}`);
       }
       setIsRoleSwitcherModalOpenState(false);
+      void syncBackendSession(email, password, 'consumer');
       showToast(`Welcome back, ${customUser.name}! Consumer Portal loaded.`, 'success');
       addAuditEvent('DEMO_AUTH_LOGIN', 'Workspace:consumer', `Custom user login: ${customUser.email}`, customUser.name, 'SUCCESS');
       return { success: true };
@@ -1239,6 +1244,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       window.history.pushState(null, '', `/consumer/${targetTab}`);
     }
     setIsRoleSwitcherModalOpenState(false);
+    void syncBackendSession(email, password, 'consumer');
     showToast(`Consumer registration successful! Welcome, ${newUser.name}.`, 'success');
     addAuditEvent('DEMO_AUTH_SIGNUP', 'Consumer Account Registered', `New consumer created: ${newUser.email}`, newUser.name, 'SUCCESS');
     return { success: true };
@@ -1246,6 +1252,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logoutDemoSession = async (): Promise<void> => {
     pendingConsumerTabRef.current = null;
+    clearBackendSession();
     if (authMode === 'server') {
       await logoutServerSessionApi();
       setDemoSession(null);
@@ -1778,6 +1785,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetDemoData = () => {
+    clearBackendSession();
     try {
       localStorage.removeItem('vidyutone_consumers');
       localStorage.removeItem('vidyutone_connections');

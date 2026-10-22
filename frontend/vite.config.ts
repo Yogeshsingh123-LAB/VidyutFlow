@@ -428,6 +428,17 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
+        '/api/backend': {
+          // FastAPI auth + any future backend routes not shadowed by dev middleware
+          target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8008',
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api\/backend/, '')
+        },
+        '/api/notifications': {
+          target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8008',
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api/, '')
+        },
         '/api/requests': {
           target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8008',
           changeOrigin: true,

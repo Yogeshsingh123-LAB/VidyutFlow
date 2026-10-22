@@ -10,7 +10,7 @@
     "preview": "vite preview --host 0.0.0.0 --port 5173",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx tests/auth-access.test.ts && tsx tests/demo-data-integrity.test.ts && tsx tests/ai-assistant-resilience.test.ts && tsx tests/server-auth-foundation.test.ts && tsx tests/server-auth-api.test.ts && tsx tests/navigation-views.test.ts",
+    "test": "tsx tests/auth-access.test.ts && tsx tests/demo-data-integrity.test.ts && tsx tests/ai-assistant-resilience.test.ts && tsx tests/server-auth-foundation.test.ts && tsx tests/server-auth-api.test.ts && tsx tests/navigation-views.test.ts && tsx tests/live-api-wiring.test.ts",
     "test:auth": "tsx tests/auth-access.test.ts",
     "test:server-auth": "tsx tests/server-auth-foundation.test.ts && tsx tests/server-auth-api.test.ts",
     "test:integrity": "tsx tests/demo-data-integrity.test.ts",

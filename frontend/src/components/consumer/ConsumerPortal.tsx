@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { submitLiveRequest } from '../../utils/liveData';
 import { CONSUMPTION_HISTORY } from '../../data/mockData';
 import {
   Zap,
@@ -262,6 +263,33 @@ export const ConsumerPortal: React.FC = () => {
       estimatedSanctionCost: totalSanctionEstimate,
       documentsSubmitted: uploadedDocs
     });
+
+    // Also submit to the live VidyutFlow API (fire-and-forget): the backend runs the real
+    // workflow — validation, ML classification, SLA-risk scoring, zone routing — and the
+    // toast reports what the live models returned. Demo workspace stays usable if API is down.
+    void submitLiveRequest({
+      applicant_name: applicantName,
+      phone: applicantPhone,
+      address: `${address}, Pin - ${pincode}`,
+      zone: subdivision.toLowerCase().includes('south') ? 'South' : 'North',
+      pin_code: pincode,
+      request_type: 'new_connection',
+      description: `New ${category} connection via consumer wizard`,
+      requested_load_kw: Number(loadKw),
+      tariff_category: category,
+      phase,
+      premises_type: premisesType,
+      document_name: uploadedDocs[0] || ''
+    })
+      .then(r => {
+        showToast(
+          `Live API recorded the request (ref ${r.id.slice(0, 8)}) — ML: ${r.category}/${r.severity} · SLA risk ${Math.round((r.sla_breach_risk ?? 0) * 100)}%`,
+          'success'
+        );
+      })
+      .catch(() => {
+        showToast('Live API unreachable — application recorded in the demo workspace only', 'info');
+      });
 
     // Reset step
     setFormStep(1);

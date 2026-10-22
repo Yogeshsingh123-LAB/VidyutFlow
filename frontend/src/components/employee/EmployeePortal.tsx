@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { LiveRequestQueue } from '../common/LiveRequestQueue';
 import {
   SUBDIVISION_PERFORMANCE
 } from '../../data/mockData';
@@ -242,6 +243,8 @@ export const EmployeePortal: React.FC = () => {
       {/* VIEW 2: APPLICATION QUEUE */}
       {(activeTab === 'applications' || activeTab === 'approvals') && (
         <div className="space-y-4 min-w-0">
+          {/* Live Request Queue — wired to the VidyutFlow FastAPI backend (auto-refresh 45s) */}
+          <LiveRequestQueue />
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
