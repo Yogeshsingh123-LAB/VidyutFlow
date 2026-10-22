@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { LiveWorkflowKpis } from '../common/LiveWorkflowKpis';
+import { LiveSlaRiskWatchlist } from '../common/LiveSlaRiskWatchlist';
 import {
   EXECUTIVE_MONTHLY_METRICS,
   FEEDER_METRICS,
@@ -338,6 +339,8 @@ export const ManagementPortal: React.FC = () => {
       {/* VIEW 3: AI EXECUTIVE INSIGHTS */}
       {activeTab === 'ai-insights' && (
         <div className="space-y-6">
+          {/* Live ML output — SLA-risk probabilities + reasons straight from the wired API */}
+          <LiveSlaRiskWatchlist />
           <div className="p-5 rounded-xl bg-gradient-to-r from-blue-900/20 to-teal-900/20 border border-teal-500/30 space-y-3">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-teal-400" />

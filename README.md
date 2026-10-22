@@ -275,12 +275,15 @@ Full script: [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
 
 | Model | Held-out accuracy | Majority baseline | Test n | Reading |
 | :--- | ---: | ---: | ---: | :--- |
-| Category classifier | **1.000** | 0.167 | 144 | Perfect — *because synthetic text is templated* (see below) |
-| Severity classifier | **1.000** | 0.333 | 144 | Same caveat |
-| SLA-breach predictor | **0.794** | 0.625 | 160 | +17 pts over guessing; labels come from a noisy synthetic rule |
+| Category classifier | **0.733** | 0.185 | 195 | +55 pts over always guessing the most common class |
+| Severity classifier | **0.846** | 0.328 | 195 | +52 pts over guessing; CRITICAL recall is weak (small class) |
+| SLA-breach predictor | **0.794** | 0.625 | 160 | +17 pts over guessing; breach precision 0.79, recall 0.62 |
 
-**Accuracy is not confidence, and a risk score is not a verdict.** The classifier's 100 % means
-“the synthetic vocabulary is separable”, not “real consumer free-text will classify perfectly”.
+**Accuracy is not confidence, and a risk score is not a verdict.** Every figure is on **synthetic
+data** (templates + a noisy labelling rule) and reported **against a majority baseline**, so the
+number can never look better than always guessing the most common answer. An earlier build showed
+1.000 classifier accuracy — a templating artefact of an easy vocabulary split; the current harder
+template-group hold-out is published instead (see `docs/ML_REPORT.md` §Hostile questions).
 The SLA number is a **triage probability**: officers act on the *reasons* (missing documents,
 high zonal load, ≥ 10 kW approval chain), and a human decides. Reproduce anytime:
 
