@@ -46,6 +46,7 @@ console.log('\nRunning Test: 2. Three screens are wired to the live API');
   const management = read('src/components/management/ManagementPortal.tsx');
   const admin = read('src/components/admin/AdminPortal.tsx');
   check('Management portal renders LiveWorkflowKpis', management.includes('<LiveWorkflowKpis />'));
+  check('Management Insights tab renders LiveSlaRiskWatchlist (ML reasons live)', management.includes('<LiveSlaRiskWatchlist />'));
   check('Admin portal renders LiveWorkflowKpis', admin.includes('<LiveWorkflowKpis />'));
   const live = read('src/utils/liveData.ts');
   check('liveData polls GET /requests/kpis/summary', live.includes("'/requests/kpis/summary'"));
