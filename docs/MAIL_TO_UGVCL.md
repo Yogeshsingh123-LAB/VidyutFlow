@@ -1,17 +1,17 @@
 # Mail to UGVCL Resource Person — email draft
 
-**To:** hmtcotech2@ugvcl.com · **Send:** after locking PS000125 on the portal, by ~20 Oct 2026 (one mail, from the team-lead SPOC only) · **Follow-up:** one polite reminder after 7 days, then stop. Every answer received must be reflected in `REQUIREMENT_MAPPING.md` (replace assumptions with confirmed facts, citing "per UGVCL resource person, <date>").
+**To:** hmtcotech2@ugvcl.com · **Send:** after locking PS000125 on the portal — immediately (finalised 22 Oct 2026) (one mail, from the team-lead SPOC only) · **Follow-up:** one polite reminder after 7 days, then stop. Every answer received must be reflected in `REQUIREMENT_MAPPING.md` (replace assumptions with confirmed facts, citing "per UGVCL resource person, <date>").
 
 ## Why mail at all
 The build currently assumes: SLA timelines (24/48/72/120 h by severity), complaint categories, a simplified org chain (officer → engineer → admin), two zones, and synthetic scale figures. A short set of answers from UGVCL retires most of that risk before the synopsis (6 Nov) and the finale defence (2 Dec).
 
-## Ready-to-send draft (fill the [brackets])
+## Ready-to-send draft (finalised 22 Oct 2026 — ready to send)
 
 > **Subject:** Seva First Innovation Challenge — PS000125: Student team seeking brief guidance on scope & validation
 >
 > Respected Sir/Madam,
 >
-> We are a student team from [Institute], led by [Leader Name], participating in the Seva First Innovation Challenge. We have selected Problem Statement **PS000125** (Future-Ready, Secure and Intelligent IT Infrastructure & User-Friendly ERP/Portal Ecosystem) and are building a working prototype: a unified role-based portal for new connections and complaints with automated workflow routing, SLA tracking, an AI assistant over policy documents, and offline field-work sync for low-connectivity areas. We use **synthetic data only** and are not seeking any production access or real consumer data.
+> We are a student team from Gandhinagar University, led by Yogesh Kumar Singh, participating in the Seva First Innovation Challenge. We have selected Problem Statement **PS000125** (Future-Ready, Secure and Intelligent IT Infrastructure & User-Friendly ERP/Portal Ecosystem) and are building a working prototype: a unified role-based portal for new connections and complaints with automated workflow routing, SLA tracking, an AI assistant over policy documents, and offline field-work sync for low-connectivity areas. We use **synthetic data only** and are not seeking any production access or real consumer data.
 >
 > To align our synopsis (due 6 Nov) with UGVCL's actual priorities, we would be grateful for brief guidance on:
 >
@@ -29,7 +29,7 @@ The build currently assumes: SLA timelines (24/48/72/120 h by severity), complai
 >
 > Thank you for your time and for posing this problem statement.
 >
-> [Leader Name] · [Institute] · [Phone] · [Email]
+> Yogesh Kumar Singh · Gandhinagar University · 9558271649 · y10805311@gmail.com
 
 ## Never ask / never do
 - No real consumer data, credentials, or production access (state synthetic-only up front — done in the draft).
