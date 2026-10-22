@@ -24,7 +24,7 @@
 | 1.2 | Add CI via GitHub web UI (`.github/workflows/ci.yml`: `make test` + `make build`) — token can't push workflows, owner adds it | **Yogesh Kumar Singh** (adds), Sandip Kumar (writes YAML) | — | ✅ **22 Oct** — `ci.yml` written (backend pytest + frontend tests/tsc/build). Owner pushes workflow file if the token refuses it, then confirm the first green Actions run |
 | 1.3 | API contract freeze: final review of endpoints/response shapes; no breaking changes after this date | **Yogesh Kumar Singh** | 1.1 | Freeze note in `CHANGELOG.md` |
 | 1.4 | Frontend polish pass: loading/empty states, Gujarati label readiness (i18n structure only), accessibility (labels/contrast) | **Utsav** | 1.3 (shapes frozen) | Build green; screenshots for deck |
-| 1.5 | ML final pack: retrain (`make train`), export metrics + 2 charts (confusion matrix, risk distribution) for the deck; keep SYNTHETIC labels | **Aakash Kumar Singh** | — | `docs/ML_REPORT.md` updated; chart images in `docs/assets/` |
+| 1.5 | ML final pack: retrain (`make train`), export metrics + 2 charts (confusion matrix, risk distribution) for the deck; keep SYNTHETIC labels | **Aakash Kumar Singh** | — | ✅ **22 Oct** — `make train` byte-identical reproducible · `docs/assets/ml_confusion_matrices.png` + `ml_risk_distribution.png` (SYNTHETIC-labelled) · `docs/ML_REPORT.md` + honesty script + 3 hostile Q&A · live SLA watchlist in Insights tab |
 | 1.6 | If UGVCL replied: apply Plan B swaps (SLA hours/taxonomy/role names) — config/label changes only | R1+R3 (data), R2 (labels) | 0.5 | `REQUIREMENT_MAPPING.md` rows marked *validated* |
 | 1.7 | Security quick wins within freeze: login rate-limit note or simple throttle; officer zone-scoping **decision** (build or defer to roadmap — record it) | **Sandip Kumar** + Yogesh Kumar Singh | 1.3 | ✅ **22 Oct** — throttle built (`login_limit.py`, 20/min/IP, tested) · zone-scoping **built & fail-closed** (prototype assumption pending UGVCL org tree) · known-gaps one-liners recorded in `SECURITY.md` §Known-gaps |
 
@@ -32,15 +32,15 @@
 
 | # | Task | Owner | Depends on | Evidence |
 | :--- | :--- | :--- | :--- | :--- |
-| 2.1 | Final synopsis text (problem → architecture → impact, assumptions labelled) and portal submission | **Arnav** (writes), Yogesh Kumar Singh (approves) | 0.4, 1.5, 1.6 | Submitted confirmation |
-| 2.2 | One architecture diagram (built vs roadmap visually distinct) for synopsis + deck | **Yogesh Kumar Singh** | 1.3 | Image in `docs/assets/` |
-| 2.3 | Synopsis numbers audit: every figure labelled measured/synthetic/target — no orphan percentages | **Aakash Kumar Singh** (ML figs), Arnav (rest) | 1.5 | Checklist signed in `docs/REQUIREMENT_MAPPING.md` §D |
+| 2.1 | Final synopsis text (problem → architecture → impact, assumptions labelled) and portal submission | **Arnav** (writes), Yogesh Kumar Singh (approves) | 0.4, 1.5, 1.6 | 📝 **22 Oct — text finalised in `docs/SYNOPSIS_ABSTRACT.md`** (measured/synthetic figures attached); remaining: leader approval + portal submit before **6 Nov** |
+| 2.2 | One architecture diagram (built vs roadmap visually distinct) for synopsis + deck | **Yogesh Kumar Singh** | 1.3 | ✅ **22 Oct** — `docs/assets/architecture.svg` + `architecture.png` (built=colored, roadmap=grey dashed) |
+| 2.3 | Synopsis numbers audit: every figure labelled measured/synthetic/target — no orphan percentages | **Aakash Kumar Singh** (ML figs), Arnav (rest) | 1.5 | ✅ **22 Oct** — checklist signed in `docs/REQUIREMENT_MAPPING.md` §F |
 
 ## Phase 3 — Finale pack (by 2 Dec) 🟢
 
 | # | Task | Owner | Depends on | Evidence |
 | :--- | :--- | :--- | :--- | :--- |
-| 3.1 | Build the actual 12-slide deck (`.pptx`, from `docs/DECK_OUTLINE.md`) | **Arnav** | 1.4 screenshots, 1.5 charts, 2.2 diagram | `docs/deck/VidyutFlow_PS000125.pptx` (≤20 MB) |
+| 3.1 | Build the actual 12-slide deck (`.pptx`, from `docs/DECK_OUTLINE.md`) | **Arnav** | 1.4 screenshots, 1.5 charts, 2.2 diagram | ✅ **22 Oct (draft)** — `docs/deck/VidyutFlow_PS000125.pptx` (451 KB) generated via `scripts/build_deck.py`, speaker notes included; remaining: drop in Utsav's screenshot pack and design polish |
 | 3.2 | Demo screenshots pack (one per role view + offline-sync sequence) | **Utsav** | 1.4 | Images in `docs/assets/` |
 | 3.3 | Record 3–5 min demo video following `docs/DEMO_SCRIPT.md` (each role narrates own segment) | **All** (Arnav edits) | 3.2 | Video file/link in README |
 | 3.4 | Full rehearsal ×3 with timing; backup plan: recorded video + offline DB snapshot if venue Wi-Fi fails | **Yogesh Kumar Singh** (runs), all attend | 3.1, 3.3 | Rehearsal log in team chat |

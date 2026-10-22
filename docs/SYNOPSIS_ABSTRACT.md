@@ -9,6 +9,6 @@
 
 **Users served in the demo.** Primary: subdivision officers, field engineers, IT/admin and management (Fleet Management Console). Secondary: consumers/applicants. Contractors/agencies and government stakeholders are roadmap (scoped logins), stated as such.
 
-**Impact (targets, not measured UGVCL results).** "Enter Once, Use Everywhere" with a click-and-get-work-done flow: no manual re-entry in the demo path, SLA risk visible before breach, zero duplicate field records on re-sync, and consumer-visible status at every step. All ML results are on **synthetic data**, reported vs a majority baseline on a held-out test set.
+**Impact (targets, not measured UGVCL results).** "Enter Once, Use Everywhere" with a click-and-get-work-done flow: no manual re-entry in the demo path, SLA risk visible before breach, zero duplicate field records on re-sync, and consumer-visible status at every step. All ML results are on **synthetic data**, reported vs a majority baseline on a held-out test set: category 0.733 (baseline 0.185), severity 0.846 (0.328), SLA-breach 0.794 (0.625), n = 195/195/160. API responsiveness measured **locally on synthetic demo data**: p50 3.1 ms · p95 4.5 ms over 100 mixed reads (0 errors) — not a UGVCL production benchmark.
 
 **Roadmap (not built).** Legacy ERP adapters, Kafka/Temporal, GraphQL/GIS/WebSockets, Flutter/Couchbase, fine-tuned LLM in VPC, Zero Trust/multi-AZ DR, real SCADA telemetry, contractor/govt access, hardware modernisation tiers.
