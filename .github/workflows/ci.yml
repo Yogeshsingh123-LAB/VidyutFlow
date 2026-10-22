@@ -1,0 +1,42 @@
+# CI — Role 4 (DevOps/QA): every push/PR must keep the suites green.
+# Mirrors the Makefile contract: backend `make test`, frontend `npm test` + `make build`.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend-tests:
+    name: Backend tests (make test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+      - name: Run backend test suite
+        run: cd backend && python -m pytest -q
+
+  frontend-tests-build:
+    name: Frontend tests + build (make build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+      - name: Run frontend test suites
+        run: cd frontend && npm test
+      - name: Type check
+        run: cd frontend && npm run lint
+      - name: Production build
+        run: cd frontend && npm run build
