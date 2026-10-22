@@ -19,6 +19,9 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        # The root .env (and Compose) also carries frontend-only keys (SESSION_SECRET,
+        # APP_URL, VITE_PROXY_TARGET). Backend settings must tolerate their presence.
+        extra = "ignore"
 
     @model_validator(mode="after")
     def validate_production_secret(self):

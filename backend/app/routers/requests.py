@@ -7,7 +7,8 @@ from ..db import get_db
 from ..models import User, ConnectionRequest, FieldUpdate, AuditLog
 from ..deps import current_user, require
 from ..workflow import run_workflow
-from ..audit import audit
+from ..audit import audit, verify_chain
+from ..notify import notify, notify_request_parties, notify_zone_officers
 from ..access import visible_requests, require_request_access
 from ..transitions import apply_transition
 
@@ -23,10 +24,20 @@ class CreateReq(BaseModel):
     request_type: str = "new_connection"; description: str = ""; requested_load_kw: float = 1.0; document_name: str = ""
     tariff_category: str = "Residential (RGPU)"; phase: str = "1-Phase"; premises_type: str = "Owned"
 
+def _notify_submission(db, r: ConnectionRequest, u: User):
+    """Alert-centre rows on submit: consumer confirmation, zone officers, assigned engineer."""
+    kind = "warning" if r.status == "NEEDS_CORRECTION" else "success"
+    detail = r.validation_notes if r.status == "NEEDS_CORRECTION" else f"Status {r.status} · {r.category}/{r.severity}"
+    notify(db, u.id, "Request submitted", f"{detail} (ref {r.id[:8]})", kind, r.id)
+    notify_zone_officers(db, r.zone, "New request in queue", f"{r.applicant_name} · {r.category} · risk {r.sla_breach_risk}", "info", r.id)
+    if r.assigned_engineer_id:
+        notify(db, r.assigned_engineer_id, "New field task assigned", f"{r.applicant_name} · {r.zone} zone", "info", r.id)
+
 @router.post("", status_code=201)
 def create(body: CreateReq, db: Session = Depends(get_db), u: User = Depends(require("consumer"))):
     r = ConnectionRequest(consumer_id=u.id, **body.model_dump())
     db.add(r); db.flush(); run_workflow(db, r); audit(db, u, "REQUEST_CREATED", "request", r.id, f"{r.status} {r.category}/{r.severity} risk={r.sla_breach_risk}")
+    _notify_submission(db, r, u)
     db.commit(); db.refresh(r); return out(r)
 
 @router.post("/with-document", status_code=201)
@@ -41,6 +52,7 @@ async def create_with_doc(applicant_name: str = Form(...), phone: str = Form(...
         pin_code=pin_code, request_type=request_type, description=description, requested_load_kw=requested_load_kw, document_name=name,
         tariff_category=tariff_category, phase=phase, premises_type=premises_type)
     db.add(r); db.flush(); run_workflow(db, r); audit(db, u, "REQUEST_CREATED_WITH_DOC", "request", r.id, r.status)
+    _notify_submission(db, r, u)
     db.commit(); db.refresh(r); return out(r)
 
 @router.get("")
@@ -74,7 +86,12 @@ def update_status(request_id: str, body: StatusUpdate, db: Session = Depends(get
         raise HTTPException(403, "Engineers may only update field-work statuses")
     changes = {"validation_notes": body.notes} if body.notes else {}
     apply_transition(db, r, body.status, **changes)
-    audit(db, u, "STATUS_UPDATED", "request", r.id, body.status); db.commit(); db.refresh(r); return out(r)
+    audit(db, u, "STATUS_UPDATED", "request", r.id, body.status)
+    notify_request_parties(db, r, u, f"Request {body.status}",
+                           f"{r.applicant_name} · {body.notes or r.category}",
+                           "warning" if body.status in ("NEEDS_CORRECTION", "BLOCKED", "REJECTED")
+                           else "success" if body.status in ("APPROVED", "COMPLETED") else "info")
+    db.commit(); db.refresh(r); return out(r)
 
 @router.get("/kpis/summary")
 def kpis(db: Session = Depends(get_db), u: User = Depends(current_user)):
@@ -130,6 +147,8 @@ def field_sync(body: FieldSync, db: Session = Depends(get_db), u: User = Depends
                      task_status=body.task_status, notes=body.notes, meter_serial=body.meter_serial, created_offline_at=body.created_offline_at)
     db.add(fu)
     audit(db, u, "FIELD_SYNC", "request", r.id, f"{body.task_status} uuid={body.client_uuid}")
+    notify_request_parties(db, r, u, f"Field update: {body.task_status}",
+                           f"{r.applicant_name} · {body.notes or 'synced from field app'}", "info")
     try:
         db.commit()
     except IntegrityError:
@@ -143,6 +162,11 @@ def field_sync(body: FieldSync, db: Session = Depends(get_db), u: User = Depends
             raise HTTPException(409, "client_uuid belongs to another sync operation")
         return {"duplicate": True, "synced": False, "field_update_id": existing.id, "message": "Already synced — duplicate ignored"}
     return {"duplicate": False, "synced": True, "field_update_id": fu.id, "request_status": r.status}
+
+@router.get("/audit/verify")
+def audit_verify(db: Session = Depends(get_db), u: User = Depends(require("admin"))):
+    """Admin tamper-check over the audit hash chain (audit.py). Read-only; never repairs rows."""
+    return verify_chain(db)
 
 @router.get("/audit/logs")
 def logs(db: Session = Depends(get_db), u: User = Depends(require("officer","admin"))):
