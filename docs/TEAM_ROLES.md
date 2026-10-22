@@ -81,7 +81,7 @@ like data/maths → Role 3 · like servers/security → Role 4 · like writing/p
 - [x] Compose stack, Makefile targets, backup/demo-reset scripts, CORS allowlist, bcrypt/JWT *(in repo)*
 - [x] Test suite green from a clean machine (`make setup && make test`) — re-verify **weekly**
 - [ ] Before Nov 6: one full `make up` rehearsal on a clean checkout; change every demo password if the deck shows them publicly
-- [ ] Own the known-gaps list (JWT in localStorage, no rate-limit, filename-only uploads) and their one-line defences
+- [x] Own the known-gaps list (JWT in localStorage, no rate-limit, filename-only uploads) and their one-line defences — `SECURITY.md` §Known-gaps one-liners (22 Oct; note: login throttle is now built, not missing)
 - [ ] Before Dec 2: offline fallback kit — pre-trained models, local DB backup, recorded demo (with Role 5) if Wi-Fi fails
 
 **Reviews:** every PR touching `security.py` / `deps.py` / CORS needs this role's approval.

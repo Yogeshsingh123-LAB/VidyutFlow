@@ -1,0 +1,27 @@
+== 1. BEFORE — live DB contents ==
+  users=11  connection_requests=4  notifications=7  audit_logs=2  field_updates=0
+  integrity_check: ok
+== 2. backup.sh ==
+Backup: backups/vidyutos-20261022-174105.db
+Checksum: backups/vidyutos-20261022-174105.db.sha256 (verify with: (cd backups && sha256sum -c vidyutos-20261022-174105.db.sha256))
+-rw-r--r-- 1 user user 92K Oct 22 17:41 backups/vidyutos-20261022-174105.db
+-rw-r--r-- 1 user user  94 Oct 22 17:41 backups/vidyutos-20261022-174105.db.sha256
+  selected: backups/vidyutos-20261022-174105.db
+== 3. checksum verification ==
+vidyutos-20261022-174105.db: OK
+== 4. tamper detection (copy + 1-byte corruption must FAIL) ==
+  OK: tampered copy correctly REJECTED by sha256 verification
+== 5. disaster: wipe vidyutos.db ==
+  vidyutos.db deleted.
+== 6. restore.sh ==
+vidyutos-20261022-174105.db: OK
+SQLite restore: backups/vidyutos-20261022-174105.db -> vidyutos.db (restart the API to pick it up)
+== 7. AFTER — restored DB contents ==
+  users=11  connection_requests=4  notifications=7  audit_logs=2  field_updates=0
+  integrity_check: ok
+== 8. drill complete — restart the API to serve the recovered database ==
+== 8. API restarted on the recovered DB — live verification ==
+{"status":"ok","service":"VidyutFlow","data_notice":"Demo uses synthetic data only."}
+  live GET /requests rows: 4
+  live KPIs: total 4 | notifications restored above
+DRILL RESULT: PASS — backup/verify/tamper-reject/restore/live-serve all green

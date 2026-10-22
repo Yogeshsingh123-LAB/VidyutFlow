@@ -20,13 +20,13 @@
 
 | # | Task | Owner | Depends on | Evidence |
 | :--- | :--- | :--- | :--- | :--- |
-| 1.1 | Run `docker compose up --build` end-to-end; fix whatever breaks; note it in README QA table | **Sandip Kumar** | — | Compose log + README line "verified" |
-| 1.2 | Add CI via GitHub web UI (`.github/workflows/ci.yml`: `make test` + `make build`) — token can't push workflows, owner adds it | **Yogesh Kumar Singh** (adds), Sandip Kumar (writes YAML) | — | Green Actions run on `main` |
+| 1.1 | Run `docker compose up --build` end-to-end; fix whatever breaks; note it in README QA table | **Sandip Kumar** | — | ✅ **17 Oct** — Compose/PostgreSQL + restart persistence + scripted Chromium checks; `docs/verification/compose-smoke.txt`, `docs/COMPOSE_VERIFICATION.md`. Agent re-verify of Compose is blocked (no Docker in agent sandbox) — CI runs the equivalent on GitHub runners |
+| 1.2 | Add CI via GitHub web UI (`.github/workflows/ci.yml`: `make test` + `make build`) — token can't push workflows, owner adds it | **Yogesh Kumar Singh** (adds), Sandip Kumar (writes YAML) | — | ✅ **22 Oct** — `ci.yml` written (backend pytest + frontend tests/tsc/build). Owner pushes workflow file if the token refuses it, then confirm the first green Actions run |
 | 1.3 | API contract freeze: final review of endpoints/response shapes; no breaking changes after this date | **Yogesh Kumar Singh** | 1.1 | Freeze note in `CHANGELOG.md` |
 | 1.4 | Frontend polish pass: loading/empty states, Gujarati label readiness (i18n structure only), accessibility (labels/contrast) | **Utsav** | 1.3 (shapes frozen) | Build green; screenshots for deck |
 | 1.5 | ML final pack: retrain (`make train`), export metrics + 2 charts (confusion matrix, risk distribution) for the deck; keep SYNTHETIC labels | **Aakash Kumar Singh** | — | `docs/ML_REPORT.md` updated; chart images in `docs/assets/` |
 | 1.6 | If UGVCL replied: apply Plan B swaps (SLA hours/taxonomy/role names) — config/label changes only | R1+R3 (data), R2 (labels) | 0.5 | `REQUIREMENT_MAPPING.md` rows marked *validated* |
-| 1.7 | Security quick wins within freeze: login rate-limit note or simple throttle; officer zone-scoping **decision** (build or defer to roadmap — record it) | **Sandip Kumar** + Yogesh Kumar Singh | 1.3 | Decision recorded in `docs/CODE_REVIEW.md` |
+| 1.7 | Security quick wins within freeze: login rate-limit note or simple throttle; officer zone-scoping **decision** (build or defer to roadmap — record it) | **Sandip Kumar** + Yogesh Kumar Singh | 1.3 | ✅ **22 Oct** — throttle built (`login_limit.py`, 20/min/IP, tested) · zone-scoping **built & fail-closed** (prototype assumption pending UGVCL org tree) · known-gaps one-liners recorded in `SECURITY.md` §Known-gaps |
 
 ## Phase 2 — Synopsis (by 6 Nov) 🟡
 
@@ -51,8 +51,9 @@
 
 | Task | Owner | Note |
 | :--- | :--- | :--- |
-| Frontend smoke tests (login + one flow per role) | Utsav + Sandip Kumar | Currently zero frontend tests — known gap |
-| Simple load check (100 req) to replace "unbenchmarked" with a measured local figure | Sandip Kumar | Must be labelled *local, synthetic* if quoted |
+| Frontend smoke tests (login + one flow per role) | Utsav + Sandip Kumar | ✅ Now 7 suites green incl. `tests/live-api-wiring.test.ts` (18 checks) — keep green in CI |
+| Simple load check (100 req) to replace "unbenchmarked" with a measured local figure | Sandip Kumar | ✅ **22 Oct** — `backend/scripts/load_check.py`: 100 mixed reads, **p50 3.1 ms · p95 4.5 ms · 0 errors** (local, synthetic) · `docs/verification/r4-load-check.txt` |
+| Backup→wipe→restore drill (R1 handoff to R4) | Sandip Kumar + Yogesh | ✅ **22 Oct** — `scripts/restore_drill.sh`: checksum verify ✓ tamper rejected ✓ restore identical ✓ live-serve ✓ · `docs/verification/r4-backup-restore.txt` |
 | Gujarati UI strings | Utsav | Only if UGVCL asks (Plan B) |
 | Contractor/govt read-only role | Yogesh Kumar Singh + Utsav | Only if UGVCL confirms it's in scope |
 

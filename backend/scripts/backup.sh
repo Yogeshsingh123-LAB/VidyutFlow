@@ -12,7 +12,8 @@ else
   out="backups/vidyutos-$stamp.db"
   cp -f vidyutos.db "$out" 2>/dev/null || { echo "No local vidyutos.db yet — start the app first."; exit 1; }
 fi
-sha256sum "$out" > "$out.sha256"
+# Checksum records the file by basename so restore.sh can verify from inside the backups/ dir.
+(cd "$(dirname "$out")" && sha256sum "$(basename "$out")" > "$(basename "$out").sha256")
 echo "Backup: $out"
-echo "Checksum: $out.sha256 (verify with: sha256sum -c $out.sha256)"
+echo "Checksum: $out.sha256 (verify with: (cd backups && sha256sum -c $(basename "$out").sha256))"
 ls -lh "$out" "$out.sha256"
