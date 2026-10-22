@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { LiveWorkflowKpis } from '../common/LiveWorkflowKpis';
 import {
   EXECUTIVE_MONTHLY_METRICS,
   FEEDER_METRICS,
@@ -90,6 +91,8 @@ export const ManagementPortal: React.FC = () => {
       {/* VIEW 1: EXECUTIVE DASHBOARD */}
       {activeTab === 'dashboard' && (
         <div className="space-y-4 sm:space-y-6">
+          {/* Live Workflow KPIs — wired to the VidyutFlow FastAPI backend (auto-refresh 45s) */}
+          <LiveWorkflowKpis />
           {/* Executive KPI Bento */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* AT&C Loss */}

@@ -10,6 +10,25 @@ import {
   AlertTriangle,
   Zap
 } from 'lucide-react';
+import {
+  fetchLiveNotifications,
+  markAllLiveNotificationsRead,
+  markLiveNotificationRead,
+  useLivePoll,
+  type LiveNotificationItem
+} from '../../utils/liveData';
+
+const mapLiveCategory = (n: LiveNotificationItem): 'Billing' | 'Outage' | 'Approval' | 'Inspection' | 'Security' => {
+  const t = `${n.title} ${n.message}`.toLowerCase();
+  if (t.includes('field')) return 'Inspection';
+  if (t.includes('outage') || t.includes('power')) return 'Outage';
+  if (t.includes('bill') || t.includes('payment')) return 'Billing';
+  if (t.includes('security') || n.kind === 'alert') return 'Security';
+  return 'Approval';
+};
+
+const mapLiveType = (kind: LiveNotificationItem['kind']): 'info' | 'alert' | 'success' | 'warning' =>
+  kind === 'alert' ? 'alert' : kind;
 
 export const NotificationDrawer: React.FC = () => {
   const {
@@ -22,19 +41,54 @@ export const NotificationDrawer: React.FC = () => {
     currentRole
   } = useApp();
 
+  // Live alert-centre rows from the FastAPI backend (owner-scoped). Hidden when no backend session.
+  const { data: liveInbox, refresh: refreshLive } = useLivePoll(fetchLiveNotifications);
+  const [hiddenLiveIds, setHiddenLiveIds] = useState<Set<string>>(new Set());
+
   const [activeFilter, setActiveFilter] = useState<'all' | 'mine' | 'unread'>('all');
 
   if (!isNotificationDrawerOpen) return null;
 
   const baseNotifications = currentRole === 'consumer' ? userNotifications : notifications;
+  const liveAsAppNotifications = (liveInbox?.items ?? [])
+    .filter(n => !hiddenLiveIds.has(n.id))
+    .map(n => ({
+      id: `live-${n.id}`,
+      title: n.title,
+      message: n.message,
+      time: new Date(n.created_at).toLocaleString(),
+      targetRole: 'all' as const,
+      type: mapLiveType(n.kind),
+      read: n.read,
+      category: mapLiveCategory(n),
+      actionUrl: undefined
+    }));
+  // Live rows first (server truth), then the demo/session workspace rows
+  const allNotifications = [...liveAsAppNotifications, ...baseNotifications];
 
-  const filteredNotifications = baseNotifications.filter(n => {
+  const filteredNotifications = allNotifications.filter(n => {
     if (activeFilter === 'mine') return n.targetRole === currentRole || n.targetRole === 'all';
     if (activeFilter === 'unread') return !n.read;
     return true;
   });
 
-  const unreadCount = baseNotifications.filter(n => !n.read).length;
+  const unreadCount = allNotifications.filter(n => !n.read).length;
+
+  // Route reads: `live-<id>` rows live on the backend; everything else is workspace state.
+  const handleMarkRead = (compoundId: string) => {
+    if (compoundId.startsWith('live-')) {
+      const backendId = compoundId.slice('live-'.length);
+      void markLiveNotificationRead(backendId).then(() => refreshLive());
+    } else {
+      markNotificationRead(compoundId);
+    }
+  };
+  const handleMarkAllRead = () => {
+    if (liveInbox && liveInbox.unread > 0) {
+      void markAllLiveNotificationsRead().then(() => refreshLive());
+    }
+    markAllNotificationsRead();
+  };
 
   const iconMap = {
     alert: <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />,
@@ -75,7 +129,7 @@ export const NotificationDrawer: React.FC = () => {
           <div className="flex items-center gap-1">
             {unreadCount > 0 && (
               <button
-                onClick={markAllNotificationsRead}
+                onClick={handleMarkAllRead}
                 className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 p-1"
                 title="Mark all as read"
               >
@@ -137,7 +191,7 @@ export const NotificationDrawer: React.FC = () => {
             filteredNotifications.map(item => (
               <div
                 key={item.id}
-                onClick={() => markNotificationRead(item.id)}
+                onClick={() => handleMarkRead(item.id)}
                 className={`p-3 rounded-lg cursor-pointer transition-colors ${
                   !item.read
                     ? 'bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-50 dark:hover:bg-blue-950/30'
