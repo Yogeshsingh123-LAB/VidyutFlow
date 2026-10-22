@@ -21,6 +21,13 @@ DEMO = [
  ("engineer@vidyut.local","engineer (North)","engineer","North","Engineer@123"),
  ("engineer@example.com","Engineer South","engineer","South","Engineer@123"),
  ("consumer@vidyut.local","Demo Consumer","consumer","North","Consumer@123"),
+ # Portal demo accounts (frontend demoAuthData) — same credentials unlock the live API,
+ # so one login covers portal + backend (kills the dual-auth story). Role-mapped to backend RBAC.
+ ("consumer@vidyutflow.demo","Smt. Meenaben Patel","consumer","North","Demo@12345"),
+ ("employee@vidyutflow.demo","Priya Rathod","officer","North","Demo@12345"),
+ ("field@vidyutflow.demo","Vikram Zala","engineer","North","Demo@12345"),
+ ("management@vidyutflow.demo","Rajesh Solanki","admin","North","Demo@12345"),
+ ("admin@vidyutflow.demo","Anand Patel","admin","North","Demo@12345"),
 ]
 def seed():
     if settings.app_env == "production":

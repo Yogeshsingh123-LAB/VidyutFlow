@@ -6,6 +6,19 @@ this project is a hackathon prototype, so versions track milestones rather than 
 ## [Unreleased]
 
 ### Added
+- **UI → live API wiring (Role 2):** the three demo-critical screens now talk to the FastAPI
+  backend through `fastApiClient` — Consumer wizard `POST /api/requests` (toast reports live ML
+  category/severity + SLA risk), Employee **Live Request Queue** (`GET /api/requests`), and
+  Management/Admin **Live Workflow KPIs** (`GET /api/requests/kpis/summary`). Panels poll every
+  45s with a last-updated stamp ("live on refresh" — streaming is roadmap) and degrade silently
+  to the demo workspace when the API is unreachable. Alert centre merges backend
+  `/api/notifications` rows with mark-read wired through. New test chain file
+  `tests/live-api-wiring.test.ts` (18 checks).
+- **One credential set for portal + API:** backend seeds the portal demo accounts
+  (`*@vidyutflow.demo` / `Demo@12345`, role-mapped to RBAC); `src/utils/backendSession.ts`
+  acquires the backend JWT at portal login (stored as `vidyutos_token`) via the new
+  `/api/backend/*` dev proxy (the dev auth middleware shadows `/api/auth`). Kills the dual-auth
+  story: same login covers workspace + live API. Production seeding/rejection unchanged in policy.
 - **Alert centre (server-side):** per-user `Notification` rows with `GET /notifications`,
   `POST /notifications/read-all`, `POST /notifications/{id}/read` (owner-or-admin; cross-user
   writes 403). Workflow events (submit, status change, field sync) notify the attached parties —
