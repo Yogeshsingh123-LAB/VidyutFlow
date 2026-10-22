@@ -1,6 +1,6 @@
 # VidyutFlow API contract — review candidate
 
-Status: **documented, not frozen**. Reviewed 17 Oct 2026. Product, repository and API display labels use VidyutFlow; persistent storage identifiers remain unchanged for compatibility. This is the existing prototype API, not a new product scope.
+Status: **demo-path endpoint shapes frozen 21 Oct 2026** (WORK_PLAN 1.3, ahead of the 24 Oct gate) — no breaking changes to the operations below without joint R1/R2 approval and a deliberate snapshot regen. Reviewed 17 Oct 2026; security/alerts hardening (notifications API, tamper-evident audit chain, security headers) folded into this freeze review. Remaining pre-v1.0 gates are listed at the end. Product, repository and API display labels use VidyutFlow; persistent storage identifiers remain unchanged for compatibility. This is the existing prototype API, not a new product scope.
 
 ## Addressing and authentication
 
@@ -21,7 +21,7 @@ The machine-readable [OpenAPI snapshot](api/openapi.json) is generated from `app
 
 Officer zone scope is a prototype assumption, pending UGVCL confirmation. Collection/KPI/assistant queries use this policy. Officer audit logs include only request events for visible requests. Existing cross-zone assignments are not migrated automatically. Routing selects active same-zone staff, without cross-zone fallback.
 
-## Operation inventory — 16 operations across 15 paths
+## Operation inventory — 20 operations across 19 paths
 
 | Method and path | Access | Success / response |
 |---|---|---|
@@ -37,7 +37,11 @@ Officer zone scope is a prototype assumption, pending UGVCL confirmation. Collec
 | PATCH `/requests/{request_id}/status` | Officer/admin or assigned engineer | 200: updated request |
 | GET `/requests/kpis/summary` | Authenticated, scoped | 200: KPI object |
 | POST `/requests/field-sync` | Officer/admin or assigned engineer, scoped | 200: sync acknowledgment |
+| GET `/requests/audit/verify` | Admin | 200: tamper-check over the audit hash chain (`ok,checked,legacy_skipped,last_entry_hash,broken_at`); read-only |
 | GET `/requests/audit/logs` | Officer scoped / admin global | 200: latest 100 audit events |
+| GET `/notifications` | Authenticated, own rows (admin: all) | 200: `unread`, `items[]` (max 50, newest first) |
+| POST `/notifications/read-all` | Authenticated, own rows | 200: `marked_read` |
+| POST `/notifications/{notification_id}/read` | Owner or admin | 200: updated notification; another user's row returns 403 |
 | POST `/assistant/chat` | Authenticated | 200: answer plus branch-dependent data/sources |
 | GET `/assistant/ml-metrics` | Authenticated | 200: synthetic model metrics; no real-world performance claim |
 | GET `/system/status` | Admin only | 200: global technical status/counts |
@@ -66,7 +70,37 @@ Sync JSON: required strings `client_uuid,request_id,task_status`; optional `note
 
 KPI fields: `total_requests,completed,pending,high_sla_risk,needs_correction,avg_sla_risk,risk_buckets,by_status,by_zone,by_category,by_severity`. Risk buckets: `low_<0.4,watch_0.4-0.7,high_>=0.7`. `pending` counts requests whose status is neither COMPLETED nor REJECTED, matching assistant pending counts and the open set used for risk calculations. `total_requests` still includes all statuses; rejected is available in `by_status`.
 
-Audit rows: `id,actor_id,actor_role,action,entity_id,detail,created_at`.
+Audit rows: `id,actor_id,actor_role,action,entity_id,detail,prev_hash,entry_hash,created_at`. Each row's `entry_hash` is a sha256 hash chain over its fields plus the previous row's hash (tamper-evident; rows from before the upgrade have empty hashes and are reported as `legacy_skipped`, never counted as verified). `GET /requests/audit/verify` walks the chain read-only and returns `ok,checked,legacy_skipped,last_entry_hash,broken_at`; pin `last_entry_hash` externally if stronger evidence is needed. Editing, deleting or reordering any chained row makes `ok:false` with `broken_at` naming the first bad row.
+
+### Notifications (alert centre)
+
+Workflow events create rows: submit (consumer confirmation, zone officers, assigned engineer), status change and field sync (all attached parties except the actor). Notification items: `id,title,message,kind,request_id,read,created_at`; `kind` is `info|warning|success|alert`. Listing is strictly per-user (admin sees all for support); mark-read is owner-or-admin. Rows never cross user scope in responses. `request_id` is a plain string, not a foreign key.
+
+### Frozen request shapes for R2 wiring (examples)
+
+`GET /requests` (array of requests, newest first):
+
+```json
+[{"id": "3f2…", "consumer_id": "9a1…", "applicant_name": "Demo Consumer", "phone": "9876543210",
+  "address": "North Zone, Gujarat", "zone": "North", "pin_code": "", "request_type": "new_connection",
+  "description": "need new electricity connection for my home", "requested_load_kw": 3.0,
+  "tariff_category": "Residential (RGPU)", "phase": "1-Phase", "premises_type": "Owned",
+  "document_name": "id_proof.pdf", "meter_serial": "", "category": "NEW_CONNECTION", "severity": "LOW",
+  "priority": "P4-LOW", "sla_breach_risk": 0.12, "sla_risk_reasons": [], "status": "ASSIGNED",
+  "assigned_officer_id": "…", "assigned_engineer_id": "…", "validation_notes": "",
+  "sla_due_at": "2026-10-24T10:00:00", "created_at": "2026-10-21T10:00:00", "updated_at": "2026-10-21T10:00:00"}]
+```
+
+`GET /requests/kpis/summary` (object):
+
+```json
+{"total_requests": 6, "completed": 1, "pending": 5, "high_sla_risk": 1, "needs_correction": 1,
+ "avg_sla_risk": 0.31, "risk_buckets": {"low_<0.4": 3, "watch_0.4-0.7": 1, "high_>=0.7": 1},
+ "by_status": {"ASSIGNED": 4, "NEEDS_CORRECTION": 1, "COMPLETED": 1}, "by_zone": {"North": 5, "South": 1},
+ "by_category": {"NEW_CONNECTION": 6}, "by_severity": {"LOW": 3, "MEDIUM": 2, "HIGH": 1}}
+```
+
+`POST /requests/with-document` (multipart form fields `applicant_name,phone,address` required; `zone,pin_code,request_type,description,requested_load_kw,tariff_category,phase,premises_type` optional; file field `document` optional) returns a single request object (201) with the same keys as `GET /requests` items. Workflow validation failures still return **201** with `status: "NEEDS_CORRECTION"` and `validation_notes` filled.
 
 Assistant input: `{"question":"Which requests have SLA breach risk?"}`. Every branch includes `answer,data`. Risk rows include `id,applicant,zone,status,sla_breach_risk,reasons`; counts have empty data. Policy answers may include `sources,excerpts`. This is keyword dispatch plus TF-IDF retrieval, not an external LLM. Model metric fields come from the synthetic-training artifact and can change when evaluation changes.
 
@@ -97,7 +131,7 @@ Unexpected DB/application failures can still produce 500. Do not blindly retry w
 - [ ] Decide and implement required response models before freeze.
 - [x] Docker Compose end-to-end, scripted browser conflict and restart persistence evidence recorded in verification/README.md.
 - [ ] Team manual acceptance on target hardware.
-- [ ] Update changelog with explicit freeze approval only after these gates.
+- [x] Demo-path endpoint shapes frozen 21 Oct 2026 (this revision: +notifications, +audit verify, security headers); changelog updated. Full v1.0 freeze still requires the open gates above.
 
 Regenerate snapshot deliberately after a reviewed API change:
 

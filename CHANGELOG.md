@@ -5,7 +5,30 @@ this project is a hackathon prototype, so versions track milestones rather than 
 
 ## [Unreleased]
 
+### Added
+- **Alert centre (server-side):** per-user `Notification` rows with `GET /notifications`,
+  `POST /notifications/read-all`, `POST /notifications/{id}/read` (owner-or-admin; cross-user
+  writes 403). Workflow events (submit, status change, field sync) notify the attached parties —
+  closes the "notification centre is frontend-state only" gap. Tests: `tests/test_notifications.py`.
+- **Tamper-evident audit log:** sha256 hash chain (`prev_hash`/`entry_hash` per row) with read-only
+  admin check `GET /requests/audit/verify` (`ok,checked,legacy_skipped,last_entry_hash,broken_at`);
+  pre-upgrade rows are reported as `legacy_skipped`, never counted as verified. Editing/deleting any
+  chained row is detectable. Tests: `tests/test_audit_chain.py`.
+- **Server security headers** on every response (`X-Content-Type-Options`, `X-Frame-Options`,
+  `Referrer-Policy`, `Cache-Control: no-store`; HSTS in `APP_ENV=production` only, TLS at gateway).
+  AI endpoints (`/assistant/chat`, `/assistant/ml-metrics`) verified auth-required.
+- **Storage permanence:** `backup.sh` now writes `sha256` checksums; new `restore.sh` verifies the
+  checksum before restoring SQLite/PostgreSQL dumps.
+- Seed-data polish: realistic North/South synthetic cases (commercial, agricultural, high-load,
+  NEEDS_CORRECTION without document) so dashboards demo convincingly; production seeding stays off.
+- `docs/API_CONTRACT.md`: demo-path endpoint shapes **frozen 21 Oct 2026** (20 ops / 19 paths with
+  notifications + audit verify) and frozen example payloads for R2's UI→API wiring.
+
 ### Fixed
+- Backend `Settings` crashed when the shared root `.env` (frontend keys `SESSION_SECRET`,
+  `APP_URL`, `VITE_PROXY_TARGET`) was present in the environment; unknown keys are now ignored.
+- Audit-chain timestamps hash identically across Python (timezone-aware) and SQLite (naive)
+  representations; same-microsecond insert ordering guard added.
 - Compose runtime blockers: corrected demo PostgreSQL password YAML type and healthcheck database name; added API/proxy readiness checks and frontend dependency gating. Compose/PostgreSQL flow, restart persistence and scripted Chromium offline/conflict checks passed (17 Oct 2026); evidence in docs/verification.
 - Terminal request protection: status PATCH and fresh field sync cannot overwrite COMPLETED/REJECTED cases. Lifecycle policy plus status/timestamp conditional writes reject stale updates; existing authorized UUID retries remain idempotent. Frontend preserves queued conflicts for review and no longer labels HTTP 4xx as network failure. 17 tests pass locally; frontend builds.
 - Public registration can no longer create staff/admin accounts; inactive users cannot obtain login tokens.
