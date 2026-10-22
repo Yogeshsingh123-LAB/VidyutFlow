@@ -3,7 +3,7 @@
 **To:** hmtcotech2@ugvcl.com · **Send:** after locking PS000125 on the portal, by ~20 Oct 2026 (one mail, from the team-lead SPOC only) · **Follow-up:** one polite reminder after 7 days, then stop. Every answer received must be reflected in `REQUIREMENT_MAPPING.md` (replace assumptions with confirmed facts, citing "per UGVCL resource person, <date>").
 
 ## Why mail at all
-The build currently assumes: SLA timelines (24/48/72/120 h by severity), complaint categories, a simplified org chain (officer → engineer → admin), two zones, and synthetic scale figures. Six short answers from UGVCL retire most of that risk before the synopsis (6 Nov) and the finale defence (2 Dec).
+The build currently assumes: SLA timelines (24/48/72/120 h by severity), complaint categories, a simplified org chain (officer → engineer → admin), two zones, and synthetic scale figures. A short set of answers from UGVCL retires most of that risk before the synopsis (6 Nov) and the finale defence (2 Dec).
 
 ## Ready-to-send draft (fill the [brackets])
 
@@ -17,11 +17,13 @@ The build currently assumes: SLA timelines (24/48/72/120 h by severity), complai
 >
 > 1. Which of the problem areas (duplicate data entry, portal integration, offline field work, SLA follow-up, dashboards) is the highest priority for UGVCL today?
 > 2. The typical steps and official timelines/SLAs for a new connection request, and the complaint categories used in your current system.
-> 3. The approval hierarchy (Corporate/Circle/Division/Subdivision) a request passes through, and which staff roles handle it at each level.
-> 4. Field conditions: devices used by field staff and areas with poor connectivity, so our offline design is realistic.
-> 5. Any public SOPs/circulars (e.g., new-connection procedure) we may reference, and any sample *formats* (blank forms/report layouts) you can share — structure only, no real data.
-> 6. For the infrastructure part of the statement: is a phased modernization *proposal* expected, and are there hosting/security preferences (cloud/on-premise, SSO) we should design for?
-> 7. Approximate scale we should design for (subdivisions, consumers, requests per day).
+> 3. Field conditions: devices used by field staff and areas with poor connectivity, so our offline design is realistic.
+> 4. Any public SOPs/circulars (e.g., new-connection procedure) we may reference, and any sample *formats* (blank forms/report layouts) you can share — structure only, no real data.
+> 5. For the infrastructure part of the statement: is a phased modernization *proposal* expected, and are there hosting/security preferences (cloud/on-premise, SSO) we should design for?
+> 6. Approximate scale we should design for (subdivisions, consumers, requests per day).
+> 7. A set of **mock datasets** (anonymised structure is fine — field names, formats and volume patterns only, no real consumer data) so our prototype and tests mirror realistic records.
+> 8. **Datasets for training and testing our SLA-breach prediction** — even aggregated/anonymised figures (e.g., request type × actual days to resolution) would help us validate the model beyond synthetic data.
+> 9. The consumer-facing **complaint category options** — the exact list a consumer can choose from when raising a complaint in your current system (dropdown/menu options).
 >
 > Written replies to any subset, or a short 20-minute call at your convenience, would help us greatly. We would also welcome the opportunity to show the prototype to your team before the Grand Finale (2 Dec) if that is feasible.
 >
@@ -39,6 +41,9 @@ The build currently assumes: SLA timelines (24/48/72/120 h by severity), complai
 - [ ] Scale: subdivisions, daily request volume, peak load
 
 **Resources that would materially help**
+- [ ] Mock datasets (anonymised structure/formats/volume patterns — no real consumer data)
+- [ ] SLA training & testing dataset (aggregated/anonymised: request type × days-to-resolution)
+- [ ] Consumer-facing complaint category options (exact list shown to consumers)
 - [ ] Blank/redacted forms or report formats (structure only)
 - [ ] Public SOPs/circulars the assistant may quote
 - [ ] List of current ERP modules/portals + any existing API layer
