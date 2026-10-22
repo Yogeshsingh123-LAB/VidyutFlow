@@ -1,4 +1,4 @@
-# Mail to UGVCL Resource Person — draft & question bank
+# Mail to UGVCL Resource Person — email draft
 
 **To:** hmtcotech2@ugvcl.com · **Send:** after locking PS000125 on the portal, by ~20 Oct 2026 (one mail, from the team-lead SPOC only) · **Follow-up:** one polite reminder after 7 days, then stop. Every answer received must be reflected in `REQUIREMENT_MAPPING.md` (replace assumptions with confirmed facts, citing "per UGVCL resource person, <date>").
 
@@ -11,7 +11,7 @@ The build currently assumes: SLA timelines (24/48/72/120 h by severity), complai
 >
 > Respected Sir/Madam,
 >
-> We are [Team Name] from [Institute], participating in the Seva First Innovation Challenge. We have selected Problem Statement **PS000125** (Future-Ready, Secure and Intelligent IT Infrastructure & User-Friendly ERP/Portal Ecosystem) and are building a working prototype: a unified role-based portal for new connections and complaints with automated workflow routing, SLA tracking, an AI assistant over policy documents, and offline field-work sync for low-connectivity areas. We use **synthetic data only** and are not seeking any production access or real consumer data.
+> We are a student team from [Institute], led by [Leader Name], participating in the Seva First Innovation Challenge. We have selected Problem Statement **PS000125** (Future-Ready, Secure and Intelligent IT Infrastructure & User-Friendly ERP/Portal Ecosystem) and are building a working prototype: a unified role-based portal for new connections and complaints with automated workflow routing, SLA tracking, an AI assistant over policy documents, and offline field-work sync for low-connectivity areas. We use **synthetic data only** and are not seeking any production access or real consumer data.
 >
 > To align our synopsis (due 6 Nov) with UGVCL's actual priorities, we would be grateful for brief guidance on:
 >
@@ -25,37 +25,11 @@ The build currently assumes: SLA timelines (24/48/72/120 h by severity), complai
 > 8. **Datasets for training and testing our SLA-breach prediction** — even aggregated/anonymised figures (e.g., request type × actual days to resolution) would help us validate the model beyond synthetic data.
 > 9. The consumer-facing **complaint category options** — the exact list a consumer can choose from when raising a complaint in your current system (dropdown/menu options).
 >
-> Written replies to any subset, or a short 20-minute call at your convenience, would help us greatly. We would also welcome the opportunity to show the prototype to your team before the Grand Finale (2 Dec) if that is feasible.
+> Written replies to any subset, at your convenience, would help us greatly. We would also welcome the opportunity to show the prototype to your team before the Grand Finale (2 Dec) if that is feasible.
 >
 > Thank you for your time and for posing this problem statement.
 >
-> [Team Lead Name] · [Team Name] · [Institute] · [Phone] · [Email]
-
-## Question bank (if a call happens — pick in this order)
-
-**Validate the build (highest value)**
-- [ ] Priority ranking of the 12 problem points
-- [ ] Real SLA hours per category/severity vs our assumed 24/48/72/120
-- [ ] Official complaint/request taxonomy vs our ML categories
-- [ ] Approval chain & role names (do "officer/engineer" map to JE/DE/EE?)
-- [ ] Scale: subdivisions, daily request volume, peak load
-
-**Resources that would materially help**
-- [ ] Mock datasets (anonymised structure/formats/volume patterns — no real consumer data)
-- [ ] SLA training & testing dataset (aggregated/anonymised: request type × days-to-resolution)
-- [ ] Consumer-facing complaint category options (exact list shown to consumers)
-- [ ] Blank/redacted forms or report formats (structure only)
-- [ ] Public SOPs/circulars the assistant may quote
-- [ ] List of current ERP modules/portals + any existing API layer
-- [ ] Field-device reality (Android? BYOD? worst-connectivity areas)
-- [ ] Language needs: Gujarati UI needed for consumers/field staff?
-
-**Scope & expectations**
-- [ ] Hardware point: proposal-only or costing expected? Existing standards?
-- [ ] Hosting/security preferences: cloud vs on-prem, SSO, DPDP/audit needs
-- [ ] Secondary users: do contractors/agencies or govt departments need logins in scope?
-- [ ] Finale expectations: live prototype vs slides; pilot subdivision possible?
-- [ ] Any visit/demo opportunity before 2 Dec
+> [Leader Name] · [Institute] · [Phone] · [Email]
 
 ## Never ask / never do
 - No real consumer data, credentials, or production access (state synthetic-only up front — done in the draft).
