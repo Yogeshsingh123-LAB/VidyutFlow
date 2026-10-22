@@ -63,9 +63,9 @@ like data/maths → Role 3 · like servers/security → Role 4 · like writing/p
 
 **Deliverables**
 - [x] Category+severity classifier, SLA-breach predictor, TF-IDF policy assistant *(in repo)*
-- [ ] Keep `metrics.json` reproducible: any data change ⇒ `make train` and commit the new metrics
-- [ ] Own the **honesty script** for judges: synthetic data, baselines, why 100% classifier accuracy is a templating artefact
-- [ ] Before Dec 2: prepare 3 hostile questions (“Is this real UGVCL data?”, “Why should we trust 79%?”) with 2-line answers
+- [x] Keep `metrics.json` reproducible: any data change ⇒ `make train` and commit the new metrics — verified byte-identical (22 Oct)
+- [x] Own the **honesty script** for judges: synthetic data, baselines, why 100% classifier accuracy is a templating artefact — `docs/ML_REPORT.md` §Honesty script (22 Oct; README stale 1.000 table corrected the same day)
+- [x] Before Dec 2: prepare 3 hostile questions (“Is this real UGVCL data?”, “Why should we trust 79%?”) with 2-line answers — `docs/ML_REPORT.md` §Hostile questions + `docs/DEFENCE_QA.md` (22 Oct)
 - [ ] Grow policy corpus from 3 extracts toward the real procedure set (if provided) — retrieval only, no fine-tuning promises
 
 **Hands off to:** Role 1 (predict-function signatures), Role 5 (the exact accuracy wording used in deck/abstract — never unlabelled)

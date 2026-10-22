@@ -6,6 +6,16 @@ this project is a hackathon prototype, so versions track milestones rather than 
 ## [Unreleased]
 
 ### Added
+- **ML evidence pack (Role 3):** `scripts/export_ml_charts.py` → `docs/assets/ml_confusion_matrices.png`
+  + `ml_risk_distribution.png` (SYNTHETIC-labelled, deck-ready) · `docs/ML_REPORT.md` expanded with the
+  results table, evaluation protocol, 30-second honesty script and 3 hostile Q&A with 2-line answers ·
+  `make train` verified **byte-identical** reproducible. Live **SLA-Risk Watchlist** (model probability
+  + reasons) added to Management ▸ AI Insights via the wired API.
+- **Synopsis & defence pack (Role 5):** `docs/SYNOPSIS_ABSTRACT.md` finalised with measured/synthetic
+  figures · `docs/DECK_OUTLINE.md` expanded to 12 slides with speaker notes · `docs/DEFENCE_QA.md`
+  (print sheet) · architecture diagram built-vs-roadmap (`docs/assets/architecture.svg` + `.png`) ·
+  `docs/REQUIREMENT_MAPPING.md` evidence refresh + §E words grid + §F numbers-audit checklist ·
+  12-slide deck generated: `docs/deck/VidyutFlow_PS000125.pptx` (`scripts/build_deck.py`, regenerable).
 - **QA evidence pack (Role 4):** `backend/scripts/load_check.py` — 100 mixed authenticated reads,
   **p50 3.1 ms · p95 4.5 ms · 0 errors** (labelled *local, synthetic*; never a UGVCL figure) ·
   `docs/verification/r4-load-check.txt`. `scripts/restore_drill.sh` — backup → checksum verify →
