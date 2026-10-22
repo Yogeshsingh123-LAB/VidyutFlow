@@ -69,6 +69,8 @@ class FieldUpdate(Base):
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
 class AuditLog(Base):
+    """Append-only activity record. Tamper-evidence: each row's entry_hash commits to the
+    previous row's hash (hash chain) — see audit.py / GET /requests/audit/verify."""
     __tablename__ = "audit_logs"
     id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
     actor_id: Mapped[str] = mapped_column(String, default="system")
@@ -77,4 +79,18 @@ class AuditLog(Base):
     entity: Mapped[str] = mapped_column(String, default="")
     entity_id: Mapped[str] = mapped_column(String, default="")
     detail: Mapped[str] = mapped_column(Text, default="")
+    prev_hash: Mapped[str] = mapped_column(String, default="")   # entry_hash of previous row
+    entry_hash: Mapped[str] = mapped_column(String, default="")  # sha256 over this row + prev_hash
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+class Notification(Base):
+    """Role-scoped alert-centre row (server-side, per user). Fed by workflow events."""
+    __tablename__ = "notifications"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    title: Mapped[str] = mapped_column(String)
+    message: Mapped[str] = mapped_column(Text, default="")
+    kind: Mapped[str] = mapped_column(String, default="info")  # info|warning|success|alert
+    request_id: Mapped[str] = mapped_column(String, default="")  # no FK: may reference any entity
+    read: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

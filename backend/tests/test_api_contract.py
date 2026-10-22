@@ -9,5 +9,5 @@ def test_openapi_matches_reviewed_snapshot():
         'API schema changed: review docs/API_CONTRACT.md and regenerate the snapshot deliberately.'
     )
     schema = app.openapi()
-    assert len(schema['paths']) == 15
-    assert sum(len(methods) for methods in schema['paths'].values()) == 16
+    assert len(schema['paths']) == 19
+    assert sum(len(methods) for methods in schema['paths'].values()) == 20
