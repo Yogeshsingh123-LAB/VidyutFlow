@@ -422,21 +422,26 @@ export default defineConfig(() => {
     server: {
       host: '0.0.0.0',
       port: Number(process.env.PORT) || 5173,
+      // Allow the sandbox preview proxy host (e.g. *.e2b.app) in dev
+      allowedHosts: true,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
         '/api/requests': {
           target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8008',
-          changeOrigin: true
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api/, '')
         },
         '/api/system': {
           target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8008',
-          changeOrigin: true
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api/, '')
         },
         '/api/assistant/ml-metrics': {
           target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8008',
-          changeOrigin: true
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api/, '')
         }
       }
     },
