@@ -6,6 +6,15 @@ this project is a hackathon prototype, so versions track milestones rather than 
 ## [Unreleased]
 
 ### Added
+- **QA evidence pack (Role 4):** `backend/scripts/load_check.py` — 100 mixed authenticated reads,
+  **p50 3.1 ms · p95 4.5 ms · 0 errors** (labelled *local, synthetic*; never a UGVCL figure) ·
+  `docs/verification/r4-load-check.txt`. `scripts/restore_drill.sh` — backup → checksum verify →
+  tamper-reject → wipe → restore → live-serve drill **PASS** · `docs/verification/r4-backup-restore.txt`.
+  Backup checksums now record basenames so `restore.sh` verifies from inside `backups/`.
+- **CI (Role 4):** `.github/workflows/ci.yml` — backend pytest + frontend suites/tsc/build on every
+  push and PR (mirrors `make test` / `make build`).
+- **Defence pack (Role 4):** `SECURITY.md` gains the one-sentence team auth story, known-gap
+  one-liners for Q&A, and the evidence index (load check + restore drill + CI).
 - **UI → live API wiring (Role 2):** the three demo-critical screens now talk to the FastAPI
   backend through `fastApiClient` — Consumer wizard `POST /api/requests` (toast reports live ML
   category/severity + SLA risk), Employee **Live Request Queue** (`GET /api/requests`), and
