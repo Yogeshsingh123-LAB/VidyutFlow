@@ -434,6 +434,11 @@ export default defineConfig(() => {
           changeOrigin: true,
           rewrite: path => path.replace(/^\/api\/backend/, '')
         },
+        '/api/health': {
+          target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8008',
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api/, '')
+        },
         '/api/notifications': {
           target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8008',
           changeOrigin: true,
@@ -453,12 +458,18 @@ export default defineConfig(() => {
           target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8008',
           changeOrigin: true,
           rewrite: path => path.replace(/^\/api/, '')
+        },
+        '/api/auth': {
+          target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8008',
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api/, '')
         }
       }
     },
     preview: {
       host: '0.0.0.0',
-      port: Number(process.env.PORT) || 5173
+      port: Number(process.env.PORT) || 5173,
+      allowedHosts: true
     },
     build: {
       chunkSizeWarningLimit: 1500,

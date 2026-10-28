@@ -204,6 +204,10 @@ export function createAuthApiHandler(options: AuthApiHandlerOptions = {}) {
     // 1. GET /api/auth/me — Verify current HttpOnly session cookie
     // -----------------------------------------------------------------------
     if (pathname === '/me' || pathname === '/me/') {
+      if (next && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+        next();
+        return;
+      }
       if (method !== 'GET') {
         sendJson(res, 405, { error: 'Method not allowed. Use GET.', code: 'METHOD_NOT_ALLOWED' });
         return;
@@ -245,6 +249,10 @@ export function createAuthApiHandler(options: AuthApiHandlerOptions = {}) {
     // 2. POST /api/auth/login — Authenticate & issue HttpOnly session cookie
     // -----------------------------------------------------------------------
     if (pathname === '/login' || pathname === '/login/') {
+      if (next && req.headers['content-type']?.includes('application/x-www-form-urlencoded')) {
+        next();
+        return;
+      }
       if (method !== 'POST') {
         sendJson(res, 405, { error: 'Method not allowed. Use POST.', code: 'METHOD_NOT_ALLOWED' });
         return;

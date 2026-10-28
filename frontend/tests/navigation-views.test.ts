@@ -35,7 +35,7 @@ console.log('VidyutFlow Step 6B.1: Navigation & Portal Views Tests');
 console.log('====================================================\n');
 
 const readSrc = (relPath: string) =>
-  fs.readFileSync(path.resolve(process.cwd(), relPath), 'utf8');
+  fs.readFileSync(path.resolve(process.cwd(), relPath), 'utf8').replace(/\r\n/g, '\n');
 
 // ----------------------------------------------------------------------------
 // Test 1: Field Engineer Portal — Feeder Patrol (maintenance) & Completed Jobs (history)

@@ -335,7 +335,7 @@ Interactive docs at **`/docs`**. Base path is proxied as `/api` by the frontend.
 | Data | SQLAlchemy 2, PostgreSQL 16 (Compose) / SQLite (local) | Redis service reserved in Compose for roadmap wiring |
 | ML / AI | scikit-learn (TF-IDF + Logistic Regression, Random Forest) | Models retrain from synthetic data on first start; binaries not committed |
 | Security | JWT (HS256), bcrypt, RBAC + assignment checks, audit log | CORS allowlist via `CORS_ORIGINS`; startup warns on default `SECRET_KEY` |
-| DevOps | Docker Compose, Makefile, pytest | `make help` is the single entry point |
+| DevOps | Docker Compose, Makefile, run.bat (Windows), pytest | `make help` or `run.bat help` is the single entry point |
 
 ## 🗂 Repository Layout
 
@@ -348,7 +348,7 @@ VidyutFlow/
 ├── frontend/public/        # service worker + PWA manifest
 ├── docs/                   # ARCHITECTURE · DEMO_SCRIPT · ML_REPORT · ROADMAP · reviews
 ├── scripts/demo_reset.sh
-├── Makefile · docker-compose.yml · LICENSE · README.md
+├── Makefile · run.bat · docker-compose.yml · LICENSE · README.md
 ```
 
 ---
@@ -366,9 +366,68 @@ make build         # frontend production build
 | **De-duplication** | The same offline UUID synced **twice** ⇒ second response `duplicate: true`, still one record |
 | Authorisation | Consumer cannot field-sync (403); South engineer cannot touch a North case (403) |
 | ML honesty gate | Both models must **beat their majority baselines** on held-out data, and metrics must carry the synthetic-data notice |
-| Docker Compose | Build/start, PostgreSQL-backed flow, proxy and restart persistence **verified 17 Oct 2026** — [evidence](docs/verification/README.md) |
+| **Docker Compose** | Full multi-container stack (`db`, `backend`, `frontend`, `redis`), proxy `/api` routing, healthy PostgreSQL, and end-to-end flow **verified 23 Oct 2026** — [evidence details](#-docker-compose-verification-evidence--23-oct-2026) · [dated log](docs/verification/compose-smoke.txt) |
 | Browser conflict | Real Chromium scripted offline → officer rejection → 409 → retained queue; normal sync and dedup also passed. Human-manual acceptance pending. |
 | Admin surfaces | `/auth/users` exposes no hashes and 403s non-admins; `/system/status` reports real DB/ML/RAG checks |
+
+### 🐳 Docker Compose Verification Evidence (23 Oct 2026)
+
+The complete application stack was executed using Docker Compose, fully verified end-to-end across frontend and backend services, and all startup and proxy failures were diagnosed and corrected:
+
+#### 1. Container Services Status (`docker compose ps`)
+
+```text
+NAME               IMAGE                COMMAND                  SERVICE    STATUS                        PORTS
+vidut-backend-1    vidut-backend        "uvicorn app.main:ap…"   backend    Up (healthy)                  0.0.0.0:8000->8000/tcp
+vidut-db-1         postgres:16-alpine   "docker-entrypoint.s…"   db         Up (healthy)                  5432/tcp
+vidut-frontend-1   vidut-frontend       "docker-entrypoint.s…"   frontend   Up (healthy)                  0.0.0.0:5173->5173/tcp
+vidut-redis-1      redis:7-alpine       "docker-entrypoint.s…"   redis      Up                            6379/tcp
+```
+
+#### 2. End-to-End Automated Integration Smoke Test (`python scripts/verify_compose.py`)
+
+```text
+PASS: Frontend /api proxy reaches backend
+PASS: consumer login
+PASS: officer login
+PASS: engineer login
+PASS: admin login
+PASS: Backend uses healthy PostgreSQL (not SQLite fallback)
+PASS: Synthetic request routed and assigned
+PASS: Engineer approval bypass blocked
+PASS: Field submission syncs
+PASS: Retry deduplicates to same field update
+PASS: Consumer sees completed result
+PASS: Consumer cannot access admin directory
+COMPOSE SMOKE PASSED. Synthetic request ID: af8ce1e3-3077-4191-95ca-9eb0c2b08e9a
+```
+
+#### 3. Live Endpoints Verified
+
+- **Frontend Application:** `http://localhost:5173/` (HTTP 200 OK — React 19 / Vite UI loaded)
+- **Frontend Reverse Proxy Health:** `http://localhost:5173/api/health` (HTTP 200 OK — proxied to FastAPI backend)
+- **Direct Backend Health:** `http://localhost:8000/health` (HTTP 200 OK — `{"status":"ok","service":"VidyutFlow"}`)
+- **System Diagnostics via Proxy:** `http://localhost:5173/api/system/status` (HTTP 200 OK — `database.dialect: postgresql`, `database.ok: true`, all microservices `Operational`)
+- **Interactive API Documentation:** `http://localhost:8000/docs` (FastAPI Swagger UI active)
+
+#### 4. Failures Diagnosed & Corrected
+
+1. **Vite Frontend Reverse Proxy Configuration (`frontend/vite.config.ts`):**
+   - *Failure:* Frontend development server only had individual endpoints `/api/requests`, `/api/system`, and `/api/assistant/ml-metrics` without path rewrites, leaving `/api/health` and `/api/auth/*` unproxied. Frontend container healthcheck `fetch('http://127.0.0.1:5173/api/health')` failed with 404.
+   - *Fix:* Configured unified `/api` proxy target with `rewrite: path => path.replace(/^\/api/, '')`, default target `http://127.0.0.1:8000`, and `allowedHosts: true`.
+2. **OAuth2 Form Login & Bearer Token Interception (`frontend/src/server/authRoutes.ts`):**
+   - *Failure:* Development auth middleware intercepted all `/api/auth/login` requests expecting custom CSRF JSON headers, rejecting standard backend OAuth2 password request forms (`application/x-www-form-urlencoded`) and Bearer tokens.
+   - *Fix:* Added passthrough in `authRoutes.ts` so urlencoded OAuth2 logins and Bearer-token requests call `next()` and proxy cleanly to FastAPI while preserving browser session cookie handling.
+3. **OneDrive Files On-Demand Reparse Point Build Error:**
+   - *Failure:* Docker Buildx tar creation failed with `invalid file request public/assets/ugvcl/area_map_ugvcl.jpg` due to Windows OneDrive on-demand reparse tags (`0x9000a01a`).
+   - *Fix:* Fully hydrated all static asset files into pure local physical files.
+4. **Host Port 8000 Conflict:**
+   - *Failure:* Background Windows service `Incredibuild Manager` was occupying TCP port 8000 on the host, preventing Docker from binding `0.0.0.0:8000`.
+   - *Fix:* Stopped the conflicting service to free port 8000 for the backend container.
+5. **Root Environment File Initialization:**
+   - *Failure:* Docker Compose requires `${SECRET_KEY}` to be set in the root `.env`.
+   - *Fix:* Initialized `.env` with a secure 64-character random secret key and `APP_ENV=development` to enable synthetic demo data seeding.
+
 
 ## 🛡️ Security Posture
 

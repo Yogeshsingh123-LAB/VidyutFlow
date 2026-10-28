@@ -1,8 +1,8 @@
-NAME                  IMAGE                COMMAND                  SERVICE    CREATED              STATUS                    PORTS
-vidyutos-backend-1    vidyutos-backend     "uvicorn app.main:ap…"   backend    27 seconds ago       Up 11 seconds (healthy)   0.0.0.0:8000->8000/tcp, :::8000->8000/tcp
-vidyutos-db-1         postgres:16-alpine   "docker-entrypoint.s…"   db         About a minute ago   Up 42 seconds (healthy)   5432/tcp
-vidyutos-frontend-1   vidyutos-frontend    "docker-entrypoint.s…"   frontend   17 seconds ago       Up 5 seconds (healthy)    0.0.0.0:5173->5173/tcp, :::5173->5173/tcp
-vidyutos-redis-1      redis:7-alpine       "docker-entrypoint.s…"   redis      About a minute ago   Up About a minute         6379/tcp
+NAME               IMAGE                COMMAND                  SERVICE    CREATED          STATUS                    PORTS
+vidut-backend-1    vidut-backend        "uvicorn app.main:ap…"   backend    12 minutes ago   Up 10 minutes (healthy)   0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+vidut-db-1         postgres:16-alpine   "docker-entrypoint.s…"   db         12 minutes ago   Up 12 minutes (healthy)   5432/tcp
+vidut-frontend-1   vidut-frontend       "docker-entrypoint.s…"   frontend   12 minutes ago   Up 9 minutes (healthy)    0.0.0.0:5173->5173/tcp, [::]:5173->5173/tcp
+vidut-redis-1      redis:7-alpine       "docker-entrypoint.s…"   redis      12 minutes ago   Up 12 minutes             6379/tcp
 PASS: Frontend /api proxy reaches backend
 PASS: consumer login
 PASS: officer login
@@ -15,5 +15,5 @@ PASS: Field submission syncs
 PASS: Retry deduplicates to same field update
 PASS: Consumer sees completed result
 PASS: Consumer cannot access admin directory
-COMPOSE SMOKE PASSED. Synthetic request ID: df6b2228-a06b-4b31-a3b7-e1511cc5552b
+COMPOSE SMOKE PASSED. Synthetic request ID: af8ce1e3-3077-4191-95ca-9eb0c2b08e9a
 Not a browser offline/PWA test, load test, or production security certification.
