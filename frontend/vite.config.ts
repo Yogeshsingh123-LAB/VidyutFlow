@@ -60,9 +60,8 @@ export function setCustomGeminiGeneratorForTests(fn: CustomGeminiGenerator | nul
 const VALID_ROLES: UserRole[] = ['consumer', 'employee', 'field', 'management', 'admin'];
 
 export function vidyutMitraAiPlugin(): Plugin {
-  const authApiHandler = createAuthApiHandler();
-
   const attachServerMiddlewares = (middlewares: { use: (route: string, fn: any) => void }) => {
+    const authApiHandler = createAuthApiHandler();
     // Mount server-side health & readiness diagnostic endpoint (/api/health)
     middlewares.use('/api/health', (req: any, res: any) => {
       res.setHeader('Content-Type', 'application/json');

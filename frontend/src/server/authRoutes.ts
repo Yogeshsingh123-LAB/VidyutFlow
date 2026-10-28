@@ -174,10 +174,23 @@ export interface AuthApiHandlerOptions {
   nowMsProvider?: () => number;
 }
 
-export const defaultServerAuthService = new ServerAuthService();
+let _defaultServerAuthService: ServerAuthService | null = null;
+
+export function getDefaultServerAuthService(): ServerAuthService {
+  if (!_defaultServerAuthService) {
+    _defaultServerAuthService = new ServerAuthService();
+  }
+  return _defaultServerAuthService;
+}
+
+export const defaultServerAuthService: ServerAuthService = new Proxy({} as ServerAuthService, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getDefaultServerAuthService(), prop, receiver);
+  }
+});
 
 export function createAuthApiHandler(options: AuthApiHandlerOptions = {}) {
-  const authService = options.authService || defaultServerAuthService;
+  const authService = options.authService || getDefaultServerAuthService();
   const getNowMs = options.nowMsProvider || (() => Date.now());
 
   return async function authApiMiddleware(
