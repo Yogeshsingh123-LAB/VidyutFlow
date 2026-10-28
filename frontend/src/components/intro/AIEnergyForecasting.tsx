@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { useLanguage } from '../../i18n/LanguageContext';
+import { getManagementUiDictionary } from '../../i18n/managementContentTranslations';
 import {
   TrendingUp,
   Sparkles,
@@ -25,6 +27,8 @@ import {
 } from 'recharts';
 
 export const AIEnergyForecasting: React.FC = () => {
+  const { language } = useLanguage();
+  const tm = getManagementUiDictionary(language);
   const [temperatureC, setTemperatureC] = useState<number>(36);
   const [growthPct, setGrowthPct] = useState<number>(6);
   const [solarPenetration, setSolarPenetration] = useState<boolean>(true);
@@ -101,11 +105,11 @@ export const AIEnergyForecasting: React.FC = () => {
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-cyan-500" />
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                AI Energy Demand & Load Forecasting Engine
+                {tm.forecastEngineTitle}
               </h3>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Machine-learning load projection for Day-Ahead Power Scheduling (DAPS). Adjust ambient meteorological conditions and industrial load growth to view real-time grid curve recalculation.
+              {tm.forecastEngineSubtitle}
             </p>
           </div>
 
@@ -118,7 +122,7 @@ export const AIEnergyForecasting: React.FC = () => {
             className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition-colors self-start md:self-center"
           >
             <RotateCcw className="w-3.5 h-3.5 text-cyan-500" />
-            <span>Reset Baseline</span>
+            <span>{tm.btnResetBaseline}</span>
           </button>
         </div>
 
@@ -129,7 +133,7 @@ export const AIEnergyForecasting: React.FC = () => {
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                 <Thermometer className="w-3.5 h-3.5 text-rose-500" />
-                <span>Ambient Temperature</span>
+                <span>{tm.labelAmbientTemp}</span>
               </span>
               <span className="font-mono font-bold text-slate-900 dark:text-white px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">
                 {temperatureC}°C
@@ -145,9 +149,9 @@ export const AIEnergyForecasting: React.FC = () => {
               className="w-full accent-blue-600 cursor-pointer"
             />
             <div className="flex justify-between text-[10px] text-slate-400">
-              <span>24°C (Mild Monsoon)</span>
-              <span>36°C (Normal)</span>
-              <span>45°C (Heatwave)</span>
+              <span>{tm.tempMildMonsoon}</span>
+              <span>{tm.tempNormal}</span>
+              <span>{tm.tempHeatwave}</span>
             </div>
           </div>
 
@@ -156,7 +160,7 @@ export const AIEnergyForecasting: React.FC = () => {
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                 <Percent className="w-3.5 h-3.5 text-blue-500" />
-                <span>Annual Load Trend Factor</span>
+                <span>{tm.labelAnnualLoadTrend}</span>
               </span>
               <span className="font-mono font-bold text-slate-900 dark:text-white px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">
                 {growthPct > 0 ? `+${growthPct}%` : `${growthPct}%`}
@@ -172,9 +176,9 @@ export const AIEnergyForecasting: React.FC = () => {
               className="w-full accent-blue-600 cursor-pointer"
             />
             <div className="flex justify-between text-[10px] text-slate-400">
-              <span>-10% (Industrial Shutdown)</span>
-              <span>+6% (Standard)</span>
-              <span>+25% (Peak Festive)</span>
+              <span>{tm.growthShutdown}</span>
+              <span>{tm.growthStandard}</span>
+              <span>{tm.growthFestive}</span>
             </div>
           </div>
 
@@ -182,10 +186,10 @@ export const AIEnergyForecasting: React.FC = () => {
           <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <div className="space-y-0.5">
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                Rooftop Solar Offset (Duck Curve)
+                {tm.labelDuckCurve}
               </span>
               <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
-                Simulates 7.4 MW midday solar shaving
+                {tm.descDuckCurve}
               </span>
             </div>
             <button
@@ -210,56 +214,56 @@ export const AIEnergyForecasting: React.FC = () => {
         <div className="space-y-3">
           <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-sm">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-              Predicted 24h Peak Demand
+              {tm.kpiPredictedPeakDemand}
             </span>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-extrabold text-blue-600 dark:text-cyan-400 font-mono tabular-nums">
                 {peakForecastMw} MW
               </span>
               <span className="text-xs text-slate-500 font-mono">
-                at {peakItem?.hour || '21:00'}
+                {tm.peakAtHourPrefix} {peakItem?.hour || '21:00'}
               </span>
             </div>
             <span className="text-[11px] text-slate-500 mt-1 block">
-              Baseline was 68.2 MW (+{(peakForecastMw - 68.2).toFixed(1)} MW variance)
+              {tm.peakVarianceDesc.replace('{val}', (peakForecastMw - 68.2).toFixed(1))}
             </span>
           </div>
 
           <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-sm">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-              Estimated Energy Requirement
+              {tm.kpiEstimatedEnergyReq}
             </span>
             <span className="text-2xl font-extrabold text-slate-900 dark:text-white font-mono tabular-nums">
               {totalMUs} MUs
             </span>
             <span className="text-[11px] text-slate-500 mt-1 block">
-              Day-Ahead Procurement Schedule
+              {tm.descDayAheadSchedule}
             </span>
           </div>
 
           <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-sm">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-              Day-Ahead Power Purchase Budget
+              {tm.kpiDayAheadBudget}
             </span>
             <span className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">
               ₹{estimatedCostCr} Cr
             </span>
             <span className="text-[11px] text-slate-500 mt-1 block">
-              Calculated at ₹5.42/kWh base tariff
+              {tm.descBaseTariff}
             </span>
           </div>
 
           <div className="p-4 rounded-xl bg-gradient-to-br from-blue-900/20 to-teal-900/20 border border-teal-500/30 text-xs space-y-2">
             <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
-              <span>Dispatcher Recommendation</span>
+              <span>{tm.dispatcherRecHeading}</span>
             </span>
             <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-[11px]">
               {temperatureC >= 40
-                ? 'Severe heatwave alert. Pre-book 15 MW day-ahead reserve from Sardar Sarovar hydro peaking station for 20:00 - 23:00 window.'
+                ? tm.recHeatwave
                 : solarPenetration
-                ? 'Midday solar injection shaves 7.4 MW off substation peak. Ramp thermal units down by 11% between 11:00 - 15:00 to avoid curtailment.'
-                : 'Demand profile normal. Contracted GUVNL base thermal PPA satisfies 94% of scheduled draw without spot market exposure.'}
+                ? tm.recSolarInjection
+                : tm.recDemandNormal}
             </p>
           </div>
         </div>
@@ -269,18 +273,18 @@ export const AIEnergyForecasting: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
             <div>
               <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                Next 24-Hour Load Curve: Historical Actual vs AI Forecast
+                {tm.chartForecastCurveTitle}
               </h4>
               <p className="text-xs text-slate-500">
-                Shaded envelope displays 95% statistical confidence interval (±4.5%)
+                {tm.chartConfidenceSubtitle}
               </p>
             </div>
             <div className="flex items-center gap-3 text-xs text-slate-500">
               <span className="flex items-center gap-1">
-                <span className="w-3 h-0.5 bg-slate-400" /> Historical Actual
+                <span className="w-3 h-0.5 bg-slate-400" /> {tm.legendHistoricalActual}
               </span>
               <span className="flex items-center gap-1">
-                <span className="w-3 h-0.5 bg-blue-600" /> AI Forecast (MW)
+                <span className="w-3 h-0.5 bg-blue-600" /> {tm.legendForecastLoad}
               </span>
             </div>
           </div>
@@ -315,7 +319,7 @@ export const AIEnergyForecasting: React.FC = () => {
                   dataKey="upperBound"
                   stroke="transparent"
                   fill="url(#confidenceGrad)"
-                  name="Upper Bound (95%)"
+                  name={tm.chartConfidenceSubtitle}
                 />
                 <Area
                   type="monotone"
@@ -323,7 +327,7 @@ export const AIEnergyForecasting: React.FC = () => {
                   stroke="#2563EB"
                   strokeWidth={3}
                   fill="url(#forecastGrad)"
-                  name="Forecast Load (MW)"
+                  name={tm.legendForecastLoad}
                 />
                 <Line
                   type="monotone"
@@ -332,7 +336,7 @@ export const AIEnergyForecasting: React.FC = () => {
                   strokeWidth={2}
                   strokeDasharray="4 4"
                   dot={false}
-                  name="Historical Baseline (MW)"
+                  name={tm.legendHistoricalActual}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -340,10 +344,10 @@ export const AIEnergyForecasting: React.FC = () => {
 
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex flex-wrap items-center justify-between gap-2">
             <span>
-              <strong>Model Type:</strong> Gradient Boosted Regression Tree (GBRT) + Temperature Decomposition
+              <strong>Model Type:</strong> {tm.footerModelType}
             </span>
             <span>
-              Deterministic simulation for operational evaluation
+              {tm.footerDeterministic}
             </span>
           </div>
         </div>

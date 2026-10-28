@@ -10,8 +10,11 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { UGVCL_AWARDS } from '../../data/ugvclHistoryData';
+import { useLanguage } from '../../i18n/LanguageContext';
+import { getLocalizedAward } from '../../i18n/contentTranslations';
 
 export const AchievementsSection: React.FC = () => {
+  const { dict, language } = useLanguage();
   const [expandedAwards, setExpandedAwards] = useState<Record<string, boolean>>({});
 
   const toggleAwardExpand = (id: string) => {
@@ -28,25 +31,25 @@ export const AchievementsSection: React.FC = () => {
         <div className="max-w-4xl space-y-3 text-left">
           <div className="flex items-center gap-2 text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
             <Award className="w-4 h-4" />
-            <span>Documented Recognition & Benchmarks</span>
+            <span>{dict.achievements.badge}</span>
           </div>
           <h2 className="text-3xl sm:text-4xl lg:text-[38px] font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-            UGVCL National Ratings & Public Service Achievements
+            {dict.achievements.title}
           </h2>
           <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-            Authoritative ratings and operational distinctions confirmed by the Ministry of Power,
-            Power Finance Corporation (PFC), and the Government of Gujarat.
+            {dict.achievements.subtitle}
           </p>
         </div>
 
         {/* 1. Redesigned National Discom Ratings & Achievements Grid (Up to 3 columns Desktop, 2 Tablet, 1 Mobile) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
           {UGVCL_AWARDS.map((award) => {
+            const localized = getLocalizedAward(award, language);
             const isExpanded = !!expandedAwards[award.id];
-            const needsReadMore = award.significance.length > 120;
+            const needsReadMore = localized.significance.length > 120;
             const displayText = isExpanded || !needsReadMore
-              ? award.significance
-              : `${award.significance.slice(0, 115)}...`;
+              ? localized.significance
+              : `${localized.significance.slice(0, 115)}...`;
 
             return (
               <div
@@ -66,13 +69,13 @@ export const AchievementsSection: React.FC = () => {
 
                   {/* LEVEL 2: ACHIEVEMENT TITLE (19–22px) */}
                   <h3 className="text-lg sm:text-[20px] font-bold text-slate-900 dark:text-white leading-snug group-hover:text-blue-600 dark:group-hover:text-cyan-400 transition-colors break-words">
-                    {award.title}
+                    {localized.title}
                   </h3>
 
                   {/* LEVEL 3: IMPORTANT RATING OR RECOGNITION */}
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 border border-amber-300/80 dark:border-amber-800/80 text-amber-900 dark:text-amber-300 text-xs sm:text-sm font-extrabold tracking-wide">
                     <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                    <span>{award.gradeOrRank}</span>
+                    <span>{localized.gradeOrRank}</span>
                   </div>
 
                   {/* LEVEL 4: SHORT DESCRIPTION (15–16px with comfortable line height and Read More) */}
@@ -87,7 +90,7 @@ export const AchievementsSection: React.FC = () => {
                         className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-cyan-400 hover:text-blue-800 dark:hover:text-cyan-300 transition-colors cursor-pointer pt-1 focus-visible:outline-2 focus-visible:outline-blue-500 rounded"
                         aria-expanded={isExpanded}
                       >
-                        <span>{isExpanded ? 'Show Less' : 'Read Full Summary'}</span>
+                        <span>{isExpanded ? dict.common.showLess : dict.common.readMore}</span>
                         {isExpanded ? (
                           <ChevronUp className="w-3.5 h-3.5" />
                         ) : (
@@ -102,13 +105,13 @@ export const AchievementsSection: React.FC = () => {
                 <div className="pt-4 mt-5 border-t border-slate-100 dark:border-slate-800/80 space-y-1">
                   <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                     <FileCheck className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400 shrink-0" />
-                    <span>Official Publication & Citation</span>
+                    <span>{dict.achievements.officialCitation}</span>
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-400 italic font-medium leading-normal break-words">
-                    {award.officialReport}
+                    {localized.officialReport}
                   </p>
                   <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-tight">
-                    Awarded by: {award.awardingBody}
+                    {dict.achievements.awardedBy} {localized.awardingBody}
                   </p>
                 </div>
               </div>
@@ -120,10 +123,10 @@ export const AchievementsSection: React.FC = () => {
         <div className="space-y-8 pt-6 border-t border-slate-200 dark:border-slate-800 text-left">
           <div className="space-y-1.5">
             <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              Flagship Energy Programs Driving Gujarat's Growth
+              {dict.achievements.flagshipTitle}
             </h3>
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
-              Transformative public electrification projects implemented across North Gujarat.
+              {dict.achievements.flagshipSubtitle}
             </p>
           </div>
 
@@ -137,23 +140,20 @@ export const AchievementsSection: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white leading-snug">
-                      Jyotigram Yojana (Feeder Segregation)
+                      {dict.achievements.jyotigramTitle}
                     </h4>
                     <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 block mt-0.5">
-                      24×7 Village Power · Scheduled Tubewell Irrigation
+                      {dict.achievements.jyotigramSub}
                     </span>
                   </div>
                 </div>
                 <p className="text-[15px] sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-                  Pioneered by Gujarat and operated across North Gujarat by UGVCL, this initiative segregated
-                  agricultural feeders from rural domestic feeders. Domestic consumers in all 100% of revenue villages
-                  receive continuous 24-hour, 3-phase quality power, fostering rural cottage industries, schools,
-                  and digital connectivity.
+                  {dict.achievements.jyotigramDesc}
                 </p>
               </div>
               <div className="flex items-center gap-2.5 text-sm font-bold text-blue-700 dark:text-cyan-400 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                <span>100% Rural Village Electrification Achieved</span>
+                <span>{dict.achievements.jyotigramBadge}</span>
               </div>
             </div>
 
@@ -166,22 +166,20 @@ export const AchievementsSection: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white leading-snug">
-                      Kisan Suryodaya Yojana (KSY)
+                      {dict.achievements.ksyTitle}
                     </h4>
                     <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 block mt-0.5">
-                      Daytime Agricultural Irrigation (5 AM – 9 PM)
+                      {dict.achievements.ksySub}
                     </span>
                   </div>
                 </div>
                 <p className="text-[15px] sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-                  Addressing one of the greatest perils faced by farmers—irrigating fields during dark nighttime hours
-                  amid wild animal encounters and snakebites—UGVCL reorganized its sub-transmission network to guarantee
-                  3-phase daytime electricity to agrarian feeders across Mehsana, Sabarkantha, and Banaskantha.
+                  {dict.achievements.ksyDesc}
                 </p>
               </div>
               <div className="flex items-center gap-2.5 text-sm font-bold text-amber-700 dark:text-amber-300 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                <span>Guaranteed 8-Hour Daytime Farm Supply</span>
+                <span>{dict.achievements.ksyBadge}</span>
               </div>
             </div>
           </div>

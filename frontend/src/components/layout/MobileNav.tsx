@@ -1,8 +1,11 @@
 import React, { useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 import { ROLE_PROFILES } from '../../data/mockData';
+import { LanguageSelector } from '../common/LanguageSelector';
 import {
   X,
+  AlertTriangle,
   LayoutDashboard,
   Plug,
   PlusCircle,
@@ -60,18 +63,23 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
     applications,
     complaints,
     workOrders,
+    roleIncidents,
     userConnections,
     userApplications,
     userBills,
     userComplaints,
     userNotifications,
+    setIsNotificationDrawerOpen,
     setIsAIAssistantOpen,
     setIsCommandPaletteOpen,
     exitToWelcomeScreen,
     replayIntro,
     logoutDemoSession,
-    activeUser
+    activeUser,
+    unreadIncidentsCount,
+    criticalIncidentsCount
   } = useApp();
+  const { t } = useLanguage();
 
   // Close drawer on Escape key press
   useEffect(() => {
@@ -86,11 +94,20 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
   }, [isOpen, onClose]);
 
   const profile = ROLE_PROFILES[currentRole];
+  const roleLabelMap: Record<string, string> = {
+    consumer: t.erp.roleConsumer,
+    employee: t.erp.roleEmployee,
+    field: t.erp.roleField,
+    management: t.erp.roleManagement,
+    admin: t.erp.roleAdmin
+  };
+  const localizedRoleLabel = roleLabelMap[currentRole] || profile.label;
 
   // Global counts for staff/admin roles
   const pendingApps = applications.filter(a => a.status !== 'Meter Installed' && a.status !== 'Rejected').length;
   const activeCmps = complaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
   const pendingWos = workOrders.filter(w => w.status !== 'Completed').length;
+  const activeEmployeeIncidents = roleIncidents.filter(i => i.status !== 'RESOLVED' && i.status !== 'CLOSED').length;
 
   // Scoped counts for active consumer account
   const consumerConnectionCount = (userConnections || []).length;
@@ -103,78 +120,79 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
     switch (currentRole) {
       case 'consumer':
         return [
-          { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
+          { id: 'dashboard', label: t.erp.navDashboard, icon: <LayoutDashboard className="w-4 h-4" /> },
           {
             id: 'connections',
-            label: 'My Connections',
+            label: t.erp.navMyConnections,
             icon: <Plug className="w-4 h-4" />,
             badge: consumerConnectionCount > 0 ? consumerConnectionCount : undefined
           },
-          { id: 'new-connection', label: 'New Connection', icon: <PlusCircle className="w-4 h-4" /> },
+          { id: 'new-connection', label: t.erp.navNewConnection, icon: <PlusCircle className="w-4 h-4" /> },
           {
             id: 'bills',
-            label: 'Electricity Bills',
+            label: t.erp.navElectricityBills,
             icon: <Receipt className="w-4 h-4" />,
-            badge: unpaidConsumerBills > 0 ? `${unpaidConsumerBills} Due` : undefined
+            badge: unpaidConsumerBills > 0 ? `${unpaidConsumerBills} ${t.erp.dueSuffix}` : undefined
           },
-          { id: 'payments', label: 'Payment History', icon: <CreditCard className="w-4 h-4" /> },
+          { id: 'payments', label: t.erp.navPaymentHistory, icon: <CreditCard className="w-4 h-4" /> },
           {
             id: 'complaints',
-            label: 'Complaint Desk',
+            label: t.erp.navComplaintDesk,
             icon: <MessageSquareWarning className="w-4 h-4" />,
             badge: activeConsumerCmps > 0 ? activeConsumerCmps : undefined
           },
           {
             id: 'requests',
-            label: 'Service Requests',
+            label: t.erp.navServiceRequests,
             icon: <FileText className="w-4 h-4" />,
             badge: activeConsumerApps > 0 ? activeConsumerApps : undefined
           },
           {
             id: 'notifications',
-            label: 'Notifications',
+            label: t.erp.navNotifications,
             icon: <Bell className="w-4 h-4" />,
             badge: unreadConsumerNotifs > 0 ? unreadConsumerNotifs : undefined
           },
-          { id: 'profile', label: 'Account Profile', icon: <User className="w-4 h-4" /> }
+          { id: 'profile', label: t.erp.navAccountProfile, icon: <User className="w-4 h-4" /> }
         ];
       case 'employee':
         return [
-          { id: 'dashboard', label: 'ERP Overview', icon: <LayoutDashboard className="w-4 h-4" /> },
-          { id: 'applications', label: 'Application Queue', icon: <Inbox className="w-4 h-4" />, badge: pendingApps > 0 ? pendingApps : undefined },
-          { id: 'consumers', label: 'Consumer Ledger', icon: <Database className="w-4 h-4" /> },
-          { id: 'complaints', label: 'Complaint Queue', icon: <MessageSquareWarning className="w-4 h-4" />, badge: activeCmps > 0 ? activeCmps : undefined },
-          { id: 'approvals', label: 'Approval Center', icon: <CheckSquare className="w-4 h-4" />, badge: pendingApps > 0 ? pendingApps : undefined },
-          { id: 'coordination', label: 'Dept Coordination', icon: <Network className="w-4 h-4" /> },
-          { id: 'reports', label: 'Revenue Reports', icon: <BarChart3 className="w-4 h-4" /> }
+          { id: 'dashboard', label: t.erp.navErpOverview, icon: <LayoutDashboard className="w-4 h-4" /> },
+          { id: 'incidents', label: t.erp.navIncidentControlDesk, icon: <AlertTriangle className="w-4 h-4" />, badge: activeEmployeeIncidents > 0 ? activeEmployeeIncidents : undefined },
+          { id: 'applications', label: t.erp.navApplicationQueue, icon: <Inbox className="w-4 h-4" />, badge: pendingApps > 0 ? pendingApps : undefined },
+          { id: 'consumers', label: t.erp.navConsumerLedger, icon: <Database className="w-4 h-4" /> },
+          { id: 'complaints', label: t.erp.navComplaintQueue, icon: <MessageSquareWarning className="w-4 h-4" />, badge: activeCmps > 0 ? activeCmps : undefined },
+          { id: 'approvals', label: t.erp.navApprovalCenter, icon: <CheckSquare className="w-4 h-4" />, badge: pendingApps > 0 ? pendingApps : undefined },
+          { id: 'coordination', label: t.erp.navDeptCoordination, icon: <Network className="w-4 h-4" /> },
+          { id: 'reports', label: t.erp.navRevenueReports, icon: <BarChart3 className="w-4 h-4" /> }
         ];
       case 'field':
         return [
-          { id: 'dashboard', label: 'Field Console', icon: <LayoutDashboard className="w-4 h-4" /> },
-          { id: 'workorders', label: 'Work Orders', icon: <Wrench className="w-4 h-4" />, badge: pendingWos > 0 ? pendingWos : undefined },
-          { id: 'inspections', label: 'Site Feasibility', icon: <ClipboardCheck className="w-4 h-4" /> },
-          { id: 'maintenance', label: 'Feeder Patrol', icon: <HardHat className="w-4 h-4" /> },
-          { id: 'offline', label: 'Offline Queue', icon: <WifiOff className="w-4 h-4" /> },
-          { id: 'history', label: 'Completed Jobs', icon: <History className="w-4 h-4" /> }
+          { id: 'dashboard', label: t.erp.navFieldConsole, icon: <LayoutDashboard className="w-4 h-4" /> },
+          { id: 'workorders', label: t.erp.navWorkOrders, icon: <Wrench className="w-4 h-4" />, badge: pendingWos > 0 ? pendingWos : undefined },
+          { id: 'inspections', label: t.erp.navSiteFeasibility, icon: <ClipboardCheck className="w-4 h-4" /> },
+          { id: 'maintenance', label: t.erp.navFeederPatrol, icon: <HardHat className="w-4 h-4" /> },
+          { id: 'offline', label: t.erp.navOfflineQueue, icon: <WifiOff className="w-4 h-4" /> },
+          { id: 'history', label: t.erp.navCompletedJobs, icon: <History className="w-4 h-4" /> }
         ];
       case 'management':
         return [
-          { id: 'dashboard', label: 'Executive Cockpit', icon: <LineChart className="w-4 h-4" /> },
-          { id: 'analytics', label: 'Revenue & Demand', icon: <PieChart className="w-4 h-4" /> },
-          { id: 'sla', label: 'SLA Redressal', icon: <Clock className="w-4 h-4" /> },
-          { id: 'feeders', label: 'Feeder Overloads', icon: <Cpu className="w-4 h-4" />, badge: '1 Alert' },
-          { id: 'ai-insights', label: 'UGVCL AI Insights', icon: <Sparkles className="w-4 h-4" /> },
-          { id: 'reports', label: 'Executive Export', icon: <BarChart3 className="w-4 h-4" /> }
+          { id: 'dashboard', label: t.erp.navExecutiveCockpit, icon: <LineChart className="w-4 h-4" /> },
+          { id: 'analytics', label: t.erp.navRevenueDemand, icon: <PieChart className="w-4 h-4" /> },
+          { id: 'sla', label: t.erp.navSlaRedressal, icon: <Clock className="w-4 h-4" /> },
+          { id: 'feeders', label: t.erp.navFeederOverloads, icon: <Cpu className="w-4 h-4" />, badge: `1 ${t.erp.alertSuffix}` },
+          { id: 'ai-insights', label: t.erp.navAiInsights, icon: <Sparkles className="w-4 h-4" /> },
+          { id: 'reports', label: t.erp.navExecutiveExport, icon: <BarChart3 className="w-4 h-4" /> }
         ];
       case 'admin':
         return [
-          { id: 'overview', label: 'System Overview', icon: <Activity className="w-4 h-4" /> },
-          { id: 'users', label: 'Users & Roles', icon: <UsersIcon className="w-4 h-4" />, badge: 12 },
-          { id: 'access', label: 'Access Matrix', icon: <KeyRound className="w-4 h-4" /> },
-          { id: 'audit', label: 'Audit Trail', icon: <FileSearch className="w-4 h-4" /> },
-          { id: 'integrations', label: 'API Integrations', icon: <Server className="w-4 h-4" /> },
-          { id: 'infra', label: 'Infrastructure & DB', icon: <ShieldCheck className="w-4 h-4" /> },
-          { id: 'settings', label: 'System Settings', icon: <Settings className="w-4 h-4" /> }
+          { id: 'overview', label: t.erp.navSystemOverview, icon: <Activity className="w-4 h-4" /> },
+          { id: 'users', label: t.erp.navUsersRoles, icon: <UsersIcon className="w-4 h-4" />, badge: 12 },
+          { id: 'access', label: t.erp.navAccessMatrix, icon: <KeyRound className="w-4 h-4" /> },
+          { id: 'audit', label: t.erp.navAuditTrail, icon: <FileSearch className="w-4 h-4" /> },
+          { id: 'integrations', label: t.erp.navApiIntegrations, icon: <Server className="w-4 h-4" /> },
+          { id: 'infra', label: t.erp.navInfraDb, icon: <ShieldCheck className="w-4 h-4" /> },
+          { id: 'settings', label: t.erp.navSystemSettings, icon: <Settings className="w-4 h-4" /> }
         ];
     }
   };
@@ -225,7 +243,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
           className="h-8 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap shrink-0 bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 cursor-pointer"
         >
           <Sparkles className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-          <span>Vidyut Mitra AI</span>
+          <span>{t.erp.vidyutMitraAi}</span>
         </button>
       </nav>
 
@@ -266,12 +284,14 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
             {/* Active Portal & Officer Identity */}
             <div className="my-3 p-3 rounded-xl bg-[#132240]/90 border border-slate-800/90">
               <div className="flex items-center justify-between text-[11px] mb-1">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">Active Portal</span>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">
+                  {t.erp.activePortal}
+                </span>
                 <span className="text-[10px] font-mono font-semibold uppercase px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/25">
                   {currentRole}
                 </span>
               </div>
-              <div className="text-xs font-bold text-white leading-snug">{profile.label}</div>
+              <div className="text-xs font-bold text-white leading-snug">{localizedRoleLabel}</div>
               <div className="flex items-center gap-2.5 mt-2.5 pt-2.5 border-t border-slate-800/80 min-w-0">
                 <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0">
                   {activeUser.initials}
@@ -290,7 +310,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
             {/* Role Navigation Links */}
             <div className="px-1 pb-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                {currentRole === 'consumer' ? 'Consumer Services' : 'Workspace Modules'}
+                {currentRole === 'consumer' ? t.erp.consumerServices : t.erp.workspaceModules}
               </span>
             </div>
 
@@ -332,6 +352,11 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
                   </button>
                 );
               })}
+
+              {/* Mobile Drawer Language Switcher */}
+              <div className="pt-2 mt-2 border-t border-slate-800/80">
+                <LanguageSelector variant="mobile" />
+              </div>
             </nav>
 
             {/* Quick Tools & Session Footer */}
@@ -345,7 +370,32 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
                 className="w-full min-h-[40px] px-3 py-2 rounded-lg text-xs font-semibold text-teal-200 hover:text-white bg-teal-950/50 hover:bg-teal-900/50 border border-teal-800/50 flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 cursor-pointer"
               >
                 <Sparkles className="w-4 h-4 text-teal-400 shrink-0" />
-                <span>Vidyut Mitra AI Assistant</span>
+                <span>{t.erp.vidyutMitraAiAssistant}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  setIsNotificationDrawerOpen(true);
+                }}
+                className={`w-full min-h-[38px] px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
+                  criticalIncidentsCount > 0
+                    ? 'bg-rose-950/80 text-rose-200 border border-rose-600/80 animate-pulse'
+                    : 'bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700'
+                }`}
+              >
+                <Bell className={`w-4 h-4 ${criticalIncidentsCount > 0 ? 'text-rose-400' : 'text-slate-400'}`} />
+                <span>
+                  {criticalIncidentsCount > 0
+                    ? `⚠️ ${criticalIncidentsCount} ${t.erp.criticalIncidentsAlert}`
+                    : t.erp.notificationCenter}
+                </span>
+                {unreadIncidentsCount > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-bold">
+                    {unreadIncidentsCount}
+                  </span>
+                )}
               </button>
 
               <div className="grid grid-cols-3 gap-1.5 text-[11px]">
@@ -358,7 +408,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
                   className="p-2 rounded-lg bg-slate-800/90 text-slate-200 hover:bg-slate-700 flex items-center justify-center gap-1 font-medium cursor-pointer"
                 >
                   <Search className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span>Search</span>
+                  <span>{t.erp.search}</span>
                 </button>
                 <button
                   type="button"
@@ -369,7 +419,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
                   className="p-2 rounded-lg bg-slate-800/90 text-slate-200 hover:bg-slate-700 flex items-center justify-center gap-1 font-medium cursor-pointer"
                 >
                   <Home className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span>Home</span>
+                  <span>{t.erp.home}</span>
                 </button>
                 <button
                   type="button"
@@ -380,7 +430,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
                   className="p-2 rounded-lg bg-blue-950/60 border border-blue-800/40 text-blue-200 hover:bg-blue-900 flex items-center justify-center gap-1 font-medium cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span>Intro</span>
+                  <span>{t.erp.introShort}</span>
                 </button>
               </div>
 
@@ -393,7 +443,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
                 className="w-full min-h-[40px] py-2 px-3 rounded-lg bg-rose-950/40 border border-rose-800/50 text-rose-300 hover:bg-rose-900/60 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                <span>Sign Out (Switch Role)</span>
+                <span>{t.erp.signOutSwitchRole}</span>
               </button>
             </div>
           </div>
@@ -402,3 +452,4 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
     </>
   );
 };
+

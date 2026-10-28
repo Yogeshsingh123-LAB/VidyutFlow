@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 import {
   Search,
   Zap,
@@ -52,6 +53,7 @@ export const CommandPalette: React.FC = () => {
     setActiveTab,
     openCaseDrawer
   } = useApp();
+  const { t } = useLanguage();
 
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<RecordCategory>('All');
@@ -273,8 +275,20 @@ export const CommandPalette: React.FC = () => {
     ? ['All', 'Connections', 'Bills', 'Applications', 'Complaints']
     : ['All', 'Connections', 'Bills', 'Applications', 'Complaints', 'Work Orders'];
 
+  const categoryLabelMap: Record<string, string> = {
+    'All': t.erp.catAll,
+    'Connections': t.erp.catConnections,
+    'Bills': t.erp.catBills,
+    'Applications': t.erp.catApplications,
+    'Complaints': t.erp.catComplaints,
+    'Work Orders': t.erp.catWorkOrders
+  };
+
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={t.erp.recordSearchTitle}
       className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in"
       onClick={() => setIsCommandPaletteOpen(false)}
     >
@@ -288,7 +302,7 @@ export const CommandPalette: React.FC = () => {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono">
-                VidyutFlow Record Search
+                {t.erp.recordSearchTitle}
               </span>
               <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold bg-blue-50 text-blue-700 border border-blue-200">
                 Role: {currentRole.toUpperCase()}
@@ -298,8 +312,8 @@ export const CommandPalette: React.FC = () => {
               <Shield className="w-3.5 h-3.5 text-emerald-600" />
               <span>
                 {currentRole === 'consumer'
-                  ? `Authorized for: ${activeUser.name}`
-                  : 'Authorized Utility Search'}
+                  ? `${t.erp.authorizedFor}: ${activeUser.name}`
+                  : t.erp.authorizedUtilitySearch}
               </span>
             </div>
           </div>
@@ -316,8 +330,8 @@ export const CommandPalette: React.FC = () => {
               }}
               placeholder={
                 currentRole === 'consumer'
-                  ? 'Search consumer number, bill number, application ID, or complaint ID...'
-                  : 'Search consumer no, applicant name, complaint ID, bill no, or work order...'
+                  ? t.erp.searchPlaceholderConsumer
+                  : t.erp.searchPlaceholderStaff
               }
               className="w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none py-1 font-medium"
             />
@@ -327,7 +341,7 @@ export const CommandPalette: React.FC = () => {
                 className="text-xs text-slate-400 hover:text-slate-600 px-1"
                 aria-label="Clear query"
               >
-                Clear
+                {t.erp.clear}
               </button>
             )}
             <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 bg-slate-100 rounded border border-slate-200">
@@ -353,7 +367,7 @@ export const CommandPalette: React.FC = () => {
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
-                  {cat}
+                  {categoryLabelMap[cat] || cat}
                 </button>
               );
             })}
@@ -368,14 +382,14 @@ export const CommandPalette: React.FC = () => {
                 <Search className="w-5 h-5" />
               </div>
               <div className="text-xs font-semibold text-slate-700">
-                No matching records found
+                {t.erp.noMatchingRecords}
               </div>
               <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
                 {query
                   ? `No records match "${query}". Try searching by Consumer No (e.g., 04281-99231), Bill ID (e.g., BILL-), Application (e.g., APP-), or Complaint ID (e.g., CMP-).`
                   : currentRole === 'consumer'
-                    ? 'No records linked to this consumer account yet.'
-                    : 'Enter an identifier to search across utility databases.'}
+                    ? t.erp.noRecordsConsumer
+                    : t.erp.noRecordsStaff}
               </p>
             </div>
           ) : (
@@ -425,7 +439,7 @@ export const CommandPalette: React.FC = () => {
 
                     <div className="flex items-center gap-2 shrink-0 ml-2">
                       <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-                        {item.category}
+                        {categoryLabelMap[item.category] || item.category}
                       </span>
                       {isSelected ? (
                         <ArrowRight className="w-4 h-4 text-blue-600 shrink-0" />
@@ -444,18 +458,19 @@ export const CommandPalette: React.FC = () => {
         <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
           <div className="flex items-center gap-3">
             <span>
-              Use <kbd className="px-1 py-0.5 rounded bg-white border border-slate-200 font-mono text-[10px]">↑</kbd>{' '}
-              <kbd className="px-1 py-0.5 rounded bg-white border border-slate-200 font-mono text-[10px]">↓</kbd> to navigate
+              <kbd className="px-1 py-0.5 rounded bg-white border border-slate-200 font-mono text-[10px]">↑</kbd>{' '}
+              <kbd className="px-1 py-0.5 rounded bg-white border border-slate-200 font-mono text-[10px]">↓</kbd> {t.erp.navigateHint}
             </span>
             <span>
-              <kbd className="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-[10px]">↵</kbd> to open record
+              <kbd className="px-1.5 py-0.5 rounded bg-white border border-slate-200 font-mono text-[10px]">↵</kbd> {t.erp.openRecordHint}
             </span>
           </div>
           <span className="font-medium text-slate-400">
-            Showing {filteredResults.length} authorized record{filteredResults.length !== 1 ? 's' : ''}
+            {t.erp.showingAuthorizedRecords}: {filteredResults.length}
           </span>
         </div>
       </div>
     </div>
   );
 };
+

@@ -1,26 +1,60 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { FEEDER_METRICS } from '../../data/mockData';
+import { useLanguage } from '../../i18n/LanguageContext';
+import { UGVCL_LOGO_PATH, FEEDER_METRICS } from '../../data/mockData';
+import { WorkOrder, FeederHealth } from '../../types';
+import {
+  FIELD_UI_TRANSLATIONS,
+  localizeFeederName,
+  localizeFeederStatus,
+  localizeTerminalCondition,
+  localizeSealStatus,
+  localizeFieldTechnicianRemarks,
+} from '../../i18n/fieldContentTranslations';
+import {
+  localizeSubdivision,
+  localizeConsumerAddress,
+} from '../../i18n/consumerContentTranslations';
+import {
+  localizeEmployeeDesignation,
+  localizeWorkOrderTitle,
+  localizeWorkOrderType,
+  localizeWorkOrderStatus,
+  localizeWorkOrderScheduledDate,
+  localizePriorityLevel,
+  localizeAssignedActorName,
+} from '../../i18n/employeeContentTranslations';
+import {
+  localizeIncidentTitle,
+  localizeIncidentDescription,
+  localizeIncidentSeverity,
+  localizeIncidentStatus,
+  localizeAuditTrailNote,
+} from '../../i18n/incidentLocalization';
 import {
   Wrench,
-  MapPin,
-  Clock,
   CheckCircle2,
-  AlertTriangle,
+  Clock,
+  MapPin,
   Camera,
   Wifi,
   WifiOff,
-  Navigation,
   FileCheck,
-  Check,
-  Phone,
-  HardHat,
-  RotateCw,
-  Info,
-  History,
-  Zap
+  AlertTriangle,
+  Zap,
+  RefreshCw,
+  ShieldCheck,
+  Sliders,
+  Flame,
+  X,
 } from 'lucide-react';
-import { WorkOrder } from '../../types';
+
+const DEFAULT_TECH_REMARKS_SET = new Set(
+  Object.values(FIELD_UI_TRANSLATIONS).map((d) => d.defaultTechnicianRemarks)
+);
+const DEFAULT_HAZARD_REMARKS_SET = new Set(
+  Object.values(FIELD_UI_TRANSLATIONS).map((d) => d.defaultHazardRemarks)
+);
 
 export const FieldPortal: React.FC = () => {
   const {
@@ -28,829 +62,1381 @@ export const FieldPortal: React.FC = () => {
     setActiveTab,
     workOrders,
     updateWorkOrderStatus,
-    openCaseDrawer,
-    isOfflineSimulated,
-    setIsOfflineSimulated,
+    reportFeederFault,
     showToast,
-    activeUser
+    openCaseDrawer,
+    activeUser,
+    roleIncidents,
+    acknowledgeIncident,
+    openIncidentModal,
   } = useApp();
 
-  const [selectedOrderForInspection, setSelectedOrderForInspection] = useState<WorkOrder | null>(null);
+  const feeders: FeederHealth[] = FEEDER_METRICS;
+  const criticalIncidents = roleIncidents;
+  const acknowledgeCriticalIncident = acknowledgeIncident;
+  const openDetailDrawer = (c: { type: 'workorder' | 'complaint' | 'application'; id: string }) => {
+    openCaseDrawer(c.type, c.id);
+  };
 
-  // Form states for active inspection
-  const [meterSerialScanned, setMeterSerialScanned] = useState('GEN-SM-2026-9921');
-  const [readingKwh, setReadingKwh] = useState(14820);
+  const submitSiteInspection = (
+    woId: string,
+    data: {
+      meterSerial: string;
+      readingKwh: number;
+      sealIntact: boolean;
+      terminalCondition: 'Normal' | 'Burnt' | 'Loose';
+      voltageR: number;
+      voltageY: number;
+      voltageB: number;
+      gpsLocation: string;
+      photoAttached: boolean;
+      technicianRemarks: string;
+      submittedBy: string;
+    }
+  ) => {
+    updateWorkOrderStatus(woId, 'Completed', {
+      meterSerialScanned: data.meterSerial,
+      readingKwh: data.readingKwh,
+      sealIntact: data.sealIntact,
+      terminalCondition: data.terminalCondition,
+      tamperDetected: false,
+      testedPhaseVoltage: {
+        r: data.voltageR,
+        y: data.voltageY,
+        b: data.voltageB,
+      },
+      technicianRemarks: data.technicianRemarks,
+      photoUploaded: data.photoAttached,
+    });
+  };
+
+  const { language, t } = useLanguage();
+  const tf = t.field;
+
+  // Critical incidents specifically assigned to this Field Engineer
+  const assignedIncidents = criticalIncidents.filter(
+    (inc) =>
+      inc.status !== 'RESOLVED' &&
+      (inc.assignedToUserId === activeUser.id ||
+        inc.assignedEngineerName === activeUser.name ||
+        (!inc.assignedToUserId &&
+          (inc.responsibleRoles?.includes('field') ||
+            (inc as unknown as { targetRoles?: string[] }).targetRoles?.includes('field'))))
+  );
+
+  const [offlineSimulated, setOfflineSimulated] = useState(false);
+  const [selectedWOId, setSelectedWOId] = useState<string>(
+    workOrders.find((w) => w.status !== 'Completed')?.id || workOrders[0]?.id || 'WO-4401'
+  );
+
+  // Inspection Form State
+  const [meterSerial, setMeterSerial] = useState('UGVCL-SM-2026-99412');
+  const [readingKwh, setReadingKwh] = useState('14820');
   const [sealIntact, setSealIntact] = useState(true);
   const [terminalCondition, setTerminalCondition] = useState<'Normal' | 'Burnt' | 'Loose'>('Normal');
-  const [testedVoltageR, setTestedVoltageR] = useState(232);
-  const [testedVoltageY, setTestedVoltageY] = useState(231);
-  const [testedVoltageB, setTestedVoltageB] = useState(234);
-  const [technicianRemarks, setTechnicianRemarks] = useState('Inspected neutral terminal at DP-14 and replaced oxidized aluminium crimp.');
-  const [isPhotoUploaded, setIsPhotoUploaded] = useState(true);
+  const [voltageR, setVoltageR] = useState('234');
+  const [voltageY, setVoltageY] = useState('232');
+  const [voltageB, setVoltageB] = useState('235');
+  const [technicianRemarks, setTechnicianRemarks] = useState(tf.defaultTechnicianRemarks);
+  const [gpsLocation] = useState('23.5880° N, 72.3693° E (Mehsana North)');
 
-  const handleStartInspection = (wo: WorkOrder) => {
-    setSelectedOrderForInspection(wo);
-    setActiveTab('inspections');
+  // Emergency Hazard Reporting Modal
+  const [showHazardModal, setShowHazardModal] = useState(false);
+  const [selectedFeederId, setSelectedFeederId] = useState(feeders[0]?.id || 'FDR-01');
+  const [faultType, setFaultType] = useState<
+    'TRANSFORMER_OVERHEATING' | 'FEEDER_OVERLOAD' | 'CRITICAL_FEEDER_OUTAGE'
+  >('TRANSFORMER_OVERHEATING');
+  const [faultRemarks, setFaultRemarks] = useState(tf.defaultHazardRemarks);
+
+  // Keep default sample remarks synchronized with active language unless edited by user
+  useEffect(() => {
+    setTechnicianRemarks((prev) =>
+      DEFAULT_TECH_REMARKS_SET.has(prev) ? tf.defaultTechnicianRemarks : prev
+    );
+    setFaultRemarks((prev) =>
+      DEFAULT_HAZARD_REMARKS_SET.has(prev) ? tf.defaultHazardRemarks : prev
+    );
+  }, [language, tf.defaultTechnicianRemarks, tf.defaultHazardRemarks]);
+
+  const handleHazardSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const canonicalRemarks = DEFAULT_HAZARD_REMARKS_SET.has(faultRemarks)
+      ? FIELD_UI_TRANSLATIONS.en.defaultHazardRemarks
+      : faultRemarks;
+    reportFeederFault(selectedFeederId, faultType, canonicalRemarks);
+    setShowHazardModal(false);
+    showToast(
+      `Emergency Hazard reported for ${selectedFeederId} — Critical incident broadcasted`,
+      'warning'
+    );
+  };
+
+  const toggleOfflineMode = () => {
+    const next = !offlineSimulated;
+    setOfflineSimulated(next);
+    showToast(
+      next
+        ? 'Simulated Offline Mode enabled — inspections will queue locally'
+        : 'Simulated Online Mode restored — local queue synchronized',
+      next ? 'warning' : 'success'
+    );
   };
 
   const handleInspectionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedOrderForInspection) return;
-
-    updateWorkOrderStatus(selectedOrderForInspection.id, 'Completed', {
-      meterSerialScanned,
-      readingKwh: Number(readingKwh),
+    const canonicalRemarks = DEFAULT_TECH_REMARKS_SET.has(technicianRemarks)
+      ? FIELD_UI_TRANSLATIONS.en.defaultTechnicianRemarks
+      : technicianRemarks;
+    submitSiteInspection(selectedWOId, {
+      meterSerial,
+      readingKwh: Number(readingKwh) || 0,
       sealIntact,
       terminalCondition,
-      tamperDetected: false,
-      testedPhaseVoltage: { r: Number(testedVoltageR), y: Number(testedVoltageY), b: Number(testedVoltageB) },
-      technicianRemarks,
-      photoUploaded: isPhotoUploaded
+      voltageR: Number(voltageR) || 230,
+      voltageY: Number(voltageY) || 230,
+      voltageB: Number(voltageB) || 230,
+      gpsLocation,
+      photoAttached: true,
+      technicianRemarks: canonicalRemarks,
+      submittedBy: `${activeUser.name} (${activeUser.id})`,
     });
-
-    showToast(`Inspection report submitted for ${selectedOrderForInspection.id}!`, 'success');
-    setSelectedOrderForInspection(null);
+    showToast(
+      `Inspection report submitted for ${selectedWOId} — Status updated to Completed`,
+      'success'
+    );
     setActiveTab('workorders');
   };
 
-  const pendingOrders = workOrders.filter(w => w.status !== 'Completed');
-  const completedOrders = workOrders.filter(w => w.status === 'Completed');
+  const pendingWorkOrders = workOrders.filter((w) => w.status !== 'Completed');
+  const completedWorkOrders = workOrders.filter((w) => w.status === 'Completed');
+
+  const selectedWO = workOrders.find((w) => w.id === selectedWOId);
 
   return (
-    <div className="space-y-4 sm:space-y-6 min-w-0">
-      {/* Field Engineer Status Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
+    <div className="space-y-6">
+      {/* Field Engineer Top Status Bar */}
+      <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t-4 border-t-emerald-600">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3.5 min-w-0">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white p-1 border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center shrink-0">
-            <img src="/assets/ugvcl-logo.png" alt="UGVCL Official Logo" className="w-full h-full object-contain" />
+          <div className="w-11 h-11 rounded-lg bg-white p-1.5 border border-slate-200 shadow-xs shrink-0 flex items-center justify-center">
+            <img
+              src={UGVCL_LOGO_PATH}
+              alt={tf.ugvclLogoAlt}
+              className="w-full h-full object-contain"
+            />
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug break-words">
-                Field Operations Console &amp; Inspection App
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-snug break-words">
+                {tf.consoleTitle}
               </h1>
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                Field Lineman / JE
+              <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold uppercase tracking-wider">
+                {tf.roleBadgeField}
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-relaxed break-words">
-              <span>UGVCL Operations · Engineer:</span>
-              <span className="font-semibold text-slate-700 dark:text-slate-300">{activeUser.name}</span>
-              <span>({activeUser.designation}) · Feeder Wing Mehsana</span>
+            <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
+              {tf.subtitleOpsPrefix}{' '}
+              <span className="text-slate-800 dark:text-slate-200 font-semibold">
+                {activeUser.name}
+              </span>{' '}
+              •{' '}
+              <span className="text-emerald-700 dark:text-emerald-400 font-mono">
+                {activeUser.id}
+              </span>{' '}
+              (
+              {localizeEmployeeDesignation(
+                activeUser.designation || 'Junior Engineer (Field) / Sr. Lineman',
+                language
+              )}
+              ) · {localizeSubdivision(activeUser.subdivision || 'Feeder Wing Mehsana', language)}
             </p>
           </div>
         </div>
-
-        {/* Offline Simulation Control */}
-        <div className="flex items-center gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800/80 shrink-0">
+        <div className="flex items-center gap-2.5 flex-wrap">
           <button
-            onClick={() => {
-              setIsOfflineSimulated(!isOfflineSimulated);
-              showToast(
-                !isOfflineSimulated
-                  ? 'Simulated Offline Mode enabled (No network). Changes queued in memory.'
-                  : 'Simulated Online Mode restored. Queued records flushed.',
-                'info'
-              );
-            }}
-            className={`w-full sm:w-auto min-h-11 sm:min-h-[38px] flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
-              isOfflineSimulated
-                ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-400 text-amber-900 dark:text-amber-200'
-                : 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 text-emerald-800 dark:text-emerald-300'
+            type="button"
+            onClick={() => setShowHazardModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-all cursor-pointer"
+          >
+            <Flame className="w-3.5 h-3.5" aria-hidden="true" />
+            {tf.btnReportHazard}
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleOfflineMode}
+            aria-label={offlineSimulated ? tf.ariaDisableOffline : tf.ariaEnableOffline}
+            aria-pressed={offlineSimulated}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+              offlineSimulated
+                ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300'
+                : 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
             }`}
           >
-            {isOfflineSimulated ? (
+            {offlineSimulated ? (
               <>
-                <WifiOff className="w-3.5 h-3.5" />
-                <span>Simulated Offline</span>
+                <WifiOff className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
+                {tf.btnSimulatedOffline}
               </>
             ) : (
               <>
-                <Wifi className="w-3.5 h-3.5" />
-                <span>Online (4G AMR)</span>
+                <Wifi className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" />
+                {tf.btnOnlineAmr}
               </>
             )}
           </button>
         </div>
       </div>
 
-      {/* Offline Notice */}
-      {isOfflineSimulated && (
-        <div className="p-3 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
-          <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-          <div>
-            <strong>UI Simulation Only:</strong> You are testing the field offline experience. Completed inspection forms and photo captures are stored in volatile client state and will simulate synchronization when toggled back to Online.
+      {/* Offline Queue Indicator Banner */}
+      {offlineSimulated && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="bg-amber-950 border border-amber-700/80 text-white px-4 py-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+              <WifiOff className="w-4 h-4 text-amber-400" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-300">
+                {tf.offlineBufferActivePrefix}{' '}
+                <span className="font-normal text-amber-100/90 normal-case">
+                  {tf.offlineBufferActiveDesc}
+                </span>
+              </p>
+            </div>
           </div>
+          <span className="px-2.5 py-1 rounded bg-amber-500/20 border border-amber-500/40 text-[10px] font-bold uppercase tracking-wider text-amber-300 shrink-0">
+            {tf.badgeLocalQueueReady}
+          </span>
         </div>
       )}
 
-      {/* VIEW 1: FIELD DASHBOARD */}
-      {activeTab === 'dashboard' && (
-        <div className="space-y-6">
-          {/* Quick Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Assigned Work Orders Today
-              </span>
-              <div className="text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums">
-                {pendingOrders.length}
+      {/* Emergency Hazard Reporting Modal */}
+      {showHazardModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="hazard-modal-title"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setShowHazardModal(false);
+          }}
+          className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div className="bg-white dark:bg-[#111827] border border-rose-300 dark:border-rose-900/60 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
+                  <Flame className="w-5 h-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <h3 id="hazard-modal-title" className="font-bold text-slate-900 dark:text-white text-base">
+                    {tf.hazardModalTitle}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {tf.hazardModalSubtitle}
+                  </p>
+                </div>
               </div>
-              <span className="text-xs text-blue-600 font-medium">1 In Progress · 2 Pending Sites</span>
-            </div>
-
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Emergency Fault Callouts
-              </span>
-              <div className="text-3xl font-extrabold text-amber-600 tabular-nums">
-                1 Active
-              </div>
-              <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">DT Overload Inspection (WO-4403)</span>
-            </div>
-
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Completed Inspections
-              </span>
-              <div className="text-3xl font-extrabold text-emerald-600 tabular-nums">
-                {completedOrders.length}
-              </div>
-              <span className="text-xs text-slate-500">Synchronized with Sub-division</span>
-            </div>
-          </div>
-
-          {/* Today's Schedule Card List */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Today&apos;s Field Itinerary & Tasks
-              </h3>
               <button
-                onClick={() => setActiveTab('workorders')}
-                className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline"
+                type="button"
+                onClick={() => setShowHazardModal(false)}
+                aria-label={t.common.close}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
               >
-                View All Work Orders →
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {pendingOrders.map(wo => (
-                <div
-                  key={wo.id}
-                  className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3"
+            <form onSubmit={handleHazardSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {tf.labelTargetFeederCorridor}
+                </label>
+                <select
+                  value={selectedFeederId}
+                  onChange={(e) => setSelectedFeederId(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-sm text-slate-900 dark:text-white"
                 >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="font-mono text-xs font-bold text-teal-600 dark:text-teal-400">
-                        {wo.id}
-                      </span>
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
-                        {wo.title}
-                      </h4>
-                    </div>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                      wo.priority === 'Emergency'
-                        ? 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
-                        : 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                    }`}>
-                      {wo.priority}
-                    </span>
-                  </div>
+                  {feeders.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.id} — {localizeFeederName(f.name, language)} (
+                      {localizeSubdivision(f.subdivision, language)})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                  <div className="text-xs text-slate-600 dark:text-slate-300 flex items-start gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                    <span>{wo.location}</span>
-                  </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {tf.labelDetectedHazardType}
+                </label>
+                <select
+                  value={faultType}
+                  onChange={(e) => setFaultType(e.target.value as typeof faultType)}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-sm text-slate-900 dark:text-white"
+                >
+                  <option value="TRANSFORMER_OVERHEATING">
+                    {tf.optionHazardTransformerOverheating}
+                  </option>
+                  <option value="FEEDER_OVERLOAD">{tf.optionHazardFeederOverload}</option>
+                  <option value="CRITICAL_FEEDER_OUTAGE">{tf.optionHazardCriticalOutage}</option>
+                </select>
+              </div>
 
-                  <div className="text-[11px] text-slate-400">
-                    Feeder: {wo.feederName} · Scheduled: {wo.scheduledDate}
-                  </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {tf.labelHazardObservations}
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={faultRemarks}
+                  onChange={(e) => setFaultRemarks(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-sm text-slate-900 dark:text-white"
+                />
+              </div>
 
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                      Status: {wo.status}
-                    </span>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => openCaseDrawer('workorder', wo.id)}
-                        className="min-h-[36px] px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
-                      >
-                        Details
-                      </button>
-                      <button
-                        onClick={() => handleStartInspection(wo)}
-                        className="min-h-[36px] px-3.5 py-1.5 text-xs rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold flex items-center gap-1 shadow-xs cursor-pointer"
-                      >
-                        <FileCheck className="w-3.5 h-3.5" />
-                        <span>Perform Inspection</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowHazardModal(false)}
+                  className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  {tf.btnCancel}
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  {tf.btnTransmitCriticalAlert}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* VIEW 2: ASSIGNED WORK ORDERS */}
-      {activeTab === 'workorders' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                Assigned Work Orders
-              </h2>
-              <p className="text-xs text-slate-500">
-                Inspection tasks, fault callouts, and meter replacements
+      {offlineSimulated && (
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/60 rounded-xl p-3.5 flex items-center gap-3">
+          <WifiOff className="w-5 h-5 text-amber-600 shrink-0" />
+          <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+            <strong>{tf.offlineSimNoticePrefix}</strong> {tf.offlineSimNoticeDesc}
+          </p>
+        </div>
+      )}
+
+      {/* TAB 1: FIELD DASHBOARD */}
+      {activeTab === 'dashboard' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {tf.kpiAssignedWorkOrders}
+                </span>
+                <Wrench className="w-4 h-4 text-blue-600" />
+              </div>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                {pendingWorkOrders.length}
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                {tf.kpiAssignedWorkOrdersSub}
+              </p>
+            </div>
+
+            <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {tf.kpiEmergencyCallouts}
+                </span>
+                <AlertTriangle className="w-4 h-4 text-rose-600" />
+              </div>
+              <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">
+                1 {tf.kpiEmergencyActiveSuffix}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                {tf.kpiEmergencySub}
+              </p>
+            </div>
+
+            <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {tf.kpiCompletedInspections}
+                </span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              </div>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white">
+                {completedWorkOrders.length}
+              </p>
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                {tf.kpiCompletedInspectionsSub}
               </p>
             </div>
           </div>
 
-          <div className="space-y-3">
-            {workOrders.map(wo => (
-              <div
-                key={wo.id}
-                className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3"
+          {/* Assigned Critical Incidents Section */}
+          {assignedIncidents.length > 0 && (
+            <div className="bg-white dark:bg-[#111827] rounded-xl border-2 border-rose-300 dark:border-rose-900/70 overflow-hidden shadow-xs">
+              <div className="px-6 py-3.5 bg-rose-50/80 dark:bg-rose-950/30 border-b border-rose-200 dark:border-rose-900/50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                  <h2 className="font-bold text-slate-900 dark:text-white text-sm">
+                    {tf.sectionAssignedIncidents} ({assignedIncidents.length})
+                  </h2>
+                </div>
+                <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded bg-rose-600 text-white">
+                  {tf.badgeTargetedDispatch}
+                </span>
+              </div>
+              <div className="divide-y divide-slate-200 dark:divide-slate-800">
+                {assignedIncidents.map((inc) => (
+                  <div
+                    key={inc.id}
+                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs font-bold text-rose-600 dark:text-rose-400">
+                          {inc.id}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            inc.severity === 'CRITICAL'
+                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                              : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                          }`}
+                        >
+                          {localizeIncidentSeverity(inc.severity, language)}
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                          {localizeIncidentStatus(inc.status, language)}
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                        {localizeIncidentTitle(inc.title, language)}
+                      </h3>
+                      <p className="text-xs text-slate-600 dark:text-slate-300">
+                        {localizeIncidentDescription(inc.description, language)}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 pt-1">
+                        {inc.entityId && (
+                          <span>
+                            {tf.labelFeederAsset} <strong>{inc.entityId}</strong>
+                          </span>
+                        )}
+                        {inc.subdivision && (
+                          <span>
+                            {tf.labelSubdivision}{' '}
+                            <strong>{localizeSubdivision(inc.subdivision, language)}</strong>
+                          </span>
+                        )}
+                        {inc.assignedAt && (
+                          <span>
+                            {tf.labelAssignedTime} {inc.assignedAt}
+                          </span>
+                        )}
+                        {inc.assignmentNotes && (
+                          <span className="text-blue-700 dark:text-blue-300">
+                            {tf.labelNotes} {localizeAuditTrailNote(inc.assignmentNotes, language)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => openIncidentModal(inc.id)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors cursor-pointer shadow-xs"
+                      >
+                        {tf.btnReviewAssignment}
+                      </button>
+                      {inc.status !== 'ACKNOWLEDGED' && inc.status !== 'IN_PROGRESS' && (
+                        <button
+                          type="button"
+                          onClick={() => acknowledgeCriticalIncident(inc.id)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors cursor-pointer"
+                        >
+                          {tf.btnAcknowledge}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('maintenance')}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 transition-opacity cursor-pointer"
+                      >
+                        {tf.btnInspectFeederTelemetry}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Active Field Itinerary */}
+          <div className="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <h2 className="font-semibold text-slate-900 dark:text-white text-sm">
+                {tf.sectionTodaysItinerary}
+              </h2>
+              <button
+                onClick={() => setActiveTab('workorders')}
+                className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-teal-600 dark:text-teal-400">
+                {tf.btnViewAllWorkOrders}
+              </button>
+            </div>
+            <div className="divide-y divide-slate-200 dark:divide-slate-800">
+              {workOrders.map((wo) => {
+                const woRefId = wo.complaintId || wo.applicationId;
+                return (
+                <div
+                  key={wo.id}
+                  onClick={() => openDetailDrawer({ type: 'workorder', id: wo.id })}
+                  className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors cursor-pointer"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
                         {wo.id}
                       </span>
-                      <span className="text-xs font-bold text-slate-900 dark:text-white">
-                        {wo.title}
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                          wo.priority === 'Emergency'
+                            ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
+                            : wo.priority === 'High'
+                            ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                        }`}
+                      >
+                        {localizePriorityLevel(wo.priority, language)}
+                      </span>
+                      {woRefId && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (woRefId.startsWith('CMP-')) {
+                              openDetailDrawer({ type: 'complaint', id: woRefId });
+                            } else if (woRefId.startsWith('APP-')) {
+                              openDetailDrawer({ type: 'application', id: woRefId });
+                            } else {
+                              openDetailDrawer({ type: 'workorder', id: wo.id });
+                            }
+                          }}
+                          title={
+                            woRefId.startsWith('CMP-')
+                              ? tf.tooltipViewSourceComplaint
+                              : tf.tooltipViewSourceApplication
+                          }
+                          className="text-xs font-mono text-blue-600 dark:text-blue-400 hover:underline px-1.5 py-0.5 rounded bg-blue-50/70 dark:bg-blue-950/40 cursor-pointer"
+                        >
+                          {tf.labelRefPrefix} {woRefId}
+                        </button>
+                      )}
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {localizeWorkOrderTitle(wo.title, language)}
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400" />{' '}
+                        {localizeConsumerAddress(wo.location, language)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Zap className="w-3.5 h-3.5 text-amber-500" /> {tf.labelFeederPrefix}{' '}
+                        {localizeFeederName(wo.feederName, language)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-slate-400" /> {tf.labelScheduledPrefix}{' '}
+                        {localizeWorkOrderScheduledDate(wo.scheduledDate, language)}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Type: {wo.type} · Location: {wo.location}
-                    </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                      {wo.status}
-                    </span>
+                  <div
+                    className="flex items-center gap-2.5 shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openDetailDrawer({ type: 'workorder', id: wo.id })}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                    >
+                      {tf.btnDetails}
+                    </button>
+                    <select
+                      aria-label={`${tf.labelStatusPrefix} ${wo.id}`}
+                      value={wo.status}
+                      onChange={(e) => {
+                        const nextStatus = e.target.value as typeof wo.status;
+                        updateWorkOrderStatus(wo.id, nextStatus);
+                        showToast(`Work Order ${wo.id} updated to "${nextStatus}"`, 'info');
+                      }}
+                      className="text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-200 font-medium"
+                    >
+                      <option value="Pending">
+                        {localizeWorkOrderStatus('Pending', language)}
+                      </option>
+                      <option value="En Route">
+                        {localizeWorkOrderStatus('En Route', language)}
+                      </option>
+                      <option value="On Site">
+                        {localizeWorkOrderStatus('On Site', language)}
+                      </option>
+                      <option value="Completed">
+                        {localizeWorkOrderStatus('Completed', language)}
+                      </option>
+                    </select>
+                    {wo.status !== 'Completed' && (
+                      <button
+                        onClick={() => {
+                          setSelectedWOId(wo.id);
+                          setActiveTab('inspections');
+                        }}
+                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                      >
+                        {tf.btnPerformInspection}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: ASSIGNED WORK ORDERS */}
+      {activeTab === 'workorders' && (
+        <div className="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+            <h2 className="font-semibold text-slate-900 dark:text-white text-base">
+              {tf.headingAssignedWorkOrders}
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {tf.subtitleAssignedWorkOrders}
+            </p>
+          </div>
+          <div className="divide-y divide-slate-200 dark:divide-slate-800">
+            {workOrders.map((wo) => {
+              const woRefId = wo.complaintId || wo.applicationId;
+              return (
+              <div
+                key={wo.id}
+                onClick={() => openDetailDrawer({ type: 'workorder', id: wo.id })}
+                className="p-5 flex flex-col justify-between gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors cursor-pointer"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
+                        {wo.id}
+                      </span>
+                      <span className="text-xs text-slate-400">•</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        {localizeWorkOrderTitle(wo.title, language)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {tf.labelTypePrefix} {localizeWorkOrderType(wo.type, language)} ·{' '}
+                      {tf.labelLocationPrefix} {localizeConsumerAddress(wo.location, language)}
+                      {woRefId ? (
+                        <>
+                          {' '}· {tf.labelRefPrefix}{' '}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (woRefId.startsWith('CMP-')) {
+                                openDetailDrawer({ type: 'complaint', id: woRefId });
+                              } else if (woRefId.startsWith('APP-')) {
+                                openDetailDrawer({ type: 'application', id: woRefId });
+                              } else {
+                                openDetailDrawer({ type: 'workorder', id: wo.id });
+                              }
+                            }}
+                            className="font-mono text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                          >
+                            {woRefId}
+                          </button>
+                        </>
+                      ) : null}
+                    </p>
+                  </div>
+                  <div
+                    className="flex items-center gap-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openDetailDrawer({ type: 'workorder', id: wo.id })}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                    >
+                      {tf.btnDetails}
+                    </button>
                     {wo.status !== 'Completed' ? (
                       <button
-                        onClick={() => handleStartInspection(wo)}
-                        className="px-3.5 py-1.5 text-xs font-semibold rounded bg-teal-600 hover:bg-teal-700 text-white shadow-xs"
+                        onClick={() => {
+                          setSelectedWOId(wo.id);
+                          setActiveTab('inspections');
+                        }}
+                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
                       >
-                        Enter Inspection Findings
+                        {tf.btnEnterInspectionFindings}
                       </button>
                     ) : (
-                      <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Completed
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                        {tf.badgeCompleted}
                       </span>
                     )}
                   </div>
                 </div>
-
                 {wo.inspectionReport && (
-                  <div className="p-3 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 text-xs text-emerald-950 dark:text-emerald-200">
-                    <div className="font-semibold mb-1">Inspection Findings Recorded:</div>
-                    <div className="text-[11px] text-slate-600 dark:text-slate-300">
-                      Meter Serial: {wo.inspectionReport.meterSerialScanned} · Reading: {wo.inspectionReport.readingKwh} kWh · Voltage: {wo.inspectionReport.testedPhaseVoltage.r}V / {wo.inspectionReport.testedPhaseVoltage.y}V / {wo.inspectionReport.testedPhaseVoltage.b}V
+                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3.5 border border-slate-200/80 dark:border-slate-700/60 text-xs space-y-1">
+                    <div className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4" /> {tf.labelInspectionFindingsRecorded}
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-1 italic">
-                      Remarks: &quot;{wo.inspectionReport.technicianRemarks}&quot;
+                    <p className="text-slate-600 dark:text-slate-300">
+                      {tf.labelMeterSerialPrefix}{' '}
+                      <span className="font-mono">{wo.inspectionReport.meterSerialScanned}</span> ·{' '}
+                      {tf.labelReadingPrefix} {wo.inspectionReport.readingKwh} kWh ·{' '}
+                      {tf.labelVoltagePrefix}{' '}
+                      {wo.inspectionReport.testedPhaseVoltage?.r ?? 234}V /{' '}
+                      {wo.inspectionReport.testedPhaseVoltage?.y ?? 232}V /{' '}
+                      {wo.inspectionReport.testedPhaseVoltage?.b ?? 235}V
+                    </p>
+                    <p className="text-slate-500 dark:text-slate-400">
+                      {tf.labelRemarksPrefix}{' '}
+                      {localizeFieldTechnicianRemarks(
+                        wo.inspectionReport.technicianRemarks,
+                        language
+                      )}
                     </p>
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* VIEW 3: SITE INSPECTION FORM */}
+      {/* TAB 3: SITE INSPECTION FORM */}
       {activeTab === 'inspections' && (
-        <div className="max-w-2xl mx-auto p-4 sm:p-6 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-5 sm:space-y-6">
-          <div className="border-b border-slate-100 dark:border-slate-800 pb-4">
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug">
-              Field Site Inspection &amp; Feasibility Report
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Task: {selectedOrderForInspection ? selectedOrderForInspection.title : 'WO-4401 (CMP-8821 Rectification)'}
-            </p>
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+                <FileCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  {tf.headingSiteInspectionReport}
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {tf.labelTaskPrefix}{' '}
+                  {selectedWO
+                    ? `${selectedWO.id} — ${localizeWorkOrderTitle(selectedWO.title, language)}`
+                    : tf.defaultInspectionTaskFallback}
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleInspectionSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    {tf.labelScannedMeterSerial}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={meterSerial}
+                    onChange={(e) => setMeterSerial(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-sm font-mono text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    {tf.labelVerifiedMeterReading}
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={readingKwh}
+                    onChange={(e) => setReadingKwh(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-sm font-mono text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    {tf.labelOpticalSealStatus}
+                  </label>
+                  <select
+                    value={sealIntact ? 'intact' : 'broken'}
+                    onChange={(e) => setSealIntact(e.target.value === 'intact')}
+                    className="w-full px-3.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-sm text-slate-900 dark:text-white"
+                  >
+                    <option value="intact">{tf.optionSealIntactVerified}</option>
+                    <option value="broken">{tf.optionSealBrokenSuspicious}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    {tf.labelTerminalBlockCondition}
+                  </label>
+                  <select
+                    value={terminalCondition}
+                    onChange={(e) =>
+                      setTerminalCondition(e.target.value as 'Normal' | 'Burnt' | 'Loose')
+                    }
+                    className="w-full px-3.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-sm text-slate-900 dark:text-white"
+                  >
+                    <option value="Normal">{tf.optionTerminalNormal}</option>
+                    <option value="Burnt">{tf.optionTerminalBurnt}</option>
+                    <option value="Loose">{tf.optionTerminalLooseNeutral}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {tf.labelTestedPhaseVoltages}
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <span className="text-[10px] font-bold text-rose-600 uppercase">
+                      {tf.labelRPhase}
+                    </span>
+                    <input
+                      type="number"
+                      value={voltageR}
+                      onChange={(e) => setVoltageR(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-mono text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-amber-500 uppercase">
+                      {tf.labelYPhase}
+                    </span>
+                    <input
+                      type="number"
+                      value={voltageY}
+                      onChange={(e) => setVoltageY(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-mono text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-blue-600 uppercase">
+                      {tf.labelBPhase}
+                    </span>
+                    <input
+                      type="number"
+                      value={voltageB}
+                      onChange={(e) => setVoltageB(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-mono text-slate-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Camera className="w-4 h-4 text-blue-600" />
+                  <div>
+                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                      {tf.labelSitePhotoEvidence}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {tf.labelGpsGeotag} {gpsLocation}
+                    </p>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 text-[11px] font-semibold">
+                  {tf.badgeGeotagVerified}
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  {tf.labelTechnicianObservations}
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={technicianRemarks}
+                  onChange={(e) => setTechnicianRemarks(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-sm text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-sm shadow-xs transition-all cursor-pointer"
+              >
+                {tf.btnSignTransmitReport}
+              </button>
+            </form>
           </div>
-
-          <form onSubmit={handleInspectionSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                  Scanned Meter Serial / Barcode *
-                </label>
-                <input
-                  type="text"
-                  value={meterSerialScanned}
-                  onChange={e => setMeterSerialScanned(e.target.value)}
-                  required
-                  className="w-full min-h-11 sm:min-h-9 px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                  Verified Meter Reading (kWh) *
-                </label>
-                <input
-                  type="number"
-                  value={readingKwh}
-                  onChange={e => setReadingKwh(Number(e.target.value))}
-                  required
-                  className="w-full min-h-11 sm:min-h-9 px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                  Holographic Optical Seal Status
-                </label>
-                <select
-                  value={sealIntact ? 'intact' : 'broken'}
-                  onChange={e => setSealIntact(e.target.value === 'intact')}
-                  className="w-full min-h-11 sm:min-h-9 px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                >
-                  <option value="intact">Seal Intact &amp; Verified</option>
-                  <option value="broken">Seal Broken / Suspicious</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                  Terminal Block Condition
-                </label>
-                <select
-                  value={terminalCondition}
-                  onChange={e => setTerminalCondition(e.target.value as any)}
-                  className="w-full min-h-11 sm:min-h-9 px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                >
-                  <option value="Normal">Normal Condition</option>
-                  <option value="Burnt">Burnt / Flashover Marks</option>
-                  <option value="Loose">Loose Neutral Connection</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Voltage Test Inputs */}
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
-                Tested Phase Voltages (Volts AC)
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <span className="text-[10px] text-slate-400 block mb-0.5">R-Phase</span>
-                  <input
-                    type="number"
-                    value={testedVoltageR}
-                    onChange={e => setTestedVoltageR(Number(e.target.value))}
-                    className="w-full min-h-10 sm:min-h-9 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block mb-0.5">Y-Phase</span>
-                  <input
-                    type="number"
-                    value={testedVoltageY}
-                    onChange={e => setTestedVoltageY(Number(e.target.value))}
-                    className="w-full min-h-10 sm:min-h-9 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block mb-0.5">B-Phase</span>
-                  <input
-                    type="number"
-                    value={testedVoltageB}
-                    onChange={e => setTestedVoltageB(Number(e.target.value))}
-                    className="w-full min-h-10 sm:min-h-9 px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Photo Attachment Preview */}
-            <div className="p-3.5 sm:p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2">
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                Site Photo Evidence (Mobile Camera Preview)
-              </span>
-              <div className="flex flex-col min-[380px]:flex-row min-[380px]:items-center gap-3 min-w-0">
-                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 shrink-0">
-                  <Camera className="w-6 h-6" />
-                </div>
-                <div className="text-xs min-w-0">
-                  <div className="font-semibold text-slate-800 dark:text-slate-200 break-all sm:break-normal">
-                    meter_pole_dp14_inspection.jpg
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
-                    GPS Geotag: 23.6028° N, 72.3984° E · 1.4 MB
-                  </div>
-                  <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
-                    <CheckCircle2 className="w-3 h-3 shrink-0" /> Geotag Timestamp Verified
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                Technician Observations &amp; Rectification Remarks *
-              </label>
-              <textarea
-                value={technicianRemarks}
-                onChange={e => setTechnicianRemarks(e.target.value)}
-                rows={2}
-                required
-                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full min-h-11 py-2.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shadow-xs cursor-pointer"
-            >
-              Sign &amp; Transmit Inspection Report
-            </button>
-          </form>
         </div>
       )}
 
-      {/* VIEW 4: OFFLINE QUEUE */}
+      {/* TAB 4: OFFLINE QUEUE */}
       {activeTab === 'offline' && (
-        <div className="max-w-3xl mx-auto p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white leading-snug">
-                Simulated Offline Queue Status
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                {tf.headingOfflineQueue}
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Local field buffer for areas with intermittent mobile network coverage
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {tf.subtitleOfflineQueue}
               </p>
             </div>
             <button
-              onClick={() => showToast('Simulated flush: All 2 queued inspections transmitted', 'success')}
-              className="w-full sm:w-auto min-h-11 sm:min-h-[38px] px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shrink-0 cursor-pointer"
+              onClick={() => {
+                setOfflineSimulated(false);
+                showToast('Simulated flush: All 2 queued inspections transmitted', 'success');
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
             >
-              Simulate Sync Now
+              <RefreshCw className="w-3.5 h-3.5" /> {tf.btnSimulateSyncNow}
             </button>
           </div>
 
-          <div className="space-y-2.5 text-xs">
-            <div className="p-3.5 rounded-lg border border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="divide-y divide-slate-200 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg">
+            <div className="p-4 flex items-center justify-between">
               <div>
-                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">WO-4398 Smart Meter Seal</span>
-                <p className="text-slate-500 text-[11px] mt-0.5">Sector 4/B · Polycarbonate seal #UGVCL-882191 affixed</p>
+                <p className="text-xs font-semibold text-slate-900 dark:text-white">
+                  {tf.offlineItem1Title}
+                </p>
+                <p className="text-[11px] text-slate-500">{tf.offlineItem1Desc}</p>
               </div>
-              <span className="self-start sm:self-auto text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-600 shrink-0">Synced to Server</span>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+                {tf.badgeSyncedToServer}
+              </span>
             </div>
-
-            <div className="p-3.5 rounded-lg border border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="p-4 flex items-center justify-between">
               <div>
-                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">WO-4401 Voltage Rectification</span>
-                <p className="text-slate-500 text-[11px] mt-0.5">14 Anand Nagar · Neutral crimped, 232V tested</p>
+                <p className="text-xs font-semibold text-slate-900 dark:text-white">
+                  {tf.offlineItem2Title}
+                </p>
+                <p className="text-[11px] text-slate-500">{tf.offlineItem2Desc}</p>
               </div>
-              <span className="self-start sm:self-auto text-[10px] font-semibold px-2 py-0.5 rounded bg-teal-50 dark:bg-teal-950 text-teal-600 shrink-0">Pending Background Push</span>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
+                {offlineSimulated ? tf.badgePendingBackgroundPush : tf.badgeSyncedToServer}
+              </span>
             </div>
           </div>
         </div>
       )}
 
-      {/* VIEW 5: FEEDER PATROL & LINE SURVEILLANCE */}
+      {/* TAB 5: FEEDER PATROL & LINE SURVEILLANCE */}
       {activeTab === 'maintenance' && (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                11kV Feeder Patrol &amp; Line Corridor Surveillance
-              </h2>
-              <p className="text-xs text-slate-500">
-                Distribution feeder loading, transformer clusters, and active field tasks across North Gujarat subdivisions
-              </p>
-            </div>
-            <button
-              onClick={() => setActiveTab('workorders')}
-              className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 self-start sm:self-auto"
-            >
-              View Assigned Work Orders →
-            </button>
-          </div>
-
-          {/* Feeder Patrol Summary Strip */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Monitored 11kV Feeders
-              </span>
-              <div className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
-                {FEEDER_METRICS.length}
+          <div className="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+                  <Zap className="w-5 h-5" aria-hidden="true" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                    {tf.headingFeederPatrol}
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {tf.subtitleFeederPatrol}
+                  </p>
+                </div>
               </div>
-              <span className="text-xs text-slate-500">Mehsana &amp; Gandhinagar Circles</span>
+              <button
+                onClick={() => setActiveTab('workorders')}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer self-start sm:self-auto"
+              >
+                {tf.btnViewAssignedWorkOrdersArrow}
+              </button>
             </div>
 
-            <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Feeders Requiring Attention
-              </span>
-              <div className="text-2xl font-extrabold text-amber-600 tabular-nums">
-                {FEEDER_METRICS.filter(f => f.status !== 'Optimal').length}
+            {/* Feeder Health Summary Strip */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-5">
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/60">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {tf.summaryMonitoredFeeders}
+                </span>
+                <p className="text-xl font-bold text-slate-900 dark:text-white mt-1">
+                  {feeders.length}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">{tf.summaryMonitoredFeedersSub}</p>
               </div>
-              <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
-                1 Critical Overload · 1 High Load Warning
-              </span>
-            </div>
-
-            <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Open Field Work Orders
-              </span>
-              <div className="text-2xl font-extrabold text-teal-600 tabular-nums">
-                {pendingOrders.length}
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/60">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {tf.summaryFeedersAttention}
+                </span>
+                <p className="text-xl font-bold text-rose-600 dark:text-rose-400 mt-1">
+                  {feeders.filter((f: FeederHealth) => f.status !== 'Optimal').length}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">{tf.summaryFeedersAttentionSub}</p>
               </div>
-              <span className="text-xs text-slate-500">Scheduled along 11kV corridors</span>
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/60">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  {tf.summaryOpenFieldWorkOrders}
+                </span>
+                <p className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-1">
+                  {pendingWorkOrders.length}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {tf.summaryOpenFieldWorkOrdersSub}
+                </p>
+              </div>
             </div>
-          </div>
 
-          {FEEDER_METRICS.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {FEEDER_METRICS.map(fdr => {
-                const feederOrders = workOrders.filter(wo => wo.feederName === fdr.name);
-                return (
-                  <div
-                    key={fdr.id}
-                    className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <span className="font-mono text-xs font-bold text-teal-600 dark:text-teal-400">
-                          {fdr.id}
-                        </span>
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
-                          {fdr.name}
-                        </h3>
-                        <span className="text-xs text-slate-500">{fdr.subdivision}</span>
-                      </div>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                          fdr.status === 'Critical Overload'
-                            ? 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
-                            : fdr.status === 'Warning'
-                            ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
-                            : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                        }`}
-                      >
-                        {fdr.status}
-                      </span>
-                    </div>
+            {/* Feeder Cards */}
+            {feeders.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {feeders.map((fdr: FeederHealth) => {
+                  const loadPercent = Math.min(
+                    100,
+                    Math.round((fdr.peakLoadAmps / fdr.ratedCapacityAmps) * 100)
+                  );
+                  const relatedWO = workOrders.find(
+                    (w) =>
+                      w.feederName.toLowerCase().includes(fdr.name.split(' ')[1]?.toLowerCase() || '') &&
+                      w.status !== 'Completed'
+                  );
 
-                    {/* Utilization Bar */}
-                    <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-slate-500">Conductor Load Utilization</span>
-                        <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
-                          {fdr.utilizationPct}%
-                        </span>
-                      </div>
-                      <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            fdr.utilizationPct > 100
-                              ? 'bg-rose-500'
-                              : fdr.utilizationPct > 90
-                              ? 'bg-amber-500'
-                              : 'bg-teal-500'
-                          }`}
-                          style={{ width: `${Math.min(fdr.utilizationPct, 100)}%` }}
-                        />
-                      </div>
-                    </div>
+                  return (
+                    <div
+                      key={fdr.id}
+                      className="rounded-xl border border-slate-200 dark:border-slate-800 p-4 flex flex-col justify-between gap-4 hover:border-blue-500/40 transition-colors"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
+                                {fdr.id}
+                              </span>
+                              <span className="text-xs text-slate-400">•</span>
+                              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                                {localizeSubdivision(fdr.subdivision, language)}
+                              </span>
+                            </div>
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
+                              {localizeFeederName(fdr.name, language)}
+                            </h3>
+                          </div>
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold shrink-0 ${
+                              fdr.status === 'Critical Overload'
+                                ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
+                                : fdr.status === 'Warning'
+                                ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                                : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                            }`}
+                          >
+                            {localizeFeederStatus(fdr.status, language)}
+                          </span>
+                        </div>
 
-                    <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-slate-100 dark:border-slate-800">
-                      <div>
-                        <span className="text-slate-400 block text-[10px]">Peak Load</span>
-                        <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
-                          {fdr.peakLoadAmps}A / {fdr.ratedCapacityAmps}A
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px]">Transformers</span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">
-                          {fdr.transformersCount} DTs
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px]">Consumers</span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">
-                          {fdr.consumersConnected.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
+                        {/* Load Bar */}
+                        <div>
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-slate-500 dark:text-slate-400">
+                              {tf.labelConductorLoadUtilization}
+                            </span>
+                            <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                              {fdr.peakLoadAmps}A / {fdr.ratedCapacityAmps}A ({loadPercent}%)
+                            </span>
+                          </div>
+                          <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${
+                                loadPercent >= 95
+                                  ? 'bg-rose-600'
+                                  : loadPercent >= 80
+                                  ? 'bg-amber-500'
+                                  : 'bg-emerald-500'
+                              }`}
+                              style={{ width: `${loadPercent}%` }}
+                            />
+                          </div>
+                        </div>
 
-                    {/* Associated Work Orders on this Feeder */}
-                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                      <div className="text-xs text-slate-500">
-                        {feederOrders.length > 0 ? (
-                          <span>
-                            Linked Work Order:{' '}
-                            <strong className="font-mono text-slate-800 dark:text-slate-200">
-                              {feederOrders.map(o => o.id).join(', ')}
-                            </strong>{' '}
-                            ({feederOrders[0].status})
+                        <div className="grid grid-cols-3 gap-2 pt-1 text-xs">
+                          <div className="bg-slate-50 dark:bg-slate-800/40 rounded-lg p-2">
+                            <span className="text-[10px] text-slate-400 block">
+                              {tf.labelPeakLoad}
+                            </span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                              {((fdr.peakLoadAmps * fdr.voltageKv * 1.732) / 1000).toFixed(1)} MW
+                            </span>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-800/40 rounded-lg p-2">
+                            <span className="text-[10px] text-slate-400 block">
+                              {tf.labelTransformers}
+                            </span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                              {fdr.transformersCount} {tf.unitDts}
+                            </span>
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-800/40 rounded-lg p-2">
+                            <span className="text-[10px] text-slate-400 block">
+                              {tf.labelConsumers}
+                            </span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                              {fdr.consumersConnected.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
+                        {relatedWO ? (
+                          <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium truncate">
+                            {tf.labelLinkedWorkOrder} {relatedWO.id} (
+                            {localizePriorityLevel(relatedWO.priority, language)})
                           </span>
                         ) : (
-                          <span>No open fault callouts on this feeder</span>
+                          <span className="text-[11px] text-slate-400">
+                            {tf.noOpenFaultCalloutsOnFeeder}
+                          </span>
+                        )}
+
+                        {relatedWO ? (
+                          <button
+                            onClick={() => {
+                              setSelectedWOId(relatedWO.id);
+                              setActiveTab('inspections');
+                            }}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shrink-0 cursor-pointer"
+                          >
+                            {tf.btnInspectFeederPrefix} {relatedWO.id}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() =>
+                              showToast(
+                                `Logged routine corridor patrol check for ${fdr.id} (${fdr.name})`,
+                                'success'
+                              )
+                            }
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold shrink-0 cursor-pointer"
+                          >
+                            {tf.btnLogPatrolCheck}
+                          </button>
                         )}
                       </div>
-
-                      {feederOrders.length > 0 && feederOrders[0].status !== 'Completed' ? (
-                        <button
-                          onClick={() => handleStartInspection(feederOrders[0])}
-                          className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold shrink-0"
-                        >
-                          Inspect {feederOrders[0].id}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() =>
-                            showToast(
-                              `Logged routine corridor patrol check for ${fdr.name} (UI simulation)`,
-                              'info'
-                            )
-                          }
-                          className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 shrink-0"
-                        >
-                          Log Patrol Check
-                        </button>
-                      )}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="p-8 text-center rounded-xl bg-white dark:bg-[#101C35] border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
-              <HardHat className="w-8 h-8 text-slate-400 mx-auto" />
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                No Feeder Patrol Records Available
-              </h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                No 11kV feeder telemetry records are currently loaded in the field console.
-              </p>
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-10 space-y-2">
+                <Sliders className="w-8 h-8 text-slate-400 mx-auto" />
+                <h3 className="text-sm font-bold text-slate-800 dark:text-white">
+                  {tf.emptyFeederRecordsTitle}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                  {tf.emptyFeederRecordsDesc}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* VIEW 6: COMPLETED JOBS & INSPECTION HISTORY */}
+      {/* TAB 6: COMPLETED JOBS & INSPECTION HISTORY */}
       {activeTab === 'history' && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                Completed Jobs &amp; Inspection History
+              <h2 className="font-semibold text-slate-900 dark:text-white text-base">
+                {tf.headingCompletedJobs}
               </h2>
-              <p className="text-xs text-slate-500">
-                Closed field work orders and submitted technical inspection reports
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {tf.subtitleCompletedJobs}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                {completedOrders.length} Completed {completedOrders.length === 1 ? 'Job' : 'Jobs'}
+              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                {completedWorkOrders.length} {tf.badgeCompletedJobsCountSuffix}
               </span>
               <button
                 onClick={() => setActiveTab('workorders')}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
               >
-                All Work Orders
+                {tf.btnAllWorkOrders}
               </button>
             </div>
           </div>
 
-          {completedOrders.length > 0 ? (
-            <div className="space-y-4">
-              {completedOrders.map(wo => (
+          {completedWorkOrders.length > 0 ? (
+            <div className="divide-y divide-slate-200 dark:divide-slate-800">
+              {completedWorkOrders.map((wo) => (
                 <div
                   key={wo.id}
-                  className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4"
+                  onClick={() => openDetailDrawer({ type: 'workorder', id: wo.id })}
+                  className="p-5 space-y-3 hover:bg-slate-50/40 dark:hover:bg-slate-800/20 transition-colors cursor-pointer"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-xs font-bold text-teal-600 dark:text-teal-400">
+                        <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
                           {wo.id}
                         </span>
-                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                          {wo.title}
-                        </h3>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                          {wo.type}
+                        <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                          {localizeWorkOrderType(wo.type, language)}
                         </span>
+                        {(() => {
+                          const woRefId = wo.complaintId || wo.applicationId;
+                          return woRefId ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (woRefId.startsWith('CMP-')) {
+                                  openDetailDrawer({ type: 'complaint', id: woRefId });
+                                } else if (woRefId.startsWith('APP-')) {
+                                  openDetailDrawer({ type: 'application', id: woRefId });
+                                } else {
+                                  openDetailDrawer({ type: 'workorder', id: wo.id });
+                                }
+                              }}
+                              className="text-xs font-mono text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                            >
+                              {tf.labelRefPrefix} {woRefId}
+                            </button>
+                          ) : null;
+                        })()}
                       </div>
-                      <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-white mt-1">
+                        {localizeWorkOrderTitle(wo.title, language)}
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 dark:text-slate-400 mt-1">
                         <span className="flex items-center gap-1">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{wo.location}</span>
+                          <MapPin className="w-3.5 h-3.5 text-slate-400" />{' '}
+                          {localizeConsumerAddress(wo.location, language)}
                         </span>
-                        <span>·</span>
-                        <span>Feeder: {wo.feederName}</span>
-                        <span>·</span>
-                        <span>Scheduled: {wo.scheduledDate}</span>
+                        <span className="flex items-center gap-1">
+                          <Zap className="w-3.5 h-3.5 text-amber-500" /> {tf.labelFeederPrefix}{' '}
+                          {localizeFeederName(wo.feederName, language)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />{' '}
+                          {tf.labelScheduledPrefix}{' '}
+                          {localizeWorkOrderScheduledDate(wo.scheduledDate, language)}
+                        </span>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Completed</span>
-                      </span>
+                    <div
+                      className="flex items-center gap-2 self-start sm:self-center"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <button
-                        onClick={() => openCaseDrawer('workorder', wo.id)}
-                        className="px-3 py-1.5 text-xs font-semibold rounded border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                        type="button"
+                        onClick={() => openDetailDrawer({ type: 'workorder', id: wo.id })}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 transition-colors cursor-pointer"
                       >
-                        View Case File
+                        {tf.btnViewCaseFile}
                       </button>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> {tf.badgeCompleted}
+                      </span>
                     </div>
                   </div>
 
                   {wo.inspectionReport ? (
-                    <div className="p-4 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 space-y-2.5 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-emerald-950 dark:text-emerald-200">
-                          Recorded Site Inspection Report
+                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200/80 dark:border-slate-700/60 text-xs space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4" /> {tf.labelRecordedInspectionReport}
                         </span>
-                        <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
-                          Engineer: {wo.assignedTo}
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                          {wo.actionHistory?.[wo.actionHistory.length - 1]?.timestamp || '15-Oct 14:30'} · {tf.labelEngineerPrefix}{' '}
+                          {localizeAssignedActorName(wo.assignedTo, language)}
                         </span>
                       </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                        <div>
-                          <span className="text-[10px] uppercase tracking-wider text-slate-400 block">
-                            Scanned Meter Serial
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                        <div className="bg-white dark:bg-slate-900/60 p-2 rounded-lg border border-slate-200/60 dark:border-slate-800">
+                          <span className="text-[10px] text-slate-400 block">
+                            {tf.labelScannedMeterSerialShort}
                           </span>
                           <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
                             {wo.inspectionReport.meterSerialScanned}
                           </span>
                         </div>
-                        <div>
-                          <span className="text-[10px] uppercase tracking-wider text-slate-400 block">
-                            Verified Reading
+                        <div className="bg-white dark:bg-slate-900/60 p-2 rounded-lg border border-slate-200/60 dark:border-slate-800">
+                          <span className="text-[10px] text-slate-400 block">
+                            {tf.labelVerifiedReadingShort}
                           </span>
                           <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
                             {wo.inspectionReport.readingKwh} kWh
                           </span>
                         </div>
-                        <div>
-                          <span className="text-[10px] uppercase tracking-wider text-slate-400 block">
-                            Seal &amp; Terminal
+                        <div className="bg-white dark:bg-slate-900/60 p-2 rounded-lg border border-slate-200/60 dark:border-slate-800">
+                          <span className="text-[10px] text-slate-400 block">
+                            {tf.labelSealAndTerminal}
                           </span>
                           <span className="font-semibold text-slate-800 dark:text-slate-200">
-                            {wo.inspectionReport.sealIntact ? 'Seal Intact' : 'Seal Broken'} ·{' '}
-                            {wo.inspectionReport.terminalCondition}
+                            {localizeSealStatus(wo.inspectionReport.sealIntact, language)} ·{' '}
+                            {localizeTerminalCondition(
+                              wo.inspectionReport.terminalCondition,
+                              language
+                            )}
                           </span>
                         </div>
-                        <div>
-                          <span className="text-[10px] uppercase tracking-wider text-slate-400 block">
-                            Phase Voltages (R/Y/B)
+                        <div className="bg-white dark:bg-slate-900/60 p-2 rounded-lg border border-slate-200/60 dark:border-slate-800">
+                          <span className="text-[10px] text-slate-400 block">
+                            {tf.labelPhaseVoltagesShort}
                           </span>
                           <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
-                            {wo.inspectionReport.testedPhaseVoltage.r}V /{' '}
-                            {wo.inspectionReport.testedPhaseVoltage.y}V /{' '}
-                            {wo.inspectionReport.testedPhaseVoltage.b}V
+                            {wo.inspectionReport.testedPhaseVoltage?.r ?? 234}V /{' '}
+                            {wo.inspectionReport.testedPhaseVoltage?.y ?? 232}V /{' '}
+                            {wo.inspectionReport.testedPhaseVoltage?.b ?? 235}V
                           </span>
                         </div>
                       </div>
-
-                      <p className="text-xs text-slate-600 dark:text-slate-300 pt-2 border-t border-emerald-200/60 dark:border-emerald-900/40 italic">
-                        Remarks: &quot;{wo.inspectionReport.technicianRemarks}&quot;
+                      <p className="text-slate-600 dark:text-slate-300 pt-1">
+                        <strong>{tf.labelRemarksPrefix}</strong>{' '}
+                        {localizeFieldTechnicianRemarks(
+                          wo.inspectionReport.technicianRemarks,
+                          language
+                        )}
                       </p>
                     </div>
                   ) : (
-                    <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 text-xs text-slate-500">
-                      Work order marked completed ({wo.title}).
+                    <div className="bg-slate-50 dark:bg-slate-800/40 rounded-lg p-3 text-xs text-slate-500 dark:text-slate-400">
+                      {tf.fallbackWorkOrderCompletedPrefix}
+                      {localizeWorkOrderTitle(wo.title, language)}
+                      {tf.fallbackWorkOrderCompletedSuffix}
                     </div>
                   )}
                 </div>
               ))}
             </div>
           ) : (
-            <div className="p-8 text-center rounded-xl bg-white dark:bg-[#101C35] border border-dashed border-slate-200 dark:border-slate-800 space-y-3">
-              <History className="w-8 h-8 text-slate-400 mx-auto" />
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                No Completed Work Orders Yet
+            <div className="p-10 text-center space-y-3">
+              <CheckCircle2 className="w-8 h-8 text-slate-400 mx-auto" />
+              <h3 className="text-sm font-bold text-slate-800 dark:text-white">
+                {tf.emptyCompletedJobsTitle}
               </h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Completed field inspections and fault rectifications will appear here once submitted.
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                {tf.emptyCompletedJobsDesc}
               </p>
               <button
                 onClick={() => setActiveTab('workorders')}
-                className="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
               >
-                View Assigned Work Orders
+                {tf.btnViewAssignedWorkOrdersPlain}
               </button>
             </div>
           )}

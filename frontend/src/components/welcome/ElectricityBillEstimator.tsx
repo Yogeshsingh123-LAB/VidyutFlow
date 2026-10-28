@@ -25,9 +25,20 @@ import {
   calculateDetailedUgvclBill
 } from '../../data/ugvclTariffSchedule';
 import { useApp } from '../../context/AppContext';
+import { useLanguage } from '../../i18n/LanguageContext';
+import { en } from '../../i18n/translations/en';
 
 export const ElectricityBillEstimator: React.FC = () => {
   const { showToast } = useApp();
+  const { dict: currentDict } = useLanguage();
+  const dict = {
+    ...en,
+    ...(currentDict || {}),
+    estimator: {
+      ...en.estimator,
+      ...(currentDict?.estimator || {})
+    }
+  };
 
   // State
   const [calcUnits, setCalcUnits] = useState<number>(220);
@@ -53,11 +64,11 @@ export const ElectricityBillEstimator: React.FC = () => {
 
   // Quick demonstration presets
   const presets = [
-    { label: 'Lifeline (60 kWh)', units: 60, cat: 'RGP_URBAN' as TariffCategoryId },
-    { label: 'Small Family (180 kWh)', units: 180, cat: 'RGP_URBAN' as TariffCategoryId },
-    { label: 'Standard Home (320 kWh)', units: 320, cat: 'RGP_URBAN' as TariffCategoryId },
-    { label: 'High Domestic / AC (620 kWh)', units: 620, cat: 'RGP_URBAN' as TariffCategoryId },
-    { label: 'Commercial Shop (350 kWh)', units: 350, cat: 'NRGP' as TariffCategoryId },
+    { label: dict.estimator.presetLifeline, units: 60, cat: 'RGP_URBAN' as TariffCategoryId },
+    { label: dict.estimator.presetSmallFamily, units: 180, cat: 'RGP_URBAN' as TariffCategoryId },
+    { label: dict.estimator.presetStandardHome, units: 320, cat: 'RGP_URBAN' as TariffCategoryId },
+    { label: dict.estimator.presetHighDomestic, units: 620, cat: 'RGP_URBAN' as TariffCategoryId },
+    { label: dict.estimator.presetCommercial, units: 350, cat: 'NRGP' as TariffCategoryId },
   ];
 
   const handlePrint = () => {
@@ -105,10 +116,10 @@ export const ElectricityBillEstimator: React.FC = () => {
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
                 <span className="text-[11px] font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-[#c2185b] text-white font-mono shadow-2xs">
-                  UGVCL Tariff Schedule
+                  {dict.estimator.headerTag}
                 </span>
                 <span className="text-xs font-mono text-slate-300">
-                  GERC Order Case No. 2289/2024
+                  {dict.estimator.headerGerc}
                 </span>
                 <span className="text-[11px] text-slate-400 font-mono hidden xl:inline">
                   · CIN: U40102GJ2003SGC042906
@@ -117,7 +128,7 @@ export const ElectricityBillEstimator: React.FC = () => {
 
               <div className="flex items-baseline gap-2 flex-wrap">
                 <h3 className="text-base sm:text-xl font-extrabold text-white tracking-tight">
-                  Electricity Bill Estimator & Tariff Analyzer
+                  {dict.estimator.headerTitle}
                 </h3>
                 <span className="text-xs text-slate-300 font-gujarati hidden sm:inline">
                   વીજળી બિલ ગણતરી પત્રક
@@ -125,7 +136,7 @@ export const ElectricityBillEstimator: React.FC = () => {
               </div>
 
               <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">
-                Educational tariff awareness tool based on prevailing Gujarat Electricity Regulatory Commission directives
+                {dict.estimator.headerSubtitle}
               </p>
             </div>
           </div>
@@ -140,7 +151,7 @@ export const ElectricityBillEstimator: React.FC = () => {
                 className="flex-1 sm:flex-initial px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 active:bg-white/30 text-xs font-semibold text-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-white/10"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset</span>
+                <span>{dict.common.reset}</span>
               </button>
 
               <button
@@ -150,7 +161,7 @@ export const ElectricityBillEstimator: React.FC = () => {
                 className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/20"
               >
                 <Printer className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Print Estimate</span>
+                <span>{dict.services.printEstimate}</span>
               </button>
             </div>
 
@@ -177,10 +188,10 @@ export const ElectricityBillEstimator: React.FC = () => {
             <div className="flex items-center justify-between">
               <label className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-blue-600 dark:text-cyan-400" />
-                <span>1. Select Tariff Category</span>
+                <span>{dict.estimator.step1Title}</span>
               </label>
               <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                5 Discom Categories
+                {dict.estimator.discomCategories}
               </span>
             </div>
 
@@ -191,23 +202,23 @@ export const ElectricityBillEstimator: React.FC = () => {
                   {
                     id: 'RGP_URBAN' as TariffCategoryId,
                     code: 'RGPU',
-                    primaryName: 'Residential Urban',
+                    primaryName: dict.estimator.catRgpUrban,
                     gujaratiName: 'રહેણાંક શહેરી',
                     icon: Home,
-                    badge: 'Standard'
+                    badge: dict.estimator.badgeStandard
                   },
                   {
                     id: 'RGP_RURAL' as TariffCategoryId,
                     code: 'RGP-R',
-                    primaryName: 'Residential Rural',
+                    primaryName: dict.estimator.catRgpRural,
                     gujaratiName: 'રહેણાંક ગ્રામ્ય',
                     icon: Home,
-                    badge: 'Subsidized'
+                    badge: dict.estimator.badgeSubsidized
                   },
                   {
                     id: 'BPL' as TariffCategoryId,
                     code: 'BPL',
-                    primaryName: 'BPL Lifeline',
+                    primaryName: dict.estimator.catBpl,
                     gujaratiName: 'ગરીબી રેખા હેઠળ',
                     icon: ShieldCheck,
                     badge: '₹1.50/u'
@@ -215,15 +226,15 @@ export const ElectricityBillEstimator: React.FC = () => {
                   {
                     id: 'NRGP' as TariffCategoryId,
                     code: 'NRGP',
-                    primaryName: 'Commercial',
+                    primaryName: dict.estimator.catNrgp,
                     gujaratiName: 'વાણિજ્યિક હેતુ',
                     icon: Building2,
-                    badge: 'Shops & Offices'
+                    badge: dict.estimator.badgeShops
                   },
                   {
                     id: 'GLP' as TariffCategoryId,
                     code: 'GLP',
-                    primaryName: 'Institutional',
+                    primaryName: dict.estimator.catGlp,
                     gujaratiName: 'સામાજિક સંસ્થાઓ',
                     icon: Building,
                     badge: '₹4.05 Flat'
@@ -297,7 +308,7 @@ export const ElectricityBillEstimator: React.FC = () => {
           {/* 2. SUPPLY PARAMETERS (CYCLE, PHASE, CONTRACTED LOAD) */}
           <div className="space-y-2">
             <label className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 block">
-              2. Supply Connection Parameters
+              {dict.estimator.step2Title}
             </label>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
@@ -306,10 +317,10 @@ export const ElectricityBillEstimator: React.FC = () => {
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Billing Cycle
+                    {dict.estimator.billingCycleLabel}
                   </span>
                   <span className="text-[11px] text-slate-400 font-mono">
-                    {billingCycle === 'bimonthly' ? '60 Days' : '30 Days'}
+                    {billingCycle === 'bimonthly' ? dict.estimator.cycle60Days : dict.estimator.cycle30Days}
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-1 p-1 bg-slate-200/70 dark:bg-slate-800/80 rounded-xl h-11 items-center">
@@ -322,7 +333,7 @@ export const ElectricityBillEstimator: React.FC = () => {
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
-                    Bi-Monthly
+                    {dict.services.bimonthly.split(' ')[0]}
                   </button>
                   <button
                     type="button"
@@ -333,7 +344,7 @@ export const ElectricityBillEstimator: React.FC = () => {
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
-                    Monthly
+                    {dict.services.monthly.split(' ')[0]}
                   </button>
                 </div>
               </div>
@@ -342,7 +353,7 @@ export const ElectricityBillEstimator: React.FC = () => {
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Supply Voltage
+                    {dict.estimator.supplyVoltage}
                   </span>
                   <span className="text-[11px] text-slate-400 font-mono">
                     {phase === '1-Phase' ? '230V' : '415V'}
@@ -378,10 +389,10 @@ export const ElectricityBillEstimator: React.FC = () => {
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
                   <label htmlFor={loadInputId} className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Contracted Load
+                    {dict.estimator.contractedLoad}
                   </label>
                   <span className="text-[11px] text-slate-400 font-mono">
-                    Sanctioned
+                    {dict.estimator.sanctioned}
                   </span>
                 </div>
                 <div className="flex items-center h-11 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl p-1 shadow-2xs">
@@ -427,10 +438,10 @@ export const ElectricityBillEstimator: React.FC = () => {
                   htmlFor={unitsInputId}
                   className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 block"
                 >
-                  3. Electricity Consumption ({billingCycle === 'bimonthly' ? 'Bi-Monthly / 60 Days' : 'Monthly / 30 Days'})
+                  {dict.estimator.step3Title} ({billingCycle === 'bimonthly' ? dict.estimator.billing60Day : dict.estimator.billing30Day})
                 </label>
                 <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Enter or slide to your expected energy usage during the billing cycle
+                  {dict.estimator.consumptionDesc}
                 </span>
               </div>
 
@@ -446,7 +457,7 @@ export const ElectricityBillEstimator: React.FC = () => {
                   className="w-24 text-right font-mono text-xl sm:text-2xl font-black text-blue-700 dark:text-cyan-400 bg-transparent focus:outline-none tabular-nums"
                 />
                 <span className="font-mono text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
-                  kWh / Units
+                  {dict.estimator.kwhUnits}
                 </span>
               </div>
             </div>
@@ -465,7 +476,7 @@ export const ElectricityBillEstimator: React.FC = () => {
               />
 
               <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 font-mono">
-                <span>0 units</span>
+                <span>{dict.estimator.zeroUnits}</span>
                 <span>{billingCycle === 'bimonthly' ? '300 units' : '150 units'}</span>
                 <span>{billingCycle === 'bimonthly' ? '600 units' : '300 units'}</span>
                 <span>{billingCycle === 'bimonthly' ? '1200+ units' : '600+ units'}</span>
@@ -475,7 +486,7 @@ export const ElectricityBillEstimator: React.FC = () => {
             {/* Quick Demonstration Presets */}
             <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800/80">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 block mb-2">
-                Quick Scenario Presets:
+                {dict.estimator.presetsTitle}
               </span>
               <div className="flex flex-wrap gap-2">
                 {presets.map((p, idx) => (
@@ -511,7 +522,7 @@ export const ElectricityBillEstimator: React.FC = () => {
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
-                Slab Rate Breakdown
+                {dict.estimator.tabSlabs}
               </button>
               <button
                 type="button"
@@ -522,7 +533,7 @@ export const ElectricityBillEstimator: React.FC = () => {
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
-                FPPPA Formula
+                {dict.estimator.tabFpppa}
               </button>
               <button
                 type="button"
@@ -533,7 +544,7 @@ export const ElectricityBillEstimator: React.FC = () => {
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
-                Solar Rooftop Impact
+                {dict.estimator.tabSolar}
               </button>
               <button
                 type="button"
@@ -544,7 +555,7 @@ export const ElectricityBillEstimator: React.FC = () => {
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
-                Statutory Notes
+                {dict.estimator.tabNotes}
               </button>
             </div>
 
@@ -552,10 +563,10 @@ export const ElectricityBillEstimator: React.FC = () => {
             {activeTab === 'slabs' && (
               <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-xs sm:text-sm space-y-3">
                 <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-slate-800 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  <span className="w-2/5">Slab Tier ({billingCycle === 'bimonthly' ? '60d' : '30d'})</span>
-                  <span className="w-1/5 text-center">GERC Rate</span>
-                  <span className="w-1/5 text-center">Active Units</span>
-                  <span className="w-1/5 text-right">Subtotal</span>
+                  <span className="w-2/5">{dict.estimator.colSlabTier} ({billingCycle === 'bimonthly' ? '60d' : '30d'})</span>
+                  <span className="w-1/5 text-center">{dict.estimator.colGercRate}</span>
+                  <span className="w-1/5 text-center">{dict.estimator.colActiveUnits}</span>
+                  <span className="w-1/5 text-right">{dict.estimator.colSubtotal}</span>
                 </div>
 
                 <div className="space-y-1.5">
@@ -590,7 +601,7 @@ export const ElectricityBillEstimator: React.FC = () => {
 
                 {/* Table Summary Footer */}
                 <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs font-bold text-slate-700 dark:text-slate-300">
-                  <span>Total Base Energy Charge:</span>
+                  <span>{dict.estimator.totalEnergyCharge}</span>
                   <span className="font-mono text-sm text-blue-700 dark:text-cyan-400 font-bold tabular-nums">
                     ₹{calculation.totalEnergyCharges.toFixed(2)}
                   </span>
@@ -603,17 +614,17 @@ export const ElectricityBillEstimator: React.FC = () => {
               <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-xs sm:text-sm text-slate-700 dark:text-slate-300 space-y-2.5">
                 <div className="flex items-center gap-2 text-amber-900 dark:text-amber-400 font-bold">
                   <Info className="w-4 h-4 shrink-0" />
-                  <span>Fuel & Power Purchase Price Adjustment (FPPPA) Formula</span>
+                  <span>{dict.estimator.fpppaTitle}</span>
                 </div>
                 <p className="leading-relaxed">
-                  FPPPA is a statutory quarterly surcharge determined by GERC under Section 62 of the Electricity Act, 2003. It reimburses DISCOMs for actual variations in global coal/gas prices and inter-state transmission tariffs incurred by Gujarat Urja Vikas Nigam Limited (GUVNL).
+                  {dict.estimator.fpppaDesc}
                 </p>
                 <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-amber-300/60 dark:border-amber-800/40 font-mono text-xs text-amber-950 dark:text-amber-300 space-y-1">
                   <div>
-                    Applicable GERC Base Rate: <strong>₹2.45 per kWh</strong> (Relief order in force).
+                    {dict.estimator.fpppaBaseRate}
                   </div>
                   <div>
-                    Surcharge Formula: {calcUnits} units × ₹2.45 = <strong>₹{calculation.fpppaCharges.amount.toFixed(2)}</strong>
+                    {dict.estimator.fpppaFormula} {calcUnits} units × ₹2.45 = <strong>₹{calculation.fpppaCharges.amount.toFixed(2)}</strong>
                   </div>
                 </div>
               </div>
@@ -625,30 +636,30 @@ export const ElectricityBillEstimator: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-400 font-bold">
                     <Sun className="w-4 h-4 text-amber-500 shrink-0" />
-                    <span>Surya Gujarat / PM Surya Ghar Net-Metering</span>
+                    <span>{dict.estimator.solarTitle}</span>
                   </div>
                   <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-200 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 font-mono">
-                    High North Gujarat Insolation
+                    {dict.estimator.solarTag}
                   </span>
                 </div>
                 <p className="leading-relaxed">
-                  Grid-interactive solar net-metering offsets your highest consumption slab first (saving the ₹5.20/kWh tier + ₹2.45 FPPPA + Electricity Duty).
+                  {dict.estimator.solarDesc}
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 font-mono text-xs">
                   <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800/60">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-0.5 font-sans">Recommended Size</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-0.5 font-sans">{dict.estimator.solarRecommended}</span>
                     <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
                       {calculation.solarRooftopEstimate.recommendedKw} kWp
                     </span>
                   </div>
                   <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800/60">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-0.5 font-sans">Bi-Monthly Yield</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-0.5 font-sans">{dict.estimator.solarYield}</span>
                     <span className="text-sm font-bold text-slate-800 dark:text-white">
                       ~{calculation.solarRooftopEstimate.estimatedGenerationKwh} kWh
                     </span>
                   </div>
                   <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800/60 col-span-2 sm:col-span-1">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-0.5 font-sans">Estimated Savings</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-0.5 font-sans">{dict.estimator.solarSavings}</span>
                     <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
                       ₹{calculation.solarRooftopEstimate.estimatedBiMonthlySavingsInr.toLocaleString('en-IN')}
                     </span>
@@ -660,7 +671,7 @@ export const ElectricityBillEstimator: React.FC = () => {
             {/* TAB 4: STATUTORY NOTES */}
             {activeTab === 'notes' && (
               <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-xs sm:text-sm text-slate-600 dark:text-slate-300 space-y-2">
-                <span className="font-bold text-slate-900 dark:text-white block">Official Discom Regulatory Notes:</span>
+                <span className="font-bold text-slate-900 dark:text-white block">{dict.estimator.notesTitle}</span>
                 <ul className="list-disc list-inside space-y-1.5 text-xs leading-relaxed">
                   {selectedCategoryConfig.notes.map((n, i) => (
                     <li key={i}>{n}</li>
@@ -687,10 +698,10 @@ export const ElectricityBillEstimator: React.FC = () => {
           <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-[#071329] via-[#0b1b3a] to-[#071329] text-white border border-blue-900/50 shadow-xl space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-white/10">
               <span className="text-xs uppercase font-bold tracking-wider text-blue-200">
-                Net Estimated Electricity Bill
+                {dict.estimator.netEstimatedBill}
               </span>
               <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-blue-600/60 text-blue-100">
-                {billingCycle === 'bimonthly' ? '60-Day Billing' : '30-Day Billing'}
+                {billingCycle === 'bimonthly' ? dict.estimator.billing60Day : dict.estimator.billing30Day}
               </span>
             </div>
 
@@ -700,10 +711,10 @@ export const ElectricityBillEstimator: React.FC = () => {
               </div>
               <div className="text-right">
                 <span className="text-xs text-blue-200 block font-mono">
-                  Effective ₹{calculation.averageRatePerKwh}/kWh
+                  {dict.estimator.effectiveRate} ₹{calculation.averageRatePerKwh}/kWh
                 </span>
                 <span className="text-[11px] text-slate-300 block">
-                  All Statutory Charges Included
+                  {dict.estimator.statutoryIncluded}
                 </span>
               </div>
             </div>
@@ -718,10 +729,10 @@ export const ElectricityBillEstimator: React.FC = () => {
             
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                Itemized Statutory Assessment
+                {dict.estimator.itemizedTitle}
               </span>
               <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                GERC Format
+                {dict.estimator.gercFormat}
               </span>
             </div>
 
@@ -732,10 +743,10 @@ export const ElectricityBillEstimator: React.FC = () => {
               <div className="flex justify-between items-start text-slate-700 dark:text-slate-300">
                 <div>
                   <div className="font-semibold text-slate-900 dark:text-white">
-                    Energy Charges (Slab Total)
+                    {dict.estimator.energyChargesLabel}
                   </div>
                   <span className="text-xs text-slate-500 dark:text-slate-400 block">
-                    {calculation.slabBreakdown.filter((s) => s.unitsInSlab > 0).length} active consumption tier(s)
+                    {calculation.slabBreakdown.filter((s) => s.unitsInSlab > 0).length} {dict.estimator.activeTiers}
                   </span>
                 </div>
                 <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums">
@@ -747,7 +758,7 @@ export const ElectricityBillEstimator: React.FC = () => {
               <div className="flex justify-between items-start text-slate-700 dark:text-slate-300">
                 <div>
                   <div className="font-semibold text-slate-900 dark:text-white">
-                    Fixed / Demand Charges
+                    {dict.estimator.fixedChargesLabel}
                   </div>
                   <span className="text-xs text-slate-500 dark:text-slate-400 block">
                     {calculation.fixedCharges.description}
@@ -762,13 +773,13 @@ export const ElectricityBillEstimator: React.FC = () => {
               <div className="flex justify-between items-start text-slate-700 dark:text-slate-300">
                 <div>
                   <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
-                    <span>FPPPA Surcharge</span>
+                    <span>{dict.estimator.fpppaSurchargeLabel}</span>
                     <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-400">
                       (@ ₹{calculation.fpppaCharges.ratePerUnit.toFixed(2)}/u)
                     </span>
                   </div>
                   <span className="text-xs text-slate-500 dark:text-slate-400 block">
-                    Fuel & Power Purchase Adjustment ({calcUnits} units)
+                    {dict.estimator.fuelAdjustment} ({calcUnits} units)
                   </span>
                 </div>
                 <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums">
@@ -778,7 +789,7 @@ export const ElectricityBillEstimator: React.FC = () => {
 
               {/* Assessable Subtotal Separator */}
               <div className="flex justify-between items-center py-2.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200">
-                <span>Assessable Subtotal:</span>
+                <span>{dict.estimator.assessableSubtotal}</span>
                 <span className="font-mono font-bold tabular-nums">
                   ₹{calculation.subtotalBeforeDuty.toFixed(2)}
                 </span>
@@ -788,13 +799,13 @@ export const ElectricityBillEstimator: React.FC = () => {
               <div className="flex justify-between items-start text-slate-700 dark:text-slate-300">
                 <div>
                   <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
-                    <span>Govt. Electricity Duty</span>
+                    <span>{dict.estimator.electricityDutyLabel}</span>
                     <span className="text-xs font-mono font-bold text-blue-700 dark:text-cyan-400">
                       ({calculation.electricityDuty.percentage}%)
                     </span>
                   </div>
                   <span className="text-xs text-slate-500 dark:text-slate-400 block">
-                    Levied under Gujarat Electricity Duty Act, 1958
+                    {dict.estimator.dutyActRef}
                   </span>
                 </div>
                 <span className="font-mono font-bold text-slate-900 dark:text-white tabular-nums">
@@ -811,7 +822,7 @@ export const ElectricityBillEstimator: React.FC = () => {
             <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800/50 flex items-start gap-3 text-xs sm:text-sm text-amber-900 dark:text-amber-200">
               <TrendingDown className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <span className="font-bold block">Conservation Advantage:</span>
+                <span className="font-bold block">{dict.estimator.conservationAdvantage}</span>
                 <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
                   {calculation.conservationSavings.tip}
                 </p>
@@ -828,7 +839,7 @@ export const ElectricityBillEstimator: React.FC = () => {
                 className="text-xs font-bold text-blue-700 dark:text-cyan-400 hover:underline flex items-center gap-1.5 cursor-pointer"
               >
                 <FileText className="w-3.5 h-3.5" />
-                <span>GERC Discom Tariff Order (PDF)</span>
+                <span>{dict.estimator.gercOrderPdf}</span>
               </button>
 
               <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
@@ -838,9 +849,9 @@ export const ElectricityBillEstimator: React.FC = () => {
 
             <div className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed pt-2 border-t border-slate-200 dark:border-slate-800">
               <strong className="text-slate-800 dark:text-slate-200 block mb-1">
-                Educational Information Disclosure:
+                {dict.estimator.educationalDisclosureTitle}
               </strong>
-              This calculator is an educational consumer guidance utility provided by VidyutOne based on prevailing GERC tariff regulations. Official consumer bills issued by UGVCL reflect sealed meter readings, actual power factor parameters, approved subsidies, and official ledger adjustments. To view official metered ledgers or settle active bills, please log in through the secure portal.
+              {dict.estimator.educationalDisclosureText}
             </div>
           </div>
 

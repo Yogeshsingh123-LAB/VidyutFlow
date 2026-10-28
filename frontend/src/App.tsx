@@ -1,5 +1,6 @@
 import React from 'react';
 import { AppProvider, useApp, isValidDemoSession } from './context/AppContext';
+import { LanguageProvider } from './i18n/LanguageContext';
 import { AppShell } from './components/layout/AppShell';
 import { WelcomePortalPage } from './components/intro/WelcomePortalPage';
 import { ConsumerPortal } from './components/consumer/ConsumerPortal';
@@ -58,7 +59,9 @@ const MainExperience: React.FC = () => {
 export default function App() {
   return (
     <AppProvider>
-      <MainExperience />
+      <LanguageProvider>
+        <MainExperience />
+      </LanguageProvider>
     </AppProvider>
   );
 }

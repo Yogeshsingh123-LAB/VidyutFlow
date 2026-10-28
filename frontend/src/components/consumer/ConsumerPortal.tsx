@@ -1,6 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
 import { submitLiveRequest } from '../../utils/liveData';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useApp } from '../../context/AppContext';
+import { useLanguage } from '../../i18n/LanguageContext';
+import {
+  localizeTariffCategory,
+  localizeConnectionStatus,
+  localizePhase,
+  localizeSubdivision,
+  localizeFeederName,
+  localizeConsumerAddress,
+  localizeBillMonth,
+  localizeBillStatus,
+  localizePaymentMethod,
+  localizePaymentStatus,
+  localizeApplicationStatus,
+  localizeDocumentName,
+  localizeComplaintCategory,
+  localizeComplaintStatus,
+  localizeComplaintDescription,
+  localizeConsumerNotification,
+  localizeConsumptionMonth,
+  localizeLinkConnectionError
+} from '../../i18n/consumerContentTranslations';
 import { CONSUMPTION_HISTORY } from '../../data/mockData';
 import {
   Zap,
@@ -36,7 +57,9 @@ import {
   X,
   Receipt,
   Plug,
-  Gauge
+  Gauge,
+  Trash2,
+  XCircle
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -68,7 +91,11 @@ export const ConsumerPortal: React.FC = () => {
     linkConnectionDemo,
     demoSession,
     markNotificationRead,
+    markSelectedNotificationsRead,
     markAllNotificationsRead,
+    deleteNotification,
+    deleteSelectedNotifications,
+    clearAllNotifications,
     payBillDemo,
     submitApplicationDemo,
     submitComplaintDemo,
@@ -77,12 +104,27 @@ export const ConsumerPortal: React.FC = () => {
     activeUser
   } = useApp();
 
+  const { language, t } = useLanguage();
+  const tc = t.consumer;
+
+  const localizedConsumptionHistory = useMemo(
+    () =>
+      CONSUMPTION_HISTORY.map(item => ({
+        ...item,
+        displayMonth: localizeConsumptionMonth(item.month, language)
+      })),
+    [language]
+  );
+
+  const [consumerNotifFilter, setConsumerNotifFilter] = useState<'all' | 'unread' | 'applications'>('all');
+  const [selectedConsumerNotifIds, setSelectedConsumerNotifIds] = useState<string[]>([]);
+
   // Logged-in consumer identity (Single source of truth)
   const currentUserName = activeUser.name;
   const currentUserEmail = activeUser.email;
   const currentUserId = demoSession?.user.id || 'anonymous';
   const currentConsumerInitials = activeUser.initials;
-  const isDefaultDemoConsumer = currentUserId === 'demo_consumer' || currentUserEmail.toLowerCase() === 'consumer@vidyutflow.demo';
+  const isDefaultDemoConsumer = currentUserId === 'demo_consumer' || (currentUserEmail ? currentUserEmail.toLowerCase() === 'consumer@vidyutflow.demo' : false);
 
   // Scoped datasets for the active consumer session
   const consumerConnections = userConnections || [];
@@ -174,7 +216,7 @@ export const ConsumerPortal: React.FC = () => {
         setIdentityNumber('');
       }
     }
-  }, [demoSession, isDefaultDemoConsumer, selectedConnection]);
+  }, [demoSession?.user.id, isDefaultDemoConsumer]);
 
   const [category, setCategory] = useState<TariffCategory>('Residential (RGPU)');
   const [loadKw, setLoadKw] = useState<number>(6);
@@ -246,9 +288,34 @@ export const ConsumerPortal: React.FC = () => {
   const handleNewConnectionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!applicantName || !applicantPhone || !address) {
-      showToast('Please fill all mandatory application fields', 'error');
+      showToast(tc.mandatoryFieldsToast, 'error');
       return;
     }
+
+    // Also submit to the live VidyutFlow API
+    void submitLiveRequest({
+      applicant_name: applicantName,
+      phone: applicantPhone,
+      address: `${address}, Pin - ${pincode}`,
+      zone: subdivision.toLowerCase().includes('south') ? 'South' : 'North',
+      pin_code: pincode,
+      request_type: 'new_connection',
+      description: `New ${category} connection via consumer wizard`,
+      requested_load_kw: Number(loadKw),
+      tariff_category: category,
+      phase,
+      premises_type: premisesType,
+      document_name: uploadedDocs[0] || ''
+    })
+      .then((r: any) => {
+        showToast(
+          `Live API recorded the request (ref ${r.id.slice(0, 8)}) — ML: ${r.category}/${r.severity} · SLA risk ${Math.round((r.sla_breach_risk ?? 0) * 100)}%`,
+          'success'
+        );
+      })
+      .catch(() => {
+        showToast('Live API unreachable — application recorded in the demo workspace only', 'info');
+      });
 
     const newId = submitApplicationDemo({
       applicantName,
@@ -264,33 +331,6 @@ export const ConsumerPortal: React.FC = () => {
       documentsSubmitted: uploadedDocs
     });
 
-    // Also submit to the live VidyutFlow API (fire-and-forget): the backend runs the real
-    // workflow — validation, ML classification, SLA-risk scoring, zone routing — and the
-    // toast reports what the live models returned. Demo workspace stays usable if API is down.
-    void submitLiveRequest({
-      applicant_name: applicantName,
-      phone: applicantPhone,
-      address: `${address}, Pin - ${pincode}`,
-      zone: subdivision.toLowerCase().includes('south') ? 'South' : 'North',
-      pin_code: pincode,
-      request_type: 'new_connection',
-      description: `New ${category} connection via consumer wizard`,
-      requested_load_kw: Number(loadKw),
-      tariff_category: category,
-      phase,
-      premises_type: premisesType,
-      document_name: uploadedDocs[0] || ''
-    })
-      .then(r => {
-        showToast(
-          `Live API recorded the request (ref ${r.id.slice(0, 8)}) — ML: ${r.category}/${r.severity} · SLA risk ${Math.round((r.sla_breach_risk ?? 0) * 100)}%`,
-          'success'
-        );
-      })
-      .catch(() => {
-        showToast('Live API unreachable — application recorded in the demo workspace only', 'info');
-      });
-
     // Reset step
     setFormStep(1);
     // Switch to connections tab to track
@@ -304,7 +344,7 @@ export const ConsumerPortal: React.FC = () => {
   const handleComplaintSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!cmpDesc.trim()) {
-      showToast('Please provide a description of the issue', 'error');
+      showToast(tc.provideIssueDescToast, 'error');
       return;
     }
     const newId = submitComplaintDemo({
@@ -334,13 +374,13 @@ export const ConsumerPortal: React.FC = () => {
             {hasConnections && selectedConnection ? (
               <>
                 <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5 flex-wrap">
-                  <span>UGVCL {selectedConnection.subdivision}</span>
+                  <span>{tc.ugvclPrefix} {localizeSubdivision(selectedConnection.subdivision, language)}</span>
                   <span aria-hidden="true">·</span>
-                  <span>{selectedConnection.tariffCategory}</span>
+                  <span>{localizeTariffCategory(selectedConnection.tariffCategory, language)}</span>
                   <span aria-hidden="true">·</span>
                   <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-semibold">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    {selectedConnection.status}
+                    {localizeConnectionStatus(selectedConnection.status, language)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -348,40 +388,40 @@ export const ConsumerPortal: React.FC = () => {
                     {selectedConnection.consumerName}
                   </h1>
                   <span className="text-xs font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50/80 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-md border border-blue-200/80 dark:border-blue-800/80">
-                    Consumer No: {selectedConnection.consumerNo}
+                    {tc.consumerNoLabel} {selectedConnection.consumerNo}
                   </span>
                 </div>
                 <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-start sm:items-center gap-2 flex-wrap leading-relaxed">
                   <span className="inline-flex items-start sm:items-center gap-1 min-w-0">
                     <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5 sm:mt-0" />
-                    <span className="break-words">{selectedConnection.address}</span>
+                    <span className="break-words">{localizeConsumerAddress(selectedConnection.address, language)}</span>
                   </span>
                   <span className="text-slate-300 dark:text-slate-700 hidden sm:inline" aria-hidden="true">|</span>
                   <span className="font-mono text-[11px] text-slate-600 dark:text-slate-300">
-                    Meter: {selectedConnection.meterNo} ({selectedConnection.sanctionedLoadKw} kW · {selectedConnection.phase})
+                    {tc.meterLabel} {selectedConnection.meterNo} ({selectedConnection.sanctionedLoadKw} kW · {localizePhase(selectedConnection.phase, language)})
                   </span>
                 </div>
               </>
             ) : (
               <>
                 <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5 flex-wrap">
-                  <span>UGVCL Consumer Self-Service Portal</span>
+                  <span>{tc.selfServicePortal}</span>
                   <span aria-hidden="true">·</span>
                   <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                    No Connection Linked
+                    {tc.noConnectionLinked}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight leading-snug break-words">
-                    Consumer Account: {currentUserName}
+                    {tc.consumerAccountLabel} {currentUserName}
                   </h1>
                   <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                    ID: {currentUserId}
+                    {tc.idLabel} {currentUserId}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-start sm:items-center gap-1.5 flex-wrap leading-relaxed">
                   <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5 sm:mt-0" />
-                  <span className="break-words">{currentUserEmail || 'Registered Citizen Account'} · Independent Utility ERP Demonstration</span>
+                  <span className="break-words">{currentUserEmail || tc.registeredCitizenAccount} · {tc.independentErpDemo}</span>
                 </p>
               </>
             )}
@@ -397,7 +437,7 @@ export const ConsumerPortal: React.FC = () => {
                 className="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 shrink-0"
               >
                 <Gauge className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                <span>Active Meter:</span>
+                <span>{tc.activeMeterLabel}</span>
               </label>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 min-w-0">
                 <select
@@ -406,12 +446,12 @@ export const ConsumerPortal: React.FC = () => {
                   onChange={e => {
                     setSelectedConnectionNo(e.target.value);
                   }}
-                  aria-label="Select active electricity connection meter"
+                  aria-label={tc.selectActiveMeterAria}
                   className="min-h-11 sm:min-h-9 min-w-0 w-full sm:w-auto px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 dark:bg-[#131D31] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-colors cursor-pointer"
                 >
                   {consumerConnections.map(c => (
                     <option key={c.consumerNo} value={c.consumerNo}>
-                      {c.consumerNo} — {c.tariffCategory} ({c.sanctionedLoadKw} kW)
+                      {c.consumerNo} — {localizeTariffCategory(c.tariffCategory, language)} ({c.sanctionedLoadKw} kW)
                     </option>
                   ))}
                 </select>
@@ -419,9 +459,9 @@ export const ConsumerPortal: React.FC = () => {
                   type="button"
                   onClick={() => setActiveTab('connections')}
                   className="min-h-11 sm:min-h-9 px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer shrink-0"
-                  title="Manage all linked electricity connections"
+                  title={tc.manageConnectionsTitle}
                 >
-                  Manage ({consumerConnections.length})
+                  {tc.manageConnectionsBtn} ({consumerConnections.length})
                 </button>
               </div>
             </div>
@@ -433,7 +473,7 @@ export const ConsumerPortal: React.FC = () => {
                 className="flex-1 sm:flex-initial min-h-11 sm:min-h-9 px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
               >
                 <PlusCircle className="w-3.5 h-3.5" />
-                <span>Apply for Connection</span>
+                <span>{tc.applyForConnectionBtn}</span>
               </button>
               <button
                 type="button"
@@ -441,7 +481,7 @@ export const ConsumerPortal: React.FC = () => {
                 className="flex-1 sm:flex-initial min-h-11 sm:min-h-9 px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
               >
                 <Link2 className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                <span>Link Existing</span>
+                <span>{tc.linkExistingBtn}</span>
               </button>
             </div>
           )}
@@ -457,18 +497,18 @@ export const ConsumerPortal: React.FC = () => {
               <div className="space-y-1.5 max-w-xl">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-cyan-400 font-mono">
-                    Consumer Portal Onboarding
+                    {tc.onboardingTag}
                   </span>
                   <span aria-hidden="true" className="text-slate-300 dark:text-slate-600">·</span>
                   <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
-                    No Electricity Connection Linked
+                    {tc.noElectricityConnectionLinked}
                   </span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                  Welcome, {currentUserName}
+                  {tc.welcomeUser} {currentUserName}
                 </h2>
                 <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                  Your account has been created. Apply for a new electricity connection or link an existing connection to access bills, meter information, and service history.
+                  {tc.onboardingDesc}
                 </p>
               </div>
 
@@ -479,7 +519,7 @@ export const ConsumerPortal: React.FC = () => {
                   className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-semibold shadow-xs flex items-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
                 >
                   <PlusCircle className="w-4 h-4" />
-                  <span>Apply for New Connection</span>
+                  <span>{tc.applyForNewConnectionBtn}</span>
                 </button>
                 <button
                   type="button"
@@ -487,7 +527,7 @@ export const ConsumerPortal: React.FC = () => {
                   className="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-xs sm:text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer flex items-center gap-2"
                 >
                   <Link2 className="w-4 h-4 text-slate-500" />
-                  <span>Link Existing Connection</span>
+                  <span>{tc.linkExistingConnectionBtn}</span>
                 </button>
               </div>
             </div>
@@ -504,7 +544,7 @@ export const ConsumerPortal: React.FC = () => {
                       <Receipt className="w-4 h-4" />
                     </div>
                     <span className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">
-                      Current Electricity Bill
+                      {tc.currentElectricityBill}
                     </span>
                   </div>
                   <span className={`text-[11px] font-semibold inline-flex items-center gap-1.5 ${
@@ -521,7 +561,7 @@ export const ConsumerPortal: React.FC = () => {
                         ? 'bg-amber-500'
                         : 'bg-emerald-500'
                     }`} />
-                    {!hasConnections ? 'No Active Connection' : currentBill?.status === 'Unpaid' ? 'Payment Due' : 'Paid'}
+                    {!hasConnections ? tc.noActiveConnection : currentBill?.status === 'Unpaid' ? tc.paymentDue : tc.paid}
                   </span>
                 </div>
 
@@ -531,7 +571,7 @@ export const ConsumerPortal: React.FC = () => {
                   </div>
                   {hasConnections && currentBill && (
                     <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      for {currentBill.billMonth}
+                      {tc.forMonthPrefix} {localizeBillMonth(currentBill.billMonth, language)}
                     </span>
                   )}
                 </div>
@@ -539,13 +579,13 @@ export const ConsumerPortal: React.FC = () => {
                 {hasConnections && currentBill ? (
                   <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/70 text-xs">
                     <div>
-                      <span className="text-slate-400 block text-[11px]">Billed Consumption</span>
+                      <span className="text-slate-400 block text-[11px]">{tc.billedConsumption}</span>
                       <span className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
                         {currentBill.unitsConsumed} kWh
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[11px]">Invoice Number</span>
+                      <span className="text-slate-400 block text-[11px]">{tc.invoiceNumber}</span>
                       <span className="font-mono font-medium text-slate-700 dark:text-slate-300 text-[11px]">
                         {currentBill.billNo}
                       </span>
@@ -553,7 +593,7 @@ export const ConsumerPortal: React.FC = () => {
                   </div>
                 ) : (
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-                    No bills generated yet. Monthly billing statements and tariff breakdowns appear once a service connection is linked.
+                    {tc.noBillsGeneratedDesc}
                   </p>
                 )}
               </div>
@@ -561,9 +601,9 @@ export const ConsumerPortal: React.FC = () => {
               <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
                 <span className="text-xs text-slate-500 dark:text-slate-400">
                   {hasConnections && currentBill?.dueDate ? (
-                    <>Due Date: <strong className="text-slate-800 dark:text-slate-200 font-semibold">{currentBill.dueDate}</strong></>
+                    <>{tc.dueDateLabel} <strong className="text-slate-800 dark:text-slate-200 font-semibold">{currentBill.dueDate}</strong></>
                   ) : (
-                    'Due: None pending'
+                    tc.dueNonePending
                   )}
                 </span>
                 {hasConnections && currentBill?.status === 'Unpaid' ? (
@@ -571,7 +611,7 @@ export const ConsumerPortal: React.FC = () => {
                     onClick={() => handlePayClick(currentBill.billNo)}
                     className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
                   >
-                    <span>Pay Online</span>
+                    <span>{tc.payOnlineBtn}</span>
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </button>
                 ) : hasConnections && currentBill ? (
@@ -579,14 +619,14 @@ export const ConsumerPortal: React.FC = () => {
                     onClick={() => handleViewReceipt(currentBill)}
                     className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
                   >
-                    View Receipt
+                    {tc.viewReceiptBtn}
                   </button>
                 ) : (
                   <button
                     onClick={() => setActiveTab('new-connection')}
                     className="text-xs font-semibold text-blue-600 dark:text-cyan-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded cursor-pointer"
                   >
-                    Apply Connection →
+                    {tc.applyConnectionLink}
                   </button>
                 )}
               </div>
@@ -601,7 +641,7 @@ export const ConsumerPortal: React.FC = () => {
                       <Zap className="w-4 h-4" />
                     </div>
                     <span className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">
-                      Connected Feeder
+                      {tc.connectedFeeder}
                     </span>
                   </div>
                   <span className={`text-[11px] font-semibold inline-flex items-center gap-1.5 ${
@@ -610,24 +650,24 @@ export const ConsumerPortal: React.FC = () => {
                       : 'text-slate-500 dark:text-slate-400'
                   }`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${hasConnections ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                    {hasConnections ? 'Normal Supply' : 'Unassigned'}
+                    {hasConnections ? tc.normalSupply : tc.unassigned}
                   </span>
                 </div>
 
                 <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight mt-1">
-                  {hasConnections && selectedConnection ? selectedConnection.feederName : 'No Feeder Assigned'}
+                  {hasConnections && selectedConnection ? localizeFeederName(selectedConnection.feederName, language) : tc.noFeederAssigned}
                 </div>
 
                 {hasConnections && selectedConnection ? (
                   <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/70 text-xs">
                     <div>
-                      <span className="text-slate-400 block text-[11px]">Line Voltage (Nominal 230V)</span>
+                      <span className="text-slate-400 block text-[11px]">{tc.lineVoltageLabel}</span>
                       <span className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
-                        232 V · Stable
+                        {tc.voltageStableValue}
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400 block text-[11px]">Grid Frequency</span>
+                      <span className="text-slate-400 block text-[11px]">{tc.gridFrequencyLabel}</span>
                       <span className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
                         50.02 Hz
                       </span>
@@ -635,23 +675,23 @@ export const ConsumerPortal: React.FC = () => {
                   </div>
                 ) : (
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-                    11kV radial feeder line and distribution transformer telemetry will display here once a service connection is linked.
+                    {tc.noFeederTelemetryDesc}
                   </p>
                 )}
               </div>
 
               <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
                 <div className="text-xs">
-                  <span className="text-slate-400">Scheduled Outages: </span>
+                  <span className="text-slate-400">{tc.scheduledOutagesLabel} </span>
                   <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    {hasConnections ? 'None in next 48h' : 'N/A'}
+                    {hasConnections ? tc.noneInNext48h : tc.notApplicable}
                   </span>
                 </div>
                 <button
                   onClick={() => setActiveTab('complaints')}
                   className="text-xs font-semibold text-blue-600 dark:text-cyan-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded cursor-pointer"
                 >
-                  Report Issue →
+                  {tc.reportIssueLink}
                 </button>
               </div>
             </div>
@@ -665,32 +705,32 @@ export const ConsumerPortal: React.FC = () => {
                       <FileText className="w-4 h-4" />
                     </div>
                     <span className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">
-                      Service Tracking
+                      {tc.serviceTracking}
                     </span>
                   </div>
                   <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 inline-flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                    Live Status
+                    {tc.liveStatus}
                   </span>
                 </div>
 
                 <div className="flex items-baseline gap-2.5 my-1">
                   <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">
-                    {consumerApplications.length} Active File{consumerApplications.length !== 1 ? 's' : ''}
+                    {consumerApplications.length} {consumerApplications.length === 1 ? tc.activeFileSingular : tc.activeFilePlural}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/70 text-xs">
                   <div>
-                    <span className="text-slate-400 block text-[11px]">Open Grievances</span>
+                    <span className="text-slate-400 block text-[11px]">{tc.openGrievances}</span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
-                      {consumerComplaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length} in triage
+                      {consumerComplaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length} {tc.inTriageSuffix}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[11px]">Latest Application</span>
+                    <span className="text-slate-400 block text-[11px]">{tc.latestApplication}</span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200 break-words leading-snug block">
-                      {consumerApplications[0]?.status || 'None submitted'}
+                      {consumerApplications[0] ? localizeApplicationStatus(consumerApplications[0].status, language) : tc.noneSubmitted}
                     </span>
                   </div>
                 </div>
@@ -701,13 +741,13 @@ export const ConsumerPortal: React.FC = () => {
                   onClick={() => setActiveTab('connections')}
                   className="text-xs text-blue-600 dark:text-cyan-400 font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded cursor-pointer"
                 >
-                  Track Applications →
+                  {tc.trackApplicationsLink}
                 </button>
                 <button
                   onClick={() => setActiveTab('complaints')}
                   className="text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded cursor-pointer"
                 >
-                  Grievance Desk →
+                  {tc.grievanceDeskLink}
                 </button>
               </div>
             </div>
@@ -717,10 +757,10 @@ export const ConsumerPortal: React.FC = () => {
           <div className="space-y-2.5">
             <div className="flex items-center justify-between px-0.5">
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Quick Consumer Services
+                {tc.quickConsumerServices}
               </h2>
               <span className="text-[11px] text-slate-400 hidden sm:inline">
-                Direct self-service workflows
+                {tc.directSelfServiceWorkflows}
               </span>
             </div>
 
@@ -736,10 +776,10 @@ export const ConsumerPortal: React.FC = () => {
                   </div>
                   <div className="min-w-0">
                     <div className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-white leading-snug break-words">
-                      Apply New Connection
+                      {tc.quickApplyTitle}
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug break-words mt-0.5">
-                      LT / HT Service Sanction
+                      {tc.quickApplySub}
                     </div>
                   </div>
                 </div>
@@ -750,7 +790,7 @@ export const ConsumerPortal: React.FC = () => {
                 type="button"
                 onClick={() => {
                   if (!hasConnections) {
-                    showToast('No active bill pending. Apply for a connection or link an existing account.', 'info');
+                    showToast(tc.noActiveBillToast, 'info');
                   } else {
                     setActiveTab('bills');
                   }
@@ -763,10 +803,10 @@ export const ConsumerPortal: React.FC = () => {
                   </div>
                   <div className="min-w-0">
                     <div className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-white leading-snug break-words">
-                      Pay Electricity Bill
+                      {tc.quickPayTitle}
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug break-words mt-0.5">
-                      UPI / NetBanking / BBPS
+                      {tc.quickPaySub}
                     </div>
                   </div>
                 </div>
@@ -784,10 +824,10 @@ export const ConsumerPortal: React.FC = () => {
                   </div>
                   <div className="min-w-0">
                     <div className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-white leading-snug break-words">
-                      Report Power Outage
+                      {tc.quickOutageTitle}
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug break-words mt-0.5">
-                      12h SLA Fault Redressal
+                      {tc.quickOutageSub}
                     </div>
                   </div>
                 </div>
@@ -805,10 +845,10 @@ export const ConsumerPortal: React.FC = () => {
                   </div>
                   <div className="min-w-0">
                     <div className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-white leading-snug break-words">
-                      Solar Net-Metering
+                      {tc.quickSolarTitle}
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug break-words mt-0.5">
-                      Surya Gujarat Rooftop
+                      {tc.quickSolarSub}
                     </div>
                   </div>
                 </div>
@@ -822,23 +862,23 @@ export const ConsumerPortal: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 mb-5 border-b border-slate-100 dark:border-slate-800/80">
               <div>
                 <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
-                  Monthly Electricity Consumption Trend (kWh Units)
+                  {tc.consumptionTrendTitle}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   {hasConnections && selectedConnection
-                    ? `Data sourced from Smart AMR Automated Meter Reading System · Meter ${selectedConnection.meterNo}`
-                    : 'Automated Meter Reading (AMR) monthly consumption analytics'}
+                    ? `${tc.consumptionTrendSubConnected} ${selectedConnection.meterNo}`
+                    : tc.consumptionTrendSubUnlinked}
                 </p>
               </div>
               {hasConnections && selectedConnection && (
                 <div className="flex flex-wrap items-center gap-4 text-xs">
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">6-Month Average</span>
-                    <span className="font-bold text-slate-900 dark:text-white tabular-nums">418 kWh / Month</span>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">{tc.sixMonthAverage}</span>
+                    <span className="font-bold text-slate-900 dark:text-white tabular-nums">418 kWh {tc.perMonthSuffix}</span>
                   </div>
                   <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block" />
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Latest Meter Reading</span>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">{tc.latestMeterReading}</span>
                     <span className="font-bold text-blue-600 dark:text-cyan-400 tabular-nums">
                       {selectedConnection.currentReadingKwh.toLocaleString()} kWh
                     </span>
@@ -850,7 +890,7 @@ export const ConsumerPortal: React.FC = () => {
             {hasConnections ? (
               <div className="h-72 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={CONSUMPTION_HISTORY} margin={{ top: 10, right: 16, left: 0, bottom: 4 }}>
+                  <AreaChart data={localizedConsumptionHistory} margin={{ top: 10, right: 16, left: 0, bottom: 4 }}>
                     <defs>
                       <linearGradient id="colorUnits" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#2563EB" stopOpacity={0.35} />
@@ -859,7 +899,7 @@ export const ConsumerPortal: React.FC = () => {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.18} />
                     <XAxis
-                      dataKey="month"
+                      dataKey="displayMonth"
                       stroke="#64748b"
                       fontSize={11}
                       tickLine={false}
@@ -886,8 +926,8 @@ export const ConsumerPortal: React.FC = () => {
                       }}
                       formatter={(value, name, props) => {
                         const payload = props?.payload as { amount?: number; avgTempC?: number } | undefined;
-                        const extra = payload?.amount ? ` · Billed: ₹${payload.amount.toLocaleString()}` : '';
-                        return [`${value ?? 0} kWh${extra}`, String(name ?? 'Consumed Energy')];
+                        const extra = payload?.amount ? ` · ${tc.chartBilledPrefix} ₹${payload.amount.toLocaleString()}` : '';
+                        return [`${value ?? 0} kWh${extra}`, String(name ?? tc.chartConsumedEnergy)];
                       }}
                     />
                     <Area
@@ -898,7 +938,7 @@ export const ConsumerPortal: React.FC = () => {
                       activeDot={{ r: 5, strokeWidth: 2, stroke: '#ffffff', fill: '#2563EB' }}
                       fillOpacity={1}
                       fill="url(#colorUnits)"
-                      name="Consumed Energy"
+                      name={tc.chartConsumedEnergy}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -909,10 +949,10 @@ export const ConsumerPortal: React.FC = () => {
                   <Activity className="w-6 h-6" />
                 </div>
                 <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  No Consumption Telemetry Recorded
+                  {tc.noConsumptionTelemetryTitle}
                 </h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1.5 leading-relaxed">
-                  Automated Meter Reading (AMR) energy trends will display here once your electricity connection is sanctioned and a smart digital meter is energized at your premises.
+                  {tc.noConsumptionTelemetryDesc}
                 </p>
                 <div className="mt-4 flex items-center justify-center gap-3">
                   <button
@@ -920,14 +960,14 @@ export const ConsumerPortal: React.FC = () => {
                     onClick={() => setActiveTab('new-connection')}
                     className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors cursor-pointer"
                   >
-                    Apply for New Connection
+                    {tc.applyForNewConnectionBtn}
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsLinkModalOpen(true)}
                     className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-semibold transition-colors cursor-pointer"
                   >
-                    Link Existing Connection
+                    {tc.linkExistingConnectionBtn}
                   </button>
                 </div>
               </div>
@@ -939,11 +979,11 @@ export const ConsumerPortal: React.FC = () => {
             <div className="flex items-center gap-2">
               <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
               <span>
-                <strong>Independent Utility ERP Demonstration:</strong> VidyutFlow is an educational software prototype inspired by UGVCL workflows and is not affiliated with official UGVCL consumer billing systems.
+                <strong>{tc.demoDisclosureTitle}</strong> {tc.demoDisclosureBody}
               </span>
             </div>
             <span className="font-mono text-[10px] text-slate-400 shrink-0">
-              Tariff Reference: FY 2026-27 LT/HT Schedule
+              {tc.tariffReferenceLabel}
             </span>
           </div>
         </div>
@@ -957,10 +997,10 @@ export const ConsumerPortal: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                  My Registered Electricity Connections
+                  {tc.myRegisteredConnectionsTitle}
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Consumer accounts linked to your verified Aadhaar & Mobile ({applicantPhone})
+                  {tc.myRegisteredConnectionsSub} ({applicantPhone})
                 </p>
               </div>
               <button
@@ -968,7 +1008,7 @@ export const ConsumerPortal: React.FC = () => {
                 className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
               >
                 <PlusCircle className="w-4 h-4" />
-                <span>Apply for New Connection</span>
+                <span>{tc.applyForNewConnectionBtn}</span>
               </button>
             </div>
 
@@ -986,42 +1026,42 @@ export const ConsumerPortal: React.FC = () => {
                     <div className="flex items-start justify-between">
                       <div>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                          {conn.tariffCategory}
+                          {localizeTariffCategory(conn.tariffCategory, language)}
                         </span>
                         <h3 className="text-base font-bold text-slate-900 dark:text-white">
                           {conn.consumerName}
                         </h3>
                         <span className="font-mono text-xs text-blue-600 dark:text-blue-400 font-semibold">
-                          Consumer No: {conn.consumerNo}
+                          {tc.consumerNoLabel} {conn.consumerNo}
                         </span>
                       </div>
                       <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                        {conn.status}
+                        {localizeConnectionStatus(conn.status, language)}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 text-xs pt-3 border-t border-slate-100 dark:border-slate-800">
                       <div>
-                        <span className="text-slate-400 block text-[11px]">Sanctioned Load</span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">{conn.sanctionedLoadKw} kW ({conn.phase})</span>
+                        <span className="text-slate-400 block text-[11px]">{tc.sanctionedLoad}</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{conn.sanctionedLoadKw} kW ({localizePhase(conn.phase, language)})</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 block text-[11px]">Meter Serial</span>
+                        <span className="text-slate-400 block text-[11px]">{tc.meterSerial}</span>
                         <span className="font-mono text-slate-800 dark:text-slate-200">{conn.meterNo}</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 block text-[11px]">Current Reading</span>
+                        <span className="text-slate-400 block text-[11px]">{tc.currentReading}</span>
                         <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{conn.currentReadingKwh} kWh</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 block text-[11px]">Security Deposit</span>
+                        <span className="text-slate-400 block text-[11px]">{tc.securityDeposit}</span>
                         <span className="font-mono text-slate-800 dark:text-slate-200">₹{conn.securityDeposit.toLocaleString()}</span>
                       </div>
                     </div>
 
                     <div className="pt-2 text-xs text-slate-500 dark:text-slate-400 flex items-start gap-1.5 leading-relaxed">
                       <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                      <span className="break-words">{conn.address}</span>
+                      <span className="break-words">{localizeConsumerAddress(conn.address, language)}</span>
                     </div>
 
                     <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -1032,16 +1072,16 @@ export const ConsumerPortal: React.FC = () => {
                         }}
                         className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline"
                       >
-                        View Invoices →
+                        {tc.viewInvoicesLink}
                       </button>
                       <button
                         onClick={() => {
                           setSelectedConnectionNo(conn.consumerNo);
-                          showToast(`Activated ${conn.consumerNo} for active portal operations`, 'info');
+                          showToast(`${tc.activatedAccountToastPrefix} ${conn.consumerNo} ${tc.activatedAccountToastSuffix}`, 'info');
                         }}
                         className="text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 font-medium"
                       >
-                        Select Active Account
+                        {tc.selectActiveAccountBtn}
                       </button>
                     </div>
                   </div>
@@ -1053,10 +1093,10 @@ export const ConsumerPortal: React.FC = () => {
                   <Zap className="w-6 h-6" />
                 </div>
                 <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">
-                  No Electricity Connections Linked
+                  {tc.noConnectionsEmptyTitle}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-                  Your registered account ({currentUserEmail}) does not have any active electricity service connections associated with it yet. You can apply for a new connection or link an existing UGVCL consumer number.
+                  {tc.noConnectionsEmptyDescPrefix} ({currentUserEmail}) {tc.noConnectionsEmptyDescSuffix}
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                   <button
@@ -1065,7 +1105,7 @@ export const ConsumerPortal: React.FC = () => {
                     className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
                   >
                     <PlusCircle className="w-4 h-4" />
-                    <span>Apply for New Connection</span>
+                    <span>{tc.applyForNewConnectionBtn}</span>
                   </button>
                   <button
                     type="button"
@@ -1073,7 +1113,7 @@ export const ConsumerPortal: React.FC = () => {
                     className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                   >
                     <Link2 className="w-4 h-4 text-slate-500" />
-                    <span>Link Existing Connection</span>
+                    <span>{tc.linkExistingConnectionBtn}</span>
                   </button>
                 </div>
               </div>
@@ -1086,14 +1126,14 @@ export const ConsumerPortal: React.FC = () => {
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <FileText className="w-4 h-4 text-blue-600" />
-                  <span>My Connection Applications & Sanctions</span>
+                  <span>{tc.myApplicationsTitle}</span>
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Real-time end-to-end tracking from document scrutiny to smart meter energization
+                  {tc.myApplicationsSub}
                 </p>
               </div>
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                {consumerApplications.length} Active Application{consumerApplications.length !== 1 ? 's' : ''}
+                {consumerApplications.length} {consumerApplications.length === 1 ? tc.activeApplicationSingular : tc.activeApplicationPlural}
               </span>
             </div>
 
@@ -1115,11 +1155,11 @@ export const ConsumerPortal: React.FC = () => {
                               {app.id}
                             </span>
                             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                              Step {app.workflowStep}/5: {app.status}
+                              {tc.stepPrefix} {app.workflowStep}{tc.ofFivePrefix} {localizeApplicationStatus(app.status, language)}
                             </span>
                           </div>
                           <div className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                            Applicant: <strong>{app.applicantName}</strong> · Requested Load: <strong>{app.requestedLoadKw} kW ({app.phase})</strong> · {app.category}
+                            {tc.applicantLabel} <strong>{app.applicantName}</strong> · {tc.requestedLoadLabel} <strong>{app.requestedLoadKw} kW ({localizePhase(app.phase, language)})</strong> · {localizeTariffCategory(app.category, language)}
                           </div>
                         </div>
 
@@ -1128,7 +1168,7 @@ export const ConsumerPortal: React.FC = () => {
                             onClick={() => openCaseDrawer('application', app.id)}
                             className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5"
                           >
-                            <span>Inspect File</span>
+                            <span>{tc.inspectFileBtn}</span>
                             <ChevronRight className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -1137,8 +1177,8 @@ export const ConsumerPortal: React.FC = () => {
                       {/* Progress Bar & Stepper */}
                       <div className="space-y-2">
                         <div className="flex justify-between text-[11px] text-slate-500 font-medium">
-                          <span>Workflow Progress</span>
-                          <span>{progressPct}% Completed</span>
+                          <span>{tc.workflowProgress}</span>
+                          <span>{progressPct}% {tc.completedSuffix}</span>
                         </div>
                         <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                           <div
@@ -1162,7 +1202,7 @@ export const ConsumerPortal: React.FC = () => {
                                     : 'text-slate-400 bg-slate-50 dark:bg-slate-800/40'
                                 }`}
                               >
-                                {sName}
+                                {localizeApplicationStatus(sName, language)}
                               </div>
                             );
                           })}
@@ -1172,19 +1212,19 @@ export const ConsumerPortal: React.FC = () => {
                       {/* Details Strip */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Sub-Division</span>
-                          <span className="font-medium text-slate-800 dark:text-slate-200">{app.subdivision}</span>
+                          <span className="text-slate-400 block text-[10px]">{tc.subDivisionLabel}</span>
+                          <span className="font-medium text-slate-800 dark:text-slate-200">{localizeSubdivision(app.subdivision, language)}</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Applied Date</span>
+                          <span className="text-slate-400 block text-[10px]">{tc.appliedDateLabel}</span>
                           <span className="font-medium text-slate-800 dark:text-slate-200">{app.appliedDate}</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Target Date</span>
+                          <span className="text-slate-400 block text-[10px]">{tc.targetDateLabel}</span>
                           <span className="font-medium text-slate-800 dark:text-slate-200">{app.targetCompletionDate}</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Est. Sanction Fee</span>
+                          <span className="text-slate-400 block text-[10px]">{tc.estSanctionFeeLabel}</span>
                           <span className="font-mono font-bold text-blue-600 dark:text-blue-400">₹{app.estimatedSanctionCost.toLocaleString()}</span>
                         </div>
                       </div>
@@ -1196,10 +1236,10 @@ export const ConsumerPortal: React.FC = () => {
               <div className="p-6 text-center rounded-xl bg-white dark:bg-[#101C35] border border-dashed border-slate-200 dark:border-slate-800">
                 <FileText className="w-8 h-8 text-slate-400 mx-auto mb-2" />
                 <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                  No Active Connection Applications
+                  {tc.noActiveApplicationsTitle}
                 </h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  You have not submitted any new LT or HT electricity connection applications.
+                  {tc.noActiveApplicationsDesc}
                 </p>
                 <button
                   type="button"
@@ -1207,7 +1247,7 @@ export const ConsumerPortal: React.FC = () => {
                   className="mt-3 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                 >
                   <PlusCircle className="w-3.5 h-3.5" />
-                  <span>Start New Application</span>
+                  <span>{tc.startNewApplicationBtn}</span>
                 </button>
               </div>
             )}
@@ -1224,21 +1264,21 @@ export const ConsumerPortal: React.FC = () => {
               <div className="flex items-center gap-2 mb-1">
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Application for New Electricity Connection (LT/HT Sanction)
+                  {tc.newConnFormTitle}
                 </h2>
               </div>
               <p className="text-xs text-slate-500">
-                Uttar Gujarat Vij Company Limited (UGVCL) Unified Citizen Self-Service Portal
+                {tc.newConnFormSub}
               </p>
             </div>
 
             {/* Stepper Tabs */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 border-b border-slate-100 dark:border-slate-800 pb-4">
               {[
-                { step: 1, title: '1. Applicant Details' },
-                { step: 2, title: '2. Premises & Grid' },
-                { step: 3, title: '3. Load & Tariff' },
-                { step: 4, title: '4. Documents & Sanction' }
+                { step: 1, title: tc.step1Tab },
+                { step: 2, title: tc.step2Tab },
+                { step: 3, title: tc.step3Tab },
+                { step: 4, title: tc.step4Tab }
               ].map(s => (
                 <button
                   key={s.step}
@@ -1262,7 +1302,7 @@ export const ConsumerPortal: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Full Name of Applicant (as per Aadhaar / PAN) *
+                        {tc.fullNameLabel}
                       </label>
                       <input
                         type="text"
@@ -1275,7 +1315,7 @@ export const ConsumerPortal: React.FC = () => {
 
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Father / Husband Name *
+                        {tc.fatherHusbandNameLabel}
                       </label>
                       <input
                         type="text"
@@ -1290,7 +1330,7 @@ export const ConsumerPortal: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Mobile Number (for SMS & OTP updates) *
+                        {tc.mobileNumberLabel}
                       </label>
                       <input
                         type="tel"
@@ -1303,7 +1343,7 @@ export const ConsumerPortal: React.FC = () => {
 
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Email Address (for e-bills and demand notice)
+                        {tc.emailAddressLabel}
                       </label>
                       <input
                         type="email"
@@ -1317,23 +1357,23 @@ export const ConsumerPortal: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Identity Verification Document *
+                        {tc.identityDocLabel}
                       </label>
                       <select
                         value={identityProofType}
                         onChange={e => setIdentityProofType(e.target.value)}
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       >
-                        <option value="Aadhaar Card">Aadhaar Card (UIDAI)</option>
-                        <option value="PAN Card">PAN Card (Income Tax Dept)</option>
-                        <option value="Voter ID Card">Voter ID / EPIC Card</option>
-                        <option value="Passport">Passport</option>
+                        <option value="Aadhaar Card">{tc.idAadhaarOption}</option>
+                        <option value="PAN Card">{tc.idPanOption}</option>
+                        <option value="Voter ID Card">{tc.idVoterOption}</option>
+                        <option value="Passport">{tc.idPassportOption}</option>
                       </select>
                     </div>
 
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Identity Document Number *
+                        {tc.identityDocNumberLabel}
                       </label>
                       <input
                         type="text"
@@ -1351,7 +1391,7 @@ export const ConsumerPortal: React.FC = () => {
                       onClick={() => setFormStep(2)}
                       className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5"
                     >
-                      <span>Proceed to Premises</span>
+                      <span>{tc.proceedToPremisesBtn}</span>
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -1364,41 +1404,41 @@ export const ConsumerPortal: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        UGVCL Operational Sub-Division *
+                        {tc.operationalSubDivisionLabel}
                       </label>
                       <select
                         value={subdivision}
                         onChange={e => setSubdivision(e.target.value)}
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       >
-                        <option value="Mehsana City North">Mehsana City North (Circle HQ)</option>
-                        <option value="Gandhinagar Sub-Division 2">Gandhinagar Sub-Division 2</option>
-                        <option value="Visnagar Division">Visnagar Division</option>
-                        <option value="Kalol Sub-Division">Kalol Sub-Division</option>
-                        <option value="Kadi Division">Kadi Division (Jyotigram & Rural)</option>
-                        <option value="Patan Urban Zone">Patan Urban Zone</option>
+                        <option value="Mehsana City North">{tc.subdivMehsanaNorthHq}</option>
+                        <option value="Gandhinagar Sub-Division 2">{tc.subdivGandhinagar2}</option>
+                        <option value="Visnagar Division">{tc.subdivVisnagar}</option>
+                        <option value="Kalol Sub-Division">{tc.subdivKalol}</option>
+                        <option value="Kadi Division">{tc.subdivKadi}</option>
+                        <option value="Patan Urban Zone">{tc.subdivPatan}</option>
                       </select>
                     </div>
 
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Premises Ownership Type *
+                        {tc.premisesOwnershipLabel}
                       </label>
                       <select
                         value={premisesType}
                         onChange={e => setPremisesType(e.target.value as any)}
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       >
-                        <option value="Owned">Owned (Registered Sale Deed / Index-II)</option>
-                        <option value="Rented">Rented (Registered Notarized Lease Agreement)</option>
-                        <option value="Government Leased">Government / GIDC Allotment</option>
+                        <option value="Owned">{tc.ownershipOwnedOption}</option>
+                        <option value="Rented">{tc.ownershipRentedOption}</option>
+                        <option value="Government Leased">{tc.ownershipGovOption}</option>
                       </select>
                     </div>
                   </div>
 
                   <div>
                     <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                      Full Premises Street Address *
+                      {tc.fullStreetAddressLabel}
                     </label>
                     <textarea
                       value={address}
@@ -1412,7 +1452,7 @@ export const ConsumerPortal: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Postal PIN Code *
+                        {tc.postalPinCodeLabel}
                       </label>
                       <input
                         type="text"
@@ -1425,11 +1465,11 @@ export const ConsumerPortal: React.FC = () => {
 
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Nearest Landmark / Pole Number (if known)
+                        {tc.nearestLandmarkLabel}
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. Near DP-14 / Opposite Shivalik School"
+                        placeholder={tc.nearestLandmarkPlaceholder}
                         defaultValue="Opp. Radhanpur Cross Road DP"
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       />
@@ -1442,14 +1482,14 @@ export const ConsumerPortal: React.FC = () => {
                       onClick={() => setFormStep(1)}
                       className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300"
                     >
-                      Back
+                      {tc.backBtn}
                     </button>
                     <button
                       type="button"
                       onClick={() => setFormStep(3)}
                       className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5"
                     >
-                      <span>Proceed to Technical Specs</span>
+                      <span>{tc.proceedToTechSpecsBtn}</span>
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -1462,33 +1502,33 @@ export const ConsumerPortal: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Tariff Category *
+                        {tc.tariffCategoryLabel}
                       </label>
                       <select
                         value={category}
                         onChange={e => setCategory(e.target.value as TariffCategory)}
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       >
-                        <option value="Residential (RGPU)">Residential (RGPU - Domestic)</option>
-                        <option value="Commercial (NRGP)">Commercial (NRGP - Non-Residential)</option>
-                        <option value="Industrial (LTMD)">Industrial (LTMD - Low Tension Max Demand)</option>
-                        <option value="Agricultural (AG)">Agricultural (AG - Tube well / Irrigation)</option>
+                        <option value="Residential (RGPU)">{tc.tariffResidentialOption}</option>
+                        <option value="Commercial (NRGP)">{tc.tariffCommercialOption}</option>
+                        <option value="Industrial (LTMD)">{tc.tariffIndustrialOption}</option>
+                        <option value="Agricultural (AG)">{tc.tariffAgriculturalOption}</option>
                       </select>
                     </div>
 
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Purpose of Supply
+                        {tc.purposeOfSupplyLabel}
                       </label>
                       <select
                         value={purpose}
                         onChange={e => setPurpose(e.target.value)}
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       >
-                        <option value="Domestic / Residential Lighting & Power">Domestic / Residential Lighting & Power</option>
-                        <option value="Commercial Shop / Office / Retail">Commercial Shop / Office / Retail</option>
-                        <option value="Small Scale Workshop / MSME Unit">Small Scale Workshop / MSME Unit</option>
-                        <option value="Agricultural Borewell & Farmhouse">Agricultural Borewell & Farmhouse</option>
+                        <option value="Domestic / Residential Lighting & Power">{tc.purposeDomesticOption}</option>
+                        <option value="Commercial Shop / Office / Retail">{tc.purposeCommercialOption}</option>
+                        <option value="Small Scale Workshop / MSME Unit">{tc.purposeMsmeOption}</option>
+                        <option value="Agricultural Borewell & Farmhouse">{tc.purposeAgriculturalOption}</option>
                       </select>
                     </div>
                   </div>
@@ -1497,7 +1537,7 @@ export const ConsumerPortal: React.FC = () => {
                   <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                        Requested Sanction Load (kW):
+                        {tc.requestedSanctionLoadLabel}
                       </label>
                       <span className="text-base font-extrabold text-blue-600 dark:text-blue-400 font-mono">
                         {loadKw} kW
@@ -1531,9 +1571,9 @@ export const ConsumerPortal: React.FC = () => {
                     />
 
                     <div className="text-[11px] text-slate-500 flex justify-between">
-                      <span>Minimum: 1 kW</span>
-                      <span>Above 5kW requires 3-Phase standard metering</span>
-                      <span>Maximum LT: 50 kW</span>
+                      <span>{tc.minLoadNote}</span>
+                      <span>{tc.phaseRequirementNote}</span>
+                      <span>{tc.maxLtLoadNote}</span>
                     </div>
                   </div>
 
@@ -1541,7 +1581,7 @@ export const ConsumerPortal: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Supply Phase *
+                        {tc.supplyPhaseLabel}
                       </label>
                       <div className="flex gap-4 pt-1">
                         <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
@@ -1551,7 +1591,7 @@ export const ConsumerPortal: React.FC = () => {
                             checked={phase === '1-Phase'}
                             onChange={() => setPhase('1-Phase')}
                           />
-                          <span>1-Phase (Standard for ≤ 5kW)</span>
+                          <span>{tc.phase1Option}</span>
                         </label>
                         <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
                           <input
@@ -1560,7 +1600,7 @@ export const ConsumerPortal: React.FC = () => {
                             checked={phase === '3-Phase'}
                             onChange={() => setPhase('3-Phase')}
                           />
-                          <span>3-Phase (Required for &gt; 5kW)</span>
+                          <span>{tc.phase3Option}</span>
                         </label>
                       </div>
                     </div>
@@ -1574,11 +1614,11 @@ export const ConsumerPortal: React.FC = () => {
                           className="rounded text-blue-600 focus:ring-blue-500"
                         />
                         <span className="font-semibold">
-                          Enable Rooftop Solar Net-Metering Feasibility (Surya Gujarat)
+                          {tc.enableSolarCheckbox}
                         </span>
                       </label>
                       <p className="text-[11px] text-slate-400 pl-5 mt-0.5">
-                        Will automatically schedule bidirectional smart meter allocation during site feasibility check.
+                        {tc.enableSolarHint}
                       </p>
                     </div>
                   </div>
@@ -1589,14 +1629,14 @@ export const ConsumerPortal: React.FC = () => {
                       onClick={() => setFormStep(2)}
                       className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300"
                     >
-                      Back
+                      {tc.backBtn}
                     </button>
                     <button
                       type="button"
                       onClick={() => setFormStep(4)}
                       className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5"
                     >
-                      <span>Review & Cost Estimate</span>
+                      <span>{tc.reviewCostEstimateBtn}</span>
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -1610,10 +1650,10 @@ export const ConsumerPortal: React.FC = () => {
                   <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        Mandatory Verification Documents
+                        {tc.mandatoryDocsTitle}
                       </span>
                       <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> All 3 Attached (Simulated)
+                        <CheckCircle2 className="w-3.5 h-3.5" /> {tc.allThreeAttachedBadge}
                       </span>
                     </div>
 
@@ -1625,10 +1665,10 @@ export const ConsumerPortal: React.FC = () => {
                         >
                           <div className="flex items-center gap-2">
                             <FileCheck className="w-4 h-4 text-blue-600" />
-                            <span className="font-medium text-slate-800 dark:text-slate-200">{doc}</span>
+                            <span className="font-medium text-slate-800 dark:text-slate-200">{localizeDocumentName(doc, language)}</span>
                           </div>
                           <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-                            Verified
+                            {tc.verifiedBadge}
                           </span>
                         </div>
                       ))}
@@ -1639,33 +1679,33 @@ export const ConsumerPortal: React.FC = () => {
                   <div className="p-5 rounded-xl bg-gradient-to-br from-blue-50/80 to-indigo-50/40 dark:from-blue-950/30 dark:to-slate-900 border border-blue-200 dark:border-blue-900/40 space-y-3">
                     <div className="flex items-center justify-between border-b border-blue-200/60 dark:border-blue-800/40 pb-2">
                       <span className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">
-                        UGVCL Sanction Fee Schedule (Live Breakdown)
+                        {tc.sanctionFeeScheduleTitle}
                       </span>
                       <span className="text-xs font-mono font-semibold text-slate-500">
-                        Load: {loadKw} kW ({phase})
+                        {tc.loadSummaryPrefix} {loadKw} kW ({localizePhase(phase, language)})
                       </span>
                     </div>
 
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between">
-                        <span className="text-slate-600 dark:text-slate-400">Service Line Charges ({loadKw} kW × ₹1,150)</span>
+                        <span className="text-slate-600 dark:text-slate-400">{tc.serviceLineChargesLabel} ({loadKw} kW × ₹1,150)</span>
                         <span className="font-mono font-semibold text-slate-900 dark:text-white">₹{serviceCharge.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-600 dark:text-slate-400">Standard Security Deposit ({category})</span>
+                        <span className="text-slate-600 dark:text-slate-400">{tc.standardSecurityDepositLabel} ({localizeTariffCategory(category, language)})</span>
                         <span className="font-mono font-semibold text-slate-900 dark:text-white">₹{securityDeposit.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-600 dark:text-slate-400">Smart Meter Testing & Terminal Seal Fee</span>
+                        <span className="text-slate-600 dark:text-slate-400">{tc.smartMeterTestingFeeLabel}</span>
                         <span className="font-mono font-semibold text-slate-900 dark:text-white">₹{meterTestingFee.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between pt-2 border-t border-blue-200 dark:border-blue-800/60 text-sm font-extrabold text-blue-700 dark:text-blue-300">
-                        <span>Total Estimated Sanction Payable:</span>
+                        <span>{tc.totalEstSanctionPayableLabel}</span>
                         <span className="font-mono text-base">₹{totalSanctionEstimate.toLocaleString()}</span>
                       </div>
                     </div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      * Payable upon document clearance and site feasibility approval by AE Operations.
+                      {tc.payableUponClearanceNote}
                     </p>
                   </div>
 
@@ -1675,14 +1715,14 @@ export const ConsumerPortal: React.FC = () => {
                       onClick={() => setFormStep(3)}
                       className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300"
                     >
-                      Back
+                      {tc.backBtn}
                     </button>
                     <button
                       type="submit"
                       className="px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
                     >
                       <Check className="w-4 h-4" />
-                      <span>Submit New Connection Application</span>
+                      <span>{tc.submitNewConnBtn}</span>
                     </button>
                   </div>
                 </div>
@@ -1698,13 +1738,13 @@ export const ConsumerPortal: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                Electricity Bills & Tariff Breakdown
+                {tc.billsTitle}
               </h2>
               <p className="text-xs text-slate-500">
                 {selectedConnection ? (
-                  <>Connection: {selectedConnection.consumerName} ({selectedConnection.consumerNo})</>
+                  <>{tc.connectionLabel} {selectedConnection.consumerName} ({selectedConnection.consumerNo})</>
                 ) : (
-                  <>Account: {currentUserName} · No Active Connection</>
+                  <>{tc.accountLabel} {currentUserName} · {tc.noActiveConnection}</>
                 )}
               </p>
             </div>
@@ -1730,17 +1770,17 @@ export const ConsumerPortal: React.FC = () => {
                               ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
                               : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
                           }`}>
-                            {bill.status}
+                            {localizeBillStatus(bill.status, language)}
                           </span>
                         </div>
                         <span className="text-xs text-slate-500">
-                          Month: {bill.billMonth} · Bill Date: {bill.billDate} · Due Date: {bill.dueDate}
+                          {tc.monthLabel} {localizeBillMonth(bill.billMonth, language)} · {tc.billDateLabel} {bill.billDate} · {tc.dueDateLabel} {bill.dueDate}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <span className="text-xs text-slate-400 block text-[11px]">Payable Amount</span>
+                          <span className="text-xs text-slate-400 block text-[11px]">{tc.payableAmountLabel}</span>
                           <span className="text-lg font-extrabold text-slate-900 dark:text-white font-mono">
                             ₹{bill.totalAmount.toLocaleString()}
                           </span>
@@ -1751,7 +1791,7 @@ export const ConsumerPortal: React.FC = () => {
                             onClick={() => handlePayClick(bill.billNo)}
                             className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs"
                           >
-                            Pay Online
+                            {tc.payOnlineBtn}
                           </button>
                         ) : (
                           <button
@@ -1759,7 +1799,7 @@ export const ConsumerPortal: React.FC = () => {
                             className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium flex items-center gap-1.5"
                           >
                             <Download className="w-3.5 h-3.5" />
-                            <span>View Receipt</span>
+                            <span>{tc.viewReceiptBtn}</span>
                           </button>
                         )}
                       </div>
@@ -1768,23 +1808,23 @@ export const ConsumerPortal: React.FC = () => {
                     {/* Tariff Details */}
                     <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-2 text-xs">
                       <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                        UGVCL Tariff Itemization
+                        {tc.tariffItemizationTitle}
                       </span>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         <div>
-                          <span className="text-slate-400 block text-[11px]">Energy Charges</span>
+                          <span className="text-slate-400 block text-[11px]">{tc.energyChargesLabel}</span>
                           <span className="font-semibold text-slate-800 dark:text-slate-200">₹{bill.energyCharges}</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[11px]">Fixed Charges</span>
+                          <span className="text-slate-400 block text-[11px]">{tc.fixedChargesLabel}</span>
                           <span className="font-semibold text-slate-800 dark:text-slate-200">₹{bill.fixedCharges}</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[11px]">Fuel Price Adj (FPA)</span>
+                          <span className="text-slate-400 block text-[11px]">{tc.fuelPriceAdjLabel}</span>
                           <span className="font-semibold text-slate-800 dark:text-slate-200">₹{bill.fuelPriceAdjustment}</span>
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[11px]">Electricity Duty (15%)</span>
+                          <span className="text-slate-400 block text-[11px]">{tc.electricityDutyLabel}</span>
                           <span className="font-semibold text-slate-800 dark:text-slate-200">₹{bill.electricityDuty}</span>
                         </div>
                       </div>
@@ -1795,12 +1835,12 @@ export const ConsumerPortal: React.FC = () => {
               <div className="p-8 text-center rounded-xl bg-white dark:bg-[#101C35] border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
                 <FileText className="w-10 h-10 text-slate-400 mx-auto" />
                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  No Electricity Bills Found
+                  {tc.noBillsFoundTitle}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
                   {hasConnections
-                    ? 'All monthly bills for this consumer connection have been settled or no invoices have been generated for this cycle.'
-                    : 'Invoices and tariff breakdowns appear here once an electricity service connection is linked to your account.'}
+                    ? tc.noBillsFoundConnectedDesc
+                    : tc.noBillsFoundUnlinkedDesc}
                 </p>
                 {!hasConnections && (
                   <button
@@ -1809,7 +1849,7 @@ export const ConsumerPortal: React.FC = () => {
                     className="mt-2 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                   >
                     <Link2 className="w-3.5 h-3.5" />
-                    <span>Link Consumer Number</span>
+                    <span>{tc.linkConsumerNumberBtn}</span>
                   </button>
                 )}
               </div>
@@ -1823,10 +1863,10 @@ export const ConsumerPortal: React.FC = () => {
         <div className="space-y-6 min-w-0">
           <div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              Transaction History & Receipts
+              {tc.paymentHistoryTitle}
             </h2>
             <p className="text-xs text-slate-500">
-              Complete digital payments log for consumer account ({currentUserName})
+              {tc.paymentHistorySub} ({currentUserName})
             </p>
           </div>
 
@@ -1835,13 +1875,13 @@ export const ConsumerPortal: React.FC = () => {
               <table className="w-full min-w-[720px] text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                   <tr>
-                    <th className="p-3.5 font-semibold whitespace-nowrap">Transaction ID</th>
-                    <th className="p-3.5 font-semibold whitespace-nowrap">Bill No</th>
-                    <th className="p-3.5 font-semibold whitespace-nowrap">Date & Time</th>
-                    <th className="p-3.5 font-semibold whitespace-nowrap">Method</th>
-                    <th className="p-3.5 font-semibold whitespace-nowrap">Bank Ref</th>
-                    <th className="p-3.5 font-semibold text-right whitespace-nowrap">Amount</th>
-                    <th className="p-3.5 font-semibold text-center whitespace-nowrap">Status</th>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tc.colTransactionId}</th>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tc.colBillNo}</th>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tc.colDateTime}</th>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tc.colMethod}</th>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tc.colBankRef}</th>
+                    <th className="p-3.5 font-semibold text-right whitespace-nowrap">{tc.colAmount}</th>
+                    <th className="p-3.5 font-semibold text-center whitespace-nowrap">{tc.colStatus}</th>
                   </tr>
                 </thead>
                 {consumerPayments.length > 0 ? (
@@ -1855,14 +1895,16 @@ export const ConsumerPortal: React.FC = () => {
                           {p.billNo}
                         </td>
                         <td className="p-3.5 text-slate-500 whitespace-nowrap">{p.date}</td>
-                        <td className="p-3.5 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">{p.paymentMethod}</td>
+                        <td className="p-3.5 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                          {localizePaymentMethod(p.paymentMethod, language)}
+                        </td>
                         <td className="p-3.5 font-mono text-slate-500 text-[11px] whitespace-nowrap">{p.bankReference}</td>
                         <td className="p-3.5 text-right font-bold text-slate-900 dark:text-white tabular-nums whitespace-nowrap">
                           ₹{p.amount.toLocaleString()}
                         </td>
                         <td className="p-3.5 text-center whitespace-nowrap">
                           <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
-                            {p.status}
+                            {localizePaymentStatus(p.status, language)}
                           </span>
                         </td>
                       </tr>
@@ -1872,7 +1914,7 @@ export const ConsumerPortal: React.FC = () => {
                   <tbody>
                     <tr>
                       <td colSpan={7} className="p-8 text-center text-slate-500 dark:text-slate-400">
-                        No payment transactions recorded for this account.
+                        {tc.noPaymentsRecorded}
                       </td>
                     </tr>
                   </tbody>
@@ -1890,54 +1932,54 @@ export const ConsumerPortal: React.FC = () => {
           <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Register Fault or Grievance
+                {tc.registerFaultTitle}
               </h3>
               <p className="text-xs text-slate-500">
-                Direct integration with Sub-divisional dispatch & line squad
+                {tc.registerFaultSub}
               </p>
             </div>
 
             <form onSubmit={handleComplaintSubmit} className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                  Issue Category
+                  {tc.issueCategoryLabel}
                 </label>
                 <select
                   value={cmpCategory}
                   onChange={e => setCmpCategory(e.target.value as any)}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                 >
-                  <option value="Voltage Fluctuation">Voltage Fluctuation (High / Low)</option>
-                  <option value="Power Outage">Complete Power Outage</option>
-                  <option value="Meter Fault">Smart Meter Display / Burn Error</option>
-                  <option value="Billing Dispute">Billing Dispute / Arrears</option>
-                  <option value="Sparking / Hazardous Wire">Sparking / Hazardous Overhead Wire</option>
+                  <option value="Voltage Fluctuation">{tc.cmpCatVoltageOption}</option>
+                  <option value="Power Outage">{tc.cmpCatOutageOption}</option>
+                  <option value="Meter Fault">{tc.cmpCatMeterOption}</option>
+                  <option value="Billing Dispute">{tc.cmpCatBillingOption}</option>
+                  <option value="Sparking / Hazardous Wire">{tc.cmpCatSparkingOption}</option>
                 </select>
               </div>
 
               <div>
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                  Urgency Level
+                  {tc.urgencyLevelLabel}
                 </label>
                 <select
                   value={cmpPriority}
                   onChange={e => setCmpPriority(e.target.value as any)}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                 >
-                  <option value="High">High (Resolution in 12 Hours)</option>
-                  <option value="Critical">Critical (Immediate Line Safety - 4h)</option>
-                  <option value="Medium">Medium (Routine - 24 Hours)</option>
+                  <option value="High">{tc.priorityHighOption}</option>
+                  <option value="Critical">{tc.priorityCriticalOption}</option>
+                  <option value="Medium">{tc.priorityMediumOption}</option>
                 </select>
               </div>
 
               <div>
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                  Description of Grievance
+                  {tc.grievanceDescLabel}
                 </label>
                 <textarea
                   value={cmpDesc}
                   onChange={e => setCmpDesc(e.target.value)}
-                  placeholder="Mention location specifics, nearby landmark, or fault details..."
+                  placeholder={tc.grievanceDescPlaceholder}
                   rows={3}
                   required
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
@@ -1948,7 +1990,7 @@ export const ConsumerPortal: React.FC = () => {
                 type="submit"
                 className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs"
               >
-                Submit Grievance
+                {tc.submitGrievanceBtn}
               </button>
             </form>
           </div>
@@ -1956,7 +1998,7 @@ export const ConsumerPortal: React.FC = () => {
           {/* Active Grievances List */}
           <div className="lg:col-span-2 space-y-4">
             <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              Grievance Tracking & Redressal History
+              {tc.grievanceTrackingTitle}
             </h3>
 
             {consumerComplaints.length > 0 ? (
@@ -1974,23 +2016,23 @@ export const ConsumerPortal: React.FC = () => {
                             {cmp.id}
                           </span>
                           <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                            {cmp.category}
+                            {localizeComplaintCategory(cmp.category, language)}
                           </span>
                         </div>
                         <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">
-                          {cmp.description}
+                          {localizeComplaintDescription(cmp.id, cmp.description, language)}
                         </p>
                       </div>
                       <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                        {cmp.status}
+                        {localizeComplaintStatus(cmp.status, language)}
                       </span>
                     </div>
 
                     <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
-                      <span>Filed: {cmp.filedAt}</span>
-                      <span>SLA: {cmp.slaTargetHours} Hours</span>
+                      <span>{tc.filedLabel} {cmp.filedAt}</span>
+                      <span>{tc.slaLabel} {cmp.slaTargetHours} {tc.hoursSuffix}</span>
                       <span className="text-blue-600 dark:text-blue-400 font-medium">
-                        Assigned: {cmp.assignedTechnician || 'Auto-Triage Queue'}
+                        {tc.expectedResolutionLabel} {cmp.slaDueTime}
                       </span>
                     </div>
                   </div>
@@ -2000,10 +2042,10 @@ export const ConsumerPortal: React.FC = () => {
               <div className="p-8 text-center rounded-xl bg-white dark:bg-[#101C35] border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
                 <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
                 <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                  No Active Grievances Registered
+                  {tc.noActiveGrievancesTitle}
                 </h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-                  No service tickets or power complaints logged for this account. Use the form on the left to submit a report if you experience supply anomalies.
+                  {tc.noActiveGrievancesDesc}
                 </p>
               </div>
             )}
@@ -2016,10 +2058,10 @@ export const ConsumerPortal: React.FC = () => {
         <div className="max-w-4xl mx-auto space-y-6">
           <div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              Self-Service Citizen Requests
+              {tc.selfServiceRequestsTitle}
             </h2>
             <p className="text-xs text-slate-500">
-              Apply for modifications to your existing connection without visiting UGVCL office
+              {tc.selfServiceRequestsSub}
             </p>
           </div>
 
@@ -2031,22 +2073,22 @@ export const ConsumerPortal: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Solar Rooftop Net-Metering (Surya Gujarat)
+                    {tc.solarNetMeteringCardTitle}
                   </h3>
-                  <span className="text-[11px] text-slate-400">Up to 40% government subsidy</span>
+                  <span className="text-[11px] text-slate-400">{tc.solarSubsidyBadge}</span>
                 </div>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                Install on-grid solar photovoltaic panels and get bi-directional smart meter to export excess power to UGVCL grid.
+                {tc.solarNetMeteringCardDesc}
               </p>
               <button
                 onClick={() => {
-                  showToast('Solar Rooftop Application form initialized', 'info');
+                  showToast(tc.solarFormInitToast, 'info');
                   setActiveTab('new-connection');
                 }}
                 className="w-full py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold cursor-pointer"
               >
-                Apply for Solar Net-Metering
+                {tc.applySolarNetMeteringBtn}
               </button>
             </div>
 
@@ -2057,22 +2099,22 @@ export const ConsumerPortal: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Load Enhancement / Reduction
+                    {tc.loadChangeCardTitle}
                   </h3>
-                  <span className="text-[11px] text-slate-400">Upgrade connected load kW</span>
+                  <span className="text-[11px] text-slate-400">{tc.loadChangeBadge}</span>
                 </div>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                Increase your sanctioned load (e.g., for installing AC or EV charger) from 5kW 1-Phase to 8kW 3-Phase.
+                {tc.loadChangeCardDesc}
               </p>
               <button
                 onClick={() => {
-                  showToast(`Load Enhancement Request initiated for #${selectedConnection?.consumerNo || 'account'}`, 'info');
+                  showToast(`${tc.loadChangeInitToastPrefix}${selectedConnection?.consumerNo || 'account'}`, 'info');
                   setActiveTab('new-connection');
                 }}
                 className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer"
               >
-                Request Load Change
+                {tc.requestLoadChangeBtn}
               </button>
             </div>
           </div>
@@ -2082,75 +2124,268 @@ export const ConsumerPortal: React.FC = () => {
       {/* SUBVIEW 8: NOTIFICATIONS */}
       {activeTab === 'notifications' && (
         <div className="max-w-3xl mx-auto space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                Account Notifications & Alerts
+                {tc.notifCenterTitle}
               </h2>
               <p className="text-xs text-slate-500">
-                Official alerts on bill generations, sanctions, outages, and meter status
+                {tc.notifCenterSub}
               </p>
             </div>
-            <button
-              onClick={markAllNotificationsRead}
-              className="text-xs text-blue-600 dark:text-cyan-400 font-semibold hover:underline flex items-center gap-1.5 cursor-pointer"
-            >
-              <CheckCheck className="w-4 h-4" />
-              <span>Mark all as read</span>
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {consumerNotifications.some(n => !n.read) && (
+                <button
+                  type="button"
+                  onClick={markAllNotificationsRead}
+                  className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-xs text-blue-700 font-semibold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCheck className="w-3.5 h-3.5" />
+                  <span>{tc.markAllReadBtn}</span>
+                </button>
+              )}
+              {consumerNotifications.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearAllNotifications();
+                    setSelectedConsumerNotifIds([]);
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-xs text-rose-700 font-semibold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{tc.clearAllBtn}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter & Batch Selection Bar */}
+          <div className="p-3 rounded-xl bg-white border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {([
+                { id: 'all', label: `${tc.filterAll} (${consumerNotifications.length})` },
+                { id: 'unread', label: `${tc.filterUnread} (${consumerNotifications.filter(n => !n.read).length})` },
+                { id: 'applications', label: tc.filterAppUpdates }
+              ] as const).map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setConsumerNotifFilter(tab.id)}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
+                    consumerNotifFilter === tab.id
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {selectedConsumerNotifIds.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-slate-600">
+                  {selectedConsumerNotifIds.length} {tc.selectedCountSuffix}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    markSelectedNotificationsRead(selectedConsumerNotifIds);
+                    setSelectedConsumerNotifIds([]);
+                  }}
+                  className="px-2 py-1 rounded bg-blue-50 text-blue-700 font-semibold hover:bg-blue-100 cursor-pointer"
+                >
+                  {tc.markReadBtn}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    deleteSelectedNotifications(selectedConsumerNotifIds);
+                    setSelectedConsumerNotifIds([]);
+                  }}
+                  className="px-2 py-1 rounded bg-rose-50 text-rose-700 font-semibold hover:bg-rose-100 cursor-pointer"
+                >
+                  {tc.deleteSelectedBtn}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2.5">
-            {consumerNotifications.length > 0 ? (
-              consumerNotifications.map(n => (
-                <div
-                  key={n.id}
-                  onClick={() => markNotificationRead(n.id)}
-                  className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                    n.read
-                      ? 'bg-white dark:bg-[#101C35] border-slate-200 dark:border-slate-800'
-                      : 'bg-blue-50/40 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 mt-0.5">
-                        <Bell className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-xs font-bold text-slate-900 dark:text-white">
-                            {n.title}
-                          </h4>
-                          <span className="text-[10px] font-semibold px-2 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                            {n.category}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                          {n.message}
-                        </p>
-                        <span className="text-[10px] text-slate-400 mt-1 block font-mono">
-                          {n.time}
-                        </span>
-                      </div>
-                    </div>
-                    {!n.read && (
-                      <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
-                    )}
+            {(() => {
+              const filteredList = consumerNotifications.filter(n => {
+                if (consumerNotifFilter === 'unread') return !n.read;
+                if (consumerNotifFilter === 'applications') {
+                  return Boolean(n.applicationId || n.category === 'Approval' || /APP-\d{4}-\d+/.test(`${n.title} ${n.message}`));
+                }
+                return true;
+              });
+
+              if (filteredList.length === 0) {
+                return (
+                  <div className="p-8 text-center rounded-xl bg-white dark:bg-[#101C35] border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
+                    <Bell className="w-10 h-10 text-slate-400 mx-auto" />
+                    <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                      {tc.noNotificationsTitle}
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {tc.noNotificationsDesc}
+                    </p>
                   </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-8 text-center rounded-xl bg-white dark:bg-[#101C35] border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
-                <Bell className="w-10 h-10 text-slate-400 mx-auto" />
-                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                  No Notifications
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Your account is up to date. Official service alerts and notices will appear here.
-                </p>
-              </div>
-            )}
+                );
+              }
+
+              return filteredList.map(n => {
+                const appId = n.applicationId || `${n.title} ${n.message}`.match(/APP-\d{4}-\d+/)?.[0];
+                const cmpId = n.complaintId || `${n.title} ${n.message}`.match(/CMP-[A-Z0-9-]+/)?.[0];
+                const isSelected = selectedConsumerNotifIds.includes(n.id);
+                const isApproved = n.type === 'success' || n.eventType === 'APPLICATION_APPROVED';
+                const isRejected = n.type === 'alert' || n.eventType === 'APPLICATION_REJECTED';
+                const isClarification = n.type === 'warning' || n.eventType === 'CLARIFICATION_REQUESTED';
+
+                const accentBorder = isApproved
+                  ? 'border-l-4 border-l-emerald-500'
+                  : isRejected
+                  ? 'border-l-4 border-l-rose-500'
+                  : isClarification
+                  ? 'border-l-4 border-l-amber-500'
+                  : 'border-l-4 border-l-blue-500';
+
+                const badgeClasses = isApproved
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : isRejected
+                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                  : isClarification
+                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                  : 'bg-blue-50 text-blue-700 border-blue-200';
+
+                const localizedNotif = localizeConsumerNotification(n, language);
+
+                return (
+                  <div
+                    key={n.id}
+                    onClick={() => markNotificationRead(n.id)}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer ${accentBorder} ${
+                      n.read
+                        ? 'bg-white dark:bg-[#101C35] border-slate-200 dark:border-slate-800'
+                        : 'bg-blue-50/30 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={e => {
+                            e.stopPropagation();
+                            setSelectedConsumerNotifIds(prev =>
+                              prev.includes(n.id) ? prev.filter(item => item !== n.id) : [...prev, n.id]
+                            );
+                          }}
+                          onClick={e => e.stopPropagation()}
+                          aria-label={`${tc.selectNotifAriaPrefix} ${localizedNotif.title}`}
+                          className="mt-1.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
+                        />
+                        <div
+                          className={`p-2 rounded-lg mt-0.5 shrink-0 ${
+                            isApproved
+                              ? 'bg-emerald-100 text-emerald-600'
+                              : isRejected
+                              ? 'bg-rose-100 text-rose-600'
+                              : isClarification
+                              ? 'bg-amber-100 text-amber-600'
+                              : 'bg-blue-100 text-blue-600'
+                          }`}
+                        >
+                          {isApproved ? (
+                            <CheckCircle2 className="w-4 h-4" />
+                          ) : isRejected ? (
+                            <XCircle className="w-4 h-4" />
+                          ) : isClarification ? (
+                            <AlertTriangle className="w-4 h-4" />
+                          ) : (
+                            <Bell className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {appId && (
+                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-900 text-white">
+                                {appId}
+                              </span>
+                            )}
+                            {!appId && cmpId && (
+                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-900 text-white">
+                                {cmpId}
+                              </span>
+                            )}
+                            <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                              {localizedNotif.title}
+                            </h4>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badgeClasses}`}>
+                              {localizedNotif.badgeLabel}
+                            </span>
+                            {!n.read && (
+                              <span className="text-[10px] font-bold text-blue-600">{tc.unreadBadge}</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                            {localizedNotif.message}
+                          </p>
+                          <div className="flex items-center gap-3 mt-2 flex-wrap">
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {localizedNotif.time}
+                            </span>
+                            {appId && (
+                              <button
+                                type="button"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  markNotificationRead(n.id);
+                                  openCaseDrawer('application', appId);
+                                }}
+                                className="text-[11px] font-bold text-blue-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <span>{tc.trackApplicationPrefix} {appId}</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </button>
+                            )}
+                            {cmpId && (
+                              <button
+                                type="button"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  markNotificationRead(n.id);
+                                  openCaseDrawer('complaint', cmpId);
+                                }}
+                                className="text-[11px] font-bold text-blue-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <span>{t.common.viewDetails} {cmpId}</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          deleteNotification(n.id);
+                        }}
+                        className="p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0 cursor-pointer"
+                        title={tc.deleteNotifTitle}
+                        aria-label={`${tc.deleteNotifTitle} ${localizedNotif.title}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
       )}
@@ -2173,51 +2408,55 @@ export const ConsumerPortal: React.FC = () => {
                     : 'text-blue-600 dark:text-cyan-400 bg-blue-50 dark:bg-blue-950'
                 }`}>
                   <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                  {isDefaultDemoConsumer ? 'KYC Verified (Demo Persona)' : 'Registered Citizen Account'}
+                  {isDefaultDemoConsumer ? tc.kycVerifiedDemoBadge : tc.registeredCitizenAccount}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed break-words">
-                Account ID: <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{currentUserId}</span>
-                {selectedConnection ? ` · Primary Connection: ${selectedConnection.consumerNo}` : ' · No Connection Linked'}
+                {tc.accountIdLabel} <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{currentUserId}</span>
+                {selectedConnection ? ` · ${tc.primaryConnectionLabel} ${selectedConnection.consumerNo}` : ` · ${tc.noConnectionLinked}`}
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div className="p-3.5 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">Contact Phone</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase">{tc.contactPhoneLabel}</span>
               <div className="font-semibold text-slate-800 dark:text-slate-200 break-words">
-                {demoSession?.user.mobileNumber || (isDefaultDemoConsumer ? '+91 98250 14820' : 'Not Provided')}
+                {demoSession?.user.mobileNumber || (isDefaultDemoConsumer ? '+91 98250 14820' : tc.notProvided)}
               </div>
             </div>
             <div className="p-3.5 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">Registered Email</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase">{tc.registeredEmailLabel}</span>
               <div className="font-semibold text-slate-800 dark:text-slate-200 break-words">
-                {currentUserEmail || 'Not specified'}
+                {currentUserEmail || tc.notSpecified}
               </div>
             </div>
             <div className="p-3.5 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1 md:col-span-2">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">Registered Premises / Billing Address</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase">{tc.registeredPremisesAddressLabel}</span>
               <div className="font-medium text-slate-800 dark:text-slate-200 break-words leading-relaxed">
-                {selectedConnection ? selectedConnection.address : (isDefaultDemoConsumer ? '14, Anand Nagar Society, Visnagar Road, Mehsana - 384002' : 'No service address registered yet. Link an existing connection or submit a new connection application.')}
+                {selectedConnection
+                  ? localizeConsumerAddress(selectedConnection.address, language)
+                  : isDefaultDemoConsumer
+                  ? localizeConsumerAddress('14, Anand Nagar Society, Visnagar Road, Mehsana - 384002', language)
+                  : tc.noServiceAddressDesc}
               </div>
             </div>
             <div className="p-3.5 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">Linked Connections</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase">{tc.linkedConnectionsLabel}</span>
               <div className="font-semibold text-slate-800 dark:text-slate-200">
-                {consumerConnections.length} Active Meter{consumerConnections.length !== 1 ? 's' : ''}
+                {consumerConnections.length} {consumerConnections.length === 1 ? tc.activeMeterSingular : tc.activeMeterPlural}
               </div>
             </div>
             <div className="p-3.5 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">Sub-Division Jurisdiction</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase">{tc.subDivisionJurisdictionLabel}</span>
               <div className="font-semibold text-slate-800 dark:text-slate-200">
-                {selectedConnection ? selectedConnection.subdivision : 'Pending Allocation'}
+                {selectedConnection ? localizeSubdivision(selectedConnection.subdivision, language) : tc.pendingAllocation}
               </div>
             </div>
           </div>
 
           <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 text-xs text-slate-500">
-            Citizen profile synchronization managed via UGVCL Unified Consumer Information System (CIS).
+            {tc.cisSyncFooterNote}
           </div>
         </div>
       )}
@@ -2229,7 +2468,7 @@ export const ConsumerPortal: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-blue-600" />
-                <span>Simulated Bill Payment</span>
+                <span>{tc.simulatedBillPaymentTitle}</span>
               </h3>
               <button
                 onClick={() => setIsPayModalOpen(false)}
@@ -2240,17 +2479,17 @@ export const ConsumerPortal: React.FC = () => {
             </div>
 
             <div className="p-4 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 text-center">
-              <span className="text-xs text-slate-400 block mb-0.5">Amount Payable</span>
+              <span className="text-xs text-slate-400 block mb-0.5">{tc.amountPayableModalLabel}</span>
               <span className="text-3xl font-extrabold text-blue-600 dark:text-blue-400 font-mono">
                 ₹{currentBill?.totalAmount.toLocaleString()}
               </span>
               <p className="text-[11px] text-slate-500 mt-1">
-                Bill Ref: {selectedBillToPay} · Consumer: {selectedConnection?.consumerNo}
+                {tc.billRefLabel} {selectedBillToPay} · {tc.consumerLabel} {selectedConnection?.consumerNo}
               </p>
             </div>
 
             <div className="space-y-2 text-xs">
-              <span className="text-slate-400 font-semibold block">Select Payment Gateway:</span>
+              <span className="text-slate-400 font-semibold block">{tc.selectPaymentGatewayLabel}</span>
               <div className="grid grid-cols-2 gap-2">
                 {[
                   'UPI / BHIM',
@@ -2268,14 +2507,14 @@ export const ConsumerPortal: React.FC = () => {
                         : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
                     }`}
                   >
-                    {method}
+                    {localizePaymentMethod(method, language)}
                   </button>
                 ))}
               </div>
             </div>
 
             <div className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded border border-amber-200 dark:border-amber-800">
-              * Demo Mode: Instant reconciliation without real bank deduction. Centralized state updates in real time.
+              {tc.demoPaymentReconciliationNote}
             </div>
 
             <div className="flex gap-2 pt-2">
@@ -2283,13 +2522,13 @@ export const ConsumerPortal: React.FC = () => {
                 onClick={() => setIsPayModalOpen(false)}
                 className="flex-1 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer"
               >
-                Cancel
+                {tc.cancelBtn}
               </button>
               <button
                 onClick={confirmPayment}
                 className="flex-1 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
               >
-                Authorize & Pay Now
+                {tc.authorizeAndPayBtn}
               </button>
             </div>
           </div>
@@ -2305,30 +2544,30 @@ export const ConsumerPortal: React.FC = () => {
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                UGVCL Official Payment Receipt
+                {tc.officialPaymentReceiptTitle}
               </h3>
-              <p className="text-xs text-slate-400">Uttar Gujarat Vij Company Limited</p>
+              <p className="text-xs text-slate-400">{tc.ugvclFullTitle}</p>
             </div>
 
             <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Receipt Ref:</span>
+                <span className="text-slate-400">{tc.receiptRefLabel}</span>
                 <span className="font-mono font-semibold">{selectedReceipt.transactionRef || 'TXN-UPI-9921448102'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Bill Number:</span>
+                <span className="text-slate-400">{tc.billNumberLabel}</span>
                 <span className="font-mono font-semibold">{selectedReceipt.billNo}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Consumer No:</span>
+                <span className="text-slate-400">{tc.consumerNoLabel}</span>
                 <span className="font-mono font-semibold">{selectedReceipt.consumerNo}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Paid Date:</span>
+                <span className="text-slate-400">{tc.paidDateLabel}</span>
                 <span>{selectedReceipt.paidDate || '15-Oct-2026'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">Amount Settled:</span>
+                <span className="text-slate-400">{tc.amountSettledLabel}</span>
                 <span className="font-bold text-emerald-600 text-sm">₹{selectedReceipt.totalAmount.toLocaleString()}</span>
               </div>
             </div>
@@ -2336,19 +2575,19 @@ export const ConsumerPortal: React.FC = () => {
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => {
-                  showToast('Receipt printed / downloaded as PDF', 'success');
+                  showToast(tc.receiptPrintedToast, 'success');
                   setIsReceiptModalOpen(false);
                 }}
                 className="flex-1 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" />
-                <span>Print / Download</span>
+                <span>{tc.printDownloadBtn}</span>
               </button>
               <button
                 onClick={() => setIsReceiptModalOpen(false)}
                 className="flex-1 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-xs cursor-pointer"
               >
-                Done
+                {tc.doneBtn}
               </button>
             </div>
           </div>
@@ -2371,9 +2610,9 @@ export const ConsumerPortal: React.FC = () => {
                 </div>
                 <div>
                   <h3 id="link-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
-                    Link Electricity Connection
+                    {tc.linkConnectionModalTitle}
                   </h3>
-                  <p className="text-[11px] text-slate-500">Associate an existing UGVCL consumer number</p>
+                  <p className="text-[11px] text-slate-500">{tc.linkConnectionModalSub}</p>
                 </div>
               </div>
               <button
@@ -2391,7 +2630,7 @@ export const ConsumerPortal: React.FC = () => {
             {linkError && (
               <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-500" />
-                <span>{linkError}</span>
+                <span>{localizeLinkConnectionError(linkError, language)}</span>
               </div>
             )}
 
@@ -2401,7 +2640,7 @@ export const ConsumerPortal: React.FC = () => {
                 setLinkError(null);
 
                 if (!linkConsumerNo.trim()) {
-                  setLinkError('Please enter an 11-digit UGVCL consumer number.');
+                  setLinkError(tc.enterElevenDigitError);
                   return;
                 }
 
@@ -2409,7 +2648,7 @@ export const ConsumerPortal: React.FC = () => {
                   // Step 1: Simulate sending OTP to registered mobile
                   setIsLinkOtpSent(true);
                   setLinkOtp('123456');
-                  showToast('Verification OTP sent to registered mobile number: 123456 (demo code auto-filled)', 'info');
+                  showToast(tc.otpSentToast, 'info');
                   return;
                 }
 
@@ -2432,57 +2671,57 @@ export const ConsumerPortal: React.FC = () => {
             >
               <div>
                 <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                  11-Digit Consumer Number
+                  {tc.elevenDigitConsumerNoLabel}
                 </label>
                 <input
                   type="text"
                   value={linkConsumerNo}
                   onChange={(e) => setLinkConsumerNo(e.target.value)}
-                  placeholder="e.g. 04281-99231"
+                  placeholder={tc.consumerNoPlaceholder}
                   required
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
                 />
                 
                 {/* Sample demonstration account quick autofill */}
                 <div className="flex items-center gap-1.5 mt-2 flex-wrap text-[11px]">
-                  <span className="text-slate-400">Sample accounts:</span>
+                  <span className="text-slate-400">{tc.sampleAccountsLabel}</span>
                   <button
                     type="button"
                     onClick={() => setLinkConsumerNo('04281-99231')}
                     className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-cyan-400 border border-blue-200 dark:border-blue-800 font-mono text-[10px] hover:bg-blue-100 cursor-pointer"
                   >
-                    04281-99231 (Residential)
+                    {tc.sampleResidentialBtn}
                   </button>
                   <button
                     type="button"
                     onClick={() => setLinkConsumerNo('04281-77190')}
                     className="px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-cyan-400 border border-blue-200 dark:border-blue-800 font-mono text-[10px] hover:bg-blue-100 cursor-pointer"
                   >
-                    04281-77190 (Commercial)
+                    {tc.sampleCommercialBtn}
                   </button>
                 </div>
               </div>
 
               <div>
                 <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                  Sub-Division Office
+                  {tc.subDivisionOfficeLabel}
                 </label>
                 <select
                   value={linkSubdivision}
                   onChange={(e) => setLinkSubdivision(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                 >
-                  <option value="Mehsana City North">Mehsana City North</option>
-                  <option value="Mehsana City South">Mehsana City South</option>
-                  <option value="Mehsana Industrial GIDC">Mehsana Industrial GIDC</option>
-                  <option value="Visnagar Rural">Visnagar Rural</option>
-                  <option value="Kadi Sub-Division">Kadi Sub-Division</option>
+                  <option value="Mehsana City North">{localizeSubdivision('Mehsana City North', language)}</option>
+                  <option value="Mehsana City South">{tc.subdivMehsanaSouth}</option>
+                  <option value="Mehsana Industrial GIDC">{tc.subdivMehsanaGidc}</option>
+                  <option value="Visnagar Rural">{tc.subdivVisnagarRural}</option>
+                  <option value="Kadi Sub-Division">{tc.subdivKadiSub}</option>
                 </select>
               </div>
 
               <div>
                 <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                  Registered Mobile Number
+                  {tc.registeredMobileLabel}
                 </label>
                 <input
                   type="text"
@@ -2497,10 +2736,10 @@ export const ConsumerPortal: React.FC = () => {
                 <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 space-y-2 animate-in fade-in">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-blue-900 dark:text-blue-300 text-xs">
-                      Enter 6-Digit Verification OTP
+                      {tc.enterSixDigitOtpLabel}
                     </span>
                     <span className="text-[10px] font-mono text-blue-600 dark:text-cyan-400">
-                      Demo Code: 123456
+                      {tc.demoCodeLabel}
                     </span>
                   </div>
                   <input
@@ -2512,7 +2751,7 @@ export const ConsumerPortal: React.FC = () => {
                     className="w-full px-3 py-2 text-center text-sm font-mono tracking-widest font-bold rounded-lg border border-blue-300 dark:border-blue-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                   />
                   <p className="text-[10px] text-slate-500">
-                    OTP sent to registered phone ending in {linkPhone.slice(-4) || 'XXXX'}.
+                    {tc.otpSentToPhonePrefix} {linkPhone.slice(-4) || 'XXXX'}.
                   </p>
                 </div>
               )}
@@ -2527,7 +2766,7 @@ export const ConsumerPortal: React.FC = () => {
                   }}
                   className="flex-1 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer"
                 >
-                  Cancel
+                  {tc.cancelBtn}
                 </button>
                 <button
                   type="submit"
@@ -2535,11 +2774,11 @@ export const ConsumerPortal: React.FC = () => {
                   className="flex-1 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {isLinking ? (
-                    <span>Linking...</span>
+                    <span>{tc.linkingBtn}</span>
                   ) : !isLinkOtpSent ? (
-                    <span>Verify & Send OTP</span>
+                    <span>{tc.verifyAndSendOtpBtn}</span>
                   ) : (
-                    <span>Confirm & Link Connection</span>
+                    <span>{tc.confirmAndLinkBtn}</span>
                   )}
                 </button>
               </div>

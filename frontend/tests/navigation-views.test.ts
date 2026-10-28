@@ -7,6 +7,9 @@ import {
   SUBDIVISION_PERFORMANCE
 } from '../src/data/mockData';
 import { resolvePostLoginTab } from '../src/context/AppContext';
+import { FIELD_UI_TRANSLATIONS } from '../src/i18n/fieldContentTranslations';
+import { MANAGEMENT_UI_TRANSLATIONS } from '../src/i18n/managementContentTranslations';
+import { EMPLOYEE_UI_TRANSLATIONS } from '../src/i18n/employeeContentTranslations';
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -52,23 +55,28 @@ runTest('1. Field Engineer Portal implements Feeder Patrol (maintenance) and Com
     );
   }
 
-  // Verify Feeder Patrol uses existing FEEDER_METRICS and includes an empty state
+  // Verify Feeder Patrol uses existing FEEDER_METRICS/feeders and includes a localized empty state
   assert(
-    fieldPortalSource.includes('FEEDER_METRICS.map'),
-    'Feeder Patrol view renders existing FEEDER_METRICS records'
+    fieldPortalSource.includes('FEEDER_METRICS.map') || fieldPortalSource.includes('feeders.map'),
+    'Feeder Patrol view renders existing FEEDER_METRICS/feeders records'
   );
   assert(
-    fieldPortalSource.includes('No Feeder Patrol Records Available'),
+    (fieldPortalSource.includes('No Feeder Patrol Records Available') ||
+      fieldPortalSource.includes('tf.emptyFeederRecordsTitle')) &&
+      FIELD_UI_TRANSLATIONS.en.emptyFeederRecordsTitle === 'No Feeder Patrol Records Available',
     'Feeder Patrol view includes a fallback empty state'
   );
 
-  // Verify Completed Jobs uses completedOrders and includes an empty state
+  // Verify Completed Jobs uses completedOrders/completedWorkOrders and includes a localized empty state
   assert(
-    fieldPortalSource.includes('completedOrders.map'),
-    'Completed Jobs view renders existing completedOrders records'
+    fieldPortalSource.includes('completedOrders.map') ||
+      fieldPortalSource.includes('completedWorkOrders.map'),
+    'Completed Jobs view renders existing completedOrders/completedWorkOrders records'
   );
   assert(
-    fieldPortalSource.includes('No Completed Work Orders Yet'),
+    (fieldPortalSource.includes('No Completed Work Orders Yet') ||
+      fieldPortalSource.includes('tf.emptyCompletedJobsTitle')) &&
+      FIELD_UI_TRANSLATIONS.en.emptyCompletedJobsTitle === 'No Completed Work Orders Yet',
     'Completed Jobs view includes a fallback empty state'
   );
 
@@ -94,11 +102,16 @@ runTest('2. Management Portal implements Executive Export (reports) view', () =>
   }
 
   assert(
-    managementPortalSource.includes('Executive Export &amp; Statutory Reporting Center'),
+    (managementPortalSource.includes('Executive Export &amp; Statutory Reporting Center') ||
+      managementPortalSource.includes('tm.exportCenterTitle')) &&
+      MANAGEMENT_UI_TRANSLATIONS.en.exportCenterTitle ===
+        'Executive Export & Statutory Reporting Center',
     'ManagementPortal.tsx includes Executive Export & Statutory Reporting Center heading'
   );
   assert(
-    managementPortalSource.includes('Client-Side Demo Exports'),
+    (managementPortalSource.includes('Client-Side Demo Exports') ||
+      managementPortalSource.includes('tm.clientSideDemoBadge')) &&
+      MANAGEMENT_UI_TRANSLATIONS.en.clientSideDemoBadge === 'Client-Side Demo Exports',
     'ManagementPortal.tsx clearly labels exports as client-side demo actions'
   );
   assert(
@@ -233,14 +246,19 @@ runTest('5. All five portals stack logo/title on mobile and render full headings
   const adminPortal = readSrc('src/components/admin/AdminPortal.tsx');
 
   // Verify Office Employee heading and officer info are not truncated
-  const empHeaderMatch = employeePortal.match(/Sub-Divisional Operations &amp; Sanction Desk/);
+  const empHeaderMatch =
+    employeePortal.includes('Sub-Divisional Operations &amp; Sanction Desk') ||
+    (employeePortal.includes('te.topBarTitle') &&
+      EMPLOYEE_UI_TRANSLATIONS.en.topBarTitle === 'Sub-Divisional Operations & Sanction Desk');
   assert(Boolean(empHeaderMatch), 'EmployeePortal.tsx contains full Sub-Divisional Operations & Sanction Desk title');
   assert(
     !employeePortal.includes('text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate'),
     'EmployeePortal.tsx h1 heading does not use truncate class'
   );
   assert(
-    employeePortal.includes('{activeUser.name}') && employeePortal.includes('({activeUser.designation})'),
+    employeePortal.includes('{activeUser.name}') &&
+      (employeePortal.includes('({activeUser.designation})') ||
+        employeePortal.includes('localizeEmployeeDesignation(activeUser.designation')),
     'EmployeePortal.tsx renders full Officer name and designation'
   );
   assert(

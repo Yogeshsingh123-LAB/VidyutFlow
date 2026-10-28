@@ -101,6 +101,12 @@ export const WorkflowVisualizerModal: React.FC = () => {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="VidyutOne Cross-Portal Workflow Engine"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') setIsWorkflowVisualizerOpen(false);
+      }}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-sm animate-in fade-in"
       onClick={() => setIsWorkflowVisualizerOpen(false)}
     >

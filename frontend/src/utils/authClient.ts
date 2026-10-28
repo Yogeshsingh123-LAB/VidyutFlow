@@ -1,5 +1,5 @@
 import { UserRole } from '../types';
-import { DemoSession } from '../data/demoAuthData';
+import { DemoSession, resolveCanonicalDemoIdentity } from '../data/demoAuthData';
 
 /**
  * VidyutFlow Frontend Authentication Mode & Server API Client (Step 5B.2)
@@ -180,14 +180,31 @@ export function toClientSessionFromServerPayload(
   if (!payload || !payload.authenticated || !payload.user || !payload.role) {
     return null;
   }
+
+  const canonical =
+    payload.user.isDemoAccount !== false
+      ? resolveCanonicalDemoIdentity({
+          id: payload.user.id,
+          email: payload.user.email,
+          name: payload.user.name,
+          role: payload.user.role
+        })
+      : undefined;
+
+  const resolvedId =
+    canonical && payload.user.id !== 'demo_consumer'
+      ? canonical.id
+      : payload.user.id;
+
   return {
     user: {
-      id: payload.user.id,
+      id: resolvedId,
       email: payload.user.email,
-      name: payload.user.name,
+      name: canonical?.name || payload.user.name,
       role: payload.user.role,
-      designation: payload.user.designation,
-      mobileNumber: payload.user.mobileNumber,
+      designation: canonical?.designation || payload.user.designation,
+      subdivision: canonical?.subdivision || payload.user.division,
+      mobileNumber: payload.user.mobileNumber || canonical?.phone,
       isCustomSignup: payload.user.isDemoAccount === false
     },
     role: payload.role,

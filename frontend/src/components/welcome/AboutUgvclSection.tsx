@@ -21,12 +21,18 @@ import {
   UGVCL_INFRASTRUCTURE_FACTS
 } from '../../data/ugvclHistoryData';
 import { CountUpNumber } from './CountUpNumber';
+import { useLanguage } from '../../i18n/LanguageContext';
+import {
+  getLocalizedMilestone,
+  getLocalizedInfraFact
+} from '../../i18n/contentTranslations';
 
 interface AboutUgvclSectionProps {
   onOpenPhoto: (id: string) => void;
 }
 
 export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhoto }) => {
+  const { dict, language } = useLanguage();
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [expandedMilestones, setExpandedMilestones] = useState<Record<string, boolean>>({});
 
@@ -38,12 +44,12 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
   };
 
   const categories = [
-    'All',
-    'Incorporation',
-    'Electrification',
-    'Solar & Clean Energy',
-    'Infrastructure',
-    'National Recognition'
+    { key: 'All', label: dict.about.catAll },
+    { key: 'Incorporation', label: dict.about.catIncorporation },
+    { key: 'Electrification', label: dict.about.catElectrification },
+    { key: 'Solar & Clean Energy', label: dict.about.catSolar },
+    { key: 'Infrastructure', label: dict.about.catInfra },
+    { key: 'National Recognition', label: dict.about.catRecognition }
   ];
 
   const filteredMilestones =
@@ -58,14 +64,13 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
         <div className="max-w-4xl space-y-3 text-left">
           <div className="flex items-center gap-2 text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-cyan-400">
             <Building2 className="w-4 h-4" />
-            <span>Corporate Heritage & Institutional Mandate</span>
+            <span>{dict.about.badge}</span>
           </div>
           <h2 className="text-3xl sm:text-4xl lg:text-[40px] font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-            About Uttar Gujarat Vij Company Limited
+            {dict.about.title}
           </h2>
           <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-            Established under the power sector reforms of Gujarat, UGVCL stands as an autonomous,
-            financially prudent, and operationally excellent electricity distribution utility powering Northern Gujarat.
+            {dict.about.subtitle}
           </p>
         </div>
 
@@ -85,16 +90,16 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
                 title="Expand and inspect official territory boundaries"
               >
                 <Maximize2 className="w-4 h-4" />
-                <span>View Full Map</span>
+                <span>{dict.about.viewFullMap}</span>
               </button>
             </div>
 
             <div className="mt-2.5 text-left space-y-0.5">
               <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                Official Jurisdiction Map of UGVCL (6 Administrative Districts)
+                {dict.about.mapCaption}
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Source: Wikimedia Commons / Creative Commons Attribution-Share Alike 4.0
+                {dict.about.mapSource}
               </p>
             </div>
           </div>
@@ -102,46 +107,29 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
           {/* Right: Institutional Profile & Background */}
           <div className="lg:col-span-7 space-y-6 text-left">
             <div className="space-y-4 text-slate-700 dark:text-slate-200 text-sm sm:text-base leading-relaxed">
-              <p>
-                <strong>Uttar Gujarat Vij Company Limited (UGVCL)</strong> was incorporated on{' '}
-                <span className="font-semibold text-slate-950 dark:text-white">15 September 2003</span> under
-                the Companies Act 1956, obtaining its Certificate of Commencement of Business on 15 October 2003.
-                It commenced commercial operations on{' '}
-                <span className="font-semibold text-slate-950 dark:text-white">1 April 2005</span> following the
-                unbundling of the Gujarat Electricity Board (GEB) under the Gujarat Electricity Industry
-                (Reorganization and Regulation) Act, 2003.
-              </p>
-              <p>
-                As a wholly-owned operating subsidiary of <strong>Gujarat Urja Vikas Nigam Limited (GUVNL)</strong>,
-                UGVCL holds the operational mandate for the retail distribution and supply of electricity across
-                the entire northern belt of Gujarat, spanning an expansive geographical service territory of over{' '}
-                <strong>50,000 square kilometers</strong>.
-              </p>
-              <p>
-                The company is headquartered in <strong>Mehsana</strong> on Visnagar Road, overseeing 5 operational circles
-                (Mehsana, Gandhinagar, Himatnagar, Palanpur, and Sabarmati), supported by over 140 sub-divisional offices
-                delivering zero-paper consumer services, automated feeder management, and uninterrupted rural domestic supply.
-              </p>
+              <p>{dict.about.profileP1}</p>
+              <p>{dict.about.profileP2}</p>
+              <p>{dict.about.profileP3}</p>
             </div>
 
             {/* Quick Facts Matrix */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 pt-1">
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 hover:border-blue-400/50 transition-colors">
-                <span className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400 block tracking-wider">Incorporation</span>
-                <span className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg block mt-1">15 Sept 2003</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">Companies Act 1956</span>
+                <span className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400 block tracking-wider">{dict.about.quickFactIncorp}</span>
+                <span className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg block mt-1">{dict.about.quickFactIncorpVal}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">{dict.about.quickFactIncorpSub}</span>
               </div>
 
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 hover:border-blue-400/50 transition-colors">
-                <span className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400 block tracking-wider">Corporate Office</span>
-                <span className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg block mt-1">Mehsana, Gujarat</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">Visnagar Road - 384001</span>
+                <span className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400 block tracking-wider">{dict.about.quickFactOffice}</span>
+                <span className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg block mt-1">{dict.about.quickFactOfficeVal}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">{dict.about.quickFactOfficeSub}</span>
               </div>
 
               <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 hover:border-blue-400/50 transition-colors col-span-2 sm:col-span-1">
-                <span className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400 block tracking-wider">Parent Holding</span>
-                <span className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg block mt-1">GUVNL</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">100% State Subsidiary</span>
+                <span className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400 block tracking-wider">{dict.about.quickFactParent}</span>
+                <span className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg block mt-1">{dict.about.quickFactParentVal}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">{dict.about.quickFactParentSub}</span>
               </div>
             </div>
           </div>
@@ -154,19 +142,20 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
           <div className="max-w-3xl space-y-2">
             <div className="flex items-center gap-2 text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-cyan-400">
               <Zap className="w-4 h-4" />
-              <span>Operational Grid Scale & Asset Footprint</span>
+              <span>{dict.about.numbersTag}</span>
             </div>
             <h3 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-              North Gujarat Electricity Distribution in Numbers
+              {dict.about.numbersTitle}
             </h3>
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 font-normal">
-              Verified operational scale and physical distribution infrastructure spanning 6 northern administrative districts.
+              {dict.about.numbersSubtitle}
             </p>
           </div>
 
           {/* Responsive Statistics Grid: 3 columns Desktop, 2 columns Tablet, 1 column Mobile */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {UGVCL_INFRASTRUCTURE_FACTS.map((stat) => {
+              const localizedStat = getLocalizedInfraFact(stat, language);
               const trimmed = stat.value.trim();
               const isLakh = trimmed.startsWith('1.20+ Lakh');
               const num = isLakh ? '1.20+ Lakh' : trimmed.split(' ')[0] || trimmed;
@@ -180,7 +169,7 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
                   <div className="space-y-3">
                     {/* Readable 14–16px label without truncation */}
                     <span className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 block leading-snug group-hover:text-blue-600 dark:group-hover:text-cyan-400 transition-colors">
-                      {stat.label}
+                      {localizedStat.label}
                     </span>
 
                     {/* Prominent numerical value (28–36px) with separate measurement unit */}
@@ -199,7 +188,7 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
                   {/* Supporting text naturally wrapped */}
                   <div className="pt-3.5 mt-3.5 border-t border-slate-200 dark:border-slate-800/80">
                     <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-                      {stat.note}
+                      {localizedStat.note}
                     </p>
                   </div>
                 </div>
@@ -216,13 +205,13 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
             <div className="max-w-3xl space-y-2">
               <div className="flex items-center gap-2 text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-cyan-400">
                 <Calendar className="w-4 h-4" />
-                <span>Chronological Evolution & Heritage</span>
+                <span>{dict.about.timelineTag}</span>
               </div>
               <h3 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                Historical Timeline & Landmark Milestones
+                {dict.about.timelineTitle}
               </h3>
               <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 font-normal">
-                Verified chronologies from official GUVNL corporate disclosures and Ministry of Power publications.
+                {dict.about.timelineSubtitle}
               </p>
             </div>
 
@@ -230,15 +219,15 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
             <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shrink-0">
               {categories.map((cat) => (
                 <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
+                  key={cat.key}
+                  onClick={() => setActiveCategory(cat.key)}
                   className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-blue-500 ${
-                    activeCategory === cat
+                    activeCategory === cat.key
                       ? 'bg-white dark:bg-[#101C35] text-blue-700 dark:text-cyan-400 shadow-xs font-bold border border-slate-200/80 dark:border-blue-900/60'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60'
                   }`}
                 >
-                  {cat}
+                  {cat.label}
                 </button>
               ))}
             </div>
@@ -248,34 +237,38 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
           <div className="hidden md:block relative pt-3 pb-5">
             <div className="absolute top-7 left-6 right-6 h-0.5 bg-gradient-to-r from-blue-300 via-blue-500 to-cyan-400 dark:from-blue-900 dark:via-blue-700 dark:to-cyan-600 rounded-full opacity-60" />
             <div className="relative flex justify-between items-center px-4 overflow-x-auto">
-              {filteredMilestones.map((item) => (
-                <div
-                  key={`rail-${item.year}-${item.title}`}
-                  className="flex flex-col items-center group cursor-pointer"
-                  onClick={() => {
-                    const el = document.getElementById(`milestone-${item.year}`);
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                  }}
-                  title={`Jump to ${item.year}: ${item.title}`}
-                >
-                  <div className="w-3.5 h-3.5 rounded-full bg-blue-600 dark:bg-cyan-400 ring-4 ring-white dark:ring-[#0B1528] shadow-xs group-hover:scale-130 transition-transform" />
-                  <span className="text-xs font-bold font-mono text-slate-700 dark:text-slate-300 mt-2">
-                    {item.year}
-                  </span>
-                </div>
-              ))}
+              {filteredMilestones.map((item) => {
+                const localized = getLocalizedMilestone(item, language);
+                return (
+                  <div
+                    key={`rail-${item.year}`}
+                    className="flex flex-col items-center group cursor-pointer"
+                    onClick={() => {
+                      const el = document.getElementById(`milestone-${item.year}`);
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }}
+                    title={`Jump to ${item.year}: ${localized.title}`}
+                  >
+                    <div className="w-3.5 h-3.5 rounded-full bg-blue-600 dark:bg-cyan-400 ring-4 ring-white dark:ring-[#0B1528] shadow-xs group-hover:scale-130 transition-transform" />
+                    <span className="text-xs font-bold font-mono text-slate-700 dark:text-slate-300 mt-2">
+                      {item.year}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           {/* Redesigned Responsive Timeline Card Grid (3 columns Desktop, 2 Tablet, 1 Mobile) */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
             {filteredMilestones.map((item) => {
-              const itemKey = item.year + item.title;
+              const localized = getLocalizedMilestone(item, language);
+              const itemKey = item.year;
               const isExpanded = !!expandedMilestones[itemKey];
-              const needsReadMore = item.description.length > 130;
+              const needsReadMore = localized.description.length > 130;
               const displayText = isExpanded || !needsReadMore
-                ? item.description
-                : `${item.description.slice(0, 125)}...`;
+                ? localized.description
+                : `${localized.description.slice(0, 125)}...`;
 
               return (
                 <div
@@ -293,13 +286,13 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
                         </span>
                       </div>
                       <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-md border border-slate-200 dark:border-slate-700/80">
-                        {item.category}
+                        {localized.category}
                       </span>
                     </div>
 
                     {/* LEVEL 3: MILESTONE TITLE (19–22px) */}
                     <h4 className="text-lg sm:text-[20px] font-bold text-slate-900 dark:text-white leading-snug group-hover:text-blue-600 dark:group-hover:text-cyan-400 transition-colors break-words">
-                      {item.title}
+                      {localized.title}
                     </h4>
 
                     {/* LEVEL 4: SHORT DESCRIPTION (15–16px with Read More / Show Less) */}
@@ -314,7 +307,7 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
                           className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-cyan-400 hover:text-blue-800 dark:hover:text-cyan-300 transition-colors cursor-pointer pt-0.5 focus-visible:outline-2 focus-visible:outline-blue-500 rounded"
                           aria-expanded={isExpanded}
                         >
-                          <span>{isExpanded ? 'Show Less' : 'Read Full Detail'}</span>
+                          <span>{isExpanded ? dict.common.showLess : dict.common.readMore}</span>
                           {isExpanded ? (
                             <ChevronUp className="w-3.5 h-3.5" />
                           ) : (
@@ -329,10 +322,10 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
                   <div className="pt-4 mt-5 border-t border-slate-100 dark:border-slate-800/80 space-y-1">
                     <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       <FileCheck className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400 shrink-0" />
-                      <span>Verified Citation</span>
+                      <span>{dict.about.verifiedCitation}</span>
                     </div>
                     <p className="text-xs text-slate-600 dark:text-slate-400 italic font-medium leading-normal break-words">
-                      {item.verifiedSource}
+                      {localized.verifiedSource}
                     </p>
                   </div>
                 </div>

@@ -15,6 +15,8 @@ import {
   FieldEngineerRecord
 } from '../types';
 
+export const UGVCL_LOGO_PATH = '/assets/ugvcl-logo.png';
+
 export const ROLE_PROFILES: Record<string, RoleConfig> = {
   consumer: {
     id: 'consumer',
@@ -279,7 +281,7 @@ export const INITIAL_APPLICATIONS: NewConnectionApplication[] = [
     status: 'Document Verification',
     appliedDate: '06-Oct-2026',
     targetCompletionDate: '24-Oct-2026',
-    assignedOfficer: 'Rajesh V. Trivedi (AE Ops)',
+    assignedOfficer: 'Pooja Shah (DEE Ops)',
     estimatedSanctionCost: 14500,
     documentsSubmitted: ['7/12 Land Record', '8-A Khata Certificate', 'Aadhaar Card'],
     workflowStep: 2,
@@ -301,7 +303,7 @@ export const INITIAL_APPLICATIONS: NewConnectionApplication[] = [
     status: 'Sanction Approval',
     appliedDate: '26-Sep-2026',
     targetCompletionDate: '16-Oct-2026',
-    assignedOfficer: 'Rajesh V. Trivedi (AE Ops)',
+    assignedOfficer: 'Pooja Shah (DEE Ops)',
     assignedEngineer: 'Vikramaditya Solanki (JE Field)',
     estimatedSanctionCost: 38200,
     documentsSubmitted: ['Factory License', 'Pollution Control NOC', 'Electrical Inspector Certificate', 'GST Certificate'],
@@ -309,7 +311,7 @@ export const INITIAL_APPLICATIONS: NewConnectionApplication[] = [
     notesHistory: [
       { timestamp: '26-Sep 11:00', author: 'Consumer Portal', note: 'Industrial load sanction file submitted.' },
       { timestamp: '29-Sep 16:00', author: 'Vikramaditya Solanki', note: 'Field inspection completed. 100kVA transformer has spare capacity.' },
-      { timestamp: '05-Oct 15:45', author: 'Rajesh V. Trivedi', note: 'Estimate generated and forwarded for Executive Sanction.' }
+      { timestamp: '05-Oct 15:45', author: 'Pooja Shah', note: 'Estimate generated and forwarded for Executive Sanction.' }
     ]
   },
   {
@@ -675,36 +677,108 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     title: 'Urgent Work Order Dispatched: WO-4401',
     message: 'Work order for voltage fluctuation at 14 Anand Nagar (CMP-8821) has been scheduled.',
     time: '15 mins ago',
+    createdAt: '2026-10-15T08:45:00.000Z',
+    formattedTimestamp: '15/10/2026, 02:15 PM',
     targetRole: 'field',
     type: 'alert',
     read: false,
-    category: 'Inspection'
+    category: 'Inspection',
+    subdivision: 'Mehsana City North',
+    relatedEntityType: 'work_order',
+    relatedEntityId: 'WO-4401'
   },
   {
     id: 'NOTIF-02',
     title: 'Electricity Bill Ready: September 2026',
     message: 'Your bill of ₹2,185 for consumer no. 04281-99231 is due on 22-Oct-2026.',
     time: '1 hour ago',
+    createdAt: '2026-10-15T08:00:00.000Z',
+    formattedTimestamp: '15/10/2026, 01:30 PM',
     targetRole: 'consumer',
     type: 'info',
     read: false,
-    category: 'Billing'
+    category: 'Billing',
+    targetConsumerNo: '04281-99231',
+    targetConsumerAccountId: 'demo_consumer',
+    subdivision: 'Mehsana City North',
+    relatedEntityType: 'bill',
+    relatedEntityId: 'BILL-UG-2026-10-8821'
   },
   {
     id: 'NOTIF-03',
-    title: 'New Connection Verification Pending',
-    message: 'Application APP-2026-0842 for 8kW load extension requires sub-divisional sanction approval.',
-    time: '2 hours ago',
+    title: 'Site Inspection Stage: APP-2026-0842',
+    message: 'Field feasibility check pending for Smt. Meenaben Patel (8kW Residential (RGPU)) in Mehsana City North.',
+    time: '03-Oct 14:30',
+    createdAt: '2026-10-03T09:00:00.000Z',
+    formattedTimestamp: '03/10/2026, 02:30 PM',
+    targetRole: 'employee',
+    type: 'info',
+    read: false,
+    category: 'Inspection',
+    eventType: 'SITE_INSPECTION_SCHEDULED',
+    statusBadge: 'Site Inspection',
+    subdivision: 'Mehsana City North',
+    relatedEntityType: 'application',
+    relatedEntityId: 'APP-2026-0842'
+  },
+  {
+    id: 'NOTIF-EMP-APP-2026-0843',
+    title: 'Documents Awaiting Review: APP-2026-0843',
+    message: 'Shri Jayeshbhai D. Prajapati (12kW Agricultural (AG)) is in Document Verification stage at Gandhinagar Sub-Division 2.',
+    time: '06-Oct 09:20',
+    createdAt: '2026-10-06T03:50:00.000Z',
+    formattedTimestamp: '06/10/2026, 09:20 AM',
+    targetRole: 'employee',
+    type: 'info',
+    read: false,
+    category: 'Approval',
+    eventType: 'APPLICATION_SUBMITTED',
+    statusBadge: 'Document Verification',
+    subdivision: 'Gandhinagar Sub-Division 2',
+    relatedEntityType: 'application',
+    relatedEntityId: 'APP-2026-0843'
+  },
+  {
+    id: 'NOTIF-EMP-APP-2026-0844',
+    title: 'Sanction Approval Required: APP-2026-0844',
+    message: 'Site inspection passed for Torrent Precision Tools Pvt Ltd (45kW Industrial (LTMD)). Ready for final sanction & meter allocation.',
+    time: '05-Oct 15:45',
+    createdAt: '2026-10-05T10:15:00.000Z',
+    formattedTimestamp: '05/10/2026, 03:45 PM',
     targetRole: 'employee',
     type: 'warning',
     read: false,
-    category: 'Approval'
+    category: 'Approval',
+    eventType: 'AWAITING_FINAL_APPROVAL',
+    statusBadge: 'Awaiting Approval',
+    subdivision: 'Kalol Industrial Division',
+    relatedEntityType: 'application',
+    relatedEntityId: 'APP-2026-0844'
+  },
+  {
+    id: 'NOTIF-EMP-APP-2026-0845',
+    title: 'Application Approved & Energized: APP-2026-0845',
+    message: 'Sanjaybhai B. Parmar (3kW Residential (RGPU)) approved and smart meter installed.',
+    time: '28-Sep 14:00',
+    createdAt: '2026-09-28T08:30:00.000Z',
+    formattedTimestamp: '28/09/2026, 02:00 PM',
+    targetRole: 'employee',
+    type: 'success',
+    read: true,
+    category: 'Approval',
+    eventType: 'APPLICATION_APPROVED',
+    statusBadge: 'Approved',
+    subdivision: 'Mehsana City North',
+    relatedEntityType: 'application',
+    relatedEntityId: 'APP-2026-0845'
   },
   {
     id: 'NOTIF-04',
     title: 'Peak Load Warning: 11kV Kadi-Rural Feeder',
     message: 'Feeder utilization reached 108.2% of rated capacity. Load shedding or feeder segregation recommended.',
     time: '3 hours ago',
+    createdAt: '2026-10-15T06:00:00.000Z',
+    formattedTimestamp: '15/10/2026, 11:30 AM',
     targetRole: 'management',
     type: 'alert',
     read: false,
@@ -715,6 +789,8 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
     title: 'Automated Snapshot Succeeded',
     message: 'UGVCL core enterprise database snapshot completed at 04:30 AM (184.2 GB).',
     time: '5 hours ago',
+    createdAt: '2026-10-14T23:00:00.000Z',
+    formattedTimestamp: '15/10/2026, 04:30 AM',
     targetRole: 'admin',
     type: 'success',
     read: true,
@@ -793,6 +869,16 @@ export const INITIAL_EMPLOYEES: EmployeeRecord[] = [
     subdivision: 'Mehsana City North',
     email: 'rajesh.trivedi@ugvcl.gujarat.gov.in',
     phone: '+91 94285 11042',
+    activeCases: 4
+  },
+  {
+    id: 'EMP-UG-1101',
+    name: 'Priya Rathod',
+    designation: 'Executive Engineer — Operations',
+    department: 'Circle Sanctions & Operations',
+    subdivision: 'Mehsana Corporate Circle',
+    email: 'priya.rathod@ugvcl.com',
+    phone: '+91 98250 11203',
     activeCases: 4
   },
   {

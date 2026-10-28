@@ -22,11 +22,15 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 import { isDevAuthModeSwitchEnabled } from '../../utils/authClient';
 import { UserRole } from '../../types';
 import {
   DEFAULT_DEMO_ACCOUNTS,
-  AUTH_DISCLAIMERS
+  AUTH_DISCLAIMERS,
+  getCanonicalDemoAccountsByRole,
+  getDefaultCanonicalIdentityForRole,
+  getCanonicalIdentityById
 } from '../../data/demoAuthData';
 
 interface VidyutFlowAuthModalProps {
@@ -84,9 +88,13 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
     currentRole,
     authMode,
     setAuthMode,
+    dataMode,
     loginDemoUser,
-    signupDemoUser
+    loginAsCanonicalDemoAccount,
+    signupDemoUser,
+    activeUser
   } = useApp();
+  const { dict } = useLanguage();
 
   // Active tab: Sign In vs New Consumer Sign Up
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>(initialTab);
@@ -95,6 +103,10 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
   const [loginEmail, setLoginEmail] = useState<string>('');
   const [loginPassword, setLoginPassword] = useState<string>('');
   const [loginRole, setLoginRole] = useState<UserRole>(initialRole || currentRole || 'consumer');
+  const [selectedDemoAccountId, setSelectedDemoAccountId] = useState<string>(() => {
+    const initialTargetRole = initialRole || currentRole || 'consumer';
+    return getDefaultCanonicalIdentityForRole(initialTargetRole).id;
+  });
   const [showLoginPassword, setShowLoginPassword] = useState<boolean>(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -112,12 +124,23 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
   const [signupError, setSignupError] = useState<string | null>(null);
 
   // Auto-populate credentials when role changes
-  const applyRoleDefaults = (roleKey: UserRole) => {
+  const applyRoleDefaults = (roleKey: UserRole, preferredAccountId?: string) => {
     setLoginRole(roleKey);
-    const acc = DEFAULT_DEMO_ACCOUNTS[roleKey];
-    if (acc) {
-      setLoginEmail(acc.email);
-      setLoginPassword(acc.password);
+    const roleAccounts = getCanonicalDemoAccountsByRole(roleKey);
+    const matchedAccount =
+      (preferredAccountId ? roleAccounts.find(a => a.id === preferredAccountId) : undefined) ||
+      getDefaultCanonicalIdentityForRole(roleKey);
+
+    if (matchedAccount) {
+      setSelectedDemoAccountId(matchedAccount.id);
+      setLoginEmail(matchedAccount.email);
+      setLoginPassword(matchedAccount.password);
+    } else {
+      const acc = DEFAULT_DEMO_ACCOUNTS[roleKey];
+      if (acc) {
+        setLoginEmail(acc.email);
+        setLoginPassword(acc.password);
+      }
     }
     setLoginError(null);
   };
@@ -126,7 +149,8 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
   useEffect(() => {
     if (isRoleSwitcherModalOpen) {
       const targetRole = currentRole || initialRole || 'consumer';
-      applyRoleDefaults(targetRole);
+      const preferredId = currentRole === targetRole ? activeUser?.id : undefined;
+      applyRoleDefaults(targetRole, preferredId);
       setLoginError(null);
       setSignupError(null);
       setIsDemoCredentialsOpen(false); // Collapsed by default
@@ -141,6 +165,7 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
   const emailInputId = useId();
   const passwordInputId = useId();
   const roleSelectId = useId();
+  const demoAccountSelectId = useId();
   const signupNameId = useId();
   const signupEmailId = useId();
   const signupMobileId = useId();
@@ -149,10 +174,31 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
 
   if (!isRoleSwitcherModalOpen) return null;
 
+  const availableRoleDemoAccounts = getCanonicalDemoAccountsByRole(loginRole);
+
   // Handle dropdown change
   const handleRoleDropdownChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newRole = e.target.value as UserRole;
     applyRoleDefaults(newRole);
+  };
+
+  const handleDemoAccountDropdownChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const accountId = e.target.value;
+    setSelectedDemoAccountId(accountId);
+    const canonical = getCanonicalIdentityById(accountId);
+    if (canonical) {
+      setLoginEmail(canonical.email);
+      setLoginPassword(canonical.password);
+      setLoginError(null);
+    }
+  };
+
+  const handleEnterDemoAsSelectedAccount = async () => {
+    setLoginError(null);
+    const result = await loginAsCanonicalDemoAccount(selectedDemoAccountId, loginRole);
+    if (!result.success && result.error) {
+      setLoginError(result.error);
+    }
   };
 
   // Submit Login
@@ -171,7 +217,12 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const result = await loginDemoUser(loginEmail, loginPassword, loginRole);
+      const result = await loginDemoUser(
+        loginEmail,
+        loginPassword,
+        loginRole,
+        selectedDemoAccountId
+      );
       if (!result.success && result.error) {
         setLoginError(result.error);
       }
@@ -225,6 +276,9 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="auth-modal-title"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') setIsRoleSwitcherModalOpen(false);
+      }}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
     >
       <div className="bg-white dark:bg-[#0E1A33] border border-slate-200 dark:border-slate-800 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-[600px] max-h-[90vh] overflow-y-auto flex flex-col text-left">
@@ -356,84 +410,223 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
                 </div>
               </div>
 
-              {/* Collapsible Demo Account Credentials Helper (Collapsed by Default) */}
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50/70 dark:bg-slate-900/40 transition-colors">
-                <button
-                  type="button"
-                  onClick={() => setIsDemoCredentialsOpen(!isDemoCredentialsOpen)}
-                  className="w-full px-4 py-3 text-left flex items-center justify-between text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+              {/* DEMO Mode Account Selector & Direct Simulated Session Entry */}
+              {dataMode === 'DEMO' ? (
+                <div
+                  data-testid="demo-account-selector-panel"
+                  className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/25 space-y-3"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      Use Demo Credentials
-                    </span>
-                    <span className="text-slate-500 dark:text-slate-400 font-normal hidden sm:inline">
-                      (Quick-fill test accounts)
+                  <div className="flex items-center justify-between gap-2">
+                    <label
+                      htmlFor={demoAccountSelectId}
+                      className="text-[13px] font-bold text-blue-950 dark:text-blue-200 flex items-center gap-1.5"
+                    >
+                      <Wrench className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <span>
+                        {loginRole === 'field'
+                          ? 'Select Demo Field Engineer'
+                          : 'Select Demo Account'}
+                      </span>
+                    </label>
+                    <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200">
+                      DEMO SANDBOX
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 font-medium shrink-0 ml-2">
-                    <span>{isDemoCredentialsOpen ? 'Hide' : 'Show Accounts'}</span>
-                    <ChevronDown
-                      className={`w-4 h-4 transition-transform duration-200 ${
-                        isDemoCredentialsOpen ? 'rotate-180' : ''
-                      }`}
-                    />
-                  </div>
-                </button>
 
-                {isDemoCredentialsOpen && (
-                  <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 space-y-2 bg-white dark:bg-[#0c162d]">
-                    <p className="text-[12px] text-slate-500 dark:text-slate-400 leading-normal px-1">
-                      Click any role below to autofill demonstration credentials (default password:{' '}
-                      <span className="font-semibold text-slate-700 dark:text-slate-300">Demo@12345</span>):
-                    </p>
-                    <div className="space-y-1.5">
-                      {ROLE_OPTIONS.map((item) => {
-                        const acc = DEFAULT_DEMO_ACCOUNTS[item.role];
-                        const isCurrent = loginRole === item.role;
-                        return (
-                          <button
-                            key={item.role}
-                            type="button"
-                            onClick={() => applyRoleDefaults(item.role)}
-                            className={`w-full p-2.5 rounded-lg border text-left flex items-center justify-between transition-colors cursor-pointer ${
-                              isCurrent
-                                ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-100 ring-1 ring-blue-500/20'
-                                : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="p-1 rounded bg-slate-100 dark:bg-slate-800 shrink-0">
-                                {item.icon}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="text-[13px] font-semibold truncate text-slate-900 dark:text-white">
-                                  {item.label}
-                                </div>
-                                <div className="text-[12px] text-slate-500 dark:text-slate-400 truncate">
-                                  {acc.name} · {acc.email}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="shrink-0 text-right ml-2">
-                              <span
-                                className={`text-[11px] font-semibold px-2 py-0.5 rounded ${
-                                  isCurrent
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                                }`}
-                              >
-                                {isCurrent ? 'Active' : 'Autofill'}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
+                  <div className="relative">
+                    <select
+                      id={demoAccountSelectId}
+                      data-testid="select-demo-account-dropdown"
+                      aria-label={
+                        loginRole === 'field'
+                          ? 'Select Demo Field Engineer'
+                          : 'Select Demo Account'
+                      }
+                      value={selectedDemoAccountId}
+                      onChange={handleDemoAccountDropdownChange}
+                      className="w-full h-11 appearance-none pl-3.5 pr-10 text-[13px] font-medium rounded-xl bg-white dark:bg-slate-900 border border-blue-300 dark:border-blue-800 text-slate-900 dark:text-white hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer transition-colors"
+                    >
+                      {availableRoleDemoAccounts.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.name} — {acc.id} ({acc.designation} · {acc.subdivision})
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500">
+                      <ChevronDown className="w-4 h-4" />
                     </div>
                   </div>
-                )}
+
+                  <button
+                    type="button"
+                    data-testid="enter-demo-selected-account-btn"
+                    onClick={handleEnterDemoAsSelectedAccount}
+                    className="w-full h-11 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-semibold text-[13px] shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>
+                      {loginRole === 'field'
+                        ? 'Enter Demo as Selected Engineer'
+                        : `Enter Demo as Selected ${selectedRoleConfig.label.split(' ')[0]} Account`}
+                    </span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-normal">
+                    Creates an isolated simulated DEMO session using canonical user ID{' '}
+                    <strong className="font-mono text-slate-800 dark:text-slate-200">
+                      {selectedDemoAccountId}
+                    </strong>{' '}
+                    without requiring production credentials.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/30 text-[12px] text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>LIVE Operating Mode Active:</strong> Simulated DEMO quick-select is disabled. Please sign in below using verified server credentials.
+                  </span>
+                </div>
+              )}
+
+              {/* Visual Separation Between DEMO Selection and Credential Authentication */}
+              <div className="relative flex items-center py-0.5">
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800" />
+                <span className="shrink-0 mx-3 text-[11px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  {dataMode === 'DEMO'
+                    ? 'Or Sign In With Email & Password'
+                    : 'LIVE Server Credential Authentication'}
+                </span>
+                <div className="flex-grow border-t border-slate-200 dark:border-slate-800" />
               </div>
+
+              {/* Collapsible Demo Account Credentials Helper (Collapsed by Default) */}
+              {dataMode === 'DEMO' && (
+                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50/70 dark:bg-slate-900/40 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => setIsDemoCredentialsOpen(!isDemoCredentialsOpen)}
+                    className="w-full px-4 py-3 text-left flex items-center justify-between text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        Use Demo Credentials
+                      </span>
+                      <span className="text-slate-500 dark:text-slate-400 font-normal hidden sm:inline">
+                        (Quick-fill test accounts)
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 font-medium shrink-0 ml-2">
+                      <span>{isDemoCredentialsOpen ? 'Hide' : 'Show Accounts'}</span>
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform duration-200 ${
+                          isDemoCredentialsOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </div>
+                  </button>
+
+                  {isDemoCredentialsOpen && (
+                    <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 space-y-2.5 bg-white dark:bg-[#0c162d]">
+                      <p className="text-[12px] text-slate-500 dark:text-slate-400 leading-normal px-1">
+                        Click any account below to autofill demonstration credentials (default password:{' '}
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">Demo@12345</span>):
+                      </p>
+
+                      {loginRole === 'field' && (
+                        <div className="p-2.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/50 space-y-1.5">
+                          <div className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 px-1">
+                            Canonical Field Engineer Accounts ({availableRoleDemoAccounts.length})
+                          </div>
+                          <div className="grid grid-cols-1 gap-1.5">
+                            {availableRoleDemoAccounts.map((eng) => {
+                              const isSelectedEng = selectedDemoAccountId === eng.id;
+                              return (
+                                <button
+                                  key={eng.id}
+                                  type="button"
+                                  onClick={() => applyRoleDefaults('field', eng.id)}
+                                  className={`w-full p-2 rounded-lg border text-left flex items-center justify-between transition-colors cursor-pointer ${
+                                    isSelectedEng
+                                      ? 'border-amber-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-white ring-1 ring-amber-500/30'
+                                      : 'border-amber-200/60 dark:border-slate-800 bg-white/70 dark:bg-slate-900/50 hover:bg-white text-slate-700 dark:text-slate-300'
+                                  }`}
+                                >
+                                  <div className="min-w-0">
+                                    <div className="text-[12px] font-semibold truncate">
+                                      {eng.name} — <span className="font-mono">{eng.id}</span>
+                                    </div>
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                      {eng.email} · {eng.subdivision}
+                                    </div>
+                                  </div>
+                                  <span
+                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded shrink-0 ml-2 ${
+                                      isSelectedEng
+                                        ? 'bg-amber-600 text-white'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                    }`}
+                                  >
+                                    {isSelectedEng ? 'Selected' : 'Autofill'}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-1.5">
+                        {ROLE_OPTIONS.map((item) => {
+                          const canonicalAcc =
+                            item.role === loginRole
+                              ? getCanonicalIdentityById(selectedDemoAccountId) ||
+                                getDefaultCanonicalIdentityForRole(item.role)
+                              : getDefaultCanonicalIdentityForRole(item.role);
+                          const isCurrent = loginRole === item.role;
+                          return (
+                            <button
+                              key={item.role}
+                              type="button"
+                              onClick={() => applyRoleDefaults(item.role)}
+                              className={`w-full p-2.5 rounded-lg border text-left flex items-center justify-between transition-colors cursor-pointer ${
+                                isCurrent
+                                  ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-100 ring-1 ring-blue-500/20'
+                                  : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="p-1 rounded bg-slate-100 dark:bg-slate-800 shrink-0">
+                                  {item.icon}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-[13px] font-semibold truncate text-slate-900 dark:text-white">
+                                    {item.label}
+                                  </div>
+                                  <div className="text-[12px] text-slate-500 dark:text-slate-400 truncate">
+                                    {canonicalAcc.name} ({canonicalAcc.id}) · {canonicalAcc.email}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="shrink-0 text-right ml-2">
+                                <span
+                                  className={`text-[11px] font-semibold px-2 py-0.5 rounded ${
+                                    isCurrent
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                  }`}
+                                >
+                                  {isCurrent ? 'Active' : 'Autofill'}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Email Input */}
               <div className="space-y-2">
@@ -442,7 +635,9 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
                   className="text-[14px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2"
                 >
                   <Mail className="w-4 h-4 text-slate-400" />
-                  <span>Demonstration Email Address</span>
+                  <span>
+                    {dataMode === 'LIVE' ? 'Official Email Address' : 'Demonstration Email Address'}
+                  </span>
                 </label>
                 <input
                   id={emailInputId}

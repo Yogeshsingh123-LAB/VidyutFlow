@@ -438,6 +438,87 @@ export class ServerDataStore {
   }
 
   /**
+   * Archives a completed ('Meter Installed') or 'Rejected' application from the active employee queue.
+   * Restricted exclusively to `employee` and `admin` roles.
+   */
+  public archiveApplication(
+    signedToken: string,
+    applicationId: string,
+    reason?: string,
+    nowMs?: number
+  ): NewConnectionApplication {
+    const session = requireServerRole(
+      this.authService,
+      signedToken,
+      ['employee', 'admin'],
+      nowMs
+    );
+
+    const app = this.applications.find(a => a.id === applicationId);
+    if (!app) {
+      throw new AuthSecurityError(400, 'APPLICATION_NOT_FOUND', `Application ${applicationId} not found.`);
+    }
+
+    if (app.status !== 'Meter Installed' && app.status !== 'Rejected') {
+      throw new AuthSecurityError(
+        400,
+        'APPLICATION_ARCHIVE_NOT_ELIGIBLE',
+        `Only completed (Meter Installed) or Rejected applications can be archived. Current status: ${app.status}.`
+      );
+    }
+
+    app.isArchived = true;
+    app.archivedAt = new Date().toISOString();
+    app.archivedBy = session.user.name;
+    app.archiveReason = reason || `Archived from active queue after ${app.status}`;
+
+    this.appendServerAuditLog(
+      session,
+      'APPLICATION_ARCHIVED_FROM_QUEUE',
+      applicationId,
+      `Archived application (${app.status}): ${app.archiveReason}`
+    );
+
+    return deepClone(app);
+  }
+
+  /**
+   * Restores an archived application back to the active employee queue.
+   * Restricted exclusively to `employee` and `admin` roles.
+   */
+  public restoreApplication(
+    signedToken: string,
+    applicationId: string,
+    nowMs?: number
+  ): NewConnectionApplication {
+    const session = requireServerRole(
+      this.authService,
+      signedToken,
+      ['employee', 'admin'],
+      nowMs
+    );
+
+    const app = this.applications.find(a => a.id === applicationId);
+    if (!app) {
+      throw new AuthSecurityError(400, 'APPLICATION_NOT_FOUND', `Application ${applicationId} not found.`);
+    }
+
+    app.isArchived = false;
+    app.archivedAt = undefined;
+    app.archivedBy = undefined;
+    app.archiveReason = undefined;
+
+    this.appendServerAuditLog(
+      session,
+      'APPLICATION_RESTORED_TO_QUEUE',
+      applicationId,
+      'Restored archived application to active queue'
+    );
+
+    return deepClone(app);
+  }
+
+  /**
    * Updates field work order status — restricted to `field`, `employee`, and `admin` roles.
    */
   public updateWorkOrderStatus(
@@ -476,4 +557,98 @@ export class ServerDataStore {
     requireServerRole(this.authService, signedToken, ['admin'], nowMs);
     return deepClone(this.auditLogs);
   }
+
+  /**
+   * Returns applications visible to the caller:
+   * - `consumer`: ONLY their own applications.
+   * - `employee`, `management`, `admin`: all applications.
+   * - `field`: applications requiring field site inspections.
+   */
+  public getApplications(signedToken: string, nowMs?: number): NewConnectionApplication[] {
+    const session = requireServerRole(
+      this.authService,
+      signedToken,
+      ['consumer', 'employee', 'field', 'management', 'admin'],
+      nowMs
+    );
+
+    if (session.role === 'consumer') {
+      return deepClone(
+        this.applications.filter(
+          a => a.applicantName.toLowerCase() === session.user.name.toLowerCase()
+        )
+      );
+    }
+
+    return deepClone(this.applications);
+  }
+
+  /**
+   * Returns a single application by `id` with authorization checks.
+   */
+  public getApplicationById(
+    signedToken: string,
+    id: string,
+    nowMs?: number
+  ): NewConnectionApplication {
+    const session = requireServerRole(
+      this.authService,
+      signedToken,
+      ['consumer', 'employee', 'field', 'management', 'admin'],
+      nowMs
+    );
+
+    const app = this.applications.find(a => a.id === id);
+    if (!app) {
+      throw new AuthSecurityError(400, 'APPLICATION_NOT_FOUND', `Application ${id} not found.`);
+    }
+
+    if (session.role === 'consumer' && app.applicantName.toLowerCase() !== session.user.name.toLowerCase()) {
+      throw new AuthSecurityError(403, 'FORBIDDEN_RECORD_ACCESS', 'You are not authorized to view this application.');
+    }
+
+    return deepClone(app);
+  }
+
+  /**
+   * Returns work orders visible to the caller:
+   * - `field`, `employee`, `management`, `admin`: operational work orders.
+   * - `consumer`: forbidden (403).
+   */
+  public getWorkOrders(signedToken: string, nowMs?: number): WorkOrder[] {
+    requireServerRole(
+      this.authService,
+      signedToken,
+      ['field', 'employee', 'management', 'admin'],
+      nowMs
+    );
+
+    return deepClone(this.workOrders);
+  }
+
+  /**
+   * Returns a specific work order by `id`.
+   */
+  public getWorkOrderById(
+    signedToken: string,
+    id: string,
+    nowMs?: number
+  ): WorkOrder {
+    requireServerRole(
+      this.authService,
+      signedToken,
+      ['field', 'employee', 'management', 'admin'],
+      nowMs
+    );
+
+    const wo = this.workOrders.find(w => w.id === id);
+    if (!wo) {
+      throw new AuthSecurityError(400, 'WORK_ORDER_NOT_FOUND', `Work Order ${id} not found.`);
+    }
+
+    return deepClone(wo);
+  }
 }
+
+import { defaultServerAuthService } from './authRoutes';
+export const defaultServerDataStore = new ServerDataStore(defaultServerAuthService);

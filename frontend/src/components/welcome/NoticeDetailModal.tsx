@@ -14,6 +14,11 @@ import {
   Info
 } from 'lucide-react';
 import { UgvclNotice } from '../../data/ugvclHistoryData';
+import { useLanguage } from '../../i18n/LanguageContext';
+import {
+  getLocalizedNotice,
+  LOCALIZED_NOTICE_UI
+} from '../../i18n/contentTranslations';
 
 interface NoticeDetailModalProps {
   notice: UgvclNotice | null;
@@ -21,7 +26,9 @@ interface NoticeDetailModalProps {
 }
 
 export const NoticeDetailModal: React.FC<NoticeDetailModalProps> = ({ notice, onClose }) => {
+  const { dict, language } = useLanguage();
   const [copied, setCopied] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
 
@@ -29,6 +36,7 @@ export const NoticeDetailModal: React.FC<NoticeDetailModalProps> = ({ notice, on
   useEffect(() => {
     if (!notice) return;
 
+    setShowOriginal(false);
     previousActiveElement.current = document.activeElement as HTMLElement;
     closeButtonRef.current?.focus();
 
@@ -54,23 +62,32 @@ export const NoticeDetailModal: React.FC<NoticeDetailModalProps> = ({ notice, on
 
   if (!notice) return null;
 
+  const localized = getLocalizedNotice(notice, language);
+  const currentTitle = showOriginal ? notice.title : localized.title;
+  const currentSummary = showOriginal ? notice.summary : localized.summary;
+  const currentCategory = showOriginal ? notice.category : localized.category;
+  const currentCircle = showOriginal ? notice.circle : localized.circle;
+  const currentRef = showOriginal
+    ? (notice.officialRef || notice.source || 'UGVCL Corporate Gazette Records')
+    : (localized.officialRef || notice.officialRef || notice.source || 'UGVCL Corporate Gazette Records');
+
   const handleCopy = async () => {
     const textToCopy = `UTTAR GUJARAT VIJ COMPANY LIMITED (UGVCL)
 ${notice.isSampleDemo ? 'DEMONSTRATION CIRCULAR RECORD / PUBLIC ADVISORY' : 'OFFICIAL CIRCULAR / PUBLIC NOTIFICATION'}
 --------------------------------------------------
 Reference No : ${notice.refNo}
 Date of Issue: ${notice.date}
-Category     : ${notice.category}
-Jurisdiction : ${notice.circle}
-Subject      : ${notice.title}
+Category     : ${currentCategory}
+Jurisdiction : ${currentCircle}
+Subject      : ${currentTitle}
 --------------------------------------------------
 SUMMARY & OPERATIONAL SCOPE:
-${notice.summary}
+${currentSummary}
 
 ADMINISTRATIVE CONTEXT:
 Corporate Office: Visnagar Road, Mehsana - 384001, Gujarat
 Consumer Helpline: 19122 / 1800 233 155335
-Archive Reference: ${notice.officialRef || notice.source || 'Public Discom Archive'}${notice.isSampleDemo ? '\n[Note: VidyutOne Independent Demonstration Platform Record]' : ''}`;
+Archive Reference: ${currentRef}${notice.isSampleDemo ? '\n[Note: VidyutOne Independent Demonstration Platform Record]' : ''}`;
 
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -89,16 +106,28 @@ Archive Reference: ${notice.officialRef || notice.source || 'Public Discom Archi
     }
   };
 
-  // Category badge styling helper
+  // Category badge styling helper (keyed on canonical English or translated category)
   const getCategoryStyles = (category: string) => {
     switch (category) {
       case 'Consumer Advisory':
+      case 'ગ્રાહક માર્ગદર્શિકા':
+      case 'उपभोक्ता परामर्श':
+      case 'ग्राहक सल्लागार':
         return 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-700';
       case 'Maintenance':
+      case 'આયોજિત જાળવણી':
+      case 'नियोजित रखरखाव':
+      case 'नियोजित देखभाल':
         return 'bg-rose-100 text-rose-900 border-rose-300 dark:bg-rose-950/80 dark:text-rose-300 dark:border-rose-700';
       case 'Policy & Tariff':
+      case 'નીતિ અને ટેરિફ':
+      case 'नीति एवं टैरिफ':
+      case 'धोरण आणि दरपत्रक':
         return 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-700';
       case 'Tender & Procurement':
+      case 'ટેન્ડર અને ખરીદી':
+      case 'निविदा एवं खरीद':
+      case 'निविदा आणि खरेदी':
         return 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-700';
       default:
         return 'bg-slate-100 text-slate-900 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
@@ -133,11 +162,11 @@ Archive Reference: ${notice.officialRef || notice.source || 'Public Discom Archi
               <div className="min-w-0 space-y-0.5">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-400 dark:text-amber-300 font-mono print:text-black">
-                    {notice.isSampleDemo ? 'Demonstration Notice Record' : 'Public Discom Circular'}
+                    {notice.isSampleDemo ? dict.modals.noticeDemoRecord : dict.modals.noticePublicCircular}
                   </span>
                   <span className="inline-block w-1 h-1 rounded-full bg-slate-400" />
                   <span className="text-[10px] sm:text-xs text-slate-300 dark:text-slate-300 font-medium print:text-black">
-                    Corporate Office, Mehsana
+                    {dict.modals.noticeCorporateOffice}
                   </span>
                 </div>
 
@@ -174,7 +203,7 @@ Archive Reference: ${notice.officialRef || notice.source || 'Public Discom Archi
             {/* 1. Reference Number */}
             <div className="space-y-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block print:text-slate-600">
-                Circular Ref No.
+                {dict.modals.circularRefNo}
               </span>
               <span className="font-mono font-bold text-slate-900 dark:text-cyan-300 text-xs sm:text-[13px] block break-all print:text-black">
                 {notice.refNo}
@@ -184,21 +213,21 @@ Archive Reference: ${notice.officialRef || notice.source || 'Public Discom Archi
             {/* 2. Notice Category */}
             <div className="space-y-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block print:text-slate-600">
-                Category
+                {dict.modals.category}
               </span>
               <span
                 className={`inline-block px-2.5 py-0.5 rounded-md font-bold text-[11px] uppercase tracking-wide border ${getCategoryStyles(
-                  notice.category
+                  currentCategory
                 )} print:border print:border-black print:text-black`}
               >
-                {notice.category}
+                {currentCategory}
               </span>
             </div>
 
             {/* 3. Publication Date */}
             <div className="space-y-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block print:text-slate-600">
-                Issue Date
+                {dict.modals.issueDate}
               </span>
               <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200 text-xs sm:text-[13px] print:text-black">
                 <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400 shrink-0 print:hidden" />
@@ -209,39 +238,66 @@ Archive Reference: ${notice.officialRef || notice.source || 'Public Discom Archi
             {/* 4. Jurisdiction Circle */}
             <div className="space-y-1">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block print:text-slate-600">
-                Jurisdiction
+                {dict.modals.jurisdiction}
               </span>
               <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200 text-xs sm:text-[13px] truncate print:text-black">
                 <Building2 className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0 print:hidden" />
-                <span className="truncate">{notice.circle}</span>
+                <span className="truncate">{currentCircle}</span>
               </div>
             </div>
           </div>
 
-          {/* Notice Subject / Title (Prominent, High Contrast 20–24px) */}
+          {/* Notice Subject / Title (Prominent, High Contrast 20–24px) with View Original Toggle */}
           <div className="space-y-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-cyan-400 flex items-center gap-1.5 print:text-slate-600">
-              <Info className="w-3.5 h-3.5 print:hidden" />
-              <span>Subject & Operational Scope</span>
-            </span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-cyan-400 flex items-center gap-1.5 print:text-slate-600">
+                <Info className="w-3.5 h-3.5 print:hidden" />
+                <span>{dict.modals.subjectScope}</span>
+              </span>
+
+              {language !== 'en' && (
+                <button
+                  type="button"
+                  onClick={() => setShowOriginal(!showOriginal)}
+                  className="px-3 py-1 rounded-lg border border-blue-300 dark:border-blue-700/80 bg-blue-50/80 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/80 text-blue-800 dark:text-cyan-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs print:hidden"
+                  title="Toggle between translated content and original official English text"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>
+                    {showOriginal
+                      ? LOCALIZED_NOTICE_UI.viewLocalizedOrder[language]
+                      : LOCALIZED_NOTICE_UI.viewOriginalOrder[language]}
+                  </span>
+                </button>
+              )}
+            </div>
+
+            {language !== 'en' && (
+              <div className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                {showOriginal
+                  ? LOCALIZED_NOTICE_UI.originalBadge[language]
+                  : LOCALIZED_NOTICE_UI.translatedBadge[language]}
+              </div>
+            )}
+
             <h2
               id="notice-modal-title"
               className="text-xl sm:text-2xl md:text-[24px] font-black text-slate-900 dark:text-white tracking-tight leading-snug break-words print:text-black"
             >
-              {notice.title}
+              {currentTitle}
             </h2>
           </div>
 
           {/* Official Notification Order / Executive Summary */}
           <div className="space-y-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block print:text-slate-600">
-              Official Notification Order Text
+              {dict.modals.orderText}
             </span>
             <div
               id="notice-modal-desc"
               className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#071329] border border-slate-200 dark:border-slate-800/90 text-sm sm:text-base text-slate-800 dark:text-slate-100 leading-relaxed font-normal shadow-xs break-words print:border-slate-300 print:text-black print:bg-white"
             >
-              {notice.summary}
+              {currentSummary}
             </div>
           </div>
 
@@ -249,20 +305,17 @@ Archive Reference: ${notice.officialRef || notice.source || 'Public Discom Archi
           <div className="space-y-3 p-5 sm:p-6 rounded-2xl bg-blue-50/70 dark:bg-slate-900/50 border border-blue-200/80 dark:border-slate-800 text-xs sm:text-sm text-slate-700 dark:text-slate-300 print:bg-white print:border-slate-300 print:text-black">
             <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white print:text-black">
               <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-cyan-400 print:hidden" />
-              <span>Operational Advisory & Administrative Directives</span>
+              <span>{dict.modals.advisoryTitle}</span>
             </div>
             <ul className="list-disc pl-5 space-y-2 leading-relaxed text-slate-600 dark:text-slate-300 print:text-black">
               <li>
-                Reference Jurisdiction: Operational jurisdiction under{' '}
-                <span className="font-semibold text-slate-800 dark:text-slate-200 print:text-black">{notice.circle}</span>,
-                coordinated through UGVCL Corporate Office, Visnagar Road, Mehsana, Gujarat.
+                {dict.modals.advisoryJurisdiction.replace('{circle}', currentCircle)}
               </li>
               <li>
-                Service Standards: Operations conducted under Gujarat Electricity Regulatory Commission (GERC)
-                distribution and consumer service guidelines.
+                {dict.modals.advisoryStandards}
               </li>
               <li className="flex items-center gap-1.5 flex-wrap">
-                <span>Consumer Grievances & 24×7 Escalation Desk:</span>
+                <span>{dict.modals.advisoryGrievance}</span>
                 <a
                   href="tel:19122"
                   className="font-bold text-blue-700 dark:text-cyan-400 hover:underline flex items-center gap-1 print:text-black print:no-underline"
@@ -272,9 +325,9 @@ Archive Reference: ${notice.officialRef || notice.source || 'Public Discom Archi
                 </a>
               </li>
               <li>
-                Official Reference Record Archive:{' '}
+                {dict.modals.advisoryArchive}{' '}
                 <span className="font-mono font-medium text-slate-800 dark:text-slate-200 print:text-black">
-                  {notice.officialRef || notice.source || 'UGVCL Corporate Gazette Records'}
+                  {currentRef}
                 </span>
                 .
               </li>
@@ -286,9 +339,9 @@ Archive Reference: ${notice.officialRef || notice.source || 'Public Discom Archi
             <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 text-xs sm:text-sm text-amber-900 dark:text-amber-200 flex items-start gap-3 print:hidden">
               <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
               <div className="space-y-1">
-                <span className="font-bold block">Independent Demonstration Platform Record</span>
+                <span className="font-bold block">{dict.modals.demoPlatformRecord}</span>
                 <span className="text-amber-800 dark:text-amber-300/90 leading-relaxed block">
-                  This public circular data is structured from public UGVCL operational records for the VidyutOne demonstration system. It is provided for functional verification and does not supersede active statutory gazette orders published on the state power portal.
+                  {dict.modals.demoPlatformRecordDesc}
                 </span>
               </div>
             </div>
@@ -311,12 +364,12 @@ Archive Reference: ${notice.officialRef || notice.source || 'Public Discom Archi
               {copied ? (
                 <>
                   <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span className="text-emerald-700 dark:text-emerald-300 font-bold">Copied!</span>
+                  <span className="text-emerald-700 dark:text-emerald-300 font-bold">{dict.modals.copied}</span>
                 </>
               ) : (
                 <>
                   <Copy className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                  <span>Copy Details</span>
+                  <span>{dict.modals.copyDetails}</span>
                 </>
               )}
             </button>
@@ -329,7 +382,7 @@ Archive Reference: ${notice.officialRef || notice.source || 'Public Discom Archi
               title="Print or Save Official Circular as PDF"
             >
               <Printer className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-              <span>Print / Save PDF</span>
+              <span>{dict.modals.printPdf}</span>
             </button>
 
             {/* External Official Source Link */}
@@ -341,7 +394,7 @@ Archive Reference: ${notice.officialRef || notice.source || 'Public Discom Archi
                 className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 title="View original official source page on UGVCL portal"
               >
-                <span>Official Source</span>
+                <span>{dict.modals.officialSource}</span>
                 <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
               </a>
             )}
@@ -354,7 +407,7 @@ Archive Reference: ${notice.officialRef || notice.source || 'Public Discom Archi
               onClick={onClose}
               className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-500 text-white text-xs sm:text-sm font-bold transition-colors cursor-pointer shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
-              Close
+              {dict.common.close}
             </button>
           </div>
         </div>

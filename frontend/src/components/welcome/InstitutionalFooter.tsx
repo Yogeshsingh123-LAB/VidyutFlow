@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { UGVCL_CORPORATE_PROFILE } from '../../data/ugvclHistoryData';
 import { UgvclBrandIdentity } from '../common/UgvclBrandIdentity';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface InstitutionalFooterProps {
   onOpenAboutModal: () => void;
@@ -20,6 +21,8 @@ export const InstitutionalFooter: React.FC<InstitutionalFooterProps> = ({
   onOpenAboutModal,
   onOpenManifest
 }) => {
+  const { dict } = useLanguage();
+
   return (
     <footer className="w-full bg-[#050D1C] text-slate-400 border-t border-slate-800 text-left text-xs transition-colors">
       {/* Upper Main Footer Grid */}
@@ -29,15 +32,14 @@ export const InstitutionalFooter: React.FC<InstitutionalFooterProps> = ({
           <UgvclBrandIdentity variant="footer" showMission showDemoBadge />
 
           <p className="text-slate-300 text-sm leading-relaxed font-normal">
-            Distributing 24×7 reliable electrical energy across 6 districts of Northern Gujarat.
-            A subsidiary of Gujarat Urja Vikas Nigam Limited (GUVNL).
+            {dict.footer.mission}
           </p>
 
           <div className="space-y-2 text-xs text-slate-400">
             <p className="flex items-start gap-2">
               <MapPin className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
               <span>
-                <strong className="text-slate-200">Corporate Office:</strong> Visnagar Road, Mehsana, Gujarat - 384001, India
+                <strong className="text-slate-200">{dict.footer.corporateOffice}:</strong> {dict.footer.address}
               </span>
             </p>
             <p className="font-mono text-xs text-slate-500">
@@ -49,25 +51,25 @@ export const InstitutionalFooter: React.FC<InstitutionalFooterProps> = ({
         {/* Column 2: Regional Circles & Jurisdiction */}
         <div className="space-y-4">
           <h4 className="text-sm font-bold text-white uppercase tracking-wider">
-            Operational Circles
+            {dict.footer.operationalCircles}
           </h4>
           <ul className="space-y-2.5 text-sm">
             {UGVCL_CORPORATE_PROFILE.circles.map((circle) => (
               <li key={circle} className="flex items-center gap-2 text-slate-300">
                 <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                <span>{circle} Circle</span>
+                <span>{circle} {dict.services.discomCircle}</span>
               </li>
             ))}
           </ul>
           <div className="pt-2 text-xs text-slate-400 leading-relaxed">
-            <strong className="text-slate-300">Territory Jurisdiction:</strong> Mehsana, Gandhinagar, Sabarkantha, Banaskantha, Patan, and Aravalli.
+            <strong className="text-slate-300">{dict.modals.jurisdiction}:</strong> Mehsana, Gandhinagar, Sabarkantha, Banaskantha, Patan, and Aravalli.
           </div>
         </div>
 
         {/* Column 3: Citizen Services & Governance */}
         <div className="space-y-4">
           <h4 className="text-sm font-bold text-white uppercase tracking-wider">
-            Consumer Governance
+            {dict.footer.consumerGovernance}
           </h4>
           <ul className="space-y-2.5 text-sm">
             <li>
@@ -75,7 +77,7 @@ export const InstitutionalFooter: React.FC<InstitutionalFooterProps> = ({
                 href="#consumer-services"
                 className="hover:text-cyan-300 transition-colors flex items-center gap-1.5"
               >
-                <span>Citizen Charter 2026</span>
+                <span>{dict.footer.citizenCharter}</span>
               </a>
             </li>
             <li>
@@ -83,7 +85,7 @@ export const InstitutionalFooter: React.FC<InstitutionalFooterProps> = ({
                 href="#consumer-services"
                 className="hover:text-cyan-300 transition-colors flex items-center gap-1.5"
               >
-                <span>Consumer Grievance Redressal (CGRF)</span>
+                <span>{dict.footer.cgrf}</span>
               </a>
             </li>
             <li>
@@ -92,7 +94,7 @@ export const InstitutionalFooter: React.FC<InstitutionalFooterProps> = ({
                 className="hover:text-cyan-300 transition-colors flex items-center gap-1.5 cursor-pointer text-left"
               >
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Verified Asset & Citation Manifest</span>
+                <span>{dict.footer.verifiedManifest}</span>
               </button>
             </li>
             <li>
@@ -100,7 +102,7 @@ export const InstitutionalFooter: React.FC<InstitutionalFooterProps> = ({
                 onClick={onOpenAboutModal}
                 className="hover:text-cyan-300 transition-colors flex items-center gap-1.5 cursor-pointer text-left"
               >
-                <span>Platform Architecture & Overview</span>
+                <span>{dict.footer.platformArchitecture}</span>
               </button>
             </li>
             <li>
@@ -120,11 +122,11 @@ export const InstitutionalFooter: React.FC<InstitutionalFooterProps> = ({
         {/* Column 4: 24x7 Helplines & Emergency Contacts */}
         <div className="space-y-4">
           <h4 className="text-sm font-bold text-white uppercase tracking-wider">
-            24×7 Emergency Helplines
+            {dict.footer.helplineTitle}
           </h4>
           <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-lg">
             <span className="text-xs text-cyan-400 uppercase font-bold tracking-wider block">
-              Electricity Faults & Outages
+              {dict.footer.helplineFaults}
             </span>
             <a
               href="tel:19122"
@@ -134,7 +136,7 @@ export const InstitutionalFooter: React.FC<InstitutionalFooterProps> = ({
               <span>19122 / 1800 233 155335</span>
             </a>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Toll-free customer care available 24 hours across all North Gujarat subdivisions.
+              {dict.footer.helplineSub}
             </p>
           </div>
         </div>
@@ -155,14 +157,14 @@ export const InstitutionalFooter: React.FC<InstitutionalFooterProps> = ({
               onClick={onOpenManifest}
               className="hover:text-white transition-colors cursor-pointer"
             >
-              Photo Manifest
+              {dict.header.assetManifest}
             </button>
             <span>·</span>
             <button
               onClick={onOpenAboutModal}
               className="hover:text-white transition-colors cursor-pointer"
             >
-              Platform Disclosure
+              {dict.header.platformOverview}
             </button>
           </div>
         </div>

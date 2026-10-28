@@ -12,10 +12,14 @@
     --action-orange: #f97316;
     --light-canvas: #f8fafc;
     --surface-white: #ffffff;
+    --focus-ring-color: #2563eb;
+    --radius-card: 0.75rem;
+    --radius-control: 0.5rem;
   }
 
   html {
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
@@ -23,6 +27,19 @@
     color: #0f172a;
     background-color: #f8fafc;
     overflow-x: hidden;
+    min-width: 320px;
+  }
+
+  /* Accessible visible keyboard focus indicators across all interactive elements */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--focus-ring-color);
+    outline-offset: 2px;
   }
 
   .font-gujarati {
@@ -32,6 +49,28 @@
   code, pre, .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
+}
+
+/* Skip to main content keyboard accessibility link */
+.skip-to-main-link {
+  position: fixed;
+  top: -100%;
+  left: 1rem;
+  z-index: 100;
+  padding: 0.625rem 1rem;
+  background-color: #071329;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.25);
+  transition: top 0.15s ease-in-out;
+}
+
+.skip-to-main-link:focus {
+  top: 0.75rem;
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
 }
 
 /* Custom scrollbars for enterprise data viewports */
@@ -116,9 +155,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
   .animate-electric-pulse,
   .animate-node-glow,
-  .animate-grid-wave {
+  .animate-grid-wave,
+  .animate-pulse,
+  .animate-spin,
+  .animate-bounce {
     animation: none !important;
+    transition: none !important;
   }
 }

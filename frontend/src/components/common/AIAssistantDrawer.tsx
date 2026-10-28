@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { SafeMarkdown } from './SafeMarkdown';
 import { generateUtilityGroundedResponse } from '../../utils/utilityAiEngine';
+import { AGENTIC_PERSONAS } from '../../server/agenticPersonas';
 
 interface ChatMessage {
   id: string;
@@ -26,8 +27,38 @@ interface ChatMessage {
   text: string;
   isError?: boolean;
   isFallback?: boolean;
+  executedTools?: string[];
+  personaName?: string;
   contextTag?: 'account-record' | 'tariff-guidance' | 'system';
 }
+
+export const formatToolChipName = (toolName: string): string => {
+  const map: Record<string, string> = {
+    getConsumerBillDetails: 'Checked Billing Ledgers',
+    calculateTariffEstimate: 'Calculated GERC Slabs',
+    getConsumerConnectionDetails: 'Verified Connection Technicals',
+    getConsumerPaymentHistory: 'Queried Payment Transactions',
+    getConsumerComplaints: 'Inspected Grievance Tickets',
+    getConsumerApplications: 'Tracked Connection Applications',
+    listPendingApplications: 'Scanned Application Queue',
+    getComplaintSlaRisks: 'Evaluated SLA Breach Risks',
+    getConsumerLedgerSummary: 'Summarized Consumer Ledger',
+    listPendingApprovals: 'Checked Approval Queue',
+    getAssignedWorkOrders: 'Retrieved Assigned Work Orders',
+    getFeederAndTransformerStatus: 'Queried 11kV Feeder Telemetry',
+    getSiteFeasibilityQueue: 'Checked Site Feasibility Queue',
+    getSafetyProtocolGuidelines: 'Loaded CEA Safety Protocols',
+    getExecutiveKpiSummary: 'Synthesized Discom KPIs',
+    getFeederOverloadAnalytics: 'Analyzed Overloaded Feeders',
+    getRevenueRealizationLedger: 'Inspected Revenue Ledger',
+    getDiscomComplaintTrends: 'Computed Grievance Trends',
+    querySystemAuditLogs: 'Scrutinized Security Audit Trail',
+    getSecurityAccessMatrix: 'Audited RBAC Access Matrix',
+    getSystemTelemetryStatus: 'Polled Infrastructure Telemetry',
+    getRecentAuthEvents: 'Checked Authentication Events'
+  };
+  return map[toolName] || toolName.replace(/([A-Z])/g, ' $1').trim();
+};
 
 export const ROLE_ALLOWED_TABS: Record<string, string[]> = {
   consumer: ['dashboard', 'connections', 'new-connection', 'bills', 'payments', 'complaints', 'requests', 'notifications', 'profile'],
@@ -48,19 +79,28 @@ export const AIAssistantDrawer: React.FC = () => {
     userPayments,
     userComplaints,
     userApplications,
+    roleIncidents,
+    recommendations,
+    openApprovalModal,
     setActiveTab,
     showToast
   } = useApp();
 
-  const buildWelcomeMessage = (name: string): ChatMessage => ({
-    id: `msg-welcome-${Date.now()}`,
-    sender: 'assistant',
-    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    text: `Namaste ${name.split(' ')[0]}! I am **Vidyut Mitra**, your enterprise utility operations and billing advisor for UGVCL.\n\nPowered by Gemini 3.8 Flash, I can:\n* Explain your **electricity bills**, slab breakdowns, meter readings, and payment records.\n* Verify **rooftop solar net-metering** rules and transformer feasibility.\n* Guide you through **grievance redressal** and official service requests.\n\n*Note: Prototype demonstration assistant grounded in session-scoped records and GERC tariff regulations.*`,
-    contextTag: 'system'
-  });
+  const currentPersona = AGENTIC_PERSONAS[currentRole] || AGENTIC_PERSONAS.consumer;
 
-  const [messages, setMessages] = useState<ChatMessage[]>(() => [buildWelcomeMessage(activeUser.name)]);
+  const buildWelcomeMessage = (name: string, role = currentRole): ChatMessage => {
+    const p = AGENTIC_PERSONAS[role] || AGENTIC_PERSONAS.consumer;
+    return {
+      id: `msg-welcome-${Date.now()}`,
+      sender: 'assistant',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      text: p.welcomeMessage(name),
+      personaName: p.name,
+      contextTag: 'system'
+    };
+  };
+
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [buildWelcomeMessage(activeUser.name, currentRole)]);
   const [inputVal, setInputVal] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [lastFailedQuery, setLastFailedQuery] = useState<string | null>(null);
@@ -97,7 +137,7 @@ export const AIAssistantDrawer: React.FC = () => {
     }
     isSubmittingRef.current = false;
     setIsLoading(false);
-    setMessages([buildWelcomeMessage(activeUser.name)]);
+    setMessages([buildWelcomeMessage(activeUser.name, currentRole)]);
     setLastFailedQuery(null);
     setInputVal('');
   }, [activeUser.email, activeUser.name, currentRole]);
@@ -197,9 +237,22 @@ export const AIAssistantDrawer: React.FC = () => {
         category: app.category,
         status: app.status,
         loadKw: app.requestedLoadKw
-      }))
+      })),
+      incidents:
+        currentRole === 'consumer'
+          ? []
+          : roleIncidents.map(inc => ({
+              id: inc.id,
+              title: inc.title,
+              severity: inc.severity,
+              status: inc.status,
+              module: inc.module,
+              entityType: inc.entityType,
+              entityId: inc.entityId,
+              recommendedAction: inc.recommendedAction
+            }))
     };
-  }, [currentRole, activeUser, userConnections, userBills, userPayments, userComplaints, userApplications]);
+  }, [currentRole, activeUser, userConnections, userBills, userPayments, userComplaints, userApplications, roleIncidents]);
 
   // Suggested prompts based on active role and connections
   const suggestedPrompts = useMemo(() => {
@@ -234,40 +287,8 @@ export const AIAssistantDrawer: React.FC = () => {
       return prompts;
     }
 
-    if (currentRole === 'employee') {
-      return [
-        'Standard Operating Procedure for burnt smart meter replacement',
-        'How is FPPPA calculated as per GERC distribution regulations?',
-        'Verification checklist for commercial NRGP load extension',
-        'SLA timeframes for resolving Category-A billing grievances'
-      ];
-    }
-
-    if (currentRole === 'field') {
-      return [
-        '11kV overhead distribution line ground clearance safety norms',
-        'Distribution transformer neutral grounding & phase balancing steps',
-        'Standard operating procedure for Permit to Work (PTW) line clearance',
-        'Feeder tail-end voltage compensation guidelines'
-      ];
-    }
-
-    if (currentRole === 'management') {
-      return [
-        'Feeder peak load mitigation strategies under RDSS scheme',
-        'GERC aggregate technical & commercial (AT&C) loss benchmark targets',
-        'SLDC Gotri agricultural pump power rotation coordination',
-        'Circle-level smart meter AMR ingestion exception guidelines'
-      ];
-    }
-
-    return [
-      'UGVCL CIS-SCADA synchronization security recommendations',
-      'Role-based access matrix best practices for utility staff',
-      'Audit trail retention guidelines under CEA cybersecurity regulations',
-      'Smart meter head-end system (HES) latency troubleshooting'
-    ];
-  }, [currentRole, userConnections, userBills]);
+    return currentPersona.suggestedPrompts;
+  }, [currentRole, currentPersona, userConnections, userBills]);
 
   if (!isAIAssistantOpen) return null;
 
@@ -346,11 +367,16 @@ export const AIAssistantDrawer: React.FC = () => {
           ? data.reply
           : generateUtilityGroundedResponse(text, currentRole, accountContext);
 
+      const executedTools = Array.isArray(data.executedTools) ? data.executedTools : [];
+      const personaName = data.persona?.name || currentPersona.name;
+
       const aiMsg: ChatMessage = {
         id: `msg-ai-${Date.now()}`,
         sender: 'assistant',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         text: replyText,
+        executedTools,
+        personaName,
         isFallback: Boolean(data.isFallback || !(typeof data.reply === 'string' && data.reply.trim().length > 0)),
         contextTag: text.toLowerCase().includes('bill') || text.toLowerCase().includes('meter') ? 'account-record' : 'tariff-guidance'
       };
@@ -365,7 +391,7 @@ export const AIAssistantDrawer: React.FC = () => {
 
       const isAbort = err?.name === 'AbortError';
       console.warn(
-        `[Vidyut Mitra] ${isAbort ? 'Request timed out after 8s' : 'Offline/quota fallback activated'} — using local utility grounded engine.`
+        `[${currentPersona.name}] ${isAbort ? 'Request timed out after 8s' : 'Offline/quota fallback activated'} — using local utility grounded engine.`
       );
 
       // Seamlessly fall back to client-side utility grounded engine rather than showing raw error JSON
@@ -374,7 +400,7 @@ export const AIAssistantDrawer: React.FC = () => {
         fallbackReply = generateUtilityGroundedResponse(text, currentRole, accountContext);
       } catch {
         fallbackReply =
-          '### Vidyut Mitra Utility Service\n\nNamaste. Vidyut Mitra is currently experiencing a temporary service interruption. For urgent assistance with your electricity connection, billing, or power grievances, please contact the UGVCL 24x7 Toll-Free Helpline at **19122** or **1800 233 155335**.\n\n[Open Dashboard](action:dashboard) [Go to Complaint Desk](action:complaints)';
+          `### ${currentPersona.name} Utility Service\n\nNamaste. ${currentPersona.name} is currently experiencing a temporary service interruption. For urgent assistance with your electricity connection, billing, or power grievances, please contact the UGVCL 24x7 Toll-Free Helpline at **19122** or **1800 233 155335**.\n\n[Open Dashboard](action:dashboard)`;
       }
 
       const aiMsg: ChatMessage = {
@@ -382,6 +408,7 @@ export const AIAssistantDrawer: React.FC = () => {
         sender: 'assistant',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         text: fallbackReply,
+        personaName: currentPersona.name,
         isFallback: true,
         contextTag: text.toLowerCase().includes('bill') || text.toLowerCase().includes('meter') ? 'account-record' : 'tariff-guidance'
       };
@@ -427,15 +454,7 @@ export const AIAssistantDrawer: React.FC = () => {
     }
     isSubmittingRef.current = false;
     setIsLoading(false);
-    setMessages([
-      {
-        id: `msg-reset-${Date.now()}`,
-        sender: 'assistant',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        text: `Conversation restarted. How can I assist you with your UGVCL account or utility regulations today, ${activeUser.name.split(' ')[0]}?`,
-        contextTag: 'system'
-      }
-    ]);
+    setMessages([buildWelcomeMessage(activeUser.name, currentRole)]);
     setLastFailedQuery(null);
   };
 
@@ -445,26 +464,29 @@ export const AIAssistantDrawer: React.FC = () => {
       onClick={() => setIsAIAssistantOpen(false)}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ai-assistant-drawer-title"
         className="w-full max-w-xl bg-white border-l border-slate-200 shadow-2xl h-full flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-teal-600 flex items-center justify-center text-white shadow-sm shadow-teal-600/20 shrink-0">
+            <div className={`w-9 h-9 rounded-lg ${currentPersona.avatarBg} flex items-center justify-center text-white shadow-sm shrink-0`}>
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-900">
-                  Vidyut Mitra AI Co-Pilot
+                <h3 id="ai-assistant-drawer-title" className="text-sm font-bold text-slate-900">
+                  {currentPersona.name}
                 </h3>
                 <span className="text-[10px] font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 font-mono">
-                  Gemini / Grounded Engine
+                  {currentPersona.badge}
                 </span>
               </div>
               <p className="text-[11px] text-slate-500">
-                Authoritative Utility Intelligence · UGVCL ERP Platform
+                {currentPersona.title} · UGVCL ERP Platform
               </p>
             </div>
           </div>
@@ -511,6 +533,9 @@ export const AIAssistantDrawer: React.FC = () => {
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
+          role="log"
+          aria-live="polite"
+          aria-label="AI Assistant Conversation History"
           className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#FAFBFD]"
         >
           {messages.map(m => (
@@ -534,7 +559,7 @@ export const AIAssistantDrawer: React.FC = () => {
                     ) : (
                       <>
                         <Sparkles className="w-3 h-3 text-teal-600 shrink-0" />
-                        <span>Vidyut Mitra AI</span>
+                        <span>{m.personaName || currentPersona.name}</span>
                         {m.isFallback && (
                           <span className="text-[9px] font-mono font-medium text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
                             Grounded Engine
@@ -549,7 +574,22 @@ export const AIAssistantDrawer: React.FC = () => {
                 {m.sender === 'user' ? (
                   <p className="text-xs leading-relaxed whitespace-pre-wrap font-sans">{m.text}</p>
                 ) : (
-                  <SafeMarkdown content={m.text} onNavigateTab={handleNavigateTab} />
+                  <>
+                    <SafeMarkdown content={m.text} onNavigateTab={handleNavigateTab} />
+                    {m.executedTools && m.executedTools.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2.5 pt-2 border-t border-slate-100">
+                        {m.executedTools.map((tool, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200"
+                          >
+                            <Zap className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                            <span>{formatToolChipName(tool)}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -559,7 +599,7 @@ export const AIAssistantDrawer: React.FC = () => {
           {isLoading && (
             <div className="flex items-center gap-2.5 text-xs text-slate-600 p-3 rounded-lg bg-teal-50/80 border border-teal-200 w-fit animate-pulse">
               <Sparkles className="w-4 h-4 text-teal-600 animate-spin" />
-              <span>Analyzing authorized account records & GERC tariff schedule...</span>
+              <span>{currentPersona.name} is inspecting authorized ERP records & telemetry...</span>
             </div>
           )}
 
@@ -581,11 +621,68 @@ export const AIAssistantDrawer: React.FC = () => {
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Human-in-the-Loop Action Recommendations Banner */}
+        {recommendations.filter(r => r.status === 'PENDING_APPROVAL' && (r.requiredApprovingRole === currentRole || currentRole === 'management' || currentRole === 'admin')).length > 0 && (
+          <div className="px-4 py-2.5 bg-indigo-50/70 border-t border-indigo-100 shrink-0 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950">
+                <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+                <span>AI Action Recommendations (Human Concurrence Required)</span>
+              </div>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
+                {recommendations.filter(r => r.status === 'PENDING_APPROVAL' && (r.requiredApprovingRole === currentRole || currentRole === 'management' || currentRole === 'admin')).length} Pending
+              </span>
+            </div>
+
+            <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+              {recommendations
+                .filter(r => r.status === 'PENDING_APPROVAL' && (r.requiredApprovingRole === currentRole || currentRole === 'management' || currentRole === 'admin'))
+                .slice(0, 3)
+                .map(rec => (
+                  <div
+                    key={rec.id}
+                    className="p-2.5 rounded-lg bg-white border border-indigo-200/80 shadow-3xs flex items-center justify-between gap-2 text-xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-[10px] font-bold text-indigo-600">{rec.id}</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                          rec.riskLevel === 'CRITICAL'
+                            ? 'bg-rose-100 text-rose-700'
+                            : rec.riskLevel === 'HIGH'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {rec.riskLevel}
+                        </span>
+                        <span className="font-semibold text-slate-800 truncate text-[11px]">{rec.title}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                        Diff: <span className="line-through">{rec.previousValue}</span> → <strong>{rec.proposedValue}</strong> · Approver: {rec.requiredApprovingRole.toUpperCase()}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => openApprovalModal(rec)}
+                      className="px-2.5 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] shrink-0 shadow-3xs cursor-pointer flex items-center gap-1"
+                    >
+                      <span>Review &amp; Authorize</span>
+                    </button>
+                  </div>
+                ))}
+            </div>
+
+            <p className="text-[10px] text-slate-500 italic">
+              AI recommendations remain unexecuted until authorized by an authenticated human operator.
+            </p>
+          </div>
+        )}
+
         {/* Suggested Operational Inquiries */}
         <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 shrink-0">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-              Suggested {currentRole} inquiries:
+              Suggested {currentPersona.name} inquiries:
             </span>
             <Lightbulb className="w-3 h-3 text-amber-500" />
           </div>
@@ -614,13 +711,15 @@ export const AIAssistantDrawer: React.FC = () => {
           >
             <div className="flex-1 relative">
               <textarea
+                id="ai-assistant-query-input"
                 ref={textareaRef}
                 value={inputVal}
                 onChange={e => setInputVal(e.target.value)}
                 onKeyDown={handleKeyDown}
                 disabled={isLoading}
                 rows={2}
-                placeholder="Ask Vidyut Mitra about bills, tariff slabs, solar, or outages... (Enter to send, Shift+Enter for new line)"
+                aria-label={`Ask ${currentPersona.name}`}
+                placeholder={`Ask ${currentPersona.name} about ${currentRole === 'consumer' ? 'bills, tariff slabs, solar, or outages' : currentRole === 'employee' ? 'applications, approvals, or SLA risks' : currentRole === 'field' ? 'work orders, 11kV feeders, or safety norms' : currentRole === 'management' ? 'AT&C loss, demand peaks, or revenue' : 'system telemetry, audit logs, or RBAC'}... (Enter to send)`}
                 className="w-full px-3.5 py-2.5 text-xs rounded-lg border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent font-medium disabled:opacity-60 resize-none"
               />
             </div>

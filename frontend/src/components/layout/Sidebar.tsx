@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 import { ROLE_PROFILES } from '../../data/mockData';
 import {
+  AlertTriangle,
   LayoutDashboard,
   Plug,
   PlusCircle,
@@ -54,7 +56,7 @@ export const Sidebar: React.FC = () => {
     applications,
     complaints,
     workOrders,
-    notifications,
+    roleIncidents,
     userConnections,
     userApplications,
     userBills,
@@ -64,6 +66,7 @@ export const Sidebar: React.FC = () => {
     exitToWelcomeScreen,
     activeUser
   } = useApp();
+  const { t } = useLanguage();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -71,6 +74,7 @@ export const Sidebar: React.FC = () => {
   const pendingApps = applications.filter(a => a.status !== 'Meter Installed' && a.status !== 'Rejected').length;
   const activeCmps = complaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
   const pendingWos = workOrders.filter(w => w.status !== 'Completed').length;
+  const activeEmployeeIncidents = roleIncidents.filter(i => i.status !== 'RESOLVED' && i.status !== 'CLOSED').length;
 
   // Scoped counts derived strictly from the active consumer account's authorized records
   const consumerConnectionCount = (userConnections || []).length;
@@ -83,88 +87,105 @@ export const Sidebar: React.FC = () => {
     switch (currentRole) {
       case 'consumer':
         return [
-          { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
+          { id: 'dashboard', label: t.erp.navDashboard, icon: <LayoutDashboard className="w-4 h-4" /> },
           {
             id: 'connections',
-            label: 'My Connections',
+            label: t.erp.navMyConnections,
             icon: <Plug className="w-4 h-4" />,
             badge: consumerConnectionCount > 0 ? consumerConnectionCount : undefined
           },
-          { id: 'new-connection', label: 'New Connection', icon: <PlusCircle className="w-4 h-4" /> },
+          { id: 'new-connection', label: t.erp.navNewConnection, icon: <PlusCircle className="w-4 h-4" /> },
           {
             id: 'bills',
-            label: 'Electricity Bills',
+            label: t.erp.navElectricityBills,
             icon: <Receipt className="w-4 h-4" />,
-            badge: unpaidConsumerBills > 0 ? `${unpaidConsumerBills} Due` : undefined
+            badge: unpaidConsumerBills > 0 ? `${unpaidConsumerBills} ${t.erp.dueSuffix}` : undefined
           },
-          { id: 'payments', label: 'Payment History', icon: <CreditCard className="w-4 h-4" /> },
+          { id: 'payments', label: t.erp.navPaymentHistory, icon: <CreditCard className="w-4 h-4" /> },
           {
             id: 'complaints',
-            label: 'Complaint Desk',
+            label: t.erp.navComplaintDesk,
             icon: <MessageSquareWarning className="w-4 h-4" />,
             badge: activeConsumerCmps > 0 ? activeConsumerCmps : undefined
           },
           {
             id: 'requests',
-            label: 'Service Requests',
+            label: t.erp.navServiceRequests,
             icon: <FileText className="w-4 h-4" />,
             badge: activeConsumerApps > 0 ? activeConsumerApps : undefined
           },
           {
             id: 'notifications',
-            label: 'Notifications',
+            label: t.erp.navNotifications,
             icon: <Bell className="w-4 h-4" />,
             badge: unreadConsumerNotifs > 0 ? unreadConsumerNotifs : undefined
           },
-          { id: 'profile', label: 'Account Profile', icon: <User className="w-4 h-4" /> }
+          { id: 'profile', label: t.erp.navAccountProfile, icon: <User className="w-4 h-4" /> }
         ];
 
       case 'employee':
         return [
-          { id: 'dashboard', label: 'ERP Overview', icon: <LayoutDashboard className="w-4 h-4" /> },
-          { id: 'applications', label: 'Application Queue', icon: <Inbox className="w-4 h-4" />, badge: pendingApps > 0 ? pendingApps : undefined },
-          { id: 'consumers', label: 'Consumer Ledger', icon: <Database className="w-4 h-4" /> },
-          { id: 'complaints', label: 'Complaint Queue', icon: <MessageSquareWarning className="w-4 h-4" />, badge: activeCmps > 0 ? activeCmps : undefined },
-          { id: 'approvals', label: 'Approval Center', icon: <CheckSquare className="w-4 h-4" />, badge: pendingApps > 0 ? pendingApps : undefined },
-          { id: 'coordination', label: 'Dept Coordination', icon: <Network className="w-4 h-4" /> },
-          { id: 'reports', label: 'Revenue Reports', icon: <BarChart3 className="w-4 h-4" /> }
+          { id: 'dashboard', label: t.erp.navErpOverview, icon: <LayoutDashboard className="w-4 h-4" /> },
+          { id: 'incidents', label: t.erp.navIncidentControlDesk, icon: <AlertTriangle className="w-4 h-4" />, badge: activeEmployeeIncidents > 0 ? activeEmployeeIncidents : undefined },
+          { id: 'applications', label: t.erp.navApplicationQueue, icon: <Inbox className="w-4 h-4" />, badge: pendingApps > 0 ? pendingApps : undefined },
+          { id: 'consumers', label: t.erp.navConsumerLedger, icon: <Database className="w-4 h-4" /> },
+          { id: 'complaints', label: t.erp.navComplaintQueue, icon: <MessageSquareWarning className="w-4 h-4" />, badge: activeCmps > 0 ? activeCmps : undefined },
+          { id: 'approvals', label: t.erp.navApprovalCenter, icon: <CheckSquare className="w-4 h-4" />, badge: pendingApps > 0 ? pendingApps : undefined },
+          { id: 'coordination', label: t.erp.navDeptCoordination, icon: <Network className="w-4 h-4" /> },
+          { id: 'reports', label: t.erp.navRevenueReports, icon: <BarChart3 className="w-4 h-4" /> }
         ];
 
       case 'field':
         return [
-          { id: 'dashboard', label: 'Field Console', icon: <LayoutDashboard className="w-4 h-4" /> },
-          { id: 'workorders', label: 'Work Orders', icon: <Wrench className="w-4 h-4" />, badge: pendingWos > 0 ? pendingWos : undefined },
-          { id: 'inspections', label: 'Site Feasibility', icon: <ClipboardCheck className="w-4 h-4" /> },
-          { id: 'maintenance', label: 'Feeder Patrol', icon: <HardHat className="w-4 h-4" /> },
-          { id: 'offline', label: 'Offline Queue', icon: <WifiOff className="w-4 h-4" /> },
-          { id: 'history', label: 'Completed Jobs', icon: <History className="w-4 h-4" /> }
+          { id: 'dashboard', label: t.erp.navFieldConsole, icon: <LayoutDashboard className="w-4 h-4" /> },
+          { id: 'workorders', label: t.erp.navWorkOrders, icon: <Wrench className="w-4 h-4" />, badge: pendingWos > 0 ? pendingWos : undefined },
+          { id: 'inspections', label: t.erp.navSiteFeasibility, icon: <ClipboardCheck className="w-4 h-4" /> },
+          { id: 'maintenance', label: t.erp.navFeederPatrol, icon: <HardHat className="w-4 h-4" /> },
+          { id: 'offline', label: t.erp.navOfflineQueue, icon: <WifiOff className="w-4 h-4" /> },
+          { id: 'history', label: t.erp.navCompletedJobs, icon: <History className="w-4 h-4" /> }
         ];
 
       case 'management':
         return [
-          { id: 'dashboard', label: 'Executive Cockpit', icon: <LineChart className="w-4 h-4" /> },
-          { id: 'analytics', label: 'Revenue & Demand', icon: <PieChart className="w-4 h-4" /> },
-          { id: 'sla', label: 'SLA Redressal', icon: <Clock className="w-4 h-4" /> },
-          { id: 'feeders', label: 'Feeder Overloads', icon: <Cpu className="w-4 h-4" />, badge: '1 Alert' },
-          { id: 'ai-insights', label: 'UGVCL AI Insights', icon: <Sparkles className="w-4 h-4" /> },
-          { id: 'reports', label: 'Executive Export', icon: <BarChart3 className="w-4 h-4" /> }
+          { id: 'dashboard', label: t.erp.navExecutiveCockpit, icon: <LineChart className="w-4 h-4" /> },
+          { id: 'analytics', label: t.erp.navRevenueDemand, icon: <PieChart className="w-4 h-4" /> },
+          { id: 'sla', label: t.erp.navSlaRedressal, icon: <Clock className="w-4 h-4" /> },
+          { id: 'feeders', label: t.erp.navFeederOverloads, icon: <Cpu className="w-4 h-4" />, badge: `1 ${t.erp.alertSuffix}` },
+          { id: 'ai-insights', label: t.erp.navAiInsights, icon: <Sparkles className="w-4 h-4" /> },
+          { id: 'reports', label: t.erp.navExecutiveExport, icon: <BarChart3 className="w-4 h-4" /> }
         ];
 
       case 'admin':
         return [
-          { id: 'overview', label: 'System Overview', icon: <Activity className="w-4 h-4" /> },
-          { id: 'users', label: 'Users & Roles', icon: <Users className="w-4 h-4" />, badge: 12 },
-          { id: 'access', label: 'Access Matrix', icon: <KeyRound className="w-4 h-4" /> },
-          { id: 'audit', label: 'Audit Trail', icon: <FileSearch className="w-4 h-4" /> },
-          { id: 'integrations', label: 'API Integrations', icon: <Server className="w-4 h-4" /> },
-          { id: 'infra', label: 'Infrastructure & DB', icon: <ShieldCheck className="w-4 h-4" /> },
-          { id: 'settings', label: 'System Settings', icon: <Settings className="w-4 h-4" /> }
+          { id: 'overview', label: t.erp.navSystemOverview, icon: <Activity className="w-4 h-4" /> },
+          { id: 'users', label: t.erp.navUsersRoles, icon: <Users className="w-4 h-4" />, badge: 12 },
+          { id: 'access', label: t.erp.navAccessMatrix, icon: <KeyRound className="w-4 h-4" /> },
+          { id: 'audit', label: t.erp.navAuditTrail, icon: <FileSearch className="w-4 h-4" /> },
+          { id: 'integrations', label: t.erp.navApiIntegrations, icon: <Server className="w-4 h-4" /> },
+          { id: 'infra', label: t.erp.navInfraDb, icon: <ShieldCheck className="w-4 h-4" /> },
+          { id: 'settings', label: t.erp.navSystemSettings, icon: <Settings className="w-4 h-4" /> }
         ];
     }
   };
 
   const navItems = getNavItems();
   const profile = ROLE_PROFILES[currentRole];
+  const roleLabelMap: Record<string, string> = {
+    consumer: t.erp.roleConsumer,
+    employee: t.erp.roleEmployee,
+    field: t.erp.roleField,
+    management: t.erp.roleManagement,
+    admin: t.erp.roleAdmin
+  };
+  const roleBadgeMap: Record<string, string> = {
+    consumer: t.erp.badgeConsumer,
+    employee: t.erp.badgeEmployee,
+    field: t.erp.badgeField,
+    management: t.erp.badgeManagement,
+    admin: t.erp.badgeAdmin
+  };
+  const localizedRoleLabel = roleLabelMap[currentRole] || profile.label;
+  const localizedRoleBadge = roleBadgeMap[currentRole] || profile.badge;
 
   return (
     <aside
@@ -179,7 +200,7 @@ export const Sidebar: React.FC = () => {
         <button
           onClick={() => setIsCollapsed(prev => !prev)}
           className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
-          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={isCollapsed ? t.erp.expandSidebar : t.erp.collapseSidebar}
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -191,14 +212,14 @@ export const Sidebar: React.FC = () => {
         <div className="p-3.5 mx-3 mt-3.5 mb-2 rounded-xl bg-[#132240]/90 border border-slate-800/90 shadow-xs">
           <div className="flex items-center justify-between text-[11px] mb-1">
             <span className="font-semibold text-slate-400 uppercase tracking-wider text-[10px]">
-              Active Portal
+              {t.erp.activePortal}
             </span>
             <span className="text-[10px] font-mono font-semibold uppercase px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/25">
               {currentRole}
             </span>
           </div>
           <div className="text-[13px] font-bold text-white truncate">
-            {profile.label}
+            {localizedRoleLabel}
           </div>
           <div className="flex items-center gap-2.5 mt-2.5 pt-2.5 border-t border-slate-800/90 min-w-0">
             <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0 shadow-xs">
@@ -209,7 +230,7 @@ export const Sidebar: React.FC = () => {
                 {activeUser.name}
               </div>
               <div className="text-[10px] text-slate-400 truncate">
-                {activeUser.isCustomUser ? 'Registered Citizen' : profile.badge}
+                {activeUser.isCustomUser ? t.erp.registeredCitizen : localizedRoleBadge}
               </div>
             </div>
           </div>
@@ -218,7 +239,7 @@ export const Sidebar: React.FC = () => {
         <div className="p-2 my-3 flex justify-center">
           <div
             className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shadow-xs cursor-pointer"
-            title={`${profile.label} · ${activeUser.name} (${activeUser.initials})`}
+            title={`${localizedRoleLabel} · ${activeUser.name} (${activeUser.initials})`}
           >
             {activeUser.initials}
           </div>
@@ -229,7 +250,7 @@ export const Sidebar: React.FC = () => {
       {!isCollapsed && (
         <div className="px-5 pt-2 pb-1">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            {currentRole === 'consumer' ? 'Consumer Services' : 'Workspace Modules'}
+            {currentRole === 'consumer' ? t.erp.consumerServices : t.erp.workspaceModules}
           </span>
         </div>
       )}
@@ -241,6 +262,7 @@ export const Sidebar: React.FC = () => {
           return (
             <button
               key={item.id}
+              type="button"
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-[13px] font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer ${
                 isActive
@@ -277,28 +299,30 @@ export const Sidebar: React.FC = () => {
       {/* Utility Bottom Actions */}
       <div className="p-3 border-t border-slate-800/80 space-y-1.5">
         <button
+          type="button"
           onClick={exitToWelcomeScreen}
           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-slate-300 hover:text-white bg-slate-800/50 hover:bg-slate-800 border border-slate-700/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer ${
             isCollapsed ? 'justify-center px-0' : ''
           }`}
-          title="Return to Welcome Screen & Role Selection"
+          title={t.erp.welcomeHub}
         >
           <Home className="w-4 h-4 text-cyan-400 shrink-0" />
-          {!isCollapsed && <span className="truncate font-medium">Welcome Hub</span>}
+          {!isCollapsed && <span className="truncate font-medium">{t.erp.welcomeHub}</span>}
         </button>
 
-
         <button
+          type="button"
           onClick={() => setIsAIAssistantOpen(true)}
           className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-teal-300 hover:text-white bg-teal-950/40 hover:bg-teal-900/40 border border-teal-800/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer ${
             isCollapsed ? 'justify-center px-0' : ''
           }`}
-          title="Vidyut Mitra AI Assistant"
+          title={t.erp.vidyutMitraAiAssistant}
         >
           <Sparkles className="w-4 h-4 text-teal-400 shrink-0" />
-          {!isCollapsed && <span className="truncate font-medium">Vidyut Mitra AI</span>}
+          {!isCollapsed && <span className="truncate font-medium">{t.erp.vidyutMitraAi}</span>}
         </button>
       </div>
     </aside>
   );
 };
+

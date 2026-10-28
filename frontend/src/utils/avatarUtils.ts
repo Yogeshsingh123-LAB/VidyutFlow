@@ -1,4 +1,9 @@
-import { DemoSession } from '../data/demoAuthData';
+import {
+  DemoSession,
+  getCanonicalIdentityById,
+  resolveCanonicalDemoIdentity,
+  getDefaultCanonicalIdentityForRole
+} from '../data/demoAuthData';
 import { ROLE_PROFILES } from '../data/mockData';
 import { UserRole } from '../types';
 
@@ -29,18 +34,6 @@ const HONORIFICS = new Set([
  * 2. Uses the first letter of the first and last meaningful name parts.
  * 3. For single-word names, returns the first letter.
  * 4. Gracefully handles punctuation, extra spaces, and missing names.
- * 
- * Examples:
- * - "Mandalia Utsav" -> "MU"
- * - "Meenaben Patel" -> "MP"
- * - "Smt. Meenaben Patel" -> "MP"
- * - "Rajesh V. Trivedi" -> "RT"
- * - "Rajesh Trivedi" -> "RT"
- * - "Priya Rathod" -> "PR"
- * - "Dr. Harita Joshi" -> "HJ"
- * - "Vikramaditya Solanki" -> "VS"
- * - "K. V. Sharma" -> "KS"
- * - "Utsav" -> "U"
  */
 export function getInitialsFromName(name?: string | null, fallback: string = 'VF'): string {
   if (!name || typeof name !== 'string') {
@@ -80,44 +73,103 @@ export function getInitialsFromName(name?: string | null, fallback: string = 'VF
 
 export interface ActiveUserIdentity {
   name: string;
-  email: string;
+  email?: string;
   designation: string;
-  initials: string;
-  isCustomUser: boolean;
+  initials?: string;
+  isCustomUser?: boolean;
+  id?: string;
+  subdivision?: string;
+  badge?: string;
 }
 
 /**
  * Single source of truth for active user identity across all 5 portals and navigation bars.
- * Prioritizes the active authenticated demoSession user, falling back to role default persona.
+ * Resolves against the Single Canonical User Directory (CANONICAL_DEMO_IDENTITIES) so that
+ * user ID, name, initials, designation, and subdivision are 100% consistent across portals.
  */
 export function getActiveUserIdentity(
   demoSession: DemoSession | null | undefined,
   currentRole: UserRole
 ): ActiveUserIdentity {
   const profile = ROLE_PROFILES[currentRole];
-  
-  // Authenticated demoSession is the primary source of truth
-  const isMatchingRole = demoSession && demoSession.role === currentRole;
-  
-  const name = isMatchingRole
-    ? demoSession.user.name
-    : (demoSession?.user.name || profile?.personaName || 'Citizen Consumer');
-    
-  const email = isMatchingRole
-    ? demoSession.user.email
-    : (demoSession?.user.email || `${currentRole}@vidyutflow.demo`);
-    
-  const designation = isMatchingRole
-    ? (demoSession.user.designation || profile?.personaDesignation || 'Authorized User')
-    : (profile?.personaDesignation || 'Authorized User');
-    
-  const initials = getInitialsFromName(name, profile?.personaAvatar || 'VF');
-  
+  const isMatchingRole = Boolean(demoSession && demoSession.role === currentRole);
+
+  // 1. Custom registered consumer accounts preserve their custom signup identity
+  if (isMatchingRole && demoSession?.user.isCustomSignup) {
+    const customName = demoSession.user.name || 'Citizen Consumer';
+    return {
+      id: demoSession.user.id,
+      name: customName,
+      email: demoSession.user.email,
+      designation: demoSession.user.designation || 'Registered Domestic / Commercial Consumer',
+      initials: getInitialsFromName(customName, 'CC'),
+      subdivision: demoSession.user.subdivision || 'Mehsana City North',
+      badge: profile?.badge,
+      isCustomUser: true
+    };
+  }
+
+  // 2. Canonical directory resolution for matching role session
+  if (isMatchingRole && demoSession?.user) {
+    const directCanonical = getCanonicalIdentityById(demoSession.user.id);
+    if (directCanonical && directCanonical.role === currentRole) {
+      return {
+        id: directCanonical.id,
+        name: directCanonical.name,
+        email: directCanonical.email,
+        designation: directCanonical.designation,
+        initials: getInitialsFromName(directCanonical.name, directCanonical.avatarInitials),
+        subdivision: demoSession.user.subdivision || directCanonical.subdivision,
+        badge: profile?.badge,
+        isCustomUser: false
+      };
+    }
+
+    const resolvedCanonical = resolveCanonicalDemoIdentity({
+      id: demoSession.user.id,
+      email: demoSession.user.email,
+      name: demoSession.user.name,
+      role: currentRole
+    });
+
+    if (resolvedCanonical) {
+      return {
+        id: resolvedCanonical.id,
+        name: resolvedCanonical.name,
+        email: resolvedCanonical.email,
+        designation: resolvedCanonical.designation,
+        initials: getInitialsFromName(resolvedCanonical.name, resolvedCanonical.avatarInitials),
+        subdivision: demoSession.user.subdivision || resolvedCanonical.subdivision,
+        badge: profile?.badge,
+        isCustomUser: false
+      };
+    }
+
+    // Fallback for custom server-authenticated users not in static demo list
+    const fallbackName = demoSession.user.name || profile?.personaName || 'Authorized User';
+    return {
+      id: demoSession.user.id,
+      name: fallbackName,
+      email: demoSession.user.email,
+      designation: demoSession.user.designation || profile?.personaDesignation || 'Authorized User',
+      initials: getInitialsFromName(fallbackName, profile?.personaAvatar || 'VF'),
+      subdivision: demoSession.user.subdivision,
+      badge: profile?.badge,
+      isCustomUser: false
+    };
+  }
+
+  // 3. Default canonical identity for the current role when no matching session is active
+  const defaultCanonical = getDefaultCanonicalIdentityForRole(currentRole);
   return {
-    name,
-    email,
-    designation,
-    initials,
-    isCustomUser: !!demoSession?.user.isCustomSignup
+    id: defaultCanonical.id,
+    name: defaultCanonical.name,
+    email: defaultCanonical.email,
+    designation: defaultCanonical.designation,
+    initials: getInitialsFromName(defaultCanonical.name, defaultCanonical.avatarInitials),
+    subdivision: defaultCanonical.subdivision,
+    badge: profile?.badge,
+    isCustomUser: false
   };
 }
+

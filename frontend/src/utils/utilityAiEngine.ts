@@ -196,7 +196,33 @@ Namaste **${userName}**! Enterprise platform security controls:
   }
 
   // ---------------------------------------------------------------------------
-  // 2. Consumer Portal: Newly registered accounts with 0 linked connections
+  // 2. Consumer Portal: Strict RBAC & Privacy Boundary Guard
+  // ---------------------------------------------------------------------------
+  if (
+    role === 'consumer' &&
+    (q.includes('scada') ||
+      q.includes('security log') ||
+      q.includes('audit log') ||
+      q.includes('work order') ||
+      q.includes('sla breach risk') ||
+      q.includes('internal incident') ||
+      q.includes('sub-divisional officer') ||
+      q.includes('04281-55104'))
+  ) {
+    return `### Consumer Privacy & Role Authorization Boundary
+
+Namaste **${userName}**, internal operational telemetry (SCADA diagnostics, GERC SLA breach escalation queues, field work orders, security audit trails, and other consumers' account records) is restricted to authorized UGVCL utility personnel.
+
+As a Consumer Portal user, I can assist you with:
+* Your linked electricity connections, smart meter readings, and monthly bill slab breakdowns.
+* Tracking your new connection applications and grievance status updates.
+* Reference GERC tariff schedules and rooftop solar net-metering guidelines.
+
+[Open Dashboard](action:dashboard) [Open Electricity Bills](action:bills) [Go to Complaint Desk](action:complaints)`;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2b. Consumer Portal: Newly registered accounts with 0 linked connections
   // ---------------------------------------------------------------------------
   if (role === 'consumer' && !hasLinked) {
     if (

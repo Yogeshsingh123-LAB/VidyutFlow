@@ -1,6 +1,8 @@
 import React from 'react';
-import { X, ShieldCheck, ExternalLink, MapPin, CheckCircle2, AlertTriangle, FileText } from 'lucide-react';
+import { X, ShieldCheck, ExternalLink, MapPin } from 'lucide-react';
 import { UGVCL_PHOTO_MANIFEST } from '../../data/ugvclHistoryData';
+import { useLanguage } from '../../i18n/LanguageContext';
+import { getLocalizedPhoto } from '../../i18n/contentTranslations';
 
 interface SourceManifestModalProps {
   isOpen: boolean;
@@ -8,6 +10,8 @@ interface SourceManifestModalProps {
 }
 
 export const SourceManifestModal: React.FC<SourceManifestModalProps> = ({ isOpen, onClose }) => {
+  const { dict, language } = useLanguage();
+
   if (!isOpen) return null;
 
   return (
@@ -28,10 +32,10 @@ export const SourceManifestModal: React.FC<SourceManifestModalProps> = ({ isOpen
             <ShieldCheck className="w-5 h-5 text-emerald-400" />
             <div>
               <h3 id="manifest-modal-title" className="text-base font-bold text-white">
-                Authentic UGVCL Photographic & Historical Manifest
+                {dict.modals.manifestModalTitle}
               </h3>
               <p className="text-xs text-cyan-300">
-                Audited against UGVCL Corporate Records, Ministry of Power filings, and verified Wikimedia Commons archives
+                {dict.modals.manifestModalSubtitle}
               </p>
             </div>
           </div>
@@ -48,10 +52,10 @@ export const SourceManifestModal: React.FC<SourceManifestModalProps> = ({ isOpen
         <div className="p-6 overflow-y-auto space-y-6 text-left">
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 space-y-1">
             <p className="font-semibold text-slate-900 dark:text-white">
-              Strict Asset Transparency & Attribution Policy:
+              {dict.modals.manifestPolicyTitle}
             </p>
             <p>
-              In compliance with official presentation guidelines, no artificial AI-generated photos or unrelated international stock photos are labeled as UGVCL assets. Every asset is verified, licensed for reuse, attributed with its creator, and cataloged below.
+              {dict.modals.manifestPolicyDesc}
             </p>
           </div>
 
@@ -59,50 +63,53 @@ export const SourceManifestModal: React.FC<SourceManifestModalProps> = ({ isOpen
             <table className="w-full text-xs text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-500 font-bold uppercase text-[10px]">
-                  <th className="p-3">Asset Title</th>
-                  <th className="p-3">Subject & Location</th>
-                  <th className="p-3">License & Attribution</th>
-                  <th className="p-3">Status / Verified Source</th>
+                  <th className="p-3">{dict.modals.colAssetTitle}</th>
+                  <th className="p-3">{dict.modals.colSubjectLoc}</th>
+                  <th className="p-3">{dict.modals.colLicenseAttr}</th>
+                  <th className="p-3">{dict.modals.colStatusSource}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                {UGVCL_PHOTO_MANIFEST.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
-                    <td className="p-3 font-semibold text-slate-900 dark:text-white">
-                      <div>{item.title}</div>
-                      <span className="text-[10px] text-slate-400 font-mono">{item.category}</span>
-                    </td>
-                    <td className="p-3">
-                      <div className="font-medium">{item.subject}</div>
-                      <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                        <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
-                        <span>{item.location}</span>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <div className="font-semibold text-blue-700 dark:text-cyan-400">{item.license}</div>
-                      <div className="text-[11px] text-slate-500">{item.attribution}</div>
-                    </td>
-                    <td className="p-3">
-                      <div className="text-[11px] text-slate-600 dark:text-slate-400 mb-1">
-                        {item.statusNotes}
-                      </div>
-                      {item.originalSourceUrl ? (
-                        <a
-                          href={item.originalSourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 dark:text-cyan-400 hover:underline flex items-center gap-1 text-[11px] font-semibold"
-                        >
-                          <span>Original Archival Record</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      ) : (
-                        <span className="text-slate-400 text-[10px]">Institutional Archive</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {UGVCL_PHOTO_MANIFEST.map((item) => {
+                  const localized = getLocalizedPhoto(item, language);
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
+                      <td className="p-3 font-semibold text-slate-900 dark:text-white">
+                        <div>{localized.title}</div>
+                        <span className="text-[10px] text-slate-400 font-mono">{localized.category}</span>
+                      </td>
+                      <td className="p-3">
+                        <div className="font-medium">{localized.subject}</div>
+                        <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                          <MapPin className="w-3 h-3 text-blue-500 shrink-0" />
+                          <span>{localized.location}</span>
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <div className="font-semibold text-blue-700 dark:text-cyan-400">{item.license}</div>
+                        <div className="text-[11px] text-slate-500">{item.attribution}</div>
+                      </td>
+                      <td className="p-3">
+                        <div className="text-[11px] text-slate-600 dark:text-slate-400 mb-1">
+                          {localized.statusNotes || item.statusNotes}
+                        </div>
+                        {item.originalSourceUrl ? (
+                          <a
+                            href={item.originalSourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 dark:text-cyan-400 hover:underline flex items-center gap-1 text-[11px] font-semibold"
+                          >
+                            <span>{dict.modals.originalArchival}</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <span className="text-slate-400 text-[10px]">Institutional Archive</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -114,7 +121,7 @@ export const SourceManifestModal: React.FC<SourceManifestModalProps> = ({ isOpen
             onClick={onClose}
             className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold"
           >
-            Close Manifest
+            {dict.common.close}
           </button>
         </div>
       </div>

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { useApp } from '../../context/AppContext';
 import { LiveWorkflowKpis } from '../common/LiveWorkflowKpis';
 import { LiveSlaRiskWatchlist } from '../common/LiveSlaRiskWatchlist';
+import React, { useState, useMemo } from 'react';
+import { useApp } from '../../context/AppContext';
 import {
   EXECUTIVE_MONTHLY_METRICS,
   FEEDER_METRICS,
@@ -39,10 +39,71 @@ import {
 } from 'recharts';
 import { SmartGridDigitalTwin } from '../intro/SmartGridDigitalTwin';
 import { AIEnergyForecasting } from '../intro/AIEnergyForecasting';
+import { formatErpDateTime } from '../../utils/dateUtils';
+import { useLanguage } from '../../i18n/LanguageContext';
+import {
+  getManagementUiDictionary,
+  localizeBillingMonth,
+  localizeFeederStatus,
+  localizeAiProposalRisk,
+  localizeAiProposalStatus,
+  localizeAiProposalTitle,
+  localizeAiReasoning
+} from '../../i18n/managementContentTranslations';
+import {
+  localizeIncidentTitle,
+  localizeIncidentDescription,
+  localizeIncidentSeverity
+} from '../../i18n/incidentLocalization';
+import {
+  localizeTariffCategory,
+  localizeConsumerAddress,
+  localizeSubdivision
+} from '../../i18n/consumerContentTranslations';
+import { localizeAssignedActorName as localizeActorName } from '../../i18n/employeeContentTranslations';
 
 export const ManagementPortal: React.FC = () => {
-  const { activeTab, setActiveTab, setIsAIAssistantOpen, showToast, activeUser } = useApp();
+  const { language } = useLanguage();
+  const {
+    activeTab,
+    setActiveTab,
+    applications,
+    complaints,
+    workOrders,
+    roleIncidents,
+    recommendations,
+    resolveIncident,
+    openApprovalModal,
+    openIncidentModal,
+    updateApplicationStatus,
+    openCaseDrawer,
+    setIsAIAssistantOpen,
+    showToast,
+    activeUser
+  } = useApp();
+  const tm = getManagementUiDictionary(language);
   const [timePeriod, setTimePeriod] = useState<'Q2-2026' | 'FY26-YTD'>('FY26-YTD');
+  const [selectedEscalatedIncident, setSelectedEscalatedIncident] = useState<any | null>(null);
+
+  // Derived Real-Time ERP Metrics from Canonical Records (Scoped by Role/Session)
+  const pendingApplications = applications.filter(a => a.status !== 'Meter Installed' && a.status !== 'Rejected');
+  const openComplaints = complaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed');
+  const activeWorkOrders = workOrders.filter(w => w.status !== 'Completed');
+  const activeIncidents = roleIncidents.filter(i => i.status !== 'RESOLVED');
+  const criticalIncidents = activeIncidents.filter(i => i.severity === 'CRITICAL');
+
+  // Applications requiring managerial sanction review (high load >= 10 kW or commercial/industrial)
+  const highRiskApplications = applications.filter(
+    a => (a.requestedLoadKw >= 10 || a.category.includes('Commercial') || a.category.includes('Industrial')) && a.status === 'Sanction Approval'
+  );
+
+  // Localized chart data
+  const localizedMonthlyMetrics = useMemo(() => {
+    return EXECUTIVE_MONTHLY_METRICS.map(row => ({
+      ...row,
+      month: localizeBillingMonth(row.month, language)
+    }));
+  }, [language]);
 
   return (
     <div className="space-y-4 sm:space-y-6 min-w-0">
@@ -55,15 +116,15 @@ export const ManagementPortal: React.FC = () => {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug break-words">
-                Executive Intelligence Cockpit
+                {tm.cockpitTitle}
               </h1>
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                Corporate Office Mehsana
+                {tm.corporateOfficeBadge}
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-relaxed break-words">
-              <span>UGVCL Corporate · Officer:</span>
-              <span className="font-semibold text-slate-700 dark:text-slate-300">{activeUser.name}</span>
+              <span>{tm.officerPrefix}</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-300">{localizeActorName(activeUser.name, language)}</span>
               <span>({activeUser.designation})</span>
             </p>
           </div>
@@ -75,96 +136,275 @@ export const ManagementPortal: React.FC = () => {
             onChange={e => setTimePeriod(e.target.value as any)}
             className="flex-1 sm:flex-initial min-h-11 sm:min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 dark:bg-[#131D31] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
           >
-            <option value="Q2-2026">Q2 FY2026 (Jul - Sep)</option>
-            <option value="FY26-YTD">FY2026 Year-to-Date</option>
+            <option value="Q2-2026">{tm.optQ2}</option>
+            <option value="FY26-YTD">{tm.optYtd}</option>
           </select>
 
           <button
-            onClick={() => showToast('Generated Executive Flash Report (PDF)', 'success')}
+            onClick={() => showToast(tm.flashReportToast, 'success')}
             className="flex-1 sm:flex-initial min-h-11 sm:min-h-[38px] px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 shrink-0" />
-            <span>Export Report</span>
+            <span>{tm.exportReportBtn}</span>
           </button>
+        </div>
+      </div>
+
+      {/* Cross-Portal ERP Workflow Operations Pulse */}
+      <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white border border-slate-800 shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <h2 className="text-sm font-bold tracking-wide">
+              {tm.telemetryTitle}
+            </h2>
+          </div>
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-white/10 text-slate-200 self-start sm:self-auto border border-white/10">
+            {tm.canonicalStateSyncActive}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+            <span className="text-[10px] text-slate-300 block uppercase font-medium">{tm.kpiPendingAppsTitle}</span>
+            <div className="text-xl font-bold text-white mt-0.5 font-mono">{pendingApplications.length}</div>
+            <span className="text-[10px] text-teal-300">{tm.kpiPendingAppsSub}</span>
+          </div>
+
+          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+            <span className="text-[10px] text-slate-300 block uppercase font-medium">{tm.kpiActiveGrievancesTitle}</span>
+            <div className="text-xl font-bold text-white mt-0.5 font-mono">{openComplaints.length}</div>
+            <span className="text-[10px] text-amber-300">{tm.kpiActiveGrievancesSub}</span>
+          </div>
+
+          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+            <span className="text-[10px] text-slate-300 block uppercase font-medium">{tm.kpiDispatchedFieldOrdersTitle}</span>
+            <div className="text-xl font-bold text-white mt-0.5 font-mono">{activeWorkOrders.length}</div>
+            <span className="text-[10px] text-sky-300">{tm.kpiDispatchedFieldOrdersSub}</span>
+          </div>
+
+          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+            <span className="text-[10px] text-slate-300 block uppercase font-medium">{tm.kpiCriticalHazardsTitle}</span>
+            <div className={`text-xl font-bold mt-0.5 font-mono ${criticalIncidents.length > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+              {criticalIncidents.length}
+            </div>
+            <span className="text-[10px] text-rose-300">{tm.kpiCriticalHazardsSub}</span>
+          </div>
         </div>
       </div>
 
       {/* VIEW 1: EXECUTIVE DASHBOARD */}
       {activeTab === 'dashboard' && (
         <div className="space-y-4 sm:space-y-6">
-          {/* Live Workflow KPIs — wired to the VidyutFlow FastAPI backend (auto-refresh 45s) */}
+          {/* Live Workflow KPIs — wired to VidyutFlow FastAPI backend */}
           <LiveWorkflowKpis />
+          {/* Executive Escalation Inbox (Only Escalated Incidents or Emergency Safety Overrides Appear Here) */}
+          {activeIncidents.length > 0 && (
+            <div className="p-5 rounded-xl bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/60 shadow-2xs space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    {tm.escalationInboxTitle}
+                  </h3>
+                </div>
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-900 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-700">
+                  {activeIncidents.length} {tm.escalatedAwaitingSuffix}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {activeIncidents.map(inc => (
+                  <div
+                    key={inc.id}
+                    className="p-3.5 rounded-lg bg-white dark:bg-[#101C35] border border-rose-200/80 dark:border-rose-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-rose-600 dark:text-rose-400">{inc.id}</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{localizeIncidentTitle(inc.title, language)}</span>
+                        <span className="px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900 text-rose-700 dark:text-rose-300 text-[10px] font-bold">
+                          {localizeIncidentSeverity(inc.severity, language)}
+                        </span>
+                        {inc.isEmergencyOverride && (
+                          <span className="px-1.5 py-0.5 rounded bg-red-600 text-white text-[10px] font-black uppercase">
+                            {tm.emergencySafetyOverrideBadge}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                        {localizeIncidentDescription(inc.description, language)}
+                      </p>
+                      <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                        <span>{tm.feederLabel} <strong>{inc.entityId || tm.fallbackGridLine}</strong></span>
+                        <span>·</span>
+                        <span>{tm.subdivisionLabel} <strong>{localizeSubdivision(inc.subdivision || tm.fallbackDivisionOffice, language)}</strong></span>
+                        {inc.escalatedBy && (
+                          <>
+                            <span>·</span>
+                            <span className="text-amber-700 dark:text-amber-300 font-medium">
+                              {tm.escalatedByPrefix} {localizeActorName(inc.escalatedBy, language)} {inc.escalatedAt ? `(${formatErpDateTime(inc.escalatedAt)})` : ''}
+                            </span>
+                          </>
+                        )}
+                        {inc.escalatedReason && (
+                          <>
+                            <span>·</span>
+                            <span className="italic text-slate-600 dark:text-slate-300">
+                              {tm.justificationPrefix} &quot;{inc.escalatedReason}&quot;
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => openIncidentModal(inc.id)}
+                        className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs cursor-pointer flex items-center gap-1.5 transition-colors"
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span>{tm.reviewEscalationBtn}</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* High-Risk Sanctions & Escalations Card (if any pending) */}
+          {highRiskApplications.length > 0 && (
+            <div className="p-5 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/60 shadow-2xs space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    {tm.highRiskSanctionsTitle}
+                  </h3>
+                </div>
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+                  {highRiskApplications.length} {tm.awaitingConcurrenceSuffix}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {highRiskApplications.map(app => (
+                  <div
+                    key={app.id}
+                    className="p-3 rounded-lg bg-white dark:bg-[#101C35] border border-amber-200/80 dark:border-amber-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-teal-600 dark:text-teal-400">{app.id}</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{app.applicantName}</span>
+                        <span className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-[10px]">
+                          {localizeTariffCategory(app.category, language)} · {app.requestedLoadKw} kW
+                        </span>
+                        {app.assignedWorkOrderId && (
+                          <span className="font-mono text-[10px] text-slate-500">
+                            {tm.verifiedViaWoPrefix} {app.assignedWorkOrderId}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {tm.addressLabel} {localizeConsumerAddress(app.address, language)} · {tm.subdivisionShortLabel} {localizeSubdivision(app.subdivision, language)}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => openCaseDrawer('application', app.id)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold"
+                      >
+                        {tm.reviewFieldDossierBtn}
+                      </button>
+                      <button
+                        onClick={() => {
+                          updateApplicationStatus(app.id, 'Meter Installed', tm.sanctionAuditRemark);
+                          showToast(tm.sanctionGrantedToast.replace('{id}', app.id), 'success');
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs"
+                      >
+                        {tm.grantExecutiveSanctionBtn}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Executive KPI Bento */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* AT&C Loss */}
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                AT&C Loss Rate
+                {tm.kpiAtcLossTitle}
               </span>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
                   12.4%
                 </span>
                 <span className="text-xs font-semibold text-emerald-600 flex items-center">
-                  <TrendingDown className="w-3 h-3 mr-0.5" /> -1.4% YoY
+                  <TrendingDown className="w-3 h-3 mr-0.5" /> {tm.yoyReductionSuffix}
                 </span>
               </div>
               <span className="text-[11px] text-slate-500 mt-1 block">
-                Target: 11.8% (Mehsana Circle leading at 11.8%)
+                {tm.kpiAtcLossTarget}
               </span>
             </div>
 
             {/* Billing Efficiency */}
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Billing Efficiency
+                {tm.kpiBillingEffTitle}
               </span>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
                   88.6%
                 </span>
                 <span className="text-xs font-semibold text-emerald-600 flex items-center">
-                  <TrendingUp className="w-3 h-3 mr-0.5" /> +0.9%
+                  <TrendingUp className="w-3 h-3 mr-0.5" /> {tm.trendUpSuffix}
                 </span>
               </div>
               <span className="text-[11px] text-slate-500 mt-1 block">
-                161.9 MUs billed of 182.7 MUs input
+                {tm.kpiBillingEffSub}
               </span>
             </div>
 
             {/* Collection Efficiency */}
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                Collection Efficiency
+                {tm.kpiCollectionEffTitle}
               </span>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
                   98.4%
                 </span>
                 <span className="text-xs font-semibold text-blue-600">
-                  ₹79.6 Cr collected
+                  {tm.kpiCollectionEffVal}
                 </span>
               </div>
               <span className="text-[11px] text-slate-500 mt-1 block">
-                Digital payments: 71.2% via Bharat BillPay
+                {tm.kpiCollectionEffSub}
               </span>
             </div>
 
             {/* Reliability Index (SAIDI) */}
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                System Reliability (SAIDI)
+                {tm.kpiReliabilityTitle}
               </span>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
                   18.2 min
                 </span>
                 <span className="text-xs font-semibold text-emerald-600">
-                  99.96% Uptime
+                  {tm.kpiReliabilityUptime}
                 </span>
               </div>
               <span className="text-[11px] text-slate-500 mt-1 block">
-                SAIFI: 0.24 interruptions/consumer/mo
+                {tm.kpiReliabilitySub}
               </span>
             </div>
           </div>
@@ -175,10 +415,50 @@ export const ManagementPortal: React.FC = () => {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    AT&C Loss Reduction Curve (%)
+                    {tm.chartAtcCurveTitle}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Aggregated Technical & Commercial Losses (FY2026 Monthly Trend)
+                    {tm.chartAtcCurveSubtitle}
+                  </p>
+                </div>
+              </div>
+
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={localizedMonthlyMetrics} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.15} />
+                    <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
+                    <YAxis domain={[11, 15]} stroke="#94a3b8" fontSize={11} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#101C35',
+                        border: '1px solid #1E293B',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        color: '#FFFFFF'
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="atcLossPct"
+                      name={tm.chartAtcLegend}
+                      stroke="#F59E0B"
+                      strokeWidth={3}
+                      dot={{ r: 4, fill: '#F59E0B' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    {tm.chartEnergyVsRevTitle}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {tm.chartEnergyVsRevSubtitle}
                   </p>
                 </div>
               </div>
@@ -225,7 +505,7 @@ export const ManagementPortal: React.FC = () => {
 
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={EXECUTIVE_MONTHLY_METRICS} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <BarChart data={localizedMonthlyMetrics} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.15} />
                     <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
                     <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
@@ -238,8 +518,8 @@ export const ManagementPortal: React.FC = () => {
                         color: '#FFFFFF'
                       }}
                     />
-                    <Bar dataKey="billedMUs" name="Billed MUs" fill="#2563EB" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="collectedCr" name="Revenue (₹ Cr)" fill="#0D9488" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="billedMUs" name={tm.chartLegendBilledMus} fill="#2563EB" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="collectedCr" name={tm.chartLegendRevenueCr} fill="#0D9488" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -263,10 +543,10 @@ export const ManagementPortal: React.FC = () => {
           <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-800">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                11kV Distribution Feeder Overload & Bottleneck Radar
+                {tm.feederRadarTitle}
               </h2>
               <p className="text-xs text-slate-500">
-                SCADA telemetry monitoring peak amps against rated conductor capacity
+                {tm.feederRadarSubtitle}
               </p>
             </div>
           </div>
@@ -283,7 +563,7 @@ export const ManagementPortal: React.FC = () => {
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                       {fdr.name}
                     </h3>
-                    <span className="text-xs text-slate-500">{fdr.subdivision}</span>
+                    <span className="text-xs text-slate-500">{localizeSubdivision(fdr.subdivision, language)}</span>
                   </div>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                     fdr.status === 'Critical Overload'
@@ -292,14 +572,14 @@ export const ManagementPortal: React.FC = () => {
                       ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                       : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
                   }`}>
-                    {fdr.status}
+                    {localizeFeederStatus(fdr.status, language)}
                   </span>
                 </div>
 
                 {/* Progress bar */}
                 <div>
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-slate-400">Capacity Utilization</span>
+                    <span className="text-slate-400">{tm.capacityUtilizationLabel}</span>
                     <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{fdr.utilizationPct}%</span>
                   </div>
                   <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
@@ -318,15 +598,15 @@ export const ManagementPortal: React.FC = () => {
 
                 <div className="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-slate-100 dark:border-slate-800">
                   <div>
-                    <span className="text-slate-400 block text-[10px]">Peak Load</span>
+                    <span className="text-slate-400 block text-[10px]">{tm.colPeakLoad}</span>
                     <span className="font-mono font-semibold">{fdr.peakLoadAmps}A / {fdr.ratedCapacityAmps}A</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px]">Transformers</span>
-                    <span className="font-semibold">{fdr.transformersCount} DTs</span>
+                    <span className="text-slate-400 block text-[10px]">{tm.colTransformers}</span>
+                    <span className="font-semibold">{fdr.transformersCount} {tm.unitDts}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px]">Consumers</span>
+                    <span className="text-slate-400 block text-[10px]">{tm.colConsumers}</span>
                     <span className="font-semibold">{fdr.consumersConnected.toLocaleString()}</span>
                   </div>
                 </div>
@@ -339,69 +619,158 @@ export const ManagementPortal: React.FC = () => {
       {/* VIEW 3: AI EXECUTIVE INSIGHTS */}
       {activeTab === 'ai-insights' && (
         <div className="space-y-6">
-          {/* Live ML output — SLA-risk probabilities + reasons straight from the wired API */}
+          {/* Live ML SLA Risk Watchlist */}
           <LiveSlaRiskWatchlist />
           <div className="p-5 rounded-xl bg-gradient-to-r from-blue-900/20 to-teal-900/20 border border-teal-500/30 space-y-3">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-teal-400" />
               <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                VidyutOne Smart Utility Insights & Anomaly Radar
+                {tm.aiRadarBannerTitle}
               </h2>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              Machine-learning algorithms scan smart meter interval data, transformer heatmaps, and billing variance to predict infrastructure stress before customer outages occur.
+              {tm.aiRadarBannerSubtitle}
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
               <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500 block">
-                Transformer Thermal Overload Alert
+                {tm.alert1Badge}
               </span>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                DT-KADI-19 at 108% Headroom
+                {tm.alert1Title}
               </h3>
               <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                Agricultural pump synchronization causes 40°C temperature rise between 14:00 - 18:00. Risk of winding insulation breakdown in 14 days without phase balancing.
+                {tm.alert1Desc}
               </p>
               <button
                 onClick={() => setIsAIAssistantOpen(true)}
                 className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1"
               >
-                <span>Ask Vidyut Mitra AI Co-Pilot</span>
+                <span>{tm.askCopilotBtn}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
               <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 block">
-                Commercial Revenue Leak Detection
+                {tm.alert2Badge}
               </span>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                GIDC Phase II Consumption Anomaly
+                {tm.alert2Title}
               </h3>
               <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                Smart meter clustering detected 3 units with uncharacteristic power factor dip (0.72) indicating potential meter bypass or heavy reactive load non-compliance.
+                {tm.alert2Desc}
               </p>
               <button
-                onClick={() => showToast('Dispatched Vigilance Squad inspection notice (Demo)', 'info')}
+                onClick={() => showToast(tm.dispatchVigilanceToast, 'info')}
                 className="text-xs text-amber-600 font-semibold hover:underline"
               >
-                Dispatch Vigilance Audit →
+                {tm.dispatchAuditBtn}
               </button>
             </div>
 
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
               <span className="text-[10px] font-bold uppercase tracking-wider text-teal-500 block">
-                Solar Rooftop Net-Metering Forecast
+                {tm.alert3Badge}
               </span>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                +4.2 MW Solar Addition by Nov 2026
+                {tm.alert3Title}
               </h3>
               <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                Rapid adoption in Mehsana residential sector will offset midday peak grid load by 12.8%, lowering day-ahead spot market purchase costs.
+                {tm.alert3Desc}
               </p>
-              <span className="text-xs text-slate-400">Policy Incentive: ₹2.25/kWh feed-in tariff</span>
+              <span className="text-xs text-slate-400">{tm.alert3Policy}</span>
+            </div>
+          </div>
+
+          {/* Executive AI Action Approvals & Concurrence Queue */}
+          <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-600" />
+                  <span>{tm.aiQueueTitle}</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {tm.aiQueueSubtitle}
+                </p>
+              </div>
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 self-start sm:self-auto">
+                {recommendations.filter(r => r.requiredApprovingRole === 'management' && r.status === 'PENDING_APPROVAL').length} {tm.pendingConcurrenceBadge}
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[820px] text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tm.colProposalId}</th>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tm.colActionTarget}</th>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tm.colStateTransition}</th>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tm.colRiskLevel}</th>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tm.colStatusAudit}</th>
+                    <th className="p-3.5 font-semibold text-right whitespace-nowrap">{tm.colExecutiveAction}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                  {recommendations
+                    .filter(r => r.requiredApprovingRole === 'management' || r.riskLevel === 'HIGH' || r.riskLevel === 'CRITICAL')
+                    .map(rec => (
+                      <tr key={rec.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                        <td className="p-3.5 font-mono font-bold text-purple-600 dark:text-purple-400 whitespace-nowrap">
+                          <div>{rec.id}</div>
+                          <div className="text-[10px] font-normal text-slate-400">{rec.createdAt}</div>
+                        </td>
+                        <td className="p-3.5 max-w-xs">
+                          <div className="font-semibold text-slate-900 dark:text-white">{localizeAiProposalTitle(rec.title, language)}</div>
+                          <div className="text-[11px] font-mono text-slate-500">{rec.affectedRecord.label}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 line-clamp-1">{localizeAiReasoning(rec.reasoningSummary, language)}</div>
+                        </td>
+                        <td className="p-3.5 font-mono text-[11px] whitespace-nowrap">
+                          <span className="text-slate-500">{rec.previousValue}</span>
+                          <span className="mx-1.5 text-slate-400">→</span>
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">{rec.proposedValue}</span>
+                        </td>
+                        <td className="p-3.5 whitespace-nowrap">
+                          <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                            rec.riskLevel === 'CRITICAL'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-950/70 dark:text-red-300'
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300'
+                          }`}>
+                            {localizeAiProposalRisk(rec.riskLevel, language)}
+                          </span>
+                        </td>
+                        <td className="p-3.5 whitespace-nowrap">
+                          <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded ${
+                            rec.status === 'PENDING_APPROVAL'
+                              ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                              : rec.status === 'EXECUTED'
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                              : 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300'
+                          }`}>
+                            {localizeAiProposalStatus(rec.status, language)}
+                          </span>
+                          {rec.reviewedBy && (
+                            <div className="text-[10px] text-slate-400 mt-0.5">{tm.reviewedByPrefix} {localizeActorName(rec.reviewedBy, language)}</div>
+                          )}
+                        </td>
+                        <td className="p-3.5 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => openApprovalModal(rec)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                              rec.status === 'PENDING_APPROVAL'
+                                ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-2xs'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                            }`}
+                          >
+                            {rec.status === 'PENDING_APPROVAL' ? tm.reviewAndSanctionBtn : tm.viewAuditRecordBtn}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -412,10 +781,10 @@ export const ManagementPortal: React.FC = () => {
         <div className="space-y-4 min-w-0">
           <div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              Division SLA Redressal Matrix
+              {tm.slaMatrixTitle}
             </h2>
             <p className="text-xs text-slate-500">
-              Regulatory compliance against Gujarat Electricity Regulatory Commission (GERC) standards
+              {tm.slaMatrixSubtitle}
             </p>
           </div>
 
@@ -424,25 +793,25 @@ export const ManagementPortal: React.FC = () => {
               <table className="w-full min-w-[680px] text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                   <tr>
-                    <th className="p-3.5 font-semibold whitespace-nowrap">Sub-Division Name</th>
-                    <th className="p-3.5 font-semibold whitespace-nowrap">Total Complaints</th>
-                    <th className="p-3.5 font-semibold whitespace-nowrap">Resolution Rate (%)</th>
-                    <th className="p-3.5 font-semibold whitespace-nowrap">Average TAT (Hours)</th>
-                    <th className="p-3.5 font-semibold whitespace-nowrap">AT&C Loss %</th>
-                    <th className="p-3.5 font-semibold text-center whitespace-nowrap">GERC Compliance</th>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tm.colSubdivisionName}</th>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tm.colTotalComplaints}</th>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tm.colResolutionRate}</th>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tm.colAverageTat}</th>
+                    <th className="p-3.5 font-semibold whitespace-nowrap">{tm.colAtcLossPct}</th>
+                    <th className="p-3.5 font-semibold text-center whitespace-nowrap">{tm.colGercCompliance}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                   {SUBDIVISION_PERFORMANCE.map(s => (
                     <tr key={s.name} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                      <td className="p-3.5 font-bold text-slate-900 dark:text-white whitespace-nowrap">{s.name}</td>
+                      <td className="p-3.5 font-bold text-slate-900 dark:text-white whitespace-nowrap">{localizeSubdivision(s.name, language)}</td>
                       <td className="p-3.5 font-mono tabular-nums whitespace-nowrap">{s.complaints}</td>
                       <td className="p-3.5 font-mono font-semibold text-emerald-600 tabular-nums whitespace-nowrap">{s.resolvedPct}%</td>
-                      <td className="p-3.5 font-mono tabular-nums whitespace-nowrap">{s.avgTatHours}h</td>
+                      <td className="p-3.5 font-mono tabular-nums whitespace-nowrap">{s.avgTatHours}{tm.hoursSuffix}</td>
                       <td className="p-3.5 font-mono tabular-nums whitespace-nowrap">{s.atcLossPct}%</td>
                       <td className="p-3.5 text-center whitespace-nowrap">
                         <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
-                          Compliant
+                          {tm.badgeCompliant}
                         </span>
                       </td>
                     </tr>
@@ -460,14 +829,14 @@ export const ManagementPortal: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                Executive Export &amp; Statutory Reporting Center
+                {tm.exportCenterTitle}
               </h2>
               <p className="text-xs text-slate-500">
-                Consolidated AT&amp;C loss statements, revenue reconciliation, and GERC regulatory filings ({timePeriod})
+                {tm.exportCenterSubtitle} ({timePeriod === 'Q2-2026' ? tm.optQ2 : tm.optYtd})
               </p>
             </div>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 self-start sm:self-auto">
-              Client-Side Demo Exports
+              {tm.clientSideDemoBadge}
             </span>
           </div>
 
@@ -477,31 +846,32 @@ export const ManagementPortal: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                    Financial &amp; Energy Audit
+                    {tm.pkg1Category}
                   </span>
                   <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                    CSV / PDF
+                    {tm.pkg1Format}
                   </span>
                 </div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Monthly Energy Input, Billing &amp; AT&amp;C Loss Statement
+                  {tm.pkg1Title}
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  6-month trajectory ({EXECUTIVE_MONTHLY_METRICS[0]?.month} –{' '}
-                  {EXECUTIVE_MONTHLY_METRICS[EXECUTIVE_MONTHLY_METRICS.length - 1]?.month}) covering MU input, billing efficiency, and revenue realization.
+                  {tm.pkg1Desc
+                    .replace('{from}', localizeBillingMonth(EXECUTIVE_MONTHLY_METRICS[0]?.month, language))
+                    .replace('{to}', localizeBillingMonth(EXECUTIVE_MONTHLY_METRICS[EXECUTIVE_MONTHLY_METRICS.length - 1]?.month, language))}
                 </p>
               </div>
               <button
                 onClick={() =>
                   showToast(
-                    `Prepared Monthly AT&C Loss & Revenue Statement (${timePeriod}) for download (Demo)`,
+                    tm.pkg1Toast.replace('{period}', timePeriod === 'Q2-2026' ? tm.optQ2 : tm.optYtd),
                     'success'
                   )
                 }
                 className="w-full py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Export Monthly Statement (Demo)</span>
+                <span>{tm.pkg1Btn}</span>
               </button>
             </div>
 
@@ -509,30 +879,30 @@ export const ManagementPortal: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
-                    Regulatory Compliance
+                    {tm.pkg2Category}
                   </span>
                   <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                    GERC Standard
+                    {tm.pkg2Format}
                   </span>
                 </div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Sub-Division SLA &amp; Grievance Redressal Dossier
+                  {tm.pkg2Title}
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Covers {SUBDIVISION_PERFORMANCE.length} operational subdivisions with complaint resolution rates, average TAT hours, and compliance flags.
+                  {tm.pkg2Desc.replace('{count}', String(SUBDIVISION_PERFORMANCE.length))}
                 </p>
               </div>
               <button
                 onClick={() =>
                   showToast(
-                    'Prepared Sub-Division GERC SLA Compliance Dossier (Demo)',
+                    tm.pkg2Toast,
                     'success'
                   )
                 }
                 className="w-full py-2 px-3 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Export SLA Compliance Matrix (Demo)</span>
+                <span>{tm.pkg2Btn}</span>
               </button>
             </div>
 
@@ -540,31 +910,32 @@ export const ManagementPortal: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                    Grid Infrastructure
+                    {tm.pkg3Category}
                   </span>
                   <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                    SCADA Summary
+                    {tm.pkg3Format}
                   </span>
                 </div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  11kV Feeder Peak Load &amp; Transformer Utilization Report
+                  {tm.pkg3Title}
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Snapshot of {FEEDER_METRICS.length} monitored feeders including{' '}
-                  {FEEDER_METRICS.filter(f => f.status !== 'Optimal').length} high-load/overload corridors and connected consumer counts.
+                  {tm.pkg3Desc
+                    .replace('{count}', String(FEEDER_METRICS.length))
+                    .replace('{highCount}', String(FEEDER_METRICS.filter(f => f.status !== 'Optimal').length))}
                 </p>
               </div>
               <button
                 onClick={() =>
                   showToast(
-                    'Prepared 11kV Feeder Load & Bottleneck Audit Report (Demo)',
+                    tm.pkg3Toast,
                     'success'
                   )
                 }
                 className="w-full py-2 px-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Export Feeder Load Audit (Demo)</span>
+                <span>{tm.pkg3Btn}</span>
               </button>
             </div>
           </div>
@@ -574,10 +945,10 @@ export const ManagementPortal: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Monthly Executive Performance Ledger (Preview)
+                  {tm.previewLedgerTitle}
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Source dataset for executive board packs and quarterly discom filings
+                  {tm.previewLedgerSubtitle}
                 </p>
               </div>
             </div>
@@ -587,18 +958,18 @@ export const ManagementPortal: React.FC = () => {
                 <table className="w-full min-w-[540px] text-left text-xs">
                   <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                     <tr>
-                      <th className="p-3.5 font-semibold whitespace-nowrap">Billing Month</th>
-                      <th className="p-3.5 font-semibold whitespace-nowrap">Energy Billed (MU)</th>
-                      <th className="p-3.5 font-semibold whitespace-nowrap">Revenue Collected (₹ Cr)</th>
-                      <th className="p-3.5 font-semibold whitespace-nowrap">AT&amp;C Loss %</th>
+                      <th className="p-3.5 font-semibold whitespace-nowrap">{tm.colBillingMonth}</th>
+                      <th className="p-3.5 font-semibold whitespace-nowrap">{tm.colEnergyBilled}</th>
+                      <th className="p-3.5 font-semibold whitespace-nowrap">{tm.colRevenueCollected}</th>
+                      <th className="p-3.5 font-semibold whitespace-nowrap">{tm.colAtcLoss}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
                     {EXECUTIVE_MONTHLY_METRICS.map(row => (
                       <tr key={row.month} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                        <td className="p-3.5 font-bold text-slate-900 dark:text-white whitespace-nowrap">{row.month}</td>
+                        <td className="p-3.5 font-bold text-slate-900 dark:text-white whitespace-nowrap">{localizeBillingMonth(row.month, language)}</td>
                         <td className="p-3.5 font-mono text-blue-600 dark:text-blue-400 font-semibold tabular-nums whitespace-nowrap">
-                          {row.billedMUs} MU
+                          {row.billedMUs} {tm.unitMu}
                         </td>
                         <td className="p-3.5 font-mono font-semibold text-emerald-600 tabular-nums whitespace-nowrap">
                           ₹{row.collectedCr} Cr

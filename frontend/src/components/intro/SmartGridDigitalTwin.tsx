@@ -1,4 +1,10 @@
 import React, { useState } from 'react';
+import { useLanguage } from '../../i18n/LanguageContext';
+import {
+  getManagementUiDictionary,
+  localizeDigitalTwinScenario,
+  localizeEquipmentCatalogNode
+} from '../../i18n/managementContentTranslations';
 import {
   Zap,
   Activity,
@@ -43,7 +49,10 @@ interface EquipmentDetail {
 }
 
 export const SmartGridDigitalTwin: React.FC = () => {
+  const { language } = useLanguage();
+  const tm = getManagementUiDictionary(language);
   const [activeScenario, setActiveScenario] = useState<GridScenario>('normal');
+  const [selectedNodeKey, setSelectedNodeKey] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<EquipmentDetail | null>(null);
 
   // Scenario telemetry configurations
@@ -228,9 +237,12 @@ export const SmartGridDigitalTwin: React.FC = () => {
 
   const handleSelectEquipment = (key: string) => {
     if (equipmentCatalog[key]) {
+      setSelectedNodeKey(key);
       setSelectedNode(equipmentCatalog[key]);
     }
   };
+
+  const localizedScenario = localizeDigitalTwinScenario(activeScenario, language);
 
   // Color mapping based on scenario
   const getWireStroke = (line: 'feeder1' | 'feeder2' | 'agri' | 'solar') => {
@@ -242,6 +254,15 @@ export const SmartGridDigitalTwin: React.FC = () => {
     return '#3B82F6'; // Standard blue
   };
 
+  const scenarioTabs = [
+    { key: 'normal', label: tm.scenarioNormalTab, icon: CheckCircle2, activeColor: 'border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300' },
+    { key: 'peak', label: tm.scenarioPeakTab, icon: TrendingUp, activeColor: 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300' },
+    { key: 'overload', label: tm.scenarioOverloadTab, icon: Flame, activeColor: 'border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300' },
+    { key: 'outage', label: tm.scenarioOutageTab, icon: ShieldAlert, activeColor: 'border-rose-500 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300' },
+    { key: 'solar', label: tm.scenarioSolarTab, icon: SunMedium, activeColor: 'border-teal-500 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300' },
+    { key: 'maintenance', label: tm.scenarioMaintenanceTab, icon: Wrench, activeColor: 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300' }
+  ] as const;
+
   return (
     <div className="space-y-6">
       {/* Simulation Scenario Toolbar */}
@@ -251,38 +272,33 @@ export const SmartGridDigitalTwin: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse" />
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                UGVCL Smart Grid Digital Twin & SCADA Simulator
+                {tm.twinTitle}
               </h3>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Interactive 66kV/11kV/415V distribution network. Select operational scenarios to evaluate real-time grid behavior, voltage stability, and automated protection protocols.
+              {tm.twinSubtitle}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setActiveScenario('normal')}
+              onClick={() => {
+                setActiveScenario('normal');
+                setSelectedNodeKey(null);
+                setSelectedNode(null);
+              }}
               className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 transition-colors"
-              title="Reset to normal baseline operation"
+              title={tm.btnResetGridTitle}
             >
               <RotateCcw className="w-3.5 h-3.5 text-cyan-500" />
-              <span>Reset Grid</span>
+              <span>{tm.btnResetGrid}</span>
             </button>
           </div>
         </div>
 
         {/* 6 Scenario Selector Buttons */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-          {(
-            [
-              { key: 'normal', label: '1. Normal Balance', icon: CheckCircle2, activeColor: 'border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300' },
-              { key: 'peak', label: '2. Peak Surge', icon: TrendingUp, activeColor: 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300' },
-              { key: 'overload', label: '3. Transformer Overload', icon: Flame, activeColor: 'border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300' },
-              { key: 'outage', label: '4. Feeder Trip Outage', icon: ShieldAlert, activeColor: 'border-rose-500 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300' },
-              { key: 'solar', label: '5. Solar Reverse Flow', icon: SunMedium, activeColor: 'border-teal-500 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300' },
-              { key: 'maintenance', label: '6. Maintenance PTW', icon: Wrench, activeColor: 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300' }
-            ] as const
-          ).map(s => {
+          {scenarioTabs.map(s => {
             const Icon = s.icon;
             const isActive = activeScenario === s.key;
             return (
@@ -290,6 +306,7 @@ export const SmartGridDigitalTwin: React.FC = () => {
                 key={s.key}
                 onClick={() => {
                   setActiveScenario(s.key);
+                  setSelectedNodeKey(null);
                   setSelectedNode(null);
                 }}
                 className={`p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-1.5 ${
@@ -315,22 +332,22 @@ export const SmartGridDigitalTwin: React.FC = () => {
           <div className="space-y-0.5 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold text-slate-900 dark:text-white">
-                Scenario: {current.title}
+                {tm.scenarioPrefix} {localizedScenario.title}
               </span>
               <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300">
-                {current.badge}
+                {localizedScenario.badge}
               </span>
             </div>
             <p className="text-slate-600 dark:text-slate-400 text-[11px]">
-              {current.description}
+              {localizedScenario.description}
             </p>
           </div>
           <div className="shrink-0 sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200 dark:border-slate-800 sm:border-l sm:pl-4">
             <span className="text-[10px] uppercase font-bold text-slate-400 block">
-              Automated Response
+              {tm.automatedResponseLabel}
             </span>
             <span className="font-medium text-slate-800 dark:text-slate-200 text-[11px]">
-              {current.recommendation}
+              {localizedScenario.recommendation}
             </span>
           </div>
         </div>
@@ -345,7 +362,7 @@ export const SmartGridDigitalTwin: React.FC = () => {
             <div className="flex items-center gap-2 text-xs">
               <Radio className="w-4 h-4 text-cyan-400 animate-pulse shrink-0" />
               <span className="font-semibold text-slate-300">
-                Live Single-Line Electrical Topology (Click equipment to inspect)
+                {tm.topologySubtitle}
               </span>
             </div>
             <span className="self-start sm:self-auto text-[10px] font-mono text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40 shrink-0">
@@ -389,7 +406,7 @@ export const SmartGridDigitalTwin: React.FC = () => {
                 strokeDasharray="4 2"
               />
               <text x="60" y="145" fill="#94A3B8" fontSize="10" fontWeight="bold">
-                66kV Grid (GETCO)
+                {tm.getcoGridLabel}
               </text>
 
               {/* 2. SUBSTATION POWER TRANSFORMER & 11kV BUSBAR (Clickable) */}
@@ -417,7 +434,7 @@ export const SmartGridDigitalTwin: React.FC = () => {
                   66/11kV
                 </text>
                 <text x="65" y="85" textAnchor="middle" fill="#94A3B8" fontSize="9" fontWeight="600">
-                  Mehsana North SS
+                  {tm.substationBoxLabel}
                 </text>
               </g>
 
@@ -618,10 +635,10 @@ export const SmartGridDigitalTwin: React.FC = () => {
                   className="group-hover:stroke-cyan-300 transition-all"
                 />
                 <text x="10" y="20" fill="#2DD4BF" fontSize="10" fontWeight="bold">
-                  Solar Micro-Gen (150kWp)
+                  {tm.solarMicroGenBadge}
                 </text>
                 <text x="10" y="36" fill="#94A3B8" fontSize="8" fontFamily="monospace">
-                  {activeScenario === 'solar' ? 'Surplus Export: +180A' : 'Midday Feed: 65A'}
+                  {activeScenario === 'solar' ? tm.solarSurplusExport : tm.solarMiddayFeed}
                 </text>
               </g>
               <path
@@ -638,17 +655,17 @@ export const SmartGridDigitalTwin: React.FC = () => {
           <div className="z-10 pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-1 bg-blue-500 rounded-sm" /> 11kV Active Feeder
+                <span className="w-2.5 h-1 bg-blue-500 rounded-sm" /> {tm.legendActiveFeeder}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-1 bg-teal-500 rounded-sm" /> Distributed Solar
+                <span className="w-2.5 h-1 bg-teal-500 rounded-sm" /> {tm.legendDistributedSolar}
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-1 bg-rose-500 rounded-sm" /> Tripped / Isolated
+                <span className="w-2.5 h-1 bg-rose-500 rounded-sm" /> {tm.legendTrippedIsolated}
               </span>
             </div>
             <span className="italic text-slate-500">
-              Click any substation, feeder, or transformer node for technical diagnostic inspection
+              {tm.nodeClickHint}
             </span>
           </div>
         </div>
@@ -660,14 +677,14 @@ export const SmartGridDigitalTwin: React.FC = () => {
               <div>
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <Activity className="w-4 h-4 text-cyan-500" />
-                  <span>SCADA Diagnostic Telemetry</span>
+                  <span>{tm.diagnosticTelemetryTitle}</span>
                 </h4>
                 <span className="text-[11px] text-slate-400">
-                  Real-time simulated telemetry feeds
+                  {tm.diagnosticTelemetrySubtitle}
                 </span>
               </div>
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                RTU-14 Sync
+                {tm.rtuSyncBadge}
               </span>
             </div>
 
@@ -675,31 +692,31 @@ export const SmartGridDigitalTwin: React.FC = () => {
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
                 <span className="text-[10px] text-slate-400 block uppercase font-semibold">
-                  Grid Frequency
+                  {tm.paramGridFrequency}
                 </span>
                 <span className="font-mono text-lg font-bold text-slate-900 dark:text-white tabular-nums">
                   {current.gridFrequency.toFixed(2)} Hz
                 </span>
                 <span className="text-[10px] text-emerald-600 font-medium block mt-0.5">
-                  IEGC Band: 49.90 - 50.05
+                  {tm.paramIegcBand}
                 </span>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
                 <span className="text-[10px] text-slate-400 block uppercase font-semibold">
-                  System Load
+                  {tm.paramSystemLoad}
                 </span>
                 <span className="font-mono text-lg font-bold text-blue-600 dark:text-cyan-400 tabular-nums">
                   {current.systemLoadMw} MW
                 </span>
                 <span className="text-[10px] text-slate-500 block mt-0.5">
-                  Max Peak: 72.0 MW
+                  {tm.paramMaxPeak}
                 </span>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
                 <span className="text-[10px] text-slate-400 block uppercase font-semibold">
-                  Phase Voltage (LT)
+                  {tm.paramPhaseVoltage}
                 </span>
                 <span className={`font-mono text-lg font-bold tabular-nums ${
                   current.voltageLevel === 0
@@ -711,13 +728,13 @@ export const SmartGridDigitalTwin: React.FC = () => {
                   {current.voltageLevel} V
                 </span>
                 <span className="text-[10px] text-slate-500 block mt-0.5">
-                  Standard: 230V ± 6%
+                  {tm.paramStandardVoltage}
                 </span>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
                 <span className="text-[10px] text-slate-400 block uppercase font-semibold">
-                  Transformer Temp
+                  {tm.paramTransformerTemp}
                 </span>
                 <span className={`font-mono text-lg font-bold tabular-nums ${
                   current.dtrTemp > 80
@@ -729,54 +746,61 @@ export const SmartGridDigitalTwin: React.FC = () => {
                   {current.dtrTemp}°C
                 </span>
                 <span className="text-[10px] text-slate-500 block mt-0.5">
-                  Trip Threshold: 95°C
+                  {tm.paramTripThreshold}
                 </span>
               </div>
             </div>
 
             {/* Clicked Equipment Inspection Drawer */}
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  {selectedNode ? selectedNode.name : 'Equipment Inspection'}
-                </span>
-                <span className="text-[10px] font-mono text-slate-400">
-                  {selectedNode ? selectedNode.id : 'Click a Node'}
-                </span>
-              </div>
+            {(() => {
+              const localizedNode = selectedNodeKey && selectedNode
+                ? localizeEquipmentCatalogNode(selectedNodeKey, selectedNode.voltage, language)
+                : null;
+              return (
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      {localizedNode ? localizedNode.name : tm.nodeInspectionTitle}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">
+                      {selectedNode ? selectedNode.id : tm.nodeClickHint}
+                    </span>
+                  </div>
 
-              {selectedNode ? (
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between border-b border-slate-200/60 dark:border-slate-800 pb-1">
-                    <span className="text-slate-500">Operating Voltage:</span>
-                    <span className="font-mono font-semibold text-slate-900 dark:text-white">{selectedNode.voltage}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-200/60 dark:border-slate-800 pb-1">
-                    <span className="text-slate-500">Current / Capacity:</span>
-                    <span className="font-mono font-semibold text-slate-900 dark:text-white">
-                      {selectedNode.currentAmps}A / {selectedNode.ratedCapacityAmps}A ({selectedNode.utilizationPct}%)
-                    </span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-200/60 dark:border-slate-800 pb-1">
-                    <span className="text-slate-500">Protection Relay:</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 text-[11px] truncate max-w-[160px]">
-                      {selectedNode.protectionRelay}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 italic pt-1">
-                    {selectedNode.notes}
-                  </p>
+                  {selectedNode && localizedNode ? (
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between border-b border-slate-200/60 dark:border-slate-800 pb-1">
+                        <span className="text-slate-500">{tm.nodeOperatingVoltage}</span>
+                        <span className="font-mono font-semibold text-slate-900 dark:text-white">{localizedNode.voltage}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-200/60 dark:border-slate-800 pb-1">
+                        <span className="text-slate-500">{tm.nodeCurrentCapacity}</span>
+                        <span className="font-mono font-semibold text-slate-900 dark:text-white">
+                          {selectedNode.currentAmps}A / {selectedNode.ratedCapacityAmps}A ({selectedNode.utilizationPct}%)
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-200/60 dark:border-slate-800 pb-1">
+                        <span className="text-slate-500">{tm.nodeProtectionRelay}</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 text-[11px] truncate max-w-[160px]">
+                          {localizedNode.protectionRelay}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 italic pt-1">
+                        {localizedNode.notes}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 leading-relaxed py-2">
+                      {tm.nodeDefaultSelectPrompt}
+                    </p>
+                  )}
                 </div>
-              ) : (
-                <p className="text-xs text-slate-400 leading-relaxed py-2">
-                  Select any substation transformer, 11kV feeder branch, or distribution node in the diagram to inspect relay protections, rated conductor amperages, and real-time load headroom.
-                </p>
-              )}
-            </div>
+              );
+            })()}
           </div>
 
           <div className="pt-2 text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800">
-            <strong>Protocol:</strong> IEC 61850 substation automation standard & DNP3 telemetry simulation.
+            <strong>Protocol:</strong> {tm.scadaProtocolNote}
           </div>
         </div>
       </div>

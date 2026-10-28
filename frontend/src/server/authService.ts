@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import { UserRole } from '../types';
-import { DEFAULT_DEMO_ACCOUNTS } from '../data/demoAuthData';
+import { DEFAULT_DEMO_ACCOUNTS, CANONICAL_DEMO_IDENTITIES } from '../data/demoAuthData';
 
 /**
  * VidyutFlow Server-Side Authentication & RBAC Foundation (Step 5B.1)
@@ -245,6 +245,7 @@ export class ServerAuthService {
 
   /**
    * Seeds the 5 official VidyutFlow demo accounts from `DEFAULT_DEMO_ACCOUNTS` (read-only)
+   * AND all multi-engineer / multi-staff canonical accounts from `CANONICAL_DEMO_IDENTITIES`
    * using unique random per-user salts and `crypto.scrypt` hashes.
    */
   private seedPreconfiguredDemoAccounts(): void {
@@ -269,6 +270,35 @@ export class ServerAuthService {
 
       this.usersByEmail.set(record.email, record);
       this.usersById.set(record.id, record);
+    }
+
+    // Also seed all canonical directory accounts (including FLD-UG-201, FLD-UG-204, FLD-UG-209, etc.)
+    for (const identity of CANONICAL_DEMO_IDENTITIES) {
+      const normalizedEmail = identity.email.toLowerCase();
+      if (!this.usersByEmail.has(normalizedEmail)) {
+        const { salt, hash } = hashPasswordScrypt(identity.password);
+        const canonicalRecord: ServerUserRecord = {
+          id: identity.id,
+          email: normalizedEmail,
+          name: identity.name,
+          role: identity.role,
+          designation: identity.designation,
+          department: identity.department,
+          division: identity.subdivision,
+          mobileNumber: identity.phone,
+          isDemoAccount: true,
+          passwordSalt: salt,
+          passwordHash: hash,
+          createdAt: '2026-10-01T00:00:00.000Z'
+        };
+        this.usersByEmail.set(normalizedEmail, canonicalRecord);
+        this.usersById.set(canonicalRecord.id, canonicalRecord);
+      } else {
+        const existing = this.usersByEmail.get(normalizedEmail);
+        if (existing && !this.usersById.has(identity.id)) {
+          this.usersById.set(identity.id, existing);
+        }
+      }
     }
   }
 

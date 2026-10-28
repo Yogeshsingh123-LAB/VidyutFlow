@@ -9,6 +9,7 @@ import {
   Server,
   ExternalLink
 } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface PresentationAboutModalProps {
   isOpen: boolean;
@@ -19,11 +20,24 @@ export const PresentationAboutModal: React.FC<PresentationAboutModalProps> = ({
   isOpen,
   onClose
 }) => {
+  const { dict } = useLanguage();
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={dict.modals.aboutModalTitle}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-2xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
@@ -32,10 +46,10 @@ export const PresentationAboutModal: React.FC<PresentationAboutModalProps> = ({
             </div>
             <div className="min-w-0">
               <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
-                About VidyutOne — UGVCL Architecture
+                {dict.modals.aboutModalTitle}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-gujarati truncate">
-                ઉત્તર ગુજરાત વીજ કંપની લિમિટેડ · Platform Demonstration
+                ઉત્તર ગુજરાત વીજ કંપની લિમિટેડ · {dict.modals.aboutModalSubtitle}
               </p>
             </div>
           </div>
@@ -43,6 +57,7 @@ export const PresentationAboutModal: React.FC<PresentationAboutModalProps> = ({
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            aria-label={dict.common.close}
           >
             <X className="w-4 h-4" />
           </button>
@@ -54,62 +69,62 @@ export const PresentationAboutModal: React.FC<PresentationAboutModalProps> = ({
           <div className="p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 space-y-2">
             <span className="font-bold text-blue-900 dark:text-blue-300 text-xs flex items-center gap-1.5">
               <Building className="w-4 h-4 text-blue-600" />
-              <span>Institutional Statement of Intent</span>
+              <span>{dict.modals.aboutStatementTitle}</span>
             </span>
             <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
-              <strong>VidyutOne</strong> is an advanced electricity utility demonstration platform proposing an integrated, unified IT architecture and automated ERP ecosystem tailored specifically to the operational structure of <strong>Uttar Gujarat Vij Company Limited (UGVCL)</strong> and its holding company, <strong>Gujarat Urja Vikas Nigam Limited (GUVNL)</strong>.
+              {dict.modals.aboutStatementDesc}
             </p>
           </div>
 
           {/* UGVCL Jurisdictional Scope */}
           <div className="space-y-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-              Target Utility Operational Context
+              {dict.modals.aboutContextTitle}
             </h4>
             <p>
-              UGVCL delivers electricity across the North Gujarat territory spanning 6 administrative districts: <strong>Mehsana, Gandhinagar, Sabarkantha, Banaskantha, Patan, and Aravalli</strong>. Distribution involves transforming high-voltage bulk energy received from GETCO 220kV/66kV grid substations down through thousands of 11kV primary distribution feeders, distribution transformers (DTRs), and LT lines serving over 3.8 million registered agricultural, industrial, and domestic consumers.
+              {dict.modals.aboutContextDesc}
             </p>
           </div>
 
           {/* Prototype Simulation Disclosures */}
           <div className="space-y-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-              Technical & Demonstration Governance
+              {dict.modals.aboutGovernanceTitle}
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
               <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 space-y-1">
                 <span className="font-semibold text-slate-800 dark:text-slate-200 block">
-                  Simulated SCADA Telemetry
+                  {dict.modals.aboutScadaTitle}
                 </span>
                 <p className="text-slate-500">
-                  Grid frequency, feeder loads, and transformer temperatures use mathematical engineering models for real-time visualization.
+                  {dict.modals.aboutScadaDesc}
                 </p>
               </div>
 
               <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 space-y-1">
                 <span className="font-semibold text-slate-800 dark:text-slate-200 block">
-                  Demonstration Payments
+                  {dict.modals.aboutPaymentsTitle}
                 </span>
                 <p className="text-slate-500">
-                  Quick Pay checkout simulates Bharat BillPay / UPI confirmation and issues authentic receipts without deducting bank funds.
+                  {dict.modals.aboutPaymentsDesc}
                 </p>
               </div>
 
               <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 space-y-1">
                 <span className="font-semibold text-slate-800 dark:text-slate-200 block">
-                  AI Energy Forecasting
+                  {dict.modals.aboutAiTitle}
                 </span>
                 <p className="text-slate-500">
-                  Load projection uses explainable regression models with temperature sensitivity and solar offsets.
+                  {dict.modals.aboutAiDesc}
                 </p>
               </div>
 
               <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 space-y-1">
                 <span className="font-semibold text-slate-800 dark:text-slate-200 block">
-                  Local Storage State
+                  {dict.modals.aboutStorageTitle}
                 </span>
                 <p className="text-slate-500">
-                  Data persists across page refreshes via client storage. A &quot;Reset Demo&quot; button restores default seed records at any time.
+                  {dict.modals.aboutStorageDesc}
                 </p>
               </div>
             </div>
@@ -117,7 +132,7 @@ export const PresentationAboutModal: React.FC<PresentationAboutModalProps> = ({
 
           {/* Disclaimer */}
           <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-[11px] text-amber-900 dark:text-amber-200">
-            <strong>Important Notice:</strong> VidyutOne is an independent electricity utility platform demonstration. It is not an officially deployed or operated software product of UGVCL or GUVNL. Production deployment would interface with state data centers, MDAS/AMI servers, and regulatory GERC sanction protocols.
+            {dict.modals.aboutNotice}
           </div>
         </div>
 
@@ -130,7 +145,7 @@ export const PresentationAboutModal: React.FC<PresentationAboutModalProps> = ({
             onClick={onClose}
             className="px-4 py-2 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold hover:bg-slate-800 transition-colors"
           >
-            Acknowledge & Close
+            {dict.modals.aboutAcknowledge}
           </button>
         </div>
       </div>

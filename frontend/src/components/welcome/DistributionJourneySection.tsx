@@ -11,92 +11,89 @@ import {
   CheckCircle2
 } from 'lucide-react';
 
+import { useLanguage } from '../../i18n/LanguageContext';
+
 export const DistributionJourneySection: React.FC = () => {
+  const { dict } = useLanguage();
   const [activeStep, setActiveStep] = useState<number>(2);
 
   const steps = [
     {
       id: 0,
       voltage: '400kV / 220kV',
-      stage: 'Generation & Evacuation',
-      title: 'Power Generation & Green Solar Parks',
-      entity: 'GSECL & Charanka Solar Park (Patan)',
-      description:
-        'Electrical energy is produced at state generating stations and landmark solar parks (such as Charanka Solar Park-1 in Patan district, situated within UGVCL’s geographical territory) stepped up to ultra-high voltages for transmission efficiency.',
+      stage: dict.journey.step0Stage,
+      title: dict.journey.step0Title,
+      entity: dict.journey.step0Entity,
+      description: dict.journey.step0Desc,
       details: [
-        'Evacuation via Charanka 400kV/220kV Pooling Station',
-        'State Thermal & Renewable Feeders',
-        'Interstate & Intrastate Grid Synchronization'
+        dict.journey.step0Detail1,
+        dict.journey.step0Detail2,
+        dict.journey.step0Detail3
       ]
     },
     {
       id: 1,
       voltage: '220kV / 66kV',
-      stage: 'Transmission Grid',
-      title: 'High-Voltage Transmission Network',
-      entity: 'GETCO (Gujarat Energy Transmission Corp.)',
-      description:
-        'Bulk power is transported across Northern Gujarat through high-voltage transmission corridors and stepped down at 66kV grid substations to interface with UGVCL distribution boundaries.',
+      stage: dict.journey.step1Stage,
+      title: dict.journey.step1Title,
+      entity: dict.journey.step1Entity,
+      description: dict.journey.step1Desc,
       details: [
-        '66kV Transmission Corridors',
-        'Overhead Steel Lattice Pylons',
-        'Inter-substation Ring Bus Protection'
+        dict.journey.step1Detail1,
+        dict.journey.step1Detail2,
+        dict.journey.step1Detail3
       ]
     },
     {
       id: 2,
       voltage: '66kV to 11kV',
-      stage: 'Primary Substation',
-      title: 'UGVCL Primary Distribution Substations',
-      entity: 'UGVCL 66kV/11kV Switchyards',
-      description:
-        'The heart of local electricity supply. 66kV transmission voltage is stepped down to 11kV through 15MVA/20MVA power transformers, monitored by substation engineers with vacuum circuit breakers and lightning arresters.',
+      stage: dict.journey.step2Stage,
+      title: dict.journey.step2Title,
+      entity: dict.journey.step2Entity,
+      description: dict.journey.step2Desc,
       details: [
-        '450+ 66kV/11kV Substation Interconnects',
-        'Supervisory Feeder Panels & CT/PT Metering',
-        'Automated Feeder Breaker Tripping'
+        dict.journey.step2Detail1,
+        dict.journey.step2Detail2,
+        dict.journey.step2Detail3
       ]
     },
     {
       id: 3,
       voltage: '11kV Medium Tension',
-      stage: 'Feeder Segregation',
-      title: 'Jyotigram & Agricultural 11kV Feeders',
-      entity: '2,400+ Dedicated Feeders',
-      description:
-        'UGVCL’s celebrated feeder segregation network routes power separately: Jyotigram lines supply 24×7 3-phase domestic electricity to villages, while dedicated AG feeders deliver scheduled daytime power for agricultural tubewells under Kisan Suryodaya Yojana.',
+      stage: dict.journey.step3Stage,
+      title: dict.journey.step3Title,
+      entity: dict.journey.step3Entity,
+      description: dict.journey.step3Desc,
       details: [
-        '65,000+ ckt km of 11kV Lines',
-        'RDSS Covered Conductors (MVCC) in Forest Corridors',
-        'Feeder-Level Energy Accounting'
+        dict.journey.step3Detail1,
+        dict.journey.step3Detail2,
+        dict.journey.step3Detail3
       ]
     },
     {
       id: 4,
       voltage: '11kV to 415V / 230V',
-      stage: 'Step-Down Transformation',
-      title: 'Distribution Transformers (DTCs)',
-      entity: '1,20,000+ Pole & Plinth Transformers',
-      description:
-        'Mounted on DP structures across village outskirts, farmlands, and urban neighborhoods, these transformers step down 11kV to 415V (3-phase) and 230V (1-phase) safe consumer voltages.',
+      stage: dict.journey.step4Stage,
+      title: dict.journey.step4Title,
+      entity: dict.journey.step4Entity,
+      description: dict.journey.step4Desc,
       details: [
-        '25kVA, 63kVA, 100kVA & 200kVA Ratings',
-        'Drop-Out (DO) Fuses & Horn Gap Protection',
-        'Continuous Neutral Grounding'
+        dict.journey.step4Detail1,
+        dict.journey.step4Detail2,
+        dict.journey.step4Detail3
       ]
     },
     {
       id: 5,
       voltage: '415V / 230V',
-      stage: 'Consumer Energization',
-      title: 'Smart Metering & Consumer Delivery',
-      entity: '3.8+ Million Citizens & Enterprises',
-      description:
-        'Electricity reaches homes (RGPU), commercial establishments (NRGP), agricultural pumps (AG), and industrial consumers with bi-directional smart meters enabling tamper detection and solar net-metering.',
+      stage: dict.journey.step5Stage,
+      title: dict.journey.step5Title,
+      entity: dict.journey.step5Entity,
+      description: dict.journey.step5Desc,
       details: [
-        'Residential (230V Single Phase)',
-        'Agricultural & Industrial (415V 3-Phase)',
-        'Bi-directional Net-Meters for Solar Rooftops'
+        dict.journey.step5Detail1,
+        dict.journey.step5Detail2,
+        dict.journey.step5Detail3
       ]
     }
   ];
@@ -110,14 +107,13 @@ export const DistributionJourneySection: React.FC = () => {
         <div className="max-w-4xl space-y-3 text-left">
           <div className="flex items-center gap-2 text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-cyan-400">
             <Radio className="w-4 h-4" />
-            <span>Educational Power Grid Engineering</span>
+            <span>{dict.journey.badge}</span>
           </div>
           <h2 className="text-3xl sm:text-4xl lg:text-[40px] font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-            The North Gujarat Electricity Journey
+            {dict.journey.title}
           </h2>
           <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-            Understand how electrical energy travels from regional generation facilities through high-voltage
-            transmission into UGVCL’s 11kV feeders, pole transformers, and into 3.8 million consumer meters.
+            {dict.journey.subtitle}
           </p>
         </div>
 
@@ -135,7 +131,7 @@ export const DistributionJourneySection: React.FC = () => {
             >
               <div className="flex items-center justify-between mb-2">
                 <span className={`text-xs font-bold uppercase font-mono ${activeStep === st.id ? 'text-cyan-200' : 'text-slate-400'}`}>
-                  Stage 0{st.id + 1}
+                  {dict.journey.stageLabel} 0{st.id + 1}
                 </span>
                 <span className={`text-[11px] font-bold font-mono px-2 py-0.5 rounded-md ${
                   activeStep === st.id ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
@@ -172,7 +168,7 @@ export const DistributionJourneySection: React.FC = () => {
 
               <div className="pt-2 space-y-3">
                 <span className="text-xs uppercase font-bold text-slate-400 dark:text-slate-500 block tracking-wider">
-                  Key Technical Characteristics & Asset Parameters:
+                  {dict.journey.keyParams}
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-700 dark:text-slate-300">
                   {currentStep.details.map((detail, idx) => (
@@ -188,15 +184,13 @@ export const DistributionJourneySection: React.FC = () => {
             <div className="lg:col-span-5 p-7 sm:p-8 rounded-2xl bg-slate-50 dark:bg-[#071329] border border-slate-200 dark:border-slate-800 text-left space-y-5">
               <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200">
                 <Info className="w-4 h-4 text-blue-500" />
-                <span>Electrical Architecture Note</span>
+                <span>{dict.journey.archNoteTitle}</span>
               </div>
               <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-                Step-down transformation from 66kV to 11kV occurs within UGVCL substation yards, where power is channeled
-                into distinct Jyotigram (domestic) and agriculture feeders to maintain 24x7 rural reliability without
-                overloading transformers.
+                {dict.journey.archNoteDesc}
               </p>
               <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-xs text-blue-900 dark:text-cyan-300 leading-relaxed">
-                <strong>Engineering Principle:</strong> Ultra-high voltage transmission minimizes I²R resistive heating losses over expansive geographical distances before primary substation step-down.
+                <strong>{dict.journey.engPrincipleTitle} </strong>{dict.journey.engPrincipleDesc}
               </div>
             </div>
           </div>

@@ -30,7 +30,13 @@ import {
   resolveRouteAccess,
   UNAUTHORIZED_NAVIGATION_MESSAGE
 } from '../src/context/AppContext';
-import { DEFAULT_DEMO_ACCOUNTS, DemoSession } from '../src/data/demoAuthData';
+import {
+  DEFAULT_DEMO_ACCOUNTS,
+  DemoSession,
+  getCanonicalDemoAccountsByRole,
+  CANONICAL_DEMO_IDENTITIES
+} from '../src/data/demoAuthData';
+import { getActiveUserIdentity } from '../src/utils/avatarUtils';
 import {
   INITIAL_BILLS,
   INITIAL_CONNECTIONS,
@@ -811,6 +817,79 @@ async function runTests() {
     assert(INITIAL_COMPLAINTS.length === 4, 'Canonical INITIAL_COMPLAINTS count unchanged (4)');
     assert(INITIAL_APPLICATIONS.length === 4, 'Canonical INITIAL_APPLICATIONS count unchanged (4)');
     assert(INITIAL_WORK_ORDERS.length === 4, 'Canonical INITIAL_WORK_ORDERS count unchanged (4)');
+  }
+
+  // -------------------------------------------------------------------------
+  // 12. Multi-Engineer Canonical DEMO Accounts Authentication via /api/auth/login
+  // -------------------------------------------------------------------------
+  console.log('\n12. Testing All 4 Canonical Field Engineer Accounts via POST /api/auth/login & loginWithServerApi...');
+  {
+    const fieldAccounts = getCanonicalDemoAccountsByRole('field');
+    assert(
+      fieldAccounts.length === 4,
+      'Field Engineer role exposes all 4 canonical accounts (FLD-UG-201, FLD-UG-204, FLD-UG-209, FLD-UG-212)'
+    );
+
+    const expectedEngineers = [
+      { id: 'FLD-UG-201', name: 'Vikramaditya Solanki', email: 'vikramaditya.solanki@vidyutflow.demo' },
+      { id: 'FLD-UG-204', name: 'Dharmesh P. Chaudhari', email: 'dharmesh.chaudhari@vidyutflow.demo' },
+      { id: 'FLD-UG-209', name: 'Hitesh N. Vaghela', email: 'hitesh.vaghela@vidyutflow.demo' },
+      { id: 'FLD-UG-212', name: 'Vikram Zala', email: 'field@vidyutflow.demo' }
+    ];
+
+    for (const expected of expectedEngineers) {
+      resetAuthRateLimitForTests();
+      const browserHarness = createBrowserCookieFetchHarness(handler);
+      const loginResult = await loginWithServerApi(
+        expected.email,
+        'Demo@12345',
+        'field',
+        browserHarness.fetchImpl
+      );
+
+      assert(
+        loginResult.success === true && Boolean(loginResult.session),
+        `[Engineer ${expected.id}] loginWithServerApi succeeds for ${expected.email}`
+      );
+      assert(
+        loginResult.session?.user.id === expected.id,
+        `[Engineer ${expected.id}] Client session resolves canonical user ID "${expected.id}" (got "${loginResult.session?.user.id}")`
+      );
+      assert(
+        loginResult.session?.user.name === expected.name,
+        `[Engineer ${expected.id}] Client session resolves canonical name "${expected.name}"`
+      );
+
+      const meResult = await verifyServerSessionApi(browserHarness.fetchImpl);
+      assert(
+        meResult.authenticated === true && meResult.session?.user.id === expected.id,
+        `[Engineer ${expected.id}] GET /api/auth/me preserves canonical user ID "${expected.id}"`
+      );
+
+      const activeIdentity = getActiveUserIdentity(meResult.session, 'field');
+      assert(
+        activeIdentity.id === expected.id && activeIdentity.name === expected.name,
+        `[Engineer ${expected.id}] getActiveUserIdentity resolves ${expected.name} (${expected.id}) for header/profile`
+      );
+    }
+
+    // Also verify all 13 canonical demo identities can authenticate via server auth
+    for (const identity of CANONICAL_DEMO_IDENTITIES) {
+      resetAuthRateLimitForTests();
+      const res = await simulateAuthHttpCall(handler, {
+        method: 'POST',
+        url: '/api/auth/login',
+        body: {
+          email: identity.email,
+          password: identity.password,
+          targetRole: identity.role
+        }
+      });
+      assert(
+        res.statusCode === 200 && res.body.authenticated === true,
+        `[Canonical Directory] ${identity.id} (${identity.email}) authenticates via POST /api/auth/login`
+      );
+    }
   }
 
   console.log('\n==================================================================');

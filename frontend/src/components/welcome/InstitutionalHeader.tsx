@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 import {
   PhoneCall,
   FileText,
@@ -10,6 +11,7 @@ import {
   LogIn
 } from 'lucide-react';
 import { UgvclBrandIdentity } from '../common/UgvclBrandIdentity';
+import { LanguageSelector } from '../common/LanguageSelector';
 
 interface InstitutionalHeaderProps {
   onOpenAboutModal: () => void;
@@ -21,6 +23,7 @@ export const InstitutionalHeader: React.FC<InstitutionalHeaderProps> = ({
   onOpenManifestModal
 }) => {
   const { theme, toggleTheme, setIsRoleSwitcherModalOpen } = useApp();
+  const { dict } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLaunchERP = () => {
@@ -28,13 +31,13 @@ export const InstitutionalHeader: React.FC<InstitutionalHeaderProps> = ({
   };
 
   const navLinks = [
-    { label: 'Home', href: '#' },
-    { label: 'About UGVCL', href: '#about-ugvcl' },
-    { label: 'Understanding UGVCL', href: '#understanding-ugvcl' },
-    { label: 'Achievements', href: '#achievements' },
-    { label: 'Notices & Circulars', href: '#notices' },
-    { label: 'Photo Gallery', href: '#gallery' },
-    { label: 'Power Journey', href: '#distribution-journey' }
+    { label: dict.header.navHome, href: '#' },
+    { label: dict.header.navAbout, href: '#about-ugvcl' },
+    { label: dict.header.navUnderstanding, href: '#understanding-ugvcl' },
+    { label: dict.header.navAchievements, href: '#achievements' },
+    { label: dict.header.navNotices, href: '#notices' },
+    { label: dict.header.navGallery, href: '#gallery' },
+    { label: dict.header.navJourney, href: '#distribution-journey' }
   ];
 
   return (
@@ -47,15 +50,15 @@ export const InstitutionalHeader: React.FC<InstitutionalHeaderProps> = ({
           {/* Government of Gujarat / GUVNL Institutional Relationship */}
           <div className="flex items-center gap-2 sm:gap-3 text-[11px] sm:text-xs min-w-0">
             <span className="font-semibold text-slate-100 tracking-wide shrink-0">
-              Government of Gujarat
+              {dict.header.govGujarat}
             </span>
             <span className="text-slate-600 hidden sm:inline">|</span>
             <span className="hidden sm:inline text-slate-300 truncate">
-              A Subsidiary of Gujarat Urja Vikas Nigam Limited (GUVNL)
+              {dict.header.guvnlSub}
             </span>
             <span className="text-slate-600 hidden xl:inline">|</span>
             <span className="hidden xl:inline text-slate-400 text-[11px] font-normal truncate">
-              VidyutOne Demonstration Platform · Independent System
+              {dict.header.platformDemo}
             </span>
           </div>
 
@@ -67,7 +70,7 @@ export const InstitutionalHeader: React.FC<InstitutionalHeaderProps> = ({
               title="24x7 Customer Care Helpline"
             >
               <PhoneCall className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-              <span>Helpline: 19122</span>
+              <span>{dict.common.helpline}</span>
             </a>
 
             <span className="text-slate-600 hidden md:inline">|</span>
@@ -78,7 +81,7 @@ export const InstitutionalHeader: React.FC<InstitutionalHeaderProps> = ({
               title="Download GERC Approved Electricity Tariff Schedule"
             >
               <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span>Tariff Schedule (PDF)</span>
+              <span>{dict.common.tariffPdf}</span>
             </a>
 
             <span className="text-slate-600">|</span>
@@ -108,7 +111,7 @@ export const InstitutionalHeader: React.FC<InstitutionalHeaderProps> = ({
           <div className="hidden lg:flex items-center text-right shrink-0">
             <div className="space-y-0.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
-                Toll-Free Customer Helpline
+                {dict.common.tollFree}
               </span>
               <a
                 href="tel:19122"
@@ -116,10 +119,10 @@ export const InstitutionalHeader: React.FC<InstitutionalHeaderProps> = ({
                 title="Call 19122 / 1800 233 155335 UGVCL Customer Helpline"
               >
                 <PhoneCall className="w-4 h-4 text-blue-600 dark:text-cyan-400 shrink-0" />
-                <span>19122 · 1800 233 155335</span>
+                <span>{dict.header.tollFreeNumber}</span>
               </a>
               <p className="text-[10px] text-slate-400 dark:text-slate-500 tracking-tight">
-                VidyutOne Demonstration Platform · Independent System
+                {dict.header.platformDemo}
               </p>
             </div>
           </div>
@@ -157,18 +160,19 @@ export const InstitutionalHeader: React.FC<InstitutionalHeaderProps> = ({
 
           {/* Mobile view institutional title */}
           <div className="lg:hidden text-xs font-semibold text-slate-300 truncate pr-2">
-            UGVCL Power Portal
+            {dict.header.powerPortal}
           </div>
 
-          {/* Highlighted Primary Orange Call-To-Action Button: ERP & Portal Login */}
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Top-Right Navigation Controls: Language Selector + Primary Call-To-Action Button */}
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+            <LanguageSelector variant="header" />
             <button
               onClick={handleLaunchERP}
-              className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 text-xs sm:text-sm font-black shadow-md shadow-amber-500/20 flex items-center gap-2 transition-all hover:scale-102 cursor-pointer"
+              className="px-3.5 sm:px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 text-xs sm:text-sm font-black shadow-md shadow-amber-500/20 flex items-center gap-1.5 sm:gap-2 transition-all hover:scale-102 cursor-pointer"
               title="Access Consumer Services, Employee ERP, Field Operations, SCADA Cockpit, or IT Admin"
             >
               <LogIn className="w-4 h-4 stroke-[2.5]" />
-              <span>ERP & Portal Login</span>
+              <span>{dict.common.erpLogin}</span>
             </button>
           </div>
         </div>
@@ -176,16 +180,21 @@ export const InstitutionalHeader: React.FC<InstitutionalHeaderProps> = ({
         {/* Responsive Mobile Drawer Navigation */}
         {mobileMenuOpen && (
           <div className="lg:hidden bg-[#0A1C3E] border-t border-blue-900 px-4 py-4 space-y-2 text-sm animate-in slide-in-from-top-2 duration-200 text-left">
-            {navLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-md text-slate-200 hover:bg-blue-800/60 hover:text-cyan-300 transition-colors font-medium"
-              >
-                {link.label}
-              </a>
-            ))}
+            {/* Language Selector embedded directly in mobile menu */}
+            <LanguageSelector variant="mobile" />
+
+            <div className="pt-2 border-t border-blue-900/60 space-y-1">
+              {navLinks.map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-3 py-2 rounded-md text-slate-200 hover:bg-blue-800/60 hover:text-cyan-300 transition-colors font-medium"
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
 
             <div className="pt-3 border-t border-blue-900/60 flex flex-col gap-2.5">
               <a
@@ -194,7 +203,7 @@ export const InstitutionalHeader: React.FC<InstitutionalHeaderProps> = ({
                 className="px-3 py-2 text-xs text-amber-300 hover:text-amber-200 flex items-center gap-2"
               >
                 <FileText className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Tariff Schedule (PDF)</span>
+                <span>{dict.common.tariffPdf}</span>
               </a>
 
               <button
@@ -205,39 +214,39 @@ export const InstitutionalHeader: React.FC<InstitutionalHeaderProps> = ({
                 className="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md"
               >
                 <LogIn className="w-4 h-4 stroke-[2.5]" />
-                <span>ERP & Portal Login</span>
+                <span>{dict.common.erpLogin}</span>
               </button>
 
               <div className="pt-2 flex items-center justify-between px-3 text-xs text-slate-300">
                 <button
                   onClick={() => {
-                    setMobileMenuOpen(false);
-                    onOpenAboutModal();
-                  }}
-                  className="hover:text-white transition-colors cursor-pointer"
-                >
-                  Platform Overview
-                </button>
-                <span className="text-slate-600">·</span>
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    onOpenManifestModal();
-                  }}
-                  className="hover:text-white transition-colors cursor-pointer"
-                >
-                  Asset Manifest
-                </button>
-              </div>
+                  setMobileMenuOpen(false);
+                  onOpenAboutModal();
+                }}
+                className="hover:text-white transition-colors cursor-pointer"
+              >
+                {dict.header.platformOverview}
+              </button>
+              <span className="text-slate-600">·</span>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenManifestModal();
+                }}
+                className="hover:text-white transition-colors cursor-pointer"
+              >
+                {dict.header.assetManifest}
+              </button>
+            </div>
 
-              <div className="px-3 pt-2 text-[11px] text-slate-400 border-t border-blue-900/40">
-                <p>VidyutOne · Independent Demonstration Platform</p>
-                <p className="text-[10px] text-slate-500 mt-0.5">Not an official service operated by UGVCL</p>
-              </div>
+            <div className="px-3 pt-2 text-[11px] text-slate-400 border-t border-blue-900/40">
+              <p>{dict.header.platformDemo}</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">{dict.header.independentDisclaimer}</p>
             </div>
           </div>
-        )}
-      </nav>
-    </header>
-  );
+        </div>
+      )}
+    </nav>
+  </header>
+);
 };

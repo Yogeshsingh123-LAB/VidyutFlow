@@ -89,6 +89,13 @@ export interface NewConnectionApplication {
   workflowStep: number; // 1 to 5
   notesHistory: { timestamp: string; author: string; note: string }[];
   accountId?: string;
+  assignedWorkOrderId?: string;
+  clarificationRequested?: boolean;
+  clarificationNote?: string;
+  isArchived?: boolean;
+  archivedAt?: string;
+  archivedBy?: string;
+  archiveReason?: string;
 }
 
 export interface ComplaintRecord {
@@ -107,6 +114,7 @@ export interface ComplaintRecord {
   slaDueTime: string;
   slaBreached: boolean;
   assignedTechnician?: string;
+  assignedWorkOrderId?: string;
   resolutionRemarks?: string;
   resolvedAt?: string;
   timeline: { time: string; stage: string; actor: string; remark: string }[];
@@ -128,6 +136,9 @@ export interface WorkOrder {
   status: 'Pending' | 'En Route' | 'On Site' | 'Completed' | 'Deferred';
   assignedTo: string;
   materialsNeeded: string[];
+  complaintId?: string;
+  applicationId?: string;
+  actionHistory?: { timestamp: string; stage: string; actor: string; notes?: string }[];
   inspectionReport?: {
     meterSerialScanned: string;
     readingKwh: number;
@@ -175,6 +186,17 @@ export interface SystemServiceStatus {
   lastIncident: string;
 }
 
+export type ApplicationNotificationEventType =
+  | 'APPLICATION_SUBMITTED'
+  | 'DOCUMENTS_AWAITING_REVIEW'
+  | 'SITE_INSPECTION_SCHEDULED'
+  | 'INSPECTION_COMPLETED'
+  | 'SANCTION_APPROVAL_REQUIRED'
+  | 'AWAITING_FINAL_APPROVAL'
+  | 'APPLICATION_APPROVED'
+  | 'APPLICATION_REJECTED'
+  | 'CLARIFICATION_REQUESTED';
+
 export interface AppNotification {
   id: string;
   title: string;
@@ -185,6 +207,31 @@ export interface AppNotification {
   read: boolean;
   category: 'Billing' | 'Outage' | 'Approval' | 'Inspection' | 'Security';
   actionUrl?: string;
+  applicationId?: string;
+  complaintId?: string;
+  workOrderId?: string;
+  subdivision?: string;
+  accountId?: string;
+  consumerNo?: string;
+  targetConsumerNo?: string;
+  targetConsumerAccountId?: string;
+  applicationStatus?: NewConnectionApplication['status'] | 'Clarification Requested';
+  statusBadge?: string;
+  relatedEntityType?: 'application' | 'complaint' | 'work_order' | 'bill' | 'incident' | string;
+  relatedEntityId?: string;
+  eventType?: ApplicationNotificationEventType;
+  eventKey?: string;
+  incidentId?: string;
+  targetUserId?: string;
+  notificationType?: IncidentEventType | string;
+  decisionAction?: string;
+  decisionReason?: string;
+  actorName?: string;
+  actorUserId?: string;
+  actorRole?: UserRole;
+  role?: UserRole;
+  createdAt?: string;
+  formattedTimestamp?: string;
 }
 
 export interface ConsumerProfile {
@@ -222,3 +269,212 @@ export interface FieldEngineerRecord {
   completedToday: number;
 }
 
+export type IncidentSeverity = 'CRITICAL' | 'WARNING' | 'INFO';
+
+export type IncidentStatus =
+  | 'DETECTED'
+  | 'ACKNOWLEDGED'
+  | 'ASSIGNED'
+  | 'ESCALATED'
+  | 'IN_PROGRESS'
+  | 'RESOLVED'
+  | 'CLOSED';
+
+export type IncidentApprovalDecision =
+  | 'PENDING_APPROVAL'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'MORE_INFO_REQUIRED';
+
+export type IncidentEventType =
+  | 'DETECTED'
+  | 'ACKNOWLEDGED'
+  | 'ASSIGNED'
+  | 'REASSIGNED'
+  | 'ASSIGNMENT_ACCEPTED'
+  | 'ASSIGNMENT_DECLINED'
+  | 'INSPECTION_STARTED'
+  | 'FINDINGS_SUBMITTED'
+  | 'ESCALATED'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'MORE_INFO_REQUESTED'
+  | 'ASSISTANCE_REQUESTED'
+  | 'RESOLUTION_SUBMITTED'
+  | 'RESOLVED'
+  | 'CLOSED';
+
+export type EmergencyHazardClassification =
+  | 'ELECTROCUTION_RISK'
+  | 'FIRE_HAZARD'
+  | 'CONDUCTOR_SNAP'
+  | 'SUBSTATION_EXPLOSION'
+  | 'LIFE_THREATENING_HAZARD'
+  | 'NONE';
+
+export type IncidentModule =
+  | 'Distribution & SCADA'
+  | 'Metering & SLA'
+  | 'Billing & Revenue'
+  | 'Field Operations'
+  | 'Security & Access';
+
+export interface IncidentLifecycleEvent {
+  id?: string;
+  incidentId?: string;
+  timestamp: string;
+  stage: IncidentStatus | IncidentEventType;
+  eventType?: IncidentEventType;
+  actor: string;
+  actorUserId?: string;
+  actorRole?: UserRole;
+  recipient?: string;
+  targetUserId?: string;
+  targetRole?: UserRole;
+  previousEngineerId?: string;
+  previousEngineerName?: string;
+  newEngineerId?: string;
+  newEngineerName?: string;
+  notes?: string;
+  remarks?: string;
+  reason?: string;
+  previousStatus?: IncidentStatus;
+  newStatus?: IncidentStatus;
+  approvalStatus?: IncidentApprovalDecision;
+}
+
+export interface CriticalIncident {
+  id: string;
+  title: string;
+  description: string;
+  severity: IncidentSeverity;
+  module: IncidentModule;
+  entityId: string;
+  entityType: 'feeder' | 'transformer' | 'complaint' | 'work_order' | 'billing' | 'security' | 'service';
+  timestamp: string;
+  responsibleRoles: UserRole[];
+  recommendedAction: string;
+  status: IncidentStatus;
+  subdivision?: string;
+  // Field engineer assignment fields
+  assignmentStatus?: 'UNASSIGNED' | 'ASSIGNED' | 'ACCEPTED' | 'DECLINED' | 'IN_PROGRESS' | 'COMPLETED';
+  assignedToUserId?: string;
+  assignedEngineerName?: string;
+  assignedAt?: string;
+  assignedBy?: string;
+  assignmentNotes?: string;
+  previousEngineerId?: string;
+  previousEngineerName?: string;
+  lastDeclinedByUserId?: string;
+  lastDeclinedByName?: string;
+  lastDeclinedReason?: string;
+  lastDeclinedAt?: string;
+  // Management escalation fields
+  escalatedTo?: UserRole | string;
+  escalatedToUserId?: string;
+  escalatedToUserName?: string;
+  escalatedAt?: string;
+  escalatedBy?: string;
+  escalatedReason?: string;
+  // Separate Approval Governance (Fix 6)
+  approvalStatus?: IncidentApprovalDecision;
+  approvalDecisionBy?: string;
+  approvalDecisionByUserId?: string;
+  approvalDecisionAt?: string;
+  approvalDecisionReason?: string;
+  approvalDecisionRemarks?: string;
+  // Inspection & Field resolution progress
+  inspectionStartedAt?: string;
+  inspectionFindings?: string;
+  assistanceRequestedNotes?: string;
+  resolutionReport?: string;
+  resolutionReportSubmittedAt?: string;
+  // Originating staff linkage
+  originatingEmployeeName?: string;
+  originatingEmployeeUserId?: string;
+  // Emergency safety override fields
+  isEmergencyOverride?: boolean;
+  emergencyClassification?: EmergencyHazardClassification;
+  hazardClassification?: EmergencyHazardClassification | string;
+  hazardDetails?: string;
+  emergencyBroadcastAt?: string;
+  // Decline status flag
+  isDeclined?: boolean;
+  // Resolution fields
+  acknowledgedBy?: string;
+  acknowledgedAt?: string;
+  resolvedBy?: string;
+  resolvedAt?: string;
+  resolutionNotes?: string;
+  history: IncidentLifecycleEvent[];
+  isSimulated?: boolean;
+  actionTab?: string;
+}
+
+// ============================================================================
+// PHASE 4: HUMAN-IN-THE-LOOP AI RECOMMENDATION & APPROVAL GOVERNANCE TYPES
+// ============================================================================
+
+export type RecommendationRiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export type RecommendationStatus =
+  | 'PROPOSED'
+  | 'PENDING_APPROVAL'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'EXECUTED'
+  | 'FAILED';
+
+export type RecommendationActionType =
+  | 'APPROVE_CONNECTION_APPLICATION'
+  | 'DISPATCH_INSPECTION_WORK_ORDER'
+  | 'ASSIGN_COMPLAINT_TO_FIELD'
+  | 'ESCALATE_CRITICAL_INCIDENT'
+  | 'RESOLVE_SLA_COMPLAINT'
+  | 'APPROVE_HIGH_RISK_SANCTION'
+  | 'REVOKE_SUSPICIOUS_SESSION';
+
+export interface AIActionRecommendation {
+  id: string;
+  agentRole: UserRole;
+  agentPersonaName: string;
+  proposedAction: RecommendationActionType;
+  title: string;
+  description: string;
+  affectedRecord: {
+    type: 'application' | 'complaint' | 'workorder' | 'incident' | 'security';
+    id: string;
+    label: string;
+    currentStatus: string;
+  };
+  reasoningSummary: string;
+  supportingRecordReferences: string[];
+  riskLevel: RecommendationRiskLevel;
+  requiredApprovingRole: UserRole;
+  createdAt: string;
+  status: RecommendationStatus;
+  previousValue: string;
+  proposedValue: string;
+  proposedPatch?: {
+    targetStatus?: string;
+    notes?: string;
+    remarks?: string;
+    assignedTo?: string;
+    priority?: string;
+    [key: string]: any;
+  };
+  // Human Review & Decision Audit Trail
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewerRole?: UserRole;
+  decisionRemarks?: string;
+  // Execution State & Idempotency Key
+  executionResult?: {
+    success: boolean;
+    executedAt: string;
+    message: string;
+  };
+  idempotencyKey: string;
+}
+
+export type { ActiveUserIdentity } from '../utils/avatarUtils';

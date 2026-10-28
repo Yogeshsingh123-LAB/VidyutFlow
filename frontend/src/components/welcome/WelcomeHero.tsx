@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { UGVCL_CORPORATE_PROFILE } from '../../data/ugvclHistoryData';
 import { CountUpNumber } from './CountUpNumber';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface WelcomeHeroProps {
   onOpenAboutModal: () => void;
@@ -31,6 +32,7 @@ export const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onOpenAboutModal }) =>
     showToast,
     demoSession
   } = useApp();
+  const { dict } = useLanguage();
 
   const handleGoToConsumerTab = (tabName: string) => {
     if (demoSession && demoSession.role === 'consumer') {
@@ -68,28 +70,25 @@ export const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onOpenAboutModal }) =>
           {/* Unboxed Metadata & Institutional Identification */}
           <div className="flex flex-wrap items-center gap-2.5 text-xs sm:text-sm font-semibold text-cyan-300">
             <span className="bg-blue-900/80 text-cyan-200 border border-blue-600/60 px-3.5 py-1 rounded-md text-xs uppercase tracking-wider font-bold shadow-xs">
-              North Gujarat Electricity Distribution
+              {dict.hero.badgeDistribution}
             </span>
             <span className="text-slate-400">·</span>
-            <span>Incorporated 15 Sept 2003</span>
+            <span>{dict.hero.badgeIncorporated}</span>
             <span className="text-slate-400">·</span>
             <span className="text-amber-400 font-bold flex items-center gap-1.5">
               <Award className="w-4 h-4 inline" />
-              <span>MoP Grade A+ Discom</span>
+              <span>{dict.hero.badgeRating}</span>
             </span>
           </div>
 
           {/* Powerful, Concise Heading with refined line breaks */}
           <h1 className="text-3xl sm:text-5xl lg:text-[56px] font-black tracking-tight text-white leading-[1.12]">
-            Powering North Gujarat’s Growth <br className="hidden sm:inline" />
-            with Uninterrupted Reliability.
+            {dict.hero.title}
           </h1>
 
           {/* Editorial Lead Paragraph */}
           <p className="text-base sm:text-lg text-slate-100 leading-relaxed max-w-3xl font-normal">
-            Uttar Gujarat Vij Company Limited (UGVCL) distributes 24×7 high-quality electrical energy
-            across 6 northern districts—Mehsana, Gandhinagar, Sabarkantha, Banaskantha, Patan, and Aravalli—energizing
-            over <strong>3.8 million households, farms, and industrial enterprises</strong>.
+            {dict.hero.description}
           </p>
 
           {/* Primary Call-to-Actions */}
@@ -98,7 +97,7 @@ export const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onOpenAboutModal }) =>
               onClick={() => handleGoToConsumerTab('dashboard')}
               className="px-6 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-sm sm:text-base shadow-xl shadow-blue-600/30 flex items-center gap-2.5 transition-all hover:-translate-y-0.5 cursor-pointer"
             >
-              <span>Consumer Self-Service</span>
+              <span>{dict.hero.ctaConsumer}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
@@ -107,7 +106,7 @@ export const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onOpenAboutModal }) =>
               className="px-6 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-bold text-sm sm:text-base shadow-xl shadow-amber-500/25 flex items-center gap-2.5 transition-all hover:-translate-y-0.5 cursor-pointer"
             >
               <LogIn className="w-4 h-4 stroke-[2.5]" />
-              <span>ERP & Staff Workspace</span>
+              <span>{dict.hero.ctaStaff}</span>
             </button>
 
             <button
@@ -116,7 +115,7 @@ export const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onOpenAboutModal }) =>
               title="About VidyutOne Platform Architecture & System Design"
             >
               <Info className="w-4 h-4 text-cyan-400" />
-              <span>Platform Architecture</span>
+              <span>{dict.hero.ctaArchitecture}</span>
             </button>
 
             <a
@@ -125,39 +124,39 @@ export const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onOpenAboutModal }) =>
               title="View & Download Official Electricity Tariff Schedule"
             >
               <FileText className="w-4 h-4 text-amber-400" />
-              <span>Tariff Schedule (PDF)</span>
+              <span>{dict.hero.ctaTariff}</span>
             </a>
           </div>
 
           {/* Verified Institutional Strip */}
           <div className="pt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 border-t border-white/20 text-slate-200">
             <div className="min-w-0">
-              <span className="text-[11px] sm:text-xs text-slate-400 uppercase font-bold tracking-wider block truncate">Registered Jurisdiction</span>
+              <span className="text-[11px] sm:text-xs text-slate-400 uppercase font-bold tracking-wider block truncate">{dict.hero.statJurisdictionLabel}</span>
               <span className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white font-mono block mt-0.5 truncate">
-                <CountUpNumber value="6 Districts" />
+                <CountUpNumber value={dict.hero.statJurisdictionVal} />
               </span>
-              <p className="text-xs text-slate-300 mt-0.5 line-clamp-1">Mehsana HQ, Gandhinagar</p>
+              <p className="text-xs text-slate-300 mt-0.5 line-clamp-1">{dict.hero.statJurisdictionSub}</p>
             </div>
             <div className="min-w-0">
-              <span className="text-[11px] sm:text-xs text-slate-400 uppercase font-bold tracking-wider block truncate">Consumer Base</span>
+              <span className="text-[11px] sm:text-xs text-slate-400 uppercase font-bold tracking-wider block truncate">{dict.hero.statConsumerBaseLabel}</span>
               <span className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white font-mono block mt-0.5 truncate">
-                <CountUpNumber value="3.8M+" />
+                <CountUpNumber value={dict.hero.statConsumerBaseVal} />
               </span>
-              <p className="text-xs text-slate-300 mt-0.5 line-clamp-1">Domestic, Agrarian, Industrial</p>
+              <p className="text-xs text-slate-300 mt-0.5 line-clamp-1">{dict.hero.statConsumerBaseSub}</p>
             </div>
             <div className="min-w-0">
-              <span className="text-[11px] sm:text-xs text-slate-400 uppercase font-bold tracking-wider block truncate">Rural Village Power</span>
+              <span className="text-[11px] sm:text-xs text-slate-400 uppercase font-bold tracking-wider block truncate">{dict.hero.statRuralPowerLabel}</span>
               <span className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white font-mono block mt-0.5 truncate">
-                <CountUpNumber value="100% 24x7" />
+                <CountUpNumber value={dict.hero.statRuralPowerVal} />
               </span>
-              <p className="text-xs text-slate-300 mt-0.5 line-clamp-1">Jyotigram Yojana Coverage</p>
+              <p className="text-xs text-slate-300 mt-0.5 line-clamp-1">{dict.hero.statRuralPowerSub}</p>
             </div>
             <div className="min-w-0">
-              <span className="text-[11px] sm:text-xs text-slate-400 uppercase font-bold tracking-wider block truncate">National Rating</span>
+              <span className="text-[11px] sm:text-xs text-slate-400 uppercase font-bold tracking-wider block truncate">{dict.hero.statNationalRatingLabel}</span>
               <span className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-amber-400 font-mono block mt-0.5 truncate">
-                <CountUpNumber value="Grade A+" />
+                <CountUpNumber value={dict.hero.statNationalRatingVal} />
               </span>
-              <p className="text-xs text-slate-300 mt-0.5 line-clamp-1">14th MoP/PFC Rating</p>
+              <p className="text-xs text-slate-300 mt-0.5 line-clamp-1">{dict.hero.statNationalRatingSub}</p>
             </div>
           </div>
         </div>
@@ -173,12 +172,12 @@ export const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onOpenAboutModal }) =>
                 <CreditCard className="w-5 h-5" />
               </div>
               <span className="text-xs font-bold text-cyan-300 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                <span>Instant Pay</span>
+                <span>{dict.hero.cardPayBadge}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </span>
             </div>
-            <p className="text-base sm:text-lg font-bold text-white group-hover:text-cyan-200 transition-colors">Quick Bill Payment</p>
-            <p className="text-sm text-slate-300 mt-1">Pay via NetBanking, UPI, or Debit/Credit Card</p>
+            <p className="text-base sm:text-lg font-bold text-white group-hover:text-cyan-200 transition-colors">{dict.hero.cardPayTitle}</p>
+            <p className="text-sm text-slate-300 mt-1">{dict.hero.cardPaySub}</p>
           </button>
 
           <button
@@ -190,12 +189,12 @@ export const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onOpenAboutModal }) =>
                 <FilePlus2 className="w-5 h-5" />
               </div>
               <span className="text-xs font-bold text-emerald-300 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                <span>Apply Online</span>
+                <span>{dict.hero.cardApplyBadge}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </span>
             </div>
-            <p className="text-base sm:text-lg font-bold text-white group-hover:text-emerald-200 transition-colors">New LT / HT Connection</p>
-            <p className="text-sm text-slate-300 mt-1">Residential RGPU, Agricultural & LT Commercial</p>
+            <p className="text-base sm:text-lg font-bold text-white group-hover:text-emerald-200 transition-colors">{dict.hero.cardApplyTitle}</p>
+            <p className="text-sm text-slate-300 mt-1">{dict.hero.cardApplySub}</p>
           </button>
 
           <button
@@ -207,12 +206,12 @@ export const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onOpenAboutModal }) =>
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <span className="text-xs font-bold text-amber-300 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                <span>Register / Track</span>
+                <span>{dict.hero.cardGrievanceBadge}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </span>
             </div>
-            <p className="text-base sm:text-lg font-bold text-white group-hover:text-amber-200 transition-colors">Grievances & Outages</p>
-            <p className="text-sm text-slate-300 mt-1">24x7 CGRF Redressal & Toll-Free 19122 Tracking</p>
+            <p className="text-base sm:text-lg font-bold text-white group-hover:text-amber-200 transition-colors">{dict.hero.cardGrievanceTitle}</p>
+            <p className="text-sm text-slate-300 mt-1">{dict.hero.cardGrievanceSub}</p>
           </button>
         </div>
       </div>
