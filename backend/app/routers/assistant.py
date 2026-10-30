@@ -4,10 +4,11 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import User, ConnectionRequest
-from ..deps import current_user
+from ..deps import current_user, require
 from ..access import visible_requests
 from ..assistant.service import policy_answer
 from ..ml.predict import metrics
+from ..ml.governance import build_ai_governance_report
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 class Chat(BaseModel): question: str
@@ -29,3 +30,8 @@ def chat(body: Chat, db: Session = Depends(get_db), u: User = Depends(current_us
 
 @router.get("/ml-metrics")
 def ml_metrics(u: User = Depends(current_user)): return metrics()
+
+@router.get("/ai-governance")
+def ai_governance(db: Session = Depends(get_db), u: User = Depends(require("officer", "admin"))):
+    """Model registry, live inference/drift monitoring, API versioning, and human-approval proof."""
+    return build_ai_governance_report(db, u)

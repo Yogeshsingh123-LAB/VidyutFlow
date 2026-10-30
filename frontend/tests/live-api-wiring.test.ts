@@ -27,12 +27,15 @@ function check(name: string, ok: boolean, detail = '') {
 console.log('\nRunning Test: 1. Backend session bridge stores the JWT that fastApiClient reads');
 {
   const s = read('src/utils/backendSession.ts');
-  check("backendSession writes localStorage key 'vidyutos_token'", s.includes("TOKEN_KEY = 'vidyutos_token'"));
-  check('syncBackendSession tries portal credentials first', s.includes('requestBackendToken(email, password)'));
-  check('role-mapped fallback accounts exist for all 5 portals', ['consumer', 'employee', 'field', 'management', 'admin']
-    .every(role => new RegExp(`^  ${role}: \\{ email:`, 'm').test(s)));
+  check('backend token is not stored in localStorage or sessionStorage', !s.includes('localStorage.setItem(') && !s.includes('sessionStorage.setItem('));
+  check('backend login uses normalized supplied portal credentials', s.includes('username: expectedEmail, password'));
+  check('shared role fallback is removed', !s.includes('ROLE_FALLBACK_ACCOUNTS'));
+  check('backend identity is verified via /api/backend/auth/me', s.includes("'/api/backend/auth/me'"));
+  const client = read('src/utils/fastApiClient.ts');
+  check('fastApiClient delegates token verification to backendSession', client.includes('getVerifiedBackendToken()') && !client.includes('localStorage'));
   const app = read('src/context/AppContext.tsx');
   check('AppContext syncs backend session after portal login', app.includes('syncBackendSession('));
+  check('AppContext provisions isolated consumer backend session on server signup', app.includes('registerBackendConsumerSession('));
   check('AppContext clears backend session on logout/reset', app.includes('clearBackendSession()'));
 }
 if (failed === 0) console.log('PASSED: 1. Backend session bridge');
@@ -41,6 +44,7 @@ console.log('\nRunning Test: 2. Three screens are wired to the live API');
 {
   const consumer = read('src/components/consumer/ConsumerPortal.tsx');
   check('Consumer wizard submits to POST /api/requests (live)', consumer.includes('submitLiveRequest('));
+  check('Consumer portal renders isolated LiveConsumerRequests history view', consumer.includes('<LiveConsumerRequests />'));
   const employee = read('src/components/employee/EmployeePortal.tsx');
   check('Employee portal renders LiveRequestQueue', employee.includes('<LiveRequestQueue />'));
   const management = read('src/components/management/ManagementPortal.tsx');

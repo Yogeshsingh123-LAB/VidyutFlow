@@ -58,6 +58,8 @@ export const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onOpenAboutModal }) =>
         <img
           src="/assets/ugvcl/distribution_substation_switchyard.jpg"
           alt="33kV/11kV Distribution Substation Switchyard"
+          decoding="async"
+          fetchPriority="high"
           className="w-full h-full object-cover object-center scale-102 transform filter brightness-70 contrast-105"
         />
         {/* Editorial Gradients: Darker on the left for text readability, clear and vivid on the right to showcase the substation */}

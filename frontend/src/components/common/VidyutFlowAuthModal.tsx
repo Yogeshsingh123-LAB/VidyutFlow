@@ -90,11 +90,12 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
     setAuthMode,
     dataMode,
     loginDemoUser,
+    loginViaSimulatedSso,
     loginAsCanonicalDemoAccount,
     signupDemoUser,
     activeUser
   } = useApp();
-  const { dict } = useLanguage();
+  const { dict, language } = useLanguage();
 
   // Active tab: Sign In vs New Consumer Sign Up
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>(initialTab);
@@ -709,6 +710,66 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
                   </>
                 )}
               </button>
+
+              {/* Simulated OIDC / Gujarat Parichay SSO Button (Item #18) */}
+              {isDevAuthModeSwitchEnabled() && (
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span className="font-semibold">
+                      {language === 'gu'
+                        ? 'સિંગલ સાઇન-ઓન (OIDC / પરિચય)'
+                        : language === 'hi'
+                        ? 'सिंगल साइन-ऑन (OIDC / परिचय)'
+                        : language === 'mr'
+                        ? 'सिंगल साइन-ऑन (OIDC / परिचय)'
+                        : 'Enterprise / Citizen Single Sign-On'}
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-bold text-[10px] uppercase tracking-wider">
+                      SIMULATED DEMO OIDC
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={async () => {
+                      setIsSubmitting(true);
+                      setLoginError(null);
+                      try {
+                        const provider =
+                          loginRole === 'consumer'
+                            ? 'parichay-gujarat-demo'
+                            : 'ugvcl-workforce-oidc-demo';
+                        const res = await loginViaSimulatedSso(loginEmail, loginRole, provider);
+                        if (!res.success) {
+                          setLoginError(res.error || 'Simulated SSO sign-in failed.');
+                        }
+                      } finally {
+                        setIsSubmitting(false);
+                      }
+                    }}
+                    className="w-full min-h-11 px-4 py-2.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/40 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/40 text-indigo-900 dark:text-indigo-200 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    <span>
+                      {loginRole === 'consumer'
+                        ? language === 'gu'
+                          ? 'મેરીપહેચાન / ગુજરાત પરિચય SSO (સિમ્યુલેટેડ ડેમો)'
+                          : language === 'hi'
+                          ? 'मेरीपहचान / गुजरात परिचय SSO (सिम्युलेटेड डेमो)'
+                          : language === 'mr'
+                          ? 'मेरीपहचान / गुजरात परिचय SSO (सिम्युलेटेड डेमो)'
+                          : 'Sign in with MeriPehchaan / Gujarat Parichay SSO (Simulated Demo)'
+                        : language === 'gu'
+                        ? 'UGVCL વર્કફોર્સ OIDC SSO (સિમ્યુલેટેડ ડેમો)'
+                        : language === 'hi'
+                        ? 'UGVCL वर्कफ़ोर्स OIDC SSO (सिम्युलेटेड डेमो)'
+                        : language === 'mr'
+                        ? 'UGVCL वर्कफोर्स OIDC SSO (सिम्युलेटेड डेमो)'
+                        : 'Sign in with UGVCL Workforce OIDC SSO (Simulated Demo)'}
+                    </span>
+                  </button>
+                </div>
+              )}
             </form>
           )}
 

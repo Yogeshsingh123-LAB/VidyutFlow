@@ -9,6 +9,9 @@ import {
   setCustomGeminiGeneratorForTests,
   SERVER_GEMINI_TIMEOUT_MS
 } from '../vite.config';
+import { defaultServerAuthService } from '../src/server/authRoutes';
+import { DEFAULT_DEMO_ACCOUNTS } from '../src/data/demoAuthData';
+import { SESSION_COOKIE_NAME } from '../src/server/authService';
 
 let passed = 0;
 let failed = 0;
@@ -73,9 +76,18 @@ async function invokeAiChatMiddleware(
     }
   });
 
+  const roleKey = (payload?.role || 'consumer') as keyof typeof DEFAULT_DEMO_ACCOUNTS;
+  const acct = DEFAULT_DEMO_ACCOUNTS[roleKey] || DEFAULT_DEMO_ACCOUNTS.consumer;
+  const auth = defaultServerAuthService.login({ email: acct.email, password: acct.password });
+  const sessionCookie = `${SESSION_COOKIE_NAME}=${encodeURIComponent(auth.session.signedToken)}`;
+
   const req = new EventEmitter() as any;
   req.method = method;
-  req.headers = { 'x-forwarded-for': clientIp, 'content-type': 'application/json' };
+  req.headers = {
+    'x-forwarded-for': clientIp,
+    'content-type': 'application/json',
+    cookie: sessionCookie
+  };
   req.socket = { remoteAddress: clientIp };
 
   const headers: Record<string, string> = {};

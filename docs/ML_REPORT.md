@@ -20,7 +20,11 @@ Live at `GET /assistant/ml-metrics`. Figures for the deck: `docs/assets/ml_confu
 
 **Evaluation protocol.** Classifier metrics hold out complete *source templates*, so wording variants of a template cannot appear on both sides of the split. The SLA model uses a stratified random split of synthetic rows and reports breach precision/recall/F1 alongside accuracy. `make train` is deterministic (fixed seeds) — the tracked `metrics.json` reproduces byte-identically.
 
-**Caveats.** Held-out templates are still a small, constructed vocabulary and do not establish performance on real consumer text; SLA labels come from a noisy synthetic rule. Never present these numbers as UGVCL's real performance. For deployment, retrain and validate on appropriately governed UGVCL data. The policy assistant is TF-IDF retrieval over 3 bundled policy extracts (`backend/data/policies/`) — growing the corpus is planned **if UGVCL provides real procedure documents**; retrieval only, no fine-tuning promises.
+**Caveats.** Held-out templates are still a small, constructed vocabulary and do not establish performance on real consumer text; SLA labels come from a noisy synthetic rule. Never present these numbers as UGVCL's real performance. For deployment, retrain and validate on appropriately governed UGVCL data.
+
+**Assistant architecture clarification (TF-IDF vs optional Gemini UI drawer).**
+- **Backend ML & Policy RAG (`backend/app/ml/`, `POST /assistant/chat`, `GET /assistant/ml-metrics`):** Runs 100% locally in Python/scikit-learn with zero external API calls. `POST /assistant/chat` performs deterministic role/zone-scoped live database queries plus TF-IDF cosine-similarity retrieval over the 3 bundled policy extracts (`backend/data/policies/`). None of the evaluation metrics in this report involve an LLM.
+- **Portal Vidyut Mitra Drawer (`POST /api/ai-chat` in `frontend/vite.config.ts`, `AIAssistantDrawer.tsx`):** Provides a role-scoped conversational UI that uses server-side Google Gemini (`GEMINI_API_KEY`, `3.5 s` server timeout, read-only tools) when configured, automatically falling back to a deterministic rule-based `Grounded Engine` (`utilityAiEngine.ts`) when offline, unconfigured, or quota-limited—and attaching cited FastAPI TF-IDF `/assistant/chat` results whenever a verified backend session is active. Every message displays a badge indicating which engine answered.
 
 ## Honesty script (30 seconds, say it exactly)
 

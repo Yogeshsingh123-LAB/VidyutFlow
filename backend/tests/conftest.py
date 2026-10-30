@@ -1,6 +1,6 @@
 import os
 import sys
-os.environ["DATABASE_URL"] = "sqlite:///./test_vidyutos.db"
+os.environ["DATABASE_URL"] = "sqlite:///./test_vidyutflow.db"
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest

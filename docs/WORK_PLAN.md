@@ -52,7 +52,7 @@
 | Task | Owner | Note |
 | :--- | :--- | :--- |
 | Frontend smoke tests (login + one flow per role) | Utsav + Sandip Kumar | ✅ Now 7 suites green incl. `tests/live-api-wiring.test.ts` (18 checks) — keep green in CI |
-| Simple load check (100 req) to replace "unbenchmarked" with a measured local figure | Sandip Kumar | ✅ **22 Oct** — `backend/scripts/load_check.py`: 100 mixed reads, **p50 3.1 ms · p95 4.5 ms · 0 errors** (local, synthetic) · `docs/verification/r4-load-check.txt` |
+| Concurrent load & cache check (`load_check.py`) + live `/system/performance` telemetry | Sandip Kumar | ✅ `backend/scripts/load_check.py` (200 concurrent mixed reads across 8 workers, 0 errors, KPI/template cache hits verified) · `docs/verification/r4-load-check.txt` (local synthetic check only; no UGVCL ms claim) |
 | Backup→wipe→restore drill (R1 handoff to R4) | Sandip Kumar + Yogesh | ✅ **22 Oct** — `scripts/restore_drill.sh`: checksum verify ✓ tamper rejected ✓ restore identical ✓ live-serve ✓ · `docs/verification/r4-backup-restore.txt` |
 | Gujarati UI strings | Utsav | Only if UGVCL asks (Plan B) |
 | Contractor/govt read-only role | Yogesh Kumar Singh + Utsav | Only if UGVCL confirms it's in scope |

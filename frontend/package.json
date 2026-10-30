@@ -1,15 +1,16 @@
 {
-  "name": "react-example",
+  "name": "vidyutflow-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
+    "start": "tsx src/server/prodServer.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
+    "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "tsx tests/auth-access.test.ts && tsx tests/demo-data-integrity.test.ts && tsx tests/ai-assistant-resilience.test.ts && tsx tests/server-auth-foundation.test.ts && tsx tests/server-auth-api.test.ts && tsx tests/navigation-views.test.ts && tsx tests/agentic-ai-tools.test.ts && tsx tests/critical-incidents.test.ts && tsx tests/incident-routing-escalation.test.ts && tsx tests/erp-workflows.test.ts && tsx tests/human-in-the-loop.test.ts && tsx tests/backend-readiness.test.ts && tsx tests/ui-ux-accessibility.test.ts && tsx tests/security-resilience-stress.test.ts && tsx tests/e2e-hackathon-readiness.test.ts && tsx tests/consumer-portal-security.test.ts && tsx tests/notification-application-queue.test.ts && tsx tests/multilingual-infrastructure.test.ts && tsx tests/multilingual-cards-repair.test.ts && tsx tests/erp-multilingual-navigation.test.ts && tsx tests/consumer-portal-multilingual.test.ts && tsx tests/live-api-wiring.test.ts",
+    "test": "tsx tests/auth-access.test.ts && tsx tests/demo-data-integrity.test.ts && tsx tests/ai-assistant-resilience.test.ts && tsx tests/server-auth-foundation.test.ts && tsx tests/server-auth-api.test.ts && tsx tests/navigation-views.test.ts && tsx tests/agentic-ai-tools.test.ts && tsx tests/critical-incidents.test.ts && tsx tests/incident-routing-escalation.test.ts && tsx tests/erp-workflows.test.ts && tsx tests/human-in-the-loop.test.ts && tsx tests/backend-readiness.test.ts && tsx tests/ui-ux-accessibility.test.ts && tsx tests/security-resilience-stress.test.ts && tsx tests/e2e-hackathon-readiness.test.ts && tsx tests/consumer-portal-security.test.ts && tsx tests/notification-application-queue.test.ts && tsx tests/multilingual-infrastructure.test.ts && tsx tests/multilingual-cards-repair.test.ts && tsx tests/erp-multilingual-navigation.test.ts && tsx tests/consumer-portal-multilingual.test.ts && tsx tests/live-api-wiring.test.ts && tsx tests/request-submission-status.test.ts && tsx tests/demo-load-policy.test.ts && tsx tests/backend-session-boundary.test.ts && tsx tests/document-upload.test.ts && tsx tests/ai-story-alignment.test.ts && tsx tests/offline-field-sync.test.ts && tsx tests/erp-adapter.test.ts && tsx tests/alert-engine.test.ts && tsx tests/workflow-templates.test.ts && tsx tests/performance-monitoring.test.ts && tsx tests/executive-analytics.test.ts && tsx tests/ai-governance.test.ts && tsx tests/infra-and-workload-evidence.test.ts && tsx tests/page-weight-and-five-portal-qa.test.ts && tsx tests/teammate-backlog-completion.test.ts",
     "test:auth": "tsx tests/auth-access.test.ts",
     "test:server-auth": "tsx tests/server-auth-foundation.test.ts && tsx tests/server-auth-api.test.ts",
     "test:integrity": "tsx tests/demo-data-integrity.test.ts",
@@ -30,14 +31,17 @@
     "test:erp-i18n": "tsx tests/erp-multilingual-navigation.test.ts",
     "test:consumer-i18n": "tsx tests/consumer-portal-multilingual.test.ts",
     "dev:3000": "vite --host 0.0.0.0 --port 3000",
-    "test:live-api-wiring": "tsx tests/live-api-wiring.test.ts"
+    "test:live-api-wiring": "tsx tests/live-api-wiring.test.ts",
+    "test:request-status": "tsx tests/request-submission-status.test.ts",
+    "test:load-policy": "tsx tests/demo-load-policy.test.ts",
+    "test:backend-session": "tsx tests/backend-session-boundary.test.ts",
+    "test:document-upload": "tsx tests/document-upload.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "dotenv": "^17.2.3",
-    "express": "^4.21.2",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.1",
@@ -54,7 +58,6 @@
     "esbuild": "^0.28.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
-    "typescript": "^7.0.2",
-    "@types/express": "^4.17.21"
+    "typescript": "^7.0.2"
   }
 }

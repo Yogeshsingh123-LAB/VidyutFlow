@@ -8,9 +8,21 @@ from ..db import get_db, engine
 from ..models import User, ConnectionRequest, FieldUpdate, AuditLog
 from ..deps import require
 from ..ml.predict import metrics
+from ..config import settings
+from ..perf import build_performance_report
 
 router = APIRouter(prefix="/system", tags=["system"])
 _started = time.time()
+
+@router.get("/demo-load-policy")
+def demo_load_policy():
+    """Public, non-sensitive demo policy; not an official utility limit."""
+    return {"review_threshold_kw": settings.demo_load_review_threshold_kw, "is_demo": True}
+
+@router.get("/performance")
+def performance_telemetry(u: User = Depends(require("admin"))):
+    """Admin-only rolling HTTP latency percentiles, TTL cache stats, and DB index check."""
+    return build_performance_report(engine)
 
 @router.get("/status")
 def status(db: Session = Depends(get_db), u: User = Depends(require("admin"))):
@@ -35,6 +47,7 @@ def status(db: Session = Depends(get_db), u: User = Depends(require("admin"))):
         "counts": counts,
         "ml": {"models_trained": "category_classifier" in m, "metrics": m},
         "assistant": {"policy_documents": policies, "engine": "TF-IDF RAG + live queries (no external LLM)"},
+        "performance": build_performance_report(engine),
         "process_uptime_seconds": int(time.time() - _started),
         "services": [
             {"name": "REST API + workflow", "status": "Operational"},

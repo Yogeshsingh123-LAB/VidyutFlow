@@ -21,30 +21,54 @@ The machine-readable [OpenAPI snapshot](api/openapi.json) is generated from `app
 
 Officer zone scope is a prototype assumption, pending UGVCL confirmation. Collection/KPI/assistant queries use this policy. Officer audit logs include only request events for visible requests. Existing cross-zone assignments are not migrated automatically. Routing selects active same-zone staff, without cross-zone fallback.
 
-## Operation inventory — 20 operations across 19 paths
+## Operation inventory — 44 operations across 39 paths
 
 | Method and path | Access | Success / response |
 |---|---|---|
 | GET `/health` | Public | 200: `status`, `service`, `data_notice`; liveness only, not DB readiness |
-| POST `/auth/register` | Public, consumer role only | 201: `id,email,name,role,zone` |
-| POST `/auth/login` | Public, throttled | 200: `access_token,token_type,role,name,user_id,zone` |
-| GET `/auth/me` | Active authenticated user | 200: `id,email,name,role,zone` |
+| POST `/auth/register` | Public, throttled, consumer role only | 201: `id,email,name,role,zone` (validates `zone`) |
+| POST `/auth/login` | Public, throttled | 200: `access_token,token_type,role,name,user_id,zone` + optional `HttpOnly` cookie (`?use_cookie=true`) |
+| POST `/auth/logout` | Public | 200: clears `vidyutflow_access_token` `HttpOnly` cookie |
+| GET `/auth/sso/providers` | Public | 200: simulated OIDC / Parichay SSO provider list & honesty disclosure |
+| POST `/auth/sso/login` | Public, throttled (non-prod only) | 200: simulated OIDC login + `HttpOnly` cookie (`403` in `APP_ENV=production`) |
+| GET `/auth/me` | Active authenticated user | 200: `id,email,name,role,zone` (accepts Bearer JWT or `HttpOnly` cookie) |
 | GET `/auth/users` | Admin | 200: array of `id,email,name,role,zone,is_active`; no hashes |
-| GET `/requests` | Authenticated, scoped | 200: request array, newest first; no pagination |
-| POST `/requests` | Consumer only | 201: request; submitting user becomes consumer_id |
-| POST `/requests/with-document` | Consumer only | 201: request; stores filename only, not file content |
+| GET `/auth/premises` | Consumer | 200: reusable consumer profile & saved premises |
+| POST `/auth/premises` | Consumer | 201: save reusable premise |
+| DELETE `/auth/premises/{premise_id}` | Consumer (owner) | 200: delete saved premise |
+| GET `/staff/zones` | Authenticated | 200: active UGVCL subdivision zones & staffing counts |
+| POST `/staff/zones` | Admin | 201: register or update subdivision zone |
+| GET `/staff/members` | Admin | 200: staff directory with zone & active open workload |
+| POST `/staff/members` | Admin | 201: onboard officer/engineer & auto-claim unassigned zone requests |
+| PATCH `/staff/members/{user_id}` | Admin | 200: reassign staff zone / duty status |
+| GET `/requests` | Authenticated, scoped | 200: request array including submission-time `validation_issues`, newest first; no pagination |
+| POST `/requests` | Consumer only | 201: request and structured `validation_issues`; submitting user becomes consumer_id |
+| POST `/requests/with-document` | Consumer only | 201: request and structured `validation_issues`; enforces `MAX_UPLOAD_BYTES` (default 5 MiB, 413 if exceeded), non-empty file + allowed extension (`.pdf,.jpg,.jpeg,.png,.txt`, 400 on violation), and stores sanitized filename metadata only |
 | GET `/requests/{request_id}` | Scoped | 200: request |
 | PATCH `/requests/{request_id}/status` | Officer/admin or assigned engineer | 200: updated request |
 | GET `/requests/kpis/summary` | Authenticated, scoped | 200: KPI object |
+| GET `/requests/kpis/executive-analytics` | Officer scoped / Admin global | 200: live DB-computed executive analytics (`overview`, `by_zone_matrix`, `by_category_chart`, `by_workflow_template`, `data_provenance`) |
 | POST `/requests/field-sync` | Officer/admin or assigned engineer, scoped | 200: sync acknowledgment |
 | GET `/requests/audit/verify` | Admin | 200: tamper-check over the audit hash chain (`ok,checked,legacy_skipped,last_entry_hash,broken_at`); read-only |
 | GET `/requests/audit/logs` | Officer scoped / admin global | 200: latest 100 audit events |
 | GET `/notifications` | Authenticated, own rows (admin: all) | 200: `unread`, `items[]` (max 50, newest first) |
 | POST `/notifications/read-all` | Authenticated, own rows | 200: `marked_read` |
 | POST `/notifications/{notification_id}/read` | Owner or admin | 200: updated notification; another user's row returns 403 |
+| GET `/notifications/alerts/dispatches` | Officer scoped / Admin global | 200: simulated SMS/Email + in-app alert dispatch log (`?channel=ALL|SIMULATED_SMS|SIMULATED_EMAIL|IN_APP`, `?rule_code=...`) + summary & thresholds |
+| POST `/notifications/alerts/evaluate` | Officer scoped / Admin global | 200: evaluates `SLA_BREACH_RISK`, `UNASSIGNED_STALE`, and `REPEATED_ZONE_FAILURES` idempotently and logs hash-chained `ALERT_DISPATCHED` audit rows |
 | POST `/assistant/chat` | Authenticated | 200: answer plus branch-dependent data/sources |
 | GET `/assistant/ml-metrics` | Authenticated | 200: synthetic model metrics; no real-world performance claim |
-| GET `/system/status` | Admin only | 200: global technical status/counts |
+| GET `/assistant/ai-governance` | Officer scoped / Admin global | 200: versioned model registry, live inference/drift counters, `X-API-Version: v1` contract (`/` and `/v1/*`), and human-approval audit proof |
+| GET `/system/status` | Admin only | 200: global technical status/counts + `performance` report |
+| GET `/system/performance` | Admin only | 200: live rolling HTTP latency percentiles (`p50_ms,p95_ms,p99_ms`), epoch-invalidated cache stats, and DB index verification |
+| GET `/system/demo-load-policy` | Public | 200: `review_threshold_kw`, `is_demo`; demo-only, not an official UGVCL limit |
+| GET `/erp/mappings` | Officer / Admin | 200: canonical field mapping specification + explicit simulated-adapter disclosure |
+| GET `/erp/logs` | Officer scoped / Admin global | 200: `summary` (`total,synced,failed_queue`) + `items[]` (`?status=ALL|SYNCED|FAILED`) |
+| POST `/erp/sync/{request_id}` | Officer scoped / Admin global | 200: triggers simulated outbound ERP sync (`simulate_failure` optional) and logs hash-chained audit entry |
+| POST `/erp/logs/{log_id}/retry` | Officer scoped / Admin global | 200: retries a `FAILED` sync log row (`409` if already `SYNCED`) with optional `meter_serial` override |
+| GET `/workflows/templates` | Authenticated | 200: active configurable workflow templates (`?include_inactive=true` for admin) driving SLA hours, document & field-visit flags, load caps, and step stages |
+| POST `/workflows/templates` | Admin only | 201: creates a custom workflow template and records hash-chained `WORKFLOW_TEMPLATE_CREATED` audit row (`409` on duplicate code) |
+| PATCH `/workflows/templates/{template_code}` | Admin only | 200: updates SLA hours, document/field flags, max auto-load kW, steps, or active flag (`400` if deactivating `new_connection`) and records `WORKFLOW_TEMPLATE_UPDATED` |
 
 **System-status boundary:** `/system/status` is admin-only. Officers use their zone-filtered `/requests/kpis/summary`; they cannot access global technical counts.
 
@@ -56,7 +80,7 @@ Registration JSON requires `email,name,password`; defaults `role=consumer, zone=
 
 Request JSON requires `applicant_name,phone,address`. Defaults: `zone=North`, `pin_code=""`, `request_type=new_connection`, `description=""`, `requested_load_kw=1.0`, `document_name=""`, `tariff_category="Residential (RGPU)"`, `phase="1-Phase"`, `premises_type=Owned`.
 
-Multipart creation takes the same applicable fields as form values, with optional `document` file instead of `document_name`. No document-download endpoint exists. Workflow validation failures create a request with `NEEDS_CORRECTION` and explanatory `validation_notes`; this is a **201**, not a failed transport response. Zone taxonomy and routing settings are prototype assumptions.
+Multipart creation takes the same applicable fields as form values, with optional `document` file instead of `document_name`. When `document` is provided, its size must be `1..MAX_UPLOAD_BYTES` (default `5_242_880` bytes / 5 MiB; returns **413** if exceeded), its extension must be one of `.pdf, .jpg, .jpeg, .png, .txt`, control/bidi characters are rejected (**400**), and directory paths, extra dots, formula prefixes, and unsafe punctuation are sanitized into a `<= 120`-character filename before persistence. On JSON `POST /requests`, non-empty `document_name` strings also strip path segments and unsafe/formula characters (`<= 120` chars) and reject control/bidi or degenerate strings (**400**). No document-download endpoint exists. Workflow validation failures create a request with `NEEDS_CORRECTION` and explanatory `validation_notes`; this is a **201**, not a failed transport response. Zone taxonomy and routing settings are prototype assumptions.
 
 Request responses serialize database columns: `id,consumer_id,applicant_name,phone,address,zone,pin_code,request_type,description,requested_load_kw,tariff_category,phase,premises_type,document_name,meter_serial,category,severity,priority,sla_breach_risk,sla_risk_reasons,status,assigned_officer_id,assigned_engineer_id,validation_notes,sla_due_at,created_at,updated_at`. `sla_risk_reasons` is an array, not JSON text. Dates are JSON date-time strings; `sla_due_at` can be null. SQLite may serialize naive dates; clients should not assume timezone normalization is enforced. Unassigned IDs are empty strings.
 
@@ -102,7 +126,7 @@ Workflow events create rows: submit (consumer confirmation, zone officers, assig
 
 `POST /requests/with-document` (multipart form fields `applicant_name,phone,address` required; `zone,pin_code,request_type,description,requested_load_kw,tariff_category,phase,premises_type` optional; file field `document` optional) returns a single request object (201) with the same keys as `GET /requests` items. Workflow validation failures still return **201** with `status: "NEEDS_CORRECTION"` and `validation_notes` filled.
 
-Assistant input: `{"question":"Which requests have SLA breach risk?"}`. Every branch includes `answer,data`. Risk rows include `id,applicant,zone,status,sla_breach_risk,reasons`; counts have empty data. Policy answers may include `sources,excerpts`. This is keyword dispatch plus TF-IDF retrieval, not an external LLM. Model metric fields come from the synthetic-training artifact and can change when evaluation changes.
+Assistant input (`POST /assistant/chat` on FastAPI): `{"question":"Which requests have SLA breach risk?"}`. Every branch includes `answer,data`. Risk rows include `id,applicant,zone,status,sla_breach_risk,reasons`; counts have empty data. Policy answers may include `sources,excerpts`. This FastAPI endpoint is deterministic keyword dispatch plus local scikit-learn TF-IDF retrieval (no external LLM). Separately, the frontend Vite/Node server mounts `POST /api/ai-chat` for the portal drawer (optional server-side Gemini with read-only tools + deterministic local fallback), which also attaches cited `/assistant/chat` context when a verified backend session is active. Model metric fields come from the synthetic-training artifact and can change when evaluation changes.
 
 System status fields: `service,status,database,counts,ml,assistant,process_uptime_seconds,services`. Static service labels are not independent readiness probes; database failures can still result in a server error when subsequent count queries fail.
 
@@ -144,3 +168,5 @@ python -m pytest -q
 ### Compatibility note — 17 Oct 2026
 
 Previously accepted staff/admin create calls and officer system-status reads now return 403. KPI pending excludes rejected requests. Successful response keys are unchanged. OpenAPI drift alone cannot detect these policy/meaning changes; `test_freeze_review_role_boundaries_and_pending_semantics` tests them. Staff-assisted intake is deferred until explicit consumer ownership and audit requirements are designed.
+
+**Demo load review extension:** Creation responses include `validation_issues` with stable `code`, English fallback `message`, and `threshold_kw` for `DEMO_LOAD_REVIEW`. These issues are a snapshot of validation at submission time, persisted and returned on request creation, list, detail, and status-update responses. They do not represent current decisions after later status changes. Legacy records have `validation_issues: null` because their structured history is unknown; `validation_notes` remains the existing current-note fallback. The new demo policy endpoint and creation-response fields are additive changes to the earlier frozen contract and need joint review before deployment.

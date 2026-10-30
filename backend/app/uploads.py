@@ -1,0 +1,156 @@
+"""Upload size enforcement and document filename / reference sanitising."""
+from pathlib import PurePosixPath
+import re
+import unicodedata
+from urllib.parse import unquote
+from fastapi import HTTPException, UploadFile
+
+ALLOWED_DOCUMENT_EXTENSIONS = frozenset({".pdf", ".jpg", ".jpeg", ".png", ".txt"})
+MAX_DOCUMENT_NAME_LEN = 120
+MULTIPART_OVERHEAD_BYTES = 65_536
+_READ_CHUNK_BYTES = 65_536
+
+_UNSAFE_STEM_RE = re.compile(r"[^A-Za-z0-9_-]+")
+_UNSAFE_REF_RE = re.compile(r"[^A-Za-z0-9._(), -]+")
+_MULTI_UNDERSCORE_RE = re.compile(r"_+")
+_MULTI_SPACE_RE = re.compile(r"\s+")
+
+
+def _has_forbidden_control_or_bidi(value: str) -> bool:
+    for ch in value:
+        code = ord(ch)
+        if code < 32 or (0x7F <= code <= 0x9F) or unicodedata.category(ch) == "Cf":
+            return True
+    return False
+
+
+def sanitize_uploaded_filename(raw_filename: str | None) -> str:
+    """Validate and sanitize a multipart UploadFile filename into `<safe_stem><allowed_ext>`."""
+    if raw_filename is None or not raw_filename.strip():
+        raise HTTPException(400, "Uploaded document must have a valid filename")
+    decoded_filename = unquote(raw_filename)
+    if _has_forbidden_control_or_bidi(raw_filename) or _has_forbidden_control_or_bidi(decoded_filename):
+        raise HTTPException(400, "Invalid control or formatting characters in document filename")
+
+    basename = decoded_filename.replace("\\", "/").split("/")[-1].strip()
+    if not basename or basename in {".", ".."}:
+        raise HTTPException(400, "Invalid document filename")
+
+    stripped_dots = basename.lstrip(".")
+    if not stripped_dots:
+        raise HTTPException(400, "Invalid document filename")
+
+    path = PurePosixPath(stripped_dots)
+    ext = path.suffix.lower()
+    if not ext or ext not in ALLOWED_DOCUMENT_EXTENSIONS:
+        allowed_list = ", ".join(sorted(ALLOWED_DOCUMENT_EXTENSIONS))
+        raise HTTPException(400, f"Unsupported document file type; allowed: {allowed_list}")
+
+    raw_stem = stripped_dots[: -len(path.suffix)]
+    normalized_stem = unicodedata.normalize("NFKC", raw_stem).replace(".", "_")
+    clean_stem = _UNSAFE_STEM_RE.sub("_", normalized_stem)
+    clean_stem = _MULTI_UNDERSCORE_RE.sub("_", clean_stem).strip("_-")
+    if not clean_stem or not any(ch.isalnum() for ch in clean_stem):
+        raise HTTPException(400, "Document filename must contain alphanumeric characters")
+
+    max_stem_len = MAX_DOCUMENT_NAME_LEN - len(ext)
+    if len(clean_stem) > max_stem_len:
+        clean_stem = clean_stem[:max_stem_len].rstrip("_-")
+        if not clean_stem:
+            raise HTTPException(400, "Invalid document filename")
+
+    return f"{clean_stem}{ext}"
+
+
+def sanitize_document_reference(raw_name: str) -> str:
+    """Sanitize JSON `document_name` labels/filenames while preserving empty missing-doc semantics."""
+    if not raw_name or not raw_name.strip():
+        return ""
+    decoded_name = unquote(raw_name)
+    if _has_forbidden_control_or_bidi(raw_name) or _has_forbidden_control_or_bidi(decoded_name):
+        raise HTTPException(400, "Invalid control or formatting characters in document_name")
+
+    basename = decoded_name.replace("\\", "/").split("/")[-1].strip()
+    if not basename or basename in {".", ".."}:
+        raise HTTPException(400, "Invalid document_name")
+
+    normalized = unicodedata.normalize("NFKC", basename)
+    cleaned = _UNSAFE_REF_RE.sub("_", normalized)
+    cleaned = _MULTI_SPACE_RE.sub(" ", cleaned)
+    cleaned = _MULTI_UNDERSCORE_RE.sub("_", cleaned)
+    cleaned = cleaned.lstrip("._=+-@ ").rstrip(". ")
+
+    if not cleaned or not any(ch.isalnum() for ch in cleaned):
+        raise HTTPException(400, "Invalid document_name")
+
+    return cleaned[:MAX_DOCUMENT_NAME_LEN].rstrip(". ")
+
+
+async def validate_and_read_upload(document: UploadFile, max_bytes: int) -> str:
+    """Sanitize filename and enforce non-empty + max_bytes upload size before DB writes."""
+    try:
+        clean_name = sanitize_uploaded_filename(document.filename)
+        total_bytes = 0
+        while True:
+            chunk = await document.read(_READ_CHUNK_BYTES)
+            if not chunk:
+                break
+            total_bytes += len(chunk)
+            if total_bytes > max_bytes:
+                raise HTTPException(
+                    413,
+                    f"Uploaded document exceeds maximum allowed size of {max_bytes} bytes",
+                )
+        if total_bytes == 0:
+            raise HTTPException(400, "Uploaded document must not be empty")
+        return clean_name
+    finally:
+        await document.close()
+
+
+# ---------------------------------------------------------------------------
+# Authenticated Envelope Encryption-at-Rest Helper (Item #21 — AES-256-GCM)
+# ---------------------------------------------------------------------------
+_ENC_MAGIC = b"VFENC1"
+
+
+def _derive_aes256_key(master_secret: str, salt: bytes) -> bytes:
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+    return HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        info=b"vidyutflow-upload-at-rest-v1",
+    ).derive(master_secret.encode("utf-8"))
+
+
+def encrypt_upload_at_rest(plaintext: bytes, master_secret: str, aad: bytes = b"") -> bytes:
+    """Encrypt sensitive KYC / field photo bytes with HKDF-SHA256 + AES-256-GCM."""
+    import os as _os
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    if not master_secret or len(master_secret) < 16:
+        raise ValueError("Encryption master_secret must be at least 16 characters")
+    salt = _os.urandom(16)
+    nonce = _os.urandom(12)
+    key = _derive_aes256_key(master_secret, salt)
+    ciphertext = AESGCM(key).encrypt(nonce, plaintext, aad or None)
+    return _ENC_MAGIC + salt + nonce + ciphertext
+
+
+def decrypt_upload_at_rest(blob: bytes, master_secret: str, aad: bytes = b"") -> bytes:
+    """Authenticate and decrypt a blob produced by `encrypt_upload_at_rest`."""
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    header_len = len(_ENC_MAGIC) + 16 + 12
+    if len(blob) < header_len + 16 or not blob.startswith(_ENC_MAGIC):
+        raise ValueError("Invalid or unrecognized encrypted document header")
+    offset = len(_ENC_MAGIC)
+    salt = blob[offset : offset + 16]
+    nonce = blob[offset + 16 : offset + 28]
+    ciphertext = blob[offset + 28 :]
+    key = _derive_aes256_key(master_secret, salt)
+    return AESGCM(key).decrypt(nonce, ciphertext, aad or None)
+

@@ -19,31 +19,32 @@ directly; there are no supported release branches.
 
 ## Current posture (honest)
 
-Implemented: bcrypt password hashing, JWT auth with RBAC + assignment-level checks, restricted CORS,
-zone-scoped officer access, login throttling, audit logging of officer actions, and no password hashes
-exposed via the API. Registration rejects passwords exceeding bcrypt's 72-byte UTF-8 limit rather
-than silently truncating them.
+Implemented: bcrypt + scrypt password hashing, unified `HttpOnly; SameSite=Lax` session cookies across
+both the Node runtime (`vidyutflow_sid`) and FastAPI (`vidyutflow_access_token`) plus Bearer JWT
+support for CLI/API clients, RBAC + assignment-level checks, authenticated `/api/ai-chat` proxy with
+server-derived ERP grounding, centralized Redis-backed login throttling (`REDIS_URL` with bounded
+in-memory fallback), serialized tamper-evident SHA-256 `AuditLog` hash chain (`AuditChainHead` +
+`chain_seq`), HKDF-SHA256 + AES-256-GCM upload encryption-at-rest helper (`app/uploads.py`),
+simulated OIDC / Gujarat Parichay SSO (`403` disabled in `APP_ENV=production`), restricted CORS,
+zone-scoped officer access, and zero password hashes exposed via the API.
 
-Known prototype limitations (documented in README §Security Posture — do not deploy as-is):
-JWT in `localStorage`, process-local login throttling, document uploads store metadata only, and
-demo credentials are intentionally seeded in development mode. Production mode requires a
-non-placeholder `SECRET_KEY`, does not seed demo users or requests, and refuses to start if
-the database already contains those demo accounts. Production hardening (SSO,
-secret vault, shared rate limiting, multi-AZ, WAF) is roadmap — see `docs/ROADMAP.md` and
-`docs/INFRASTRUCTURE_ROADMAP.md`.
+See also:
+- Penetration Test & CERT-In VAPT Plan: `docs/PENETRATION_TEST_PLAN.md`
+- Disaster Recovery, Offsite Replication (`backend/scripts/offsite_replicate.sh`) & RPO/RTO Runbook: `docs/DISASTER_RECOVERY.md`
+- Production Infrastructure Architecture: `docs/INFRASTRUCTURE_ROADMAP.md`
 
 ## Team auth story (say this, exactly)
 
-> *"One credential set signs you into the portal workspace and the backend API. The portal keeps
-> its server session (HttpOnly cookie); live panels also hold a role-scoped backend JWT
-> (`vidyutos_token`). Every business operation is authorized server-side — the browser state
-> grants nothing."*
+> *"Portal authentication uses an HttpOnly SameSite cookie; live FastAPI panels separately verify
+> exact credentials against FastAPI (`/auth/me` email + RBAC role) and hold the backend JWT in tab
+> memory only (never in `localStorage` or `sessionStorage`). Every business operation is authorized
+> server-side — browser state grants nothing."*
 
 ## Known-gaps one-liners (for the defence Q&A)
 
 | Gap | One-line defence |
 | :-- | :--------------- |
-| JWT in `localStorage` | Prototype trade-off for the PWA; production moves to HttpOnly cookies + refresh rotation (roadmap) |
+| Dual-store prototype auth (Node cookie + in-memory FastAPI JWT) | Tab-memory bridge verifies exact identity/role and never falls back to shared demo accounts; unified server-side SSO + refresh rotation is roadmap |
 | Process-local login throttle | Bounded 20/min/IP per process; shared gateway rate-limiting is the production answer (documented, not hidden) |
 | Document uploads store filename only | Deliberate: no file content at rest to leak; object storage + scanning is roadmap |
 | Seeded demo credentials | Development only; `APP_ENV=production` refuses to start against a DB containing them and rejects placeholder secrets |

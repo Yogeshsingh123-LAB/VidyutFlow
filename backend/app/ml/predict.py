@@ -25,15 +25,24 @@ def classify_text(text: str):
     # Safety signals get a conservative deterministic escalation because the
     # synthetic text classifier has weak recall on unseen safety phrasing.
     if any(term in normalized for term in SAFETY_CRITICAL_TERMS):
+        from .governance import governance_monitor
+        governance_monitor.record_classification("SAFETY", safety_override=True)
         return "SAFETY", "CRITICAL"
     ensure_models()
     cat_m, sev_m = _load("category_model.joblib"), _load("severity_model.joblib")
     if not text or cat_m is None:
+        from .governance import governance_monitor
+        governance_monitor.record_classification("NEW_CONNECTION", safety_override=False)
         return "NEW_CONNECTION", "MEDIUM"
-    return str(cat_m.predict([text])[0]), str(sev_m.predict([text])[0])
+    cat_pred, sev_pred = str(cat_m.predict([text])[0]), str(sev_m.predict([text])[0])
+    from .governance import governance_monitor
+    governance_monitor.record_classification(cat_pred, safety_override=False)
+    return cat_pred, sev_pred
 
 def sla_risk(load_kw, category, severity, documents_complete, zone_pending, is_weekend=False):
     ensure_models(); m = _load("sla_model.joblib")
+    from .governance import governance_monitor
+    governance_monitor.record_sla_inference()
     reasons = []
     if not documents_complete: reasons.append("Documents incomplete — likely rework / follow-up")
     if zone_pending >= 20: reasons.append(f"High workload in zone ({zone_pending} pending requests)")

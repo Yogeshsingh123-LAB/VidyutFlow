@@ -8,32 +8,43 @@
  * - /api/system/status (System diagnostic status)
  */
 
+import { clearBackendSession, getBackendToken, getVerifiedBackendToken } from './backendSession';
+
 const BASE = (import.meta as any).env?.VITE_API_URL || '/api';
 
-export const getAuthToken = (): string | null => {
-  try {
-    return localStorage.getItem('vidyutos_token');
-  } catch {
-    return null;
-  }
-};
+export interface FastApiRequestOptions extends RequestInit {
+  /** Set to false only for explicitly public endpoints (e.g. /system/demo-load-policy). */
+  auth?: boolean;
+}
 
-export async function fastApi<T = any>(path: string, opts: RequestInit = {}): Promise<T> {
-  const token = getAuthToken();
+export const getAuthToken = (): string | null => getBackendToken();
+
+export async function fastApi<T = any>(path: string, opts: FastApiRequestOptions = {}): Promise<T> {
+  const { auth = true, headers: customHeaders, ...fetchOpts } = opts;
   const headers: Record<string, string> = {
-    ...(opts.headers as Record<string, string> || {}),
+    ...((customHeaders as Record<string, string>) || {}),
   };
 
-  if (token) {
+  if (auth) {
+    const token = await getVerifiedBackendToken();
+    if (!token) {
+      const unauthError: any = new Error('No verified backend session for the active portal user.');
+      unauthError.status = 401;
+      throw unauthError;
+    }
     headers['Authorization'] = `Bearer ${token}`;
   }
 
   const res = await fetch(`${BASE}${path}`, {
-    ...opts,
+    credentials: 'same-origin',
+    ...fetchOpts,
     headers,
   });
 
   if (!res.ok) {
+    if (auth && res.status === 401) {
+      clearBackendSession();
+    }
     const text = await res.text();
     let message = text || res.statusText;
     try {

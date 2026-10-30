@@ -22,9 +22,9 @@
 [![Problem Statement](https://img.shields.io/badge/PS-PS000125-blue?style=for-the-square)](#-the-problem)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-square&logo=python&logoColor=white)](#-technology-stack)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-square&logo=fastapi&logoColor=white)](#-technology-stack)
-[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-square&logo=react&logoColor=black)](#-technology-stack)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-square&logo=react&logoColor=black)](#-technology-stack)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-ML-F7931E?style=for-the-square&logo=scikitlearn&logoColor=white)](#-what-the-bundled-models-show)
-[![Tests](https://img.shields.io/badge/tests-17_passing-16a34a?style=for-the-square)](#-testing--qa)
+[![Tests](https://img.shields.io/badge/tests-110_backend_·_37_frontend-16a34a?style=for-the-square)](#-testing--qa)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-square)](LICENSE)
 
 [![Contributors](https://img.shields.io/github/contributors/Yogeshsingh123-LAB/VidyutFlow?style=for-the-square)](https://github.com/Yogeshsingh123-LAB/VidyutFlow/graphs/contributors)
@@ -141,10 +141,9 @@ Engineer toggles **airplane mode**, records meter serial + inspection remarks of
 queue on-device with a **UUIDv4**. On reconnect they sync — and syncing twice is safe:
 the server accepts each UUID **once** (UNIQUE constraint), so duplicates are impossible.
 
-### 6. AI Assistant (no external LLM)
-TF-IDF retrieval over policy documents (`backend/data/policies/`) **plus live data queries**:
-*“Which requests are likely to breach SLA?”* · *“What is the procedure for a new connection?”* ·
-*“How does offline field work sync?”* — answers cite the policy file they came from.
+### 6. Two-Tier AI Assistant (Local TF-IDF RAG + Optional Gemini UI Co-Pilot)
+- **FastAPI Control-Plane (`POST /assistant/chat`):** 100% local scikit-learn **TF-IDF** retrieval over policy documents (`backend/data/policies/`) **plus role/zone-scoped live DB queries** (*“Which requests are likely to breach SLA?”* · *“What is the procedure for a new connection?”* · *“How does offline field work sync?”*) — zero external LLM dependency, citing exact policy files.
+- **Portal Vidyut Mitra Drawer (`POST /api/ai-chat` + `AIAssistantDrawer.tsx`):** Role-isolated conversational co-pilots using server-side **Google Gemini** (`GEMINI_API_KEY`, `3.5s` deadline, read-only tools) when configured, automatically degrading to a deterministic **Grounded Rule Engine** when offline/unconfigured/quota-limited, and attaching cited FastAPI `/assistant/chat` policy & queue context whenever a verified backend session is active. Every message badges which engine answered.
 
 ### 7. Fleet Management Console (role-based portals & executive view)
 Welcome role-picker → **Consumer / Officer / Engineer / Admin** workspaces with sidebar shell,
@@ -182,7 +181,7 @@ $$
 | :--- | :--- | :--- | :--- |
 | 1 | **Enter once, use everywhere.** One `ConnectionRequest` row is the single source of truth — consumer tracking, officer queue, engineer task list and admin KPIs all read the same row. Nothing is re-typed between roles. | `models.py` (one table) · `routers/requests.py` (`out()`, list, KPI aggregation over the same query) | End-to-end test: a field-synced `COMPLETED` + meter serial appears on the *consumer's* connection (`test_end_to_end_and_dedup`) |
 | 2 | **Idempotent offline sync.** A field entry is applied at most once: re-sending a `client_uuid` returns `{"duplicate": true}`, writes **no** second row and changes **no** state — even if two retries race. | `FieldUpdate.client_uuid` `UniqueConstraint` (`models.py`) · de-dup check + `IntegrityError`→duplicate (`routers/requests.py`) | Same sync payload sent twice in `test_end_to_end_and_dedup` |
-| 3 | **No silent scores.** Every SLA-risk value is stored **with** its reasons list (JSON), and the UI renders the score and its reasons together (request drawer, risk notifications). | `workflow.run_workflow` (stores risk + reasons atomically) · `RequestDrawer.jsx` | Response-shape checks; reasons visible in demo step 3 |
+| 3 | **No silent scores.** Every SLA-risk value is stored **with** its reasons list (JSON), and the UI renders the score and its reasons together (request drawer, risk notifications). | `workflow.run_workflow` (stores risk + reasons atomically) · `LiveSlaRiskWatchlist.tsx` / `CaseDetailDrawer.tsx` | Response-shape checks; reasons visible in demo step 3 |
 | 4 | **Auditable decisions.** Every create, status change and field sync writes an `AuditLog` row (actor, role, action, entity, detail, timestamp). The trail is append-only from the API's side — no endpoint edits or deletes it. | `audit.py` · called by create / with-document / status / field-sync handlers | Audit-trail tab (officer/admin, real API); log assertions in the demo script |
 | 5 | **Humans decide; ML advises.** Models classify, prioritise and flag risk — they never approve, reject, or complete anything. Only an officer/admin status action can approve or reject, and field sync can only report field outcomes (`FIELD_VERIFIED` / `COMPLETED` / `BLOCKED`). | `PATCH /requests/{id}/status` (role-gated, allow-listed) · `FIELD_TASK_STATUSES` guard on `/field-sync` | `test_field_sync_cannot_decide_approvals` — sync attempts with `APPROVED`/`REJECTED`/garbage return **400** and leave the status untouched *(regression test for a real bug found in review, Oct 2026)* |
 | 6 | **Scoped, not just logged-in.** A token proves identity; it does not grant reach. Consumers see only their own requests, engineers only their assigned work, and officers only their zone — including KPI aggregates and assistant live-data answers. | `deps.py` (RBAC) · per-role query scoping in list/get/KPIs · assignment checks on status & sync | Cross-engineer sync → **403** and consumer-sync → **403** in `test_end_to_end_and_dedup`; admin-only routes → 403 for consumers |
@@ -200,7 +199,7 @@ Honesty pattern borrowed across our projects: every surface states what it reall
 | :--- | :--- | :--- |
 | Requests, workflow, KPIs, audit log | **Real (this backend)** | Computed from the live database on every call |
 | Category/severity classifier, SLA predictor | **Synthetic-trained models** | Real inference, synthetic training data; metrics vs baseline below |
-| Policy assistant answers | **Real retrieval** | TF-IDF over the 3 bundled policy extracts; sources cited |
+| Policy & portal AI assistants | **Local TF-IDF RAG + optional Gemini** | FastAPI `/assistant/chat` uses local TF-IDF over 3 policy extracts + scoped DB queries; portal drawer (`/api/ai-chat`) uses optional Gemini (`3.5s` cap, read-only tools) with automatic deterministic `Grounded Engine` fallback (badged on every reply) |
 | Feeder-health panel (Admin) | **SIMULATED — labelled in UI** | Illustrative only; real SCADA feed is roadmap |
 | Seeded demo requests/logins | **Synthetic demo data** | Created on first start so dashboards aren't empty |
 | Kafka, Temporal, GraphQL/GIS, Flutter/CRDT, fine-tuned LLM, multi-AZ | **Roadmap — not built** | Slide-ware only; see [Roadmap](#-roadmap--production-integration) |
@@ -211,7 +210,7 @@ Honesty pattern borrowed across our projects: every surface states what it reall
 
 ```mermaid
 flowchart TB
-    subgraph CLIENT["1 · Presentation — React 18 PWA (Tailwind, Vite)"]
+    subgraph CLIENT["1 · Presentation — React 19 PWA (Tailwind CSS 4, Vite 8)"]
         UI["Consumer wizard · Officer queue · Field console<br/>Admin cockpit · Ctrl-K palette · Dark mode"]
         SW["Service worker + offline queue (localStorage, UUID)"]
         UI --- SW
@@ -319,7 +318,7 @@ Interactive docs at **`/docs`**. Base path is proxied as `/api` by the frontend.
 | **New Connection** | 3-step wizard (premises → tariff/phase/load/document → review) |
 | **Requests / Queue** | Search + status/risk filters, risk-first sorting, case drawer (stepper, evidence, actions) |
 | **Field Operations** | Connectivity bar, offline queue counter, meter-serial + remarks inspection form |
-| **AI Assistant** | Suggested judge questions, cited policy answers, live at-risk list |
+| **AI Assistant** | Role-isolated Vidyut Mitra drawer (optional Gemini + deterministic `Grounded Engine` fallback) + FastAPI TF-IDF policy citations & scoped at-risk list |
 | **Insights** | Model cards vs baselines, severity chart, roadmap checklist, simulated feeder panel |
 | **Audit Log** | Timestamped actor/action trail (officer & admin) |
 
@@ -327,23 +326,24 @@ Interactive docs at **`/docs`**. Base path is proxied as `/api` by the frontend.
 
 | Layer | Technology | Notes |
 | :--- | :--- | :--- |
-| Frontend | React 18, Vite 6, Tailwind CSS 3, Lucide icons | PWA: service worker + web manifest; charts are hand-rolled SVG (no chart dependency to defend) |
+| Frontend | React 19, TypeScript, Vite 8, Tailwind CSS 4, Recharts, Lucide icons | 5-portal ERP & consumer workspace, 4-language i18n (EN/GU/HI/MR), web manifest |
 | Backend | Python 3.12, FastAPI 0.115, Uvicorn | One service a small team can defend line by line |
 | Data | SQLAlchemy 2, PostgreSQL 16 (Compose) / SQLite (local) | Redis service reserved in Compose for roadmap wiring |
-| ML / AI | scikit-learn (TF-IDF + Logistic Regression, Random Forest) | Models retrain from synthetic data on first start; binaries not committed |
+| ML / AI | scikit-learn (TF-IDF + Logistic Regression, Random Forest); optional `@google/genai` (`gemini-2.5-flash`) | Backend ML & policy RAG run 100% locally; portal drawer uses optional server-side Gemini (`3.5s` cap) with automatic deterministic fallback |
 | Security | JWT (HS256), bcrypt, RBAC + assignment checks, audit log | CORS allowlist via `CORS_ORIGINS`; startup warns on default `SECRET_KEY` |
-| DevOps | Docker Compose, Makefile, pytest | `make help` is the single entry point |
+| DevOps | Docker Compose, Makefile, GitHub Actions CI, pytest | `make help` is the single entry point |
 
 ## 🗂 Repository Layout
 
 ```
 VidyutFlow/
-├── backend/app/            # FastAPI: routers/ · ml/ · assistant/ · workflow.py · security.py
+├── backend/app/            # FastAPI: routers/ · ml/ · assistant/ · workflow.py · security.py · uploads.py
 ├── backend/data/policies/  # RAG policy extracts (Markdown)
-├── backend/tests/          # pytest end-to-end suite
-├── frontend/src/           # React PWA: components/ · lib/ · App.jsx
-├── frontend/public/        # service worker + PWA manifest
+├── backend/tests/          # pytest end-to-end & validation suite
+├── frontend/src/           # React 19 + TS: components/ · context/ · i18n/ · server/ · utils/ · App.tsx
+├── frontend/public/        # service worker + PWA manifest + assets
 ├── docs/                   # ARCHITECTURE · DEMO_SCRIPT · ML_REPORT · ROADMAP · reviews
+├── .github/workflows/      # ci.yml (backend pytest + frontend tests, lint, build)
 ├── scripts/demo_reset.sh
 ├── Makefile · docker-compose.yml · LICENSE · README.md
 ```
@@ -353,8 +353,9 @@ VidyutFlow/
 ## 🧪 Testing & QA
 
 ```bash
-make test          # 17 passed — backend/tests/
-make build         # frontend production build
+make test           # 110 passed — backend/tests/
+make test-frontend  # 37 suites — frontend/tests/
+make build          # frontend production build
 ```
 
 | Check | Verifies |
@@ -510,25 +511,21 @@ synthetic demo data provided for demonstration and evaluation. Not an official U
 │   │   ├── manifest.webmanifest
 │   │   └── sw.js
 │   ├── src
-│   │   ├── components
-│   │   │   ├── RequestDrawer.jsx
-│   │   │   ├── Shell.jsx
-│   │   │   ├── featurePanels.jsx
-│   │   │   ├── panels.jsx
-│   │   │   └── ui.jsx
-│   │   ├── lib
-│   │   │   └── format.js
-│   │   ├── App.jsx
-│   │   ├── api.js
+│   │   ├── components/     # consumer/ · employee/ · field/ · management/ · admin/ · common/ · layout/ · welcome/
+│   │   ├── context/        # AppContext.tsx
+│   │   ├── i18n/           # 4-language dictionaries (EN/GU/HI/MR)
+│   │   ├── server/         # dev/preview auth & AI middleware
+│   │   ├── utils/          # backendSession.ts · fastApiClient.ts · liveData.ts · validation helpers
+│   │   ├── App.tsx
 │   │   ├── index.css
-│   │   └── main.jsx
+│   │   └── main.tsx
+│   ├── tests/
 │   ├── Dockerfile
 │   ├── index.html
 │   ├── package-lock.json
 │   ├── package.json
-│   ├── postcss.config.js
-│   ├── tailwind.config.js
-│   └── vite.config.js
+│   ├── tsconfig.json
+│   └── vite.config.ts
 ├── scripts
 │   └── demo_reset.sh
 ├── .editorconfig
@@ -592,4 +589,4 @@ clean: demo-reset ## Remove demo DBs and build artefacts
 | Memory / corruption | SQLAlchemy transactions; `client_uuid` UNIQUE in `backend/app/models.py` | Duplicate sync writes impossible; tested ×2 sync |
 | Interrupts / events | Routers in `backend/app/routers/`, every mutation writes `AuditLog` | RBAC + assignment-level 403 checks, tested |
 | Stack / crashes | Pydantic validation + workflow `validate()` → NEEDS_CORRECTION instead of 500 | Invalid input returns reasons, not crashes |
-| Build portability | `Makefile` + `docker-compose.yml`, lockfiles, no absolute paths | `make test` 2 passed · `make build` OK |
+| Build portability | `Makefile` + `docker-compose.yml`, lockfiles, no absolute paths | `make test` 110 passed · `make test-frontend` 37 suites · `make build` OK |

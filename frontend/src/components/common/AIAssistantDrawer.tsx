@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { SafeMarkdown } from './SafeMarkdown';
 import { generateUtilityGroundedResponse } from '../../utils/utilityAiEngine';
+import { fetchBackendAssistantContext, type BackendAssistantContext } from '../../utils/liveData';
 import { AGENTIC_PERSONAS } from '../../server/agenticPersonas';
 
 interface ChatMessage {
@@ -30,6 +31,7 @@ interface ChatMessage {
   executedTools?: string[];
   personaName?: string;
   contextTag?: 'account-record' | 'tariff-guidance' | 'system';
+  backendCitation?: BackendAssistantContext | null;
 }
 
 export const formatToolChipName = (toolName: string): string => {
@@ -326,6 +328,11 @@ export const AIAssistantDrawer: React.FC = () => {
     }, REQUEST_TIMEOUT_MS);
     activeTimeoutHandleRef.current = timeoutHandle;
 
+    const backendContextPromise = Promise.race([
+      fetchBackendAssistantContext(text),
+      new Promise<null>(resolve => setTimeout(() => resolve(null), 2000))
+    ]);
+
     try {
       const response = await fetch('/api/ai-chat', {
         method: 'POST',
@@ -369,6 +376,7 @@ export const AIAssistantDrawer: React.FC = () => {
 
       const executedTools = Array.isArray(data.executedTools) ? data.executedTools : [];
       const personaName = data.persona?.name || currentPersona.name;
+      const backendCitation = await backendContextPromise;
 
       const aiMsg: ChatMessage = {
         id: `msg-ai-${Date.now()}`,
@@ -378,7 +386,8 @@ export const AIAssistantDrawer: React.FC = () => {
         executedTools,
         personaName,
         isFallback: Boolean(data.isFallback || !(typeof data.reply === 'string' && data.reply.trim().length > 0)),
-        contextTag: text.toLowerCase().includes('bill') || text.toLowerCase().includes('meter') ? 'account-record' : 'tariff-guidance'
+        contextTag: text.toLowerCase().includes('bill') || text.toLowerCase().includes('meter') ? 'account-record' : 'tariff-guidance',
+        backendCitation
       };
 
       // Ensure assistant response is committed to messages state
@@ -402,6 +411,7 @@ export const AIAssistantDrawer: React.FC = () => {
         fallbackReply =
           `### ${currentPersona.name} Utility Service\n\nNamaste. ${currentPersona.name} is currently experiencing a temporary service interruption. For urgent assistance with your electricity connection, billing, or power grievances, please contact the UGVCL 24x7 Toll-Free Helpline at **19122** or **1800 233 155335**.\n\n[Open Dashboard](action:dashboard)`;
       }
+      const backendCitation = await backendContextPromise;
 
       const aiMsg: ChatMessage = {
         id: `msg-ai-fb-${Date.now()}`,
@@ -410,7 +420,8 @@ export const AIAssistantDrawer: React.FC = () => {
         text: fallbackReply,
         personaName: currentPersona.name,
         isFallback: true,
-        contextTag: text.toLowerCase().includes('bill') || text.toLowerCase().includes('meter') ? 'account-record' : 'tariff-guidance'
+        contextTag: text.toLowerCase().includes('bill') || text.toLowerCase().includes('meter') ? 'account-record' : 'tariff-guidance',
+        backendCitation
       };
       setMessages(prev => [...prev, aiMsg]);
     } finally {
@@ -553,16 +564,25 @@ export const AIAssistantDrawer: React.FC = () => {
                 }`}
               >
                 <div className="flex items-center justify-between gap-3 text-[10px] opacity-75 mb-1.5 border-b pb-1 border-current/10">
-                  <span className="font-semibold flex items-center gap-1.5">
+                  <span className="font-semibold flex flex-wrap items-center gap-1.5">
                     {m.sender === 'user' ? (
                       activeUser.name
                     ) : (
                       <>
                         <Sparkles className="w-3 h-3 text-teal-600 shrink-0" />
                         <span>{m.personaName || currentPersona.name}</span>
-                        {m.isFallback && (
+                        {m.isFallback ? (
                           <span className="text-[9px] font-mono font-medium text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
                             Grounded Engine
+                          </span>
+                        ) : m.contextTag !== 'system' ? (
+                          <span className="text-[9px] font-mono font-medium text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
+                            Gemini + Read-Only Tools
+                          </span>
+                        ) : null}
+                        {m.backendCitation && (
+                          <span className="text-[9px] font-mono font-medium text-blue-700 bg-blue-50 px-1 py-0.2 rounded border border-blue-200">
+                            + TF-IDF Policy RAG
                           </span>
                         )}
                       </>
@@ -576,6 +596,19 @@ export const AIAssistantDrawer: React.FC = () => {
                 ) : (
                   <>
                     <SafeMarkdown content={m.text} onNavigateTab={handleNavigateTab} />
+                    {m.backendCitation && (
+                      <div className="mt-2.5 rounded-lg border border-blue-200 bg-blue-50/70 p-2.5 text-[11px] text-slate-800 space-y-1">
+                        <p className="font-semibold text-blue-900">
+                          FastAPI Policy RAG &amp; Scoped Live Queue (TF-IDF)
+                        </p>
+                        <p className="leading-relaxed break-words">{m.backendCitation.answer}</p>
+                        {m.backendCitation.sources.length > 0 && (
+                          <p className="font-mono text-[10px] text-blue-700">
+                            Sources: {m.backendCitation.sources.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    )}
                     {m.executedTools && m.executedTools.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2.5 pt-2 border-t border-slate-100">
                         {m.executedTools.map((tool, idx) => (

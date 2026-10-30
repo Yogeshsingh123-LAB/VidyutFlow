@@ -1,13 +1,38 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { AppProvider, useApp, isValidDemoSession } from './context/AppContext';
 import { LanguageProvider } from './i18n/LanguageContext';
-import { AppShell } from './components/layout/AppShell';
-import { WelcomePortalPage } from './components/intro/WelcomePortalPage';
-import { ConsumerPortal } from './components/consumer/ConsumerPortal';
-import { EmployeePortal } from './components/employee/EmployeePortal';
-import { FieldPortal } from './components/field/FieldPortal';
-import { ManagementPortal } from './components/management/ManagementPortal';
-import { AdminPortal } from './components/admin/AdminPortal';
+
+const AppShell = lazy(() =>
+  import('./components/layout/AppShell').then(m => ({ default: m.AppShell }))
+);
+const WelcomePortalPage = lazy(() =>
+  import('./components/intro/WelcomePortalPage').then(m => ({ default: m.WelcomePortalPage }))
+);
+const ConsumerPortal = lazy(() =>
+  import('./components/consumer/ConsumerPortal').then(m => ({ default: m.ConsumerPortal }))
+);
+const EmployeePortal = lazy(() =>
+  import('./components/employee/EmployeePortal').then(m => ({ default: m.EmployeePortal }))
+);
+const FieldPortal = lazy(() =>
+  import('./components/field/FieldPortal').then(m => ({ default: m.FieldPortal }))
+);
+const ManagementPortal = lazy(() =>
+  import('./components/management/ManagementPortal').then(m => ({ default: m.ManagementPortal }))
+);
+const AdminPortal = lazy(() =>
+  import('./components/admin/AdminPortal').then(m => ({ default: m.AdminPortal }))
+);
+
+const WorkspaceRouteFallback: React.FC = () => (
+  <div
+    role="status"
+    aria-live="polite"
+    className="min-h-[45vh] flex items-center justify-center p-6 text-xs font-semibold text-slate-500"
+  >
+    Loading VidyutFlow workspace…
+  </div>
+);
 
 const PortalRouter: React.FC = () => {
   const { currentRole, demoSession } = useApp();
@@ -18,20 +43,15 @@ const PortalRouter: React.FC = () => {
     return null;
   }
 
-  switch (currentRole) {
-    case 'consumer':
-      return <ConsumerPortal />;
-    case 'employee':
-      return <EmployeePortal />;
-    case 'field':
-      return <FieldPortal />;
-    case 'management':
-      return <ManagementPortal />;
-    case 'admin':
-      return <AdminPortal />;
-    default:
-      return null;
-  }
+  return (
+    <Suspense fallback={<WorkspaceRouteFallback />}>
+      {currentRole === 'consumer' && <ConsumerPortal />}
+      {currentRole === 'employee' && <EmployeePortal />}
+      {currentRole === 'field' && <FieldPortal />}
+      {currentRole === 'management' && <ManagementPortal />}
+      {currentRole === 'admin' && <AdminPortal />}
+    </Suspense>
+  );
 };
 
 const MainExperience: React.FC = () => {
@@ -46,13 +66,17 @@ const MainExperience: React.FC = () => {
     demoSession.role === currentRole
   );
 
-  return !isAuthorized ? (
-    <WelcomePortalPage />
-  ) : (
-    /* Full Workspace Platform Shell */
-    <AppShell>
-      <PortalRouter />
-    </AppShell>
+  return (
+    <Suspense fallback={<WorkspaceRouteFallback />}>
+      {!isAuthorized ? (
+        <WelcomePortalPage />
+      ) : (
+        /* Full Workspace Platform Shell */
+        <AppShell>
+          <PortalRouter />
+        </AppShell>
+      )}
+    </Suspense>
   );
 };
 

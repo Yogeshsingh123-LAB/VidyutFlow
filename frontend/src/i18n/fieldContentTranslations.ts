@@ -105,6 +105,30 @@ export interface FieldUiDictionary {
   offlineItem2Title: string;
   offlineItem2Desc: string;
   badgePendingBackgroundPush: string;
+  headingLivePersistentQueue: string;
+  subtitleLivePersistentQueue: string;
+  btnSyncQueueNow: string;
+  btnSyncingQueue: string;
+  badgeOfflineModeActive: string;
+  badgeSwOfflineShellReady: string;
+  badgePendingSync: string;
+  badgeSyncingNow: string;
+  badgeUuidDeduplicated: string;
+  badgeSyncConflict: string;
+  labelInspectionTarget: string;
+  labelFieldSyncOutcome: string;
+  optionOutcomeCompleted: string;
+  optionOutcomeFieldVerified: string;
+  optionOutcomeBlocked: string;
+  sectionLiveAssignedRequests: string;
+  subtitleLiveAssignedRequests: string;
+  btnRefreshLiveQueue: string;
+  btnInspectLiveRequest: string;
+  emptyPersistentQueue: string;
+  conflictAlertTitle: string;
+  btnDismissConflict: string;
+  btnRetryFieldVerified: string;
+  btnTestUuidDeduplication: string;
 
   // Tab 5: Feeder Patrol & Line Surveillance
   headingFeederPatrol: string;
@@ -293,6 +317,30 @@ export const FIELD_UI_TRANSLATIONS: Record<Language, FieldUiDictionary> = {
     offlineItem2Title: 'WO-4401 Voltage Rectification',
     offlineItem2Desc: '14 Anand Nagar · Neutral crimped, 232V tested',
     badgePendingBackgroundPush: 'Pending Background Push',
+    headingLivePersistentQueue: 'Persistent Offline Field Sync Queue (UUID Idempotent)',
+    subtitleLivePersistentQueue: 'Stored in IndexedDB + localStorage; auto-replays to POST /api/requests/field-sync on reconnect',
+    btnSyncQueueNow: 'Sync Pending Queue Now',
+    btnSyncingQueue: 'Syncing Queue...',
+    badgeOfflineModeActive: 'Offline Queue Active',
+    badgeSwOfflineShellReady: 'PWA Service Worker Active',
+    badgePendingSync: 'Queued Offline (Pending Sync)',
+    badgeSyncingNow: 'Transmitting...',
+    badgeUuidDeduplicated: 'Duplicate UUID Ignored (Idempotent)',
+    badgeSyncConflict: 'Server Conflict Needs Action',
+    labelInspectionTarget: 'Inspection Target (Live Request or Work Order)',
+    labelFieldSyncOutcome: 'Field Outcome Status (Core Invariant 6)',
+    optionOutcomeCompleted: 'COMPLETED — Meter Installed & Verified',
+    optionOutcomeFieldVerified: 'FIELD_VERIFIED — Site Feasibility Verified',
+    optionOutcomeBlocked: 'BLOCKED — Site Access or Civil Obstruction',
+    sectionLiveAssignedRequests: 'Live Assigned Backend Requests (FastAPI)',
+    subtitleLiveAssignedRequests: 'Requests routed to your engineer account; inspect online or queue offline with UUID de-duplication',
+    btnRefreshLiveQueue: 'Refresh Queue',
+    btnInspectLiveRequest: 'Inspect / Queue Offline',
+    emptyPersistentQueue: 'No queued field updates yet. Toggle Offline Mode and submit an inspection to persist a UUID-keyed record.',
+    conflictAlertTitle: 'Offline Sync Conflict Detected — Server Rejected Transition',
+    btnDismissConflict: 'Accept Server State & Dismiss',
+    btnRetryFieldVerified: 'Re-queue as FIELD_VERIFIED',
+    btnTestUuidDeduplication: 'Re-send Same UUID (Verify Dedup)',
 
     headingFeederPatrol: '11kV Feeder Patrol & Line Corridor Surveillance',
     subtitleFeederPatrol: 'Distribution feeder loading, transformer clusters, and active field tasks across North Gujarat subdivisions',
@@ -486,6 +534,30 @@ export const FIELD_UI_TRANSLATIONS: Record<Language, FieldUiDictionary> = {
     offlineItem2Title: 'WO-4401 વોલ્ટેજ નિવારણ',
     offlineItem2Desc: '14 આનંદ નગર · ન્યુટ્રલ ક્રિમ્પ કર્યું, 232V ચકાસ્યું',
     badgePendingBackgroundPush: 'બેકગ્રાઉન્ડ પુશ બાકી',
+    headingLivePersistentQueue: 'સતત ઓફલાઇન ફિલ્ડ સિંક કતાર (UUID ડુપ્લિકેટ સુરક્ષા)',
+    subtitleLivePersistentQueue: 'IndexedDB અને localStorage માં સંગ્રહિત; નેટવર્ક પરત આવતા /api/requests/field-sync પર આપમેળે સિંક થાય છે',
+    btnSyncQueueNow: 'બાકી કતાર હમણાં સિંક કરો',
+    btnSyncingQueue: 'કતાર સિંક થઈ રહી છે...',
+    badgeOfflineModeActive: 'ઓફલાઇન કતાર સક્રિય',
+    badgeSwOfflineShellReady: 'PWA સર્વિસ વર્કર સક્રિય',
+    badgePendingSync: 'ઓફલાઇન કતારમાં (સિંક બાકી)',
+    badgeSyncingNow: 'પ્રસારિત થઈ રહ્યું છે...',
+    badgeUuidDeduplicated: 'ડુપ્લિકેટ UUID અવગણાયું (આઇડેમ્પોટન્ટ)',
+    badgeSyncConflict: 'સર્વર વિસંગતતા — પગલાં જરૂરી',
+    labelInspectionTarget: 'નિરીક્ષણ લક્ષ્ય (લાઇવ અરજી અથવા વર્ક ઓર્ડર)',
+    labelFieldSyncOutcome: 'ફિલ્ડ પરિણામ સ્થિતિ (નિયમ 6)',
+    optionOutcomeCompleted: 'COMPLETED — મીટર સ્થાપિત અને ચકાસાયેલ',
+    optionOutcomeFieldVerified: 'FIELD_VERIFIED — સ્થળ શક્યતા ચકાસાયેલ',
+    optionOutcomeBlocked: 'BLOCKED — સ્થળ પ્રવેશ અથવા સિવિલ અવરોધ',
+    sectionLiveAssignedRequests: 'લાઇવ સોંપાયેલ બેકએન્ડ અરજીઓ (FastAPI)',
+    subtitleLiveAssignedRequests: 'તમારા એન્જિનિયર ખાતામાં સોંપાયેલ અરજીઓ; ઓનલાઇન નિરીક્ષણ કરો અથવા UUID સાથે ઓફલાઇન કતારમાં મૂકો',
+    btnRefreshLiveQueue: 'કતાર તાજી કરો',
+    btnInspectLiveRequest: 'નિરીક્ષણ / ઓફલાઇન કતાર',
+    emptyPersistentQueue: 'હજુ કોઈ ઓફલાઇન ફિલ્ડ નોંધ કતારમાં નથી. UUID રેકોર્ડ સાચવવા ઓફલાઇન મોડ ચાલુ કરી નિરીક્ષણ મોકલો.',
+    conflictAlertTitle: 'ઓફલાઇન સિંક વિસંગતતા મળી — સર્વરે ફેરફાર નકાર્યો',
+    btnDismissConflict: 'સર્વર સ્થિતિ સ્વીકારો અને દૂર કરો',
+    btnRetryFieldVerified: 'FIELD_VERIFIED તરીકે ફરી કતારમાં મૂકો',
+    btnTestUuidDeduplication: 'તે જ UUID ફરી મોકલો (ડુપ્લિકેટ ચકાસણી)',
 
     headingFeederPatrol: '11kV ફીડર પેટ્રોલિંગ અને લાઇન કોરિડોર દેખરેખ',
     subtitleFeederPatrol: 'ઉત્તર ગુજરાત સબ-ડિવિઝનોમાં ડિસ્ટ્રિબ્યુશન ફીડર લોડિંગ, ટ્રાન્સફોર્મર ક્લસ્ટરો અને સક્રિય ફિલ્ડ કાર્યો',
@@ -679,6 +751,30 @@ export const FIELD_UI_TRANSLATIONS: Record<Language, FieldUiDictionary> = {
     offlineItem2Title: 'WO-4401 वोल्टेज सुधार',
     offlineItem2Desc: '14 आनंद नगर · न्यूट्रल क्रिम्प किया गया, 232V परीक्षित',
     badgePendingBackgroundPush: 'बैकग्राउंड पुश लंबित',
+    headingLivePersistentQueue: 'स्थायी ऑफलाइन फील्ड सिंक कतार (UUID डुप्लिकेट सुरक्षा)',
+    subtitleLivePersistentQueue: 'IndexedDB व localStorage में सुरक्षित; नेटवर्क जुड़ते ही /api/requests/field-sync पर स्वतः सिंक',
+    btnSyncQueueNow: 'लंबित कतार अभी सिंक करें',
+    btnSyncingQueue: 'कतार सिंक हो रही है...',
+    badgeOfflineModeActive: 'ऑफलाइन कतार सक्रिय',
+    badgeSwOfflineShellReady: 'PWA सर्विस वर्कर सक्रिय',
+    badgePendingSync: 'ऑफलाइन कतारबद्ध (सिंक लंबित)',
+    badgeSyncingNow: 'प्रसारित हो रहा है...',
+    badgeUuidDeduplicated: 'डुप्लिकेट UUID अनदेखा (आइडेम्पोटेंट)',
+    badgeSyncConflict: 'सर्वर टकराव — कार्रवाई आवश्यक',
+    labelInspectionTarget: 'निरीक्षण लक्ष्य (लाइव अनुरोध या वर्क ऑर्डर)',
+    labelFieldSyncOutcome: 'फील्ड परिणाम स्थिति (नियम 6)',
+    optionOutcomeCompleted: 'COMPLETED — मीटर स्थापित और सत्यापित',
+    optionOutcomeFieldVerified: 'FIELD_VERIFIED — स्थल व्यवहार्यता सत्यापित',
+    optionOutcomeBlocked: 'BLOCKED — स्थल पहुंच या सिविल अवरोध',
+    sectionLiveAssignedRequests: 'लाइव आवंटित बैकएंड अनुरोध (FastAPI)',
+    subtitleLiveAssignedRequests: 'आपके इंजीनियर खाते को सौंपे गए अनुरोध; ऑनलाइन निरीक्षण करें या UUID सहित ऑफलाइन कतार में रखें',
+    btnRefreshLiveQueue: 'कतार रीफ़्रेश करें',
+    btnInspectLiveRequest: 'निरीक्षण / ऑफलाइन कतार',
+    emptyPersistentQueue: 'अभी कोई ऑफलाइन फील्ड प्रविष्टि कतार में नहीं है। UUID रिकॉर्ड सहेजने हेतु ऑफलाइन मोड चालू कर निरीक्षण भेजें।',
+    conflictAlertTitle: 'ऑफलाइन सिंक टकराव मिला — सर्वर ने स्थिति परिवर्तन अस्वीकार किया',
+    btnDismissConflict: 'सर्वर स्थिति स्वीकारें व हटाएं',
+    btnRetryFieldVerified: 'FIELD_VERIFIED के रूप में पुनः कतारबद्ध करें',
+    btnTestUuidDeduplication: 'समान UUID पुनः भेजें (डुप्लिकेट जांच)',
 
     headingFeederPatrol: '11kV फीडर पेट्रोलिंग और लाइन कॉरिडोर निगरानी',
     subtitleFeederPatrol: 'उत्तर गुजरात सब-डिवीजनों में वितरण फीडर लोडिंग, ट्रांसफॉर्मर क्लस्टर और सक्रिय फील्ड कार्य',
@@ -872,6 +968,30 @@ export const FIELD_UI_TRANSLATIONS: Record<Language, FieldUiDictionary> = {
     offlineItem2Title: 'WO-4401 व्होल्टेज दुरुस्ती',
     offlineItem2Desc: '14 आनंद नगर · न्यूट्रल क्रिम्प केले, 232V तपासले',
     badgePendingBackgroundPush: 'बॅकग्राउंड पुश प्रलंबित',
+    headingLivePersistentQueue: 'स्थायी ऑफलाईन फील्ड सिंक रांग (UUID डुप्लिकेट संरक्षण)',
+    subtitleLivePersistentQueue: 'IndexedDB व localStorage मध्ये जतन; नेटवर्क येताच /api/requests/field-sync वर आपोआप सिंक होते',
+    btnSyncQueueNow: 'प्रलंबित रांग आता सिंक करा',
+    btnSyncingQueue: 'रांग सिंक होत आहे...',
+    badgeOfflineModeActive: 'ऑफलाईन रांग सक्रिय',
+    badgeSwOfflineShellReady: 'PWA सर्व्हिस वर्कर सक्रिय',
+    badgePendingSync: 'ऑफलाईन रांगेत (सिंक प्रलंबित)',
+    badgeSyncingNow: 'पाठवले जात आहे...',
+    badgeUuidDeduplicated: 'डुप्लिकेट UUID दुर्लक्षित (आयडेम्पोटंट)',
+    badgeSyncConflict: 'सर्व्हर विसंगती — कृती आवश्यक',
+    labelInspectionTarget: 'तपासणी लक्ष्य (लाईव्ह अर्ज किंवा वर्क ऑर्डर)',
+    labelFieldSyncOutcome: 'फील्ड निकाल स्थिती (नियम 6)',
+    optionOutcomeCompleted: 'COMPLETED — मीटर बसवले आणि पडताळले',
+    optionOutcomeFieldVerified: 'FIELD_VERIFIED — साईट व्यवहार्यता पडताळली',
+    optionOutcomeBlocked: 'BLOCKED — साईट प्रवेश किंवा बांधकाम अडथळा',
+    sectionLiveAssignedRequests: 'लाईव्ह नेमून दिलेले बॅकएंड अर्ज (FastAPI)',
+    subtitleLiveAssignedRequests: 'तुमच्या अभियंता खात्याला नेमलेले अर्ज; ऑनलाईन तपासा किंवा UUID सह ऑफलाईन रांगेत ठेवा',
+    btnRefreshLiveQueue: 'रांग रिफ्रेश करा',
+    btnInspectLiveRequest: 'तपासणी / ऑफलाईन रांग',
+    emptyPersistentQueue: 'अद्याप कोणतीही ऑफलाईन फील्ड नोंद रांगेत नाही. UUID नोंद जतन करण्यासाठी ऑफलाईन मोड सुरू करून तपासणी पाठवा.',
+    conflictAlertTitle: 'ऑफलाईन सिंक विसंगती आढळली — सर्व्हरने स्थिती बदल नाकारला',
+    btnDismissConflict: 'सर्व्हर स्थिती स्वीकारा व काढा',
+    btnRetryFieldVerified: 'FIELD_VERIFIED म्हणून पुन्हा रांगेत ठेवा',
+    btnTestUuidDeduplication: 'तोच UUID पुन्हा पाठवा (डुप्लिकेट पडताळणी)',
 
     headingFeederPatrol: '11kV फीडर पेट्रोलिंग आणि लाईन कॉरिडॉर निरीक्षण',
     subtitleFeederPatrol: 'उत्तर गुजरात सब-डिव्हिजनमधील वितरण फीडर लोडिंग, ट्रान्सफॉर्मर क्लस्टर्स आणि सक्रिय फील्ड कार्ये',

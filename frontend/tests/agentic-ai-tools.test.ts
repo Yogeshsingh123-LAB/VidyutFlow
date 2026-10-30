@@ -6,7 +6,9 @@ import {
   executeAgenticTool
 } from '../src/server/agenticTools';
 import { AiCacheManager } from '../src/server/aiCache';
-import { ServerAuthService } from '../src/server/authService';
+import { ServerAuthService, SESSION_COOKIE_NAME } from '../src/server/authService';
+import { defaultServerAuthService } from '../src/server/authRoutes';
+import { DEFAULT_DEMO_ACCOUNTS } from '../src/data/demoAuthData';
 import { ServerDataStore } from '../src/server/dataStore';
 import { UserRole } from '../src/types';
 import {
@@ -49,11 +51,19 @@ async function invokeAiChat(
     }
   });
 
+  let sessionCookie = cookies;
+  if (sessionCookie === undefined) {
+    const roleKey = (payload?.role || 'consumer') as keyof typeof DEFAULT_DEMO_ACCOUNTS;
+    const acct = DEFAULT_DEMO_ACCOUNTS[roleKey] || DEFAULT_DEMO_ACCOUNTS.consumer;
+    const auth = defaultServerAuthService.login({ email: acct.email, password: acct.password });
+    sessionCookie = `${SESSION_COOKIE_NAME}=${encodeURIComponent(auth.session.signedToken)}`;
+  }
+
   const req = new EventEmitter() as any;
   req.method = 'POST';
   req.headers = {
     'content-type': 'application/json',
-    cookie: cookies || ''
+    cookie: sessionCookie || ''
   };
   req.socket = { remoteAddress: '127.0.0.1' };
 

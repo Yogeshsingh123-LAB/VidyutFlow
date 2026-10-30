@@ -1,7 +1,21 @@
-import { submitLiveRequest } from '../../utils/liveData';
-import React, { useState, useEffect, useMemo } from 'react';
+import {
+  submitLiveRequest,
+  submitLiveRequestWithDocument,
+  fetchDemoLoadPolicy,
+  fetchWorkflowTemplates,
+  type WorkflowTemplateItem,
+} from '../../utils/liveData';
+import { FALLBACK_WORKFLOW_TEMPLATES } from '../admin/LiveWorkflowTemplatesPanel';
+import { validateDocumentUpload, uploadPolicyText } from '../../utils/documentUpload';
+import { subscribeBackendSession } from '../../utils/backendSession';
+import { LiveConsumerRequests } from './LiveConsumerRequests';
+import { policyText, validLoad, formatValidationIssue, requiresDemoReview } from '../../utils/demoLoadPolicy';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { submissionNoticeFromResponse, submissionNoticeText, type SubmissionNotice } from '../../utils/requestSubmissionStatus';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { LocationPinPicker } from '../common/LocationPinPicker';
+import { SavedPremisesBar } from './SavedPremisesBar';
 import {
   localizeTariffCategory,
   localizeConnectionStatus,
@@ -71,6 +85,77 @@ import {
   CartesianGrid
 } from 'recharts';
 import { TariffCategory, ElectricityConnection, ElectricityBill, PaymentTransaction } from '../../types';
+import { LanguageCode } from '../../i18n/types';
+
+export const CONSUMER_WORKFLOW_INTAKE_TEXT: Record<
+  LanguageCode,
+  {
+    selectorLabel: string;
+    slaTarget: string;
+    docMandatory: string;
+    docOptional: string;
+    fieldSurvey: string;
+    deskReview: string;
+    optionNewConnection: string;
+    optionLoadExtension: string;
+    optionMeterReplacement: string;
+    optionBillingDispute: string;
+    optionOutageSafety: string;
+  }
+> = {
+  en: {
+    selectorLabel: 'Service Workflow Template',
+    slaTarget: 'Target SLA',
+    docMandatory: 'Document required',
+    docOptional: 'Document optional',
+    fieldSurvey: 'Field survey dispatch',
+    deskReview: 'Officer desk review',
+    optionNewConnection: 'New Electricity Connection',
+    optionLoadExtension: 'Load Extension / Reduction',
+    optionMeterReplacement: 'Faulty / Smart Meter Replacement',
+    optionBillingDispute: 'Billing & Tariff Verification',
+    optionOutageSafety: 'Outage & Line Safety Escalation',
+  },
+  gu: {
+    selectorLabel: 'સેવા વર્કફ્લો ટેમ્પ્લેટ',
+    slaTarget: 'લક્ષ્યાંક SLA',
+    docMandatory: 'દસ્તાવેજ ફરજિયાત',
+    docOptional: 'દસ્તાવેજ વૈકલ્પિક',
+    fieldSurvey: 'ફીલ્ડ સર્વે ડિસ્પેચ',
+    deskReview: 'અધિકારી ડેસ્ક સમીક્ષા',
+    optionNewConnection: 'નવું વીજ જોડાણ',
+    optionLoadExtension: 'લોડ વધારો / ઘટાડો',
+    optionMeterReplacement: 'ખામીયુક્ત / સ્માર્ટ મીટર બદલી',
+    optionBillingDispute: 'બિલિંગ અને ટેરિફ ચકાસણી',
+    optionOutageSafety: 'વીજ પુરવઠો અને લાઇન સુરક્ષા એસ્કેલેશન',
+  },
+  hi: {
+    selectorLabel: 'सेवा वर्कफ़्लो टेम्पलेट',
+    slaTarget: 'लक्षित SLA',
+    docMandatory: 'दस्तावेज़ अनिवार्य',
+    docOptional: 'दस्तावेज़ वैकल्पिक',
+    fieldSurvey: 'फ़ील्ड सर्वे डिस्पैच',
+    deskReview: 'अधिकारी डेस्क समीक्षा',
+    optionNewConnection: 'नया बिजली कनेक्शन',
+    optionLoadExtension: 'लोड विस्तार / कमी',
+    optionMeterReplacement: 'ख़राब / स्मार्ट मीटर प्रतिस्थापन',
+    optionBillingDispute: 'बिलिंग व टैरिफ़ सत्यापन',
+    optionOutageSafety: 'आउटेज व लाइन सुरक्षा एस्केलेशन',
+  },
+  mr: {
+    selectorLabel: 'सेवा वर्कफ्लो टेम्पलेट',
+    slaTarget: 'लक्ष्य SLA',
+    docMandatory: 'कागदपत्रे अनिवार्य',
+    docOptional: 'कागदपत्रे ऐच्छिक',
+    fieldSurvey: 'फील्ड सर्वेक्षण डिस्पॅच',
+    deskReview: 'अधिकारी डेस्क पुनरावलोकन',
+    optionNewConnection: 'नवीन वीज जोडणी',
+    optionLoadExtension: 'लोड वाढ / कपात',
+    optionMeterReplacement: 'सदोष / स्मार्ट मीटर बदलणे',
+    optionBillingDispute: 'बिलिंग आणि टॅरिफ पडताळणी',
+    optionOutageSafety: 'खंडित वीज आणि लाईन सुरक्षा एस्केलेशन',
+  },
+};
 
 export const ConsumerPortal: React.FC = () => {
   const {
@@ -106,6 +191,34 @@ export const ConsumerPortal: React.FC = () => {
 
   const { language, t } = useLanguage();
   const tc = t.consumer;
+  const [liveSubmission, setLiveSubmission] = useState<SubmissionNotice | null>(null);
+  const latestSubmission = useRef(0);
+  useEffect(() => {
+    latestSubmission.current += 1;
+    setLiveSubmission(null);
+  }, [demoSession?.user.id, demoSession?.user.email, demoSession?.role]);
+  useEffect(
+    () =>
+      subscribeBackendSession(() => {
+        latestSubmission.current += 1;
+        setLiveSubmission(null);
+      }),
+    []
+  );
+  const noticeText = submissionNoticeText[language];
+  const loadText = policyText[language];
+  const [policy, setPolicy] = useState<number | null>(null);
+  const [policyState, setPolicyState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
+  const [policyAttempt, setPolicyAttempt] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    setPolicy(null);
+    setPolicyState('loading');
+    fetchDemoLoadPolicy().then(result => {
+      if (!cancelled) { setPolicy(result.review_threshold_kw); setPolicyState('ready'); }
+    }).catch(() => { if (!cancelled) setPolicyState('unavailable'); });
+    return () => { cancelled = true; };
+  }, [policyAttempt]);
 
   const localizedConsumptionHistory = useMemo(
     () =>
@@ -191,6 +304,9 @@ export const ConsumerPortal: React.FC = () => {
   );
 
   const [subdivision, setSubdivision] = useState('Mehsana City North');
+  const [selectedZone, setSelectedZone] = useState('North');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
   const [address, setAddress] = useState(
     isDefaultDemoConsumer ? '14, Anand Nagar Society, Visnagar Road, Mehsana' : ''
   );
@@ -219,7 +335,36 @@ export const ConsumerPortal: React.FC = () => {
   }, [demoSession?.user.id, isDefaultDemoConsumer]);
 
   const [category, setCategory] = useState<TariffCategory>('Residential (RGPU)');
-  const [loadKw, setLoadKw] = useState<number>(6);
+  const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowTemplateItem[]>(
+    FALLBACK_WORKFLOW_TEMPLATES
+  );
+  const [selectedTemplateCode, setSelectedTemplateCode] = useState<string>('new_connection');
+  const intakeWfText =
+    CONSUMER_WORKFLOW_INTAKE_TEXT[language] || CONSUMER_WORKFLOW_INTAKE_TEXT.en;
+  const activeSelectedTemplate = useMemo(
+    () =>
+      workflowTemplates.find(t => t.template_code === selectedTemplateCode) ||
+      workflowTemplates[0] ||
+      FALLBACK_WORKFLOW_TEMPLATES[0],
+    [workflowTemplates, selectedTemplateCode]
+  );
+
+  useEffect(() => {
+    const syncTemplates = () => {
+      fetchWorkflowTemplates(false)
+        .then(res => {
+          if (Array.isArray(res.items) && res.items.length > 0) {
+            setWorkflowTemplates(res.items);
+          }
+        })
+        .catch(() => {});
+    };
+    syncTemplates();
+    return subscribeBackendSession(syncTemplates);
+  }, []);
+  const [loadInput, setLoadInput] = useState('6');
+  const loadKw = Number(loadInput);
+  const loadIsValid = validLoad(loadInput);
   const [phase, setPhase] = useState<'1-Phase' | '3-Phase'>('3-Phase');
   const [purpose, setPurpose] = useState('Domestic / Residential Lighting & Power');
   const [solarInterest, setSolarInterest] = useState(false);
@@ -230,6 +375,13 @@ export const ConsumerPortal: React.FC = () => {
     'Registered Ownership Deed / Index-II (PDF, 1.2 MB)',
     'Government Licensed Electrical Contractor Test Certificate (PDF, 850 KB)'
   ]);
+  const [attachedDocument, setAttachedDocument] = useState<{ file: File; sanitizedName: string } | null>(null);
+  const [uploadErrorReason, setUploadErrorReason] = useState<'empty' | 'too_large' | 'invalid_name_or_type' | null>(null);
+  const uploadText = uploadPolicyText[language];
+  useEffect(() => {
+    setAttachedDocument(null);
+    setUploadErrorReason(null);
+  }, [demoSession?.user.id, demoSession?.user.email, demoSession?.role]);
 
   // Complaint form states
   const [cmpCategory, setCmpCategory] = useState<'Power Outage' | 'Voltage Fluctuation' | 'Meter Fault' | 'Billing Dispute'>('Voltage Fluctuation');
@@ -276,7 +428,7 @@ export const ConsumerPortal: React.FC = () => {
   };
 
   const handleLoadPresetChange = (kw: number) => {
-    setLoadKw(kw);
+    setLoadInput(String(kw));
     // Auto select phase: <=5kW is 1-Phase, >5kW is 3-Phase
     if (kw <= 5) {
       setPhase('1-Phase');
@@ -292,30 +444,69 @@ export const ConsumerPortal: React.FC = () => {
       return;
     }
 
-    // Also submit to the live VidyutFlow API
-    void submitLiveRequest({
+    if (!loadIsValid) {
+      showToast(loadText.invalid, 'error');
+      return;
+    }
+
+    if (uploadErrorReason) {
+      showToast(uploadText[uploadErrorReason], 'error');
+      return;
+    }
+
+    // Live and local demo records are separate; track the latest live response explicitly.
+    const submissionId = ++latestSubmission.current;
+    setLiveSubmission({ kind: 'pending' });
+    const baseFields: Record<string, string | number> = {
       applicant_name: applicantName,
       phone: applicantPhone,
       address: `${address}, Pin - ${pincode}`,
-      zone: subdivision.toLowerCase().includes('south') ? 'South' : 'North',
+      zone: selectedZone || (subdivision.toLowerCase().includes('south') ? 'South' : 'North'),
       pin_code: pincode,
-      request_type: 'new_connection',
-      description: `New ${category} connection via consumer wizard`,
+      request_type: selectedTemplateCode,
+      description:
+        selectedTemplateCode === 'new_connection'
+          ? `New ${category} connection via consumer wizard`
+          : `${activeSelectedTemplate.name} (${category}) via consumer wizard`,
       requested_load_kw: Number(loadKw),
       tariff_category: category,
       phase,
       premises_type: premisesType,
-      document_name: uploadedDocs[0] || ''
-    })
-      .then((r: any) => {
-        showToast(
-          `Live API recorded the request (ref ${r.id.slice(0, 8)}) — ML: ${r.category}/${r.severity} · SLA risk ${Math.round((r.sla_breach_risk ?? 0) * 100)}%`,
-          'success'
-        );
+    };
+    if (latitude !== null && longitude !== null) {
+      baseFields.latitude = latitude;
+      baseFields.longitude = longitude;
+    }
+    const liveCall = attachedDocument
+      ? submitLiveRequestWithDocument(baseFields, attachedDocument.file, attachedDocument.sanitizedName)
+      : submitLiveRequest({
+          ...baseFields,
+          document_name: uploadedDocs[0] || '',
+        });
+
+    void liveCall
+      .then((result) => {
+        if (submissionId !== latestSubmission.current) return;
+        const notice = submissionNoticeFromResponse(result);
+        setLiveSubmission(notice);
+        showToast(notice.kind === 'correction' ? noticeText.correction : noticeText.received,
+          notice.kind === 'correction' ? 'warning' : 'success');
       })
-      .catch(() => {
-        showToast('Live API unreachable — application recorded in the demo workspace only', 'info');
+      .catch((err: any) => {
+        if (submissionId !== latestSubmission.current) return;
+        if (attachedDocument && (err?.status === 413 || err?.status === 400)) {
+          setLiveSubmission(null);
+          showToast(uploadText.serverRejected, 'error');
+          return;
+        }
+        setLiveSubmission({ kind: 'unknown' });
+        showToast(noticeText.unknown, 'warning');
       });
+
+    const submittedDocs = attachedDocument
+      ? [attachedDocument.sanitizedName, ...uploadedDocs]
+      : uploadedDocs;
+    setAttachedDocument(null);
 
     const newId = submitApplicationDemo({
       applicantName,
@@ -328,7 +519,7 @@ export const ConsumerPortal: React.FC = () => {
       phase,
       premisesType,
       estimatedSanctionCost: totalSanctionEstimate,
-      documentsSubmitted: uploadedDocs
+      documentsSubmitted: submittedDocs
     });
 
     // Reset step
@@ -364,6 +555,23 @@ export const ConsumerPortal: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6 min-w-0">
+      {liveSubmission && (
+        <section role="status" aria-live="polite" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-slate-900 dark:border-blue-800 dark:bg-slate-900 dark:text-slate-100">
+          <p className="font-semibold">{noticeText[liveSubmission.kind]}</p>
+          {(liveSubmission.kind === 'received' || liveSubmission.kind === 'correction') && (
+            <div className="mt-2 break-words">
+              <p>Reference: {liveSubmission.reference}</p>
+              <p>Status: {liveSubmission.status}</p>
+              {liveSubmission.issues.length > 0 ? (
+                <ul className="list-disc pl-5">{liveSubmission.issues.map((issue, index) => (
+                  <li key={`${issue.code}-${index}`}>{formatValidationIssue(issue, language)}</li>
+                ))}</ul>
+              ) : liveSubmission.notes && <p>{liveSubmission.notes}</p>}
+            </div>
+          )}
+          <p className="mt-2 text-xs">{noticeText.separate}</p>
+        </section>
+      )}
       {/* Account & Connection Summary Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
@@ -1120,6 +1328,8 @@ export const ConsumerPortal: React.FC = () => {
             )}
           </div>
 
+          <LiveConsumerRequests />
+
           {/* Submitted In-Progress Applications Section */}
           <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
             <div className="flex items-center justify-between">
@@ -1299,6 +1509,54 @@ export const ConsumerPortal: React.FC = () => {
               {/* STEP 1: APPLICANT IDENTITY */}
               {formStep === 1 && (
                 <div className="space-y-4 animate-in fade-in">
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        {intakeWfText.selectorLabel}
+                      </label>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950/60 font-semibold text-blue-700 dark:text-blue-300 tabular-nums">
+                          {intakeWfText.slaTarget}: {activeSelectedTemplate.sla_hours}h
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          {activeSelectedTemplate.require_document
+                            ? intakeWfText.docMandatory
+                            : intakeWfText.docOptional}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
+                          {activeSelectedTemplate.require_field_visit
+                            ? intakeWfText.fieldSurvey
+                            : intakeWfText.deskReview}
+                        </span>
+                      </div>
+                    </div>
+                    <select
+                      value={selectedTemplateCode}
+                      onChange={e => setSelectedTemplateCode(e.target.value)}
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-blue-500"
+                    >
+                      {workflowTemplates.map(tpl => {
+                        const localizedName =
+                          tpl.template_code === 'new_connection'
+                            ? intakeWfText.optionNewConnection
+                            : tpl.template_code === 'load_extension'
+                              ? intakeWfText.optionLoadExtension
+                              : tpl.template_code === 'meter_replacement'
+                                ? intakeWfText.optionMeterReplacement
+                                : tpl.template_code === 'billing_dispute'
+                                  ? intakeWfText.optionBillingDispute
+                                  : tpl.template_code === 'outage_safety'
+                                    ? intakeWfText.optionOutageSafety
+                                    : tpl.name;
+                        return (
+                          <option key={tpl.template_code} value={tpl.template_code}>
+                            {localizedName} ({tpl.sla_hours}h SLA)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
@@ -1401,6 +1659,55 @@ export const ConsumerPortal: React.FC = () => {
               {/* STEP 2: PREMISES & SUBDIVISION */}
               {formStep === 2 && (
                 <div className="space-y-4 animate-in fade-in">
+                  {/* Reusable Saved Premises Bar (Item #29) */}
+                  <SavedPremisesBar
+                    userKey={currentUserEmail || currentUserId}
+                    currentDraft={{
+                      applicantName,
+                      phone: applicantPhone,
+                      address,
+                      zone: selectedZone,
+                      subdivision,
+                      pinCode: pincode,
+                      premisesType,
+                      latitude,
+                      longitude,
+                    }}
+                    onApplyPremise={prem => {
+                      if (prem.applicant_name) setApplicantName(prem.applicant_name);
+                      if (prem.phone) setApplicantPhone(prem.phone);
+                      if (prem.address) setAddress(prem.address);
+                      if (prem.zone) setSelectedZone(prem.zone);
+                      if (prem.subdivision) setSubdivision(prem.subdivision);
+                      if (prem.pin_code) setPincode(prem.pin_code);
+                      if (
+                        prem.premises_type === 'Owned' ||
+                        prem.premises_type === 'Rented' ||
+                        prem.premises_type === 'Government Leased'
+                      ) {
+                        setPremisesType(prem.premises_type);
+                      }
+                      setLatitude(prem.latitude ?? null);
+                      setLongitude(prem.longitude ?? null);
+                    }}
+                    onNotify={msg => showToast(msg, 'success')}
+                  />
+
+                  {/* Interactive GPS & Subdivision Map Pin Picker (Item #28) */}
+                  <LocationPinPicker
+                    value={{ latitude, longitude, zone: selectedZone }}
+                    onSelect={pin => {
+                      setLatitude(pin.latitude);
+                      setLongitude(pin.longitude);
+                      setSelectedZone(pin.zone);
+                      setSubdivision(pin.subdivision);
+                      setPincode(pin.pinCode);
+                      if (!address.trim() || address.startsWith('Plot ') || address.startsWith('Survey ') || address.startsWith('GPS (')) {
+                        setAddress(pin.suggestedAddress);
+                      }
+                    }}
+                  />
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
@@ -1408,7 +1715,16 @@ export const ConsumerPortal: React.FC = () => {
                       </label>
                       <select
                         value={subdivision}
-                        onChange={e => setSubdivision(e.target.value)}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setSubdivision(val);
+                          const low = val.toLowerCase();
+                          if (low.includes('gandhinagar')) setSelectedZone('South');
+                          else if (low.includes('visnagar')) setSelectedZone('East');
+                          else if (low.includes('patan')) setSelectedZone('West');
+                          else if (low.includes('kalol')) setSelectedZone('Central');
+                          else setSelectedZone('North');
+                        }}
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       >
                         <option value="Mehsana City North">{tc.subdivMehsanaNorthHq}</option>
@@ -1565,15 +1881,27 @@ export const ConsumerPortal: React.FC = () => {
                       type="range"
                       min="1"
                       max="50"
-                      value={loadKw}
+                      aria-label={loadText.slider}
+                      value={Math.min(50, Math.max(1, Number.isFinite(loadKw) ? loadKw : 1))}
                       onChange={e => handleLoadPresetChange(Number(e.target.value))}
                       className="w-full accent-blue-600"
                     />
 
-                    <div className="text-[11px] text-slate-500 flex justify-between">
-                      <span>{tc.minLoadNote}</span>
-                      <span>{tc.phaseRequirementNote}</span>
-                      <span>{tc.maxLtLoadNote}</span>
+                    <label htmlFor="requested-load-input" className="block text-xs font-semibold">{loadText.input}</label>
+                    <input id="requested-load-input" type="number" min="0" step="any" value={loadInput}
+                      onChange={e => {
+                        const next = e.target.value;
+                        setLoadInput(next);
+                        if (validLoad(next)) setPhase(Number(next) <= 5 ? '1-Phase' : '3-Phase');
+                      }}
+                      aria-invalid={!loadIsValid} aria-describedby="load-policy-description"
+                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-900 dark:bg-slate-900 dark:text-white" />
+                    <div id="load-policy-description" className="text-xs text-slate-600 dark:text-slate-300" aria-live="polite">
+                      {!loadIsValid && <p className="text-red-700 dark:text-red-300">{loadText.invalid}</p>}
+                      {policyState === 'loading' && <p>{loadText.loading}</p>}
+                      {policyState === 'unavailable' && <p>{loadText.unavailable} <button type="button" className="underline" onClick={() => setPolicyAttempt(n => n + 1)}>{loadText.retry}</button></p>}
+                      {policyState === 'ready' && policy !== null && <p>{loadText.threshold(policy)}</p>}
+                      {policyState === 'ready' && policy !== null && loadIsValid && requiresDemoReview(loadKw, policy) && <p className="font-semibold text-amber-800 dark:text-amber-300">{loadText.review}</p>}
                     </div>
                   </div>
 
@@ -1633,7 +1961,8 @@ export const ConsumerPortal: React.FC = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setFormStep(4)}
+                      onClick={() => { if (loadIsValid) setFormStep(4); else showToast(loadText.invalid, 'error'); }}
+                      disabled={!loadIsValid}
                       className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5"
                     >
                       <span>{tc.reviewCostEstimateBtn}</span>
@@ -1672,6 +2001,57 @@ export const ConsumerPortal: React.FC = () => {
                           </span>
                         </div>
                       ))}
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-2 text-xs">
+                      <label htmlFor="supporting-document-upload" className="font-semibold text-slate-800 dark:text-slate-200 block">
+                        {uploadText.attachLabel}
+                      </label>
+                      <input
+                        id="supporting-document-upload"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.txt"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (!file) {
+                            setAttachedDocument(null);
+                            setUploadErrorReason(null);
+                            return;
+                          }
+                          const check = validateDocumentUpload(file);
+                          if (!check.valid) {
+                            setAttachedDocument(null);
+                            setUploadErrorReason(check.reason);
+                            return;
+                          }
+                          setUploadErrorReason(null);
+                          setAttachedDocument({ file, sanitizedName: check.sanitizedName });
+                        }}
+                        className="block w-full text-xs text-slate-700 dark:text-slate-200 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                      />
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">{uploadText.hint}</p>
+                      {uploadErrorReason && (
+                        <p role="alert" className="text-xs font-medium text-rose-600 dark:text-rose-400">
+                          {uploadText[uploadErrorReason]}
+                        </p>
+                      )}
+                      {attachedDocument && !uploadErrorReason && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-3 py-2">
+                          <span className="break-all text-emerald-900 dark:text-emerald-200">
+                            {uploadText.selectedPrefix} <strong className="font-mono">{attachedDocument.sanitizedName}</strong> ({Math.max(1, Math.round(attachedDocument.file.size / 1024))} KB)
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAttachedDocument(null);
+                              setUploadErrorReason(null);
+                            }}
+                            className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline"
+                          >
+                            {uploadText.removeBtn}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 

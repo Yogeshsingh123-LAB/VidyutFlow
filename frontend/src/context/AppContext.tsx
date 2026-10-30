@@ -1,4 +1,12 @@
-import { syncBackendSession, clearBackendSession } from '../utils/backendSession';
+import {
+  syncBackendSession,
+  syncBackendSsoSession,
+  registerBackendConsumerSession,
+  clearBackendSession,
+  logoutBackendCookieSession,
+  notifyPortalIdentityChanged,
+} from '../utils/backendSession';
+import { clearOfflineFieldQueue } from '../utils/offlineFieldSync';
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import {
   UserRole,
@@ -70,6 +78,7 @@ import {
   isDevAuthModeSwitchEnabled,
   resolveEffectiveAuthMode,
   loginWithServerApi,
+  loginWithSimulatedSsoApi,
   signupWithServerApi,
   verifyServerSessionApi,
   logoutServerSessionApi
@@ -831,6 +840,7 @@ interface AppContextType {
   scopedNotifications: AppNotification[];
   linkConnectionDemo: (consumerNo: string) => { success: boolean; error?: string; connection?: ElectricityConnection };
   loginDemoUser: (email: string, password: string, targetRole: UserRole, selectedUserId?: string) => Promise<{ success: boolean; error?: string }>;
+  loginViaSimulatedSso: (email: string, targetRole: UserRole, providerId?: string) => Promise<{ success: boolean; error?: string }>;
   loginAsCanonicalDemoAccount: (accountId: string, targetRole?: UserRole) => Promise<{ success: boolean; error?: string }>;
   switchDemoUserAccount: (accountId: string) => { success: boolean; error?: string };
   canonicalDemoAccounts: CanonicalDemoIdentity[];
@@ -3558,6 +3568,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const demoSessionRef = React.useRef<DemoSession | null>(demoSession);
   useEffect(() => {
     demoSessionRef.current = demoSession;
+    notifyPortalIdentityChanged(demoSession?.user.email ?? null, demoSession?.role ?? null);
   }, [demoSession]);
 
   const authModeRef = React.useRef<AuthMode>(authMode);
@@ -3787,6 +3798,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const nextMode = resolveEffectiveAuthMode(mode);
     if (nextMode === authMode) return;
+    clearBackendSession();
     setStoredAuthMode(nextMode);
     setAuthModeState(nextMode);
 
@@ -3938,6 +3950,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     identity: CanonicalDemoIdentity,
     preserveCurrentTab: boolean = false
   ): DemoSession => {
+    clearBackendSession();
     const baseSession = createDemoSessionForIdentity(identity);
     const activeModeSession: DemoSession =
       authMode === 'server'
@@ -3973,6 +3986,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setIsRoleSwitcherModalOpenState(false);
     return activeModeSession;
+  };
+
+  const loginViaSimulatedSso = async (
+    email: string,
+    targetRole: UserRole,
+    providerId?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    const resolvedProvider =
+      providerId ||
+      (targetRole === 'consumer' ? 'parichay-gujarat-demo' : 'ugvcl-workforce-oidc-demo');
+    const stateToken = `oidc_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const fallbackIdentity = getDefaultCanonicalIdentityForRole(targetRole);
+    const chosenEmail = (email || fallbackIdentity.email).trim().toLowerCase();
+
+    if (authMode === 'server') {
+      const ssoRes = await loginWithSimulatedSsoApi({
+        email: chosenEmail,
+        providerId: resolvedProvider,
+        state: stateToken,
+        targetRole
+      });
+      if (!ssoRes.success || !ssoRes.session) {
+        return { success: false, error: ssoRes.error || 'Simulated SSO login failed.' };
+      }
+      const meCheck = await verifyServerSessionApi();
+      const verifiedSession = meCheck.authenticated && meCheck.session ? meCheck.session : ssoRes.session;
+      const assignedRole = verifiedSession.role;
+      const targetTab =
+        assignedRole === 'consumer' && pendingConsumerTabRef.current
+          ? pendingConsumerTabRef.current
+          : 'dashboard';
+      pendingConsumerTabRef.current = null;
+      clearTransientUserModals();
+      demoSessionRef.current = verifiedSession;
+      currentRoleRef.current = assignedRole;
+      activeTabRef.current = targetTab;
+      hasEnteredPlatformRef.current = true;
+      setStoredActivePortalRuntime({
+        session: verifiedSession,
+        role: assignedRole,
+        tab: targetTab,
+        entered: true,
+        authMode
+      });
+      setDemoSession(verifiedSession);
+      void syncBackendSsoSession(resolvedProvider, verifiedSession.user.email, assignedRole, stateToken, {
+        portalCookieVerified: meCheck.authenticated
+      });
+      setCurrentRoleState(assignedRole);
+      setActiveTabState(targetTab);
+      setHasEnteredPlatformState(true);
+      if (typeof window !== 'undefined') {
+        window.history.pushState(null, '', `/${assignedRole}/${targetTab}`);
+      }
+      setIsRoleSwitcherModalOpenState(false);
+      showToast(
+        `Signed in via Simulated SSO (${resolvedProvider}) as ${verifiedSession.user.name}.`,
+        'success'
+      );
+      addAuditEvent(
+        'SIMULATED_SSO_LOGIN',
+        `Workspace:${assignedRole}`,
+        `Simulated OIDC (${resolvedProvider}) login for ${verifiedSession.user.email}`,
+        verifiedSession.user.name,
+        'SUCCESS'
+      );
+      return { success: true };
+    }
+
+    return loginAsCanonicalDemoAccount(fallbackIdentity.id, targetRole);
   };
 
   const loginAsCanonicalDemoAccount = async (
@@ -4101,8 +4184,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         authMode,
       });
       setDemoSession(verifiedSession);
-      // Acquire backend JWT for live API panels
-      void syncBackendSession(email, password, assignedRole);
+      // Never link a token to a different portal identity. Exact credentials are
+      // checked again against FastAPI, including /auth/me and mapped role.
+      if (verifiedSession.user.email.trim().toLowerCase() === email.trim().toLowerCase()) {
+        void syncBackendSession(verifiedSession.user.email, password, assignedRole, {
+          portalCookieVerified: meCheck.authenticated,
+        });
+      } else {
+        clearBackendSession();
+      }
       setCurrentRoleState(assignedRole);
       setActiveTabState(targetTab);
       setHasEnteredPlatformState(true);
@@ -4223,6 +4313,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         sessionToken: `vidyutflow_demo_${Date.now()}`
       };
 
+      clearBackendSession();
       setStoredDemoSession(newSession);
       setDemoSession(newSession);
       setCurrentRoleState('consumer');
@@ -4271,6 +4362,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const verifiedSession =
         meCheck.authenticated && meCheck.session ? meCheck.session : serverResult.session;
 
+      clearBackendSession();
       const targetTab = resolvePostLoginTab('consumer', pendingConsumerTabRef.current);
       pendingConsumerTabRef.current = null;
       demoSessionRef.current = verifiedSession;
@@ -4285,6 +4377,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         authMode,
       });
       setDemoSession(verifiedSession);
+      if (verifiedSession.user.email.trim().toLowerCase() === email.trim().toLowerCase()) {
+        void registerBackendConsumerSession(name, verifiedSession.user.email, password, {
+          portalCookieVerified: meCheck.authenticated,
+        });
+      } else {
+        clearBackendSession();
+      }
       setCurrentRoleState('consumer');
       setActiveTabState(targetTab);
       setHasEnteredPlatformState(true);
@@ -4368,6 +4467,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       sessionToken: `vidyutflow_demo_${Date.now()}`
     };
 
+    clearBackendSession();
     setStoredDemoSession(newSession);
     const targetTab = resolvePostLoginTab('consumer', pendingConsumerTabRef.current);
     pendingConsumerTabRef.current = null;
@@ -4393,7 +4493,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       window.history.pushState(null, '', `/consumer/${targetTab}`);
     }
     setIsRoleSwitcherModalOpenState(false);
-    void syncBackendSession(email, password, 'consumer');
     showToast(`Consumer registration successful! Welcome, ${newUser.name}.`, 'success');
     addAuditEvent('DEMO_AUTH_SIGNUP', 'Consumer Account Registered', `New consumer created: ${newUser.email}`, newUser.name, 'SUCCESS');
     return { success: true };
@@ -4401,7 +4500,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logoutDemoSession = async (): Promise<void> => {
     pendingConsumerTabRef.current = null;
-    clearBackendSession();
+    void logoutBackendCookieSession();
     demoSessionRef.current = null;
     hasEnteredPlatformRef.current = false;
     setStoredActivePortalRuntime(null);
@@ -5768,6 +5867,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const resetDemoData = () => {
     clearBackendSession();
+    clearOfflineFieldQueue();
     try {
       localStorage.removeItem('vidyutone_consumers');
       localStorage.removeItem('vidyutone_connections');
@@ -5986,6 +6086,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         scopedNotifications,
         linkConnectionDemo,
         loginDemoUser,
+        loginViaSimulatedSso,
         loginAsCanonicalDemoAccount,
         switchDemoUserAccount,
         canonicalDemoAccounts: CANONICAL_DEMO_IDENTITIES,

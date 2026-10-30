@@ -62,24 +62,21 @@ and the **offline sync contract** (`POST /requests/field-sync`). Build system eq
 │   │   ├── manifest.webmanifest
 │   │   └── sw.js
 │   ├── src
-│   │   ├── components
-│   │   │   ├── RequestDrawer.jsx
-│   │   │   ├── Shell.jsx
-│   │   │   ├── panels.jsx
-│   │   │   └── ui.jsx
-│   │   ├── lib
-│   │   │   └── format.js
-│   │   ├── App.jsx
-│   │   ├── api.js
+│   │   ├── components/     # consumer/ · employee/ · field/ · management/ · admin/ · common/ · layout/ · welcome/
+│   │   ├── context/        # AppContext.tsx
+│   │   ├── i18n/           # 4-language dictionaries (EN/GU/HI/MR)
+│   │   ├── server/         # dev/preview auth & AI middleware
+│   │   ├── utils/          # backendSession.ts · fastApiClient.ts · liveData.ts · validation helpers
+│   │   ├── App.tsx
 │   │   ├── index.css
-│   │   └── main.jsx
+│   │   └── main.tsx
+│   ├── tests/
 │   ├── Dockerfile
 │   ├── index.html
 │   ├── package-lock.json
 │   ├── package.json
-│   ├── postcss.config.js
-│   ├── tailwind.config.js
-│   └── vite.config.js
+│   ├── tsconfig.json
+│   └── vite.config.ts
 ├── scripts
 │   └── demo_reset.sh
 ├── .editorconfig

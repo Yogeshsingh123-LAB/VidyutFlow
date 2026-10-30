@@ -14,14 +14,15 @@ Sources: [REQUIREMENT_MAPPING.md](REQUIREMENT_MAPPING.md) · [ML_REPORT.md](ML_R
 | :--- | :--- |
 | Where is PS point N? | Point at `REQUIREMENT_MAPPING.md` §A row N — status ✅/🟡/◻️ with named evidence; every member can pull it up in 10 s. |
 | Is this "real-time"? | Live dashboards refreshed every 45 s ("live on refresh"); streaming is roadmap. No false claims. |
-| What did you measure? | Local, synthetic only: p95 4.5 ms over 100 reads; ML held-out vs baselines. Everything else is labelled target/assumption. |
-| Hardware/DR? | Costed proposal (INFRASTRUCTURE_ROADMAP.md); the software runs on Compose today with checksummed backup + restore drill. |
+| What did you measure? | Synthetic ML held-out vs majority baselines, empirical before/after workflow click-and-field counts (`WORKLOAD_MEASUREMENT.md` / `r5-workload-measurement.txt`: 12 fields entered once, 0 staff re-entries, 0 manual handoffs, 3 staff actions), and live `/system/performance` telemetry + concurrent local load verification (`load_check.py`). Wall-clock office % is labelled pilot target. |
+| Hardware/DR? | Costed 3-tier Small (₹14.80 L) / Medium (₹1.18 Cr) / Large (₹7.45 Cr) CAPEX+OPEX proposal (`INFRASTRUCTURE_ROADMAP.md`); the software runs on Compose today with checksummed backup + restore drill. |
 | Legacy ERP integration? | First roadmap item; the API contract is frozen so adapters slot in without touching the workflow. |
 | Why should UGVCL adopt this? | One flow is end-to-end working with audit + offline + honest ML; pilot plan = governed data → retrain → before/after timing study. |
 | Who approves the connection? | The officer, always. Models triage and explain; every action is audit-logged (hash chain). |
 | What if the network drops in a village? | The field PWA queues with UUIDs and syncs later; re-sync cannot duplicate (proven by test + demo). |
 | Is it secure? | JWT+RBAC+zone scoping, bcrypt, CORS allowlist, login throttle, security headers, tamper-evident audit; known gaps listed with defences in SECURITY.md. |
 | What if ML is wrong? | Reasons are shown, risk is a probability, guardrail escalates unknown safety phrasing, human decision is final and logged. |
+| Do you use Gemini or TF-IDF? | Both, cleanly separated: workflow triage/SLA scores and `POST /assistant/chat` policy citations run 100% locally in scikit-learn/TF-IDF (zero external LLM); the portal drawer (`POST /api/ai-chat`) optionally uses server-side Gemini with read-only tools (`3.5 s` deadline) and automatically badges a deterministic `Grounded Engine` fallback when offline or unconfigured. |
 
 ## C. Rules in the room
 

@@ -43,8 +43,8 @@ like data/maths → Role 3 · like servers/security → Role 4 · like writing/p
 
 **Mission:** a judge must be able to run the whole demo from the UI without touching a terminal.
 
-**Owns:** `frontend/src/App.jsx` · `components/` (`Shell`, `panels`, `featurePanels`, `ui`, `RequestDrawer`) ·
-`lib/format.js` · `api.js` · `frontend/public/sw.js` + manifest · `index.html`
+**Owns:** `frontend/src/App.tsx` · `components/` (`layout/`, `common/`, `consumer/`, `employee/`, `field/`, `management/`, `admin/`) ·
+`context/AppContext.tsx` · `utils/` · `frontend/public/sw.js` + manifest · `index.html`
 
 **Deliverables**
 - [x] Role portals, wizard, case drawer, command palette, dark mode, offline queue *(in repo)*

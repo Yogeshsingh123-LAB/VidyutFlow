@@ -1,5 +1,5 @@
 import os, sys, uuid
-os.environ["DATABASE_URL"] = "sqlite:///./test_vidyutos.db"
+os.environ["DATABASE_URL"] = "sqlite:///./test_vidyutflow.db"
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from fastapi.testclient import TestClient
 from app.main import app
@@ -150,6 +150,14 @@ def test_officer_zone_scope_and_assistant_visibility():
         south = login(c, "officer@example.com", "Officer@123")
         admin = login(c, "admin@vidyut.local", "Admin@123")
         engineer = login(c, "engineer@vidyut.local", "Engineer@123")
+        # Unknown/unregistered zone must be rejected (Item #1)
+        assert c.post('/requests', headers=consumer, json={
+            'applicant_name': 'Unknown Zone Probe', 'phone': '9876543210',
+            'address': 'Mars Colony', 'zone': 'UnknownMarsZone', 'document_name': 'id.pdf'}).status_code == 422
+        # Admin registers an explicit unstaffed zone to verify zero cross-zone leakage
+        assert c.post('/staff/zones', headers=admin, json={
+            'code': 'Unstaffed', 'display_name': 'Unstaffed Test Subdivision', 'circle_name': 'Test Circle'
+        }).status_code == 201
         ids = {}
         for zone in ("North", "South", "Unstaffed"):
             r = c.post('/requests', headers=consumer, json={

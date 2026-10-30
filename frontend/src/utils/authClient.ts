@@ -408,3 +408,64 @@ export async function logoutServerSessionApi(
     return { loggedOut: false };
   }
 }
+
+/**
+ * Simulated OIDC / Gujarat Parichay Single Sign-On against `/api/auth/sso` (Item #18).
+ */
+export async function loginWithSimulatedSsoApi(
+  params: {
+    email: string;
+    providerId: string;
+    state: string;
+    targetRole?: UserRole;
+  },
+  fetchImpl: FetchLike = fetch
+): Promise<{
+  success: boolean;
+  session?: DemoSession;
+  disclosure?: string;
+  error?: string;
+  statusCode?: number;
+}> {
+  try {
+    const response = await fetchImpl('/api/auth/sso', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-VidyutFlow-CSRF': '1'
+      },
+      body: JSON.stringify({
+        email: params.email.trim().toLowerCase(),
+        providerId: params.providerId,
+        state: params.state,
+        targetRole: params.targetRole
+      })
+    });
+    const data = (await response.json().catch(() => ({}))) as ServerAuthApiPayload & {
+      disclosure?: string;
+    };
+    if (!response.ok || !data.authenticated) {
+      return {
+        success: false,
+        error: data.error || 'Simulated SSO sign-in failed.',
+        statusCode: response.status
+      };
+    }
+    const session = toClientSessionFromServerPayload(data);
+    if (!session) {
+      return { success: false, error: 'Malformed SSO response from server.', statusCode: 500 };
+    }
+    return {
+      success: true,
+      session,
+      disclosure: data.disclosure
+    };
+  } catch {
+    return {
+      success: false,
+      error: 'Unable to reach /api/auth/sso server endpoint.'
+    };
+  }
+}

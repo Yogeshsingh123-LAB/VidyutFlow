@@ -1,9 +1,11 @@
-== LOCAL, SYNTHETIC load check — single caller, loopback, demo DB. Not a UGVCL benchmark. ==
-target=http://127.0.0.1:8000 requests=100
-login: 282.7 ms (excluded from percentiles)
-completed=100 errors=0
-overall p50=3.1 ms  p95=4.5 ms  p99=6.9 ms  max=7.3 ms  mean=3.3 ms
-  /requests                    n=34   p50=3.8 ms p95=4.6 ms
-  /requests/kpis/summary       n=33   p50=2.7 ms p95=4.3 ms
-  /notifications               n=33   p50=2.6 ms p95=4.1 ms
-Quote as: 'measured locally on synthetic demo data (p95 above)' — never as a UGVCL figure.
+== LOCAL CONCURRENT LOAD & CACHE VERIFICATION (synthetic demo DB — NOT a UGVCL benchmark) ==
+target=http://127.0.0.1:18089 total_requests=200 concurrency=8
+auth_warmup: 296.9 ms (excluded from workload percentiles)
+completed=200 errors=0 throughput=376.6 req/s
+cache_hits: kpi_summary=49 workflow_templates=49
+client_observed p50=20.0 ms  p95=31.4 ms  p99=37.4 ms  mean=20.8 ms
+  /notifications               n=50   p50=20.4 ms p95=29.4 ms
+  /requests                    n=50   p50=23.2 ms p95=37.4 ms
+  /requests/kpis/summary       n=50   p50=18.4 ms p95=26.9 ms
+  /workflows/templates         n=50   p50=18.9 ms p95=25.5 ms
+Disclosure: local loopback synthetic check only — never present as a UGVCL production benchmark.

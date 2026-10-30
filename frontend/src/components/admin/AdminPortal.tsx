@@ -1,4 +1,10 @@
 import { LiveWorkflowKpis } from '../common/LiveWorkflowKpis';
+import { LiveAlertEnginePanel } from '../common/LiveAlertEnginePanel';
+import { LiveAiGovernancePanel } from '../common/LiveAiGovernancePanel';
+import { LiveErpAdapterPanel } from './LiveErpAdapterPanel';
+import { LiveWorkflowTemplatesPanel } from './LiveWorkflowTemplatesPanel';
+import { LiveStaffAssignmentPanel } from './LiveStaffAssignmentPanel';
+import { LivePerformanceTelemetryPanel } from './LivePerformanceTelemetryPanel';
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -185,6 +191,7 @@ export const AdminPortal: React.FC = () => {
       {/* VIEW 1: SYSTEM OVERVIEW & INTEGRATIONS */}
       {(activeTab === 'overview' || activeTab === 'integrations') && (
         <div className="space-y-4 sm:space-y-6">
+          {activeTab === 'integrations' && <LiveErpAdapterPanel />}
           {/* Live Workflow KPIs — wired to VidyutFlow FastAPI backend */}
           <LiveWorkflowKpis />
           {/* Bento Health Strip */}
@@ -272,6 +279,8 @@ export const AdminPortal: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {activeTab === 'overview' && <LiveErpAdapterPanel />}
         </div>
       )}
 
@@ -288,12 +297,19 @@ export const AdminPortal: React.FC = () => {
               </p>
             </div>
             <button
-              onClick={() => showToast('New enterprise user onboarding dialog (Demo)', 'info')}
+              onClick={() => {
+                const el = document.getElementById('live-staff-assignment-panel');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
               className="w-full sm:w-auto min-h-11 sm:min-h-9 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shrink-0 whitespace-nowrap cursor-pointer"
             >
               {ad.addStaffUserBtn}
             </button>
           </div>
+
+          <LiveStaffAssignmentPanel
+            onToast={(msg, kind) => showToast(msg, kind || 'info')}
+          />
 
           <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
             <div className="overflow-x-auto">
@@ -411,6 +427,9 @@ export const AdminPortal: React.FC = () => {
       {/* VIEW 4: AUDIT TRAIL & SECURITY GOVERNANCE APPROVALS */}
       {activeTab === 'audit' && (
         <div className="space-y-5 min-w-0">
+          <LiveAiGovernancePanel />
+          <LiveAlertEnginePanel />
+
           {/* Security & Governance Human-in-the-Loop Approvals Queue */}
           <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
             <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -641,7 +660,9 @@ export const AdminPortal: React.FC = () => {
 
       {/* VIEW 5: INFRASTRUCTURE & BACKUP */}
       {activeTab === 'infra' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+        <div className="space-y-5 min-w-0">
+          <LivePerformanceTelemetryPanel />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
             <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Database className="w-5 h-5 text-blue-600 shrink-0" />
@@ -690,12 +711,16 @@ export const AdminPortal: React.FC = () => {
               </div>
             </div>
           </div>
+          </div>
         </div>
       )}
 
       {/* VIEW 6: SYSTEM SETTINGS */}
       {activeTab === 'settings' && (
-        <div className="max-w-2xl mx-auto p-4 sm:p-6 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
+        <div className="space-y-5 min-w-0">
+          <LiveWorkflowTemplatesPanel />
+
+          <div className="max-w-2xl mx-auto p-4 sm:p-6 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
           <h2 className="text-base font-bold text-slate-900 dark:text-white">
             {ad.settingsTitle}
           </h2>
@@ -729,6 +754,7 @@ export const AdminPortal: React.FC = () => {
               {ad.saveConfigurationBtn}
             </button>
           </div>
+        </div>
         </div>
       )}
     </div>

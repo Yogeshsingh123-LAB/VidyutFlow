@@ -1,5 +1,8 @@
 import { LiveWorkflowKpis } from '../common/LiveWorkflowKpis';
 import { LiveSlaRiskWatchlist } from '../common/LiveSlaRiskWatchlist';
+import { LiveAlertEnginePanel } from '../common/LiveAlertEnginePanel';
+import { LiveAiGovernancePanel } from '../common/LiveAiGovernancePanel';
+import { LiveExecutiveAnalyticsSection } from './LiveExecutiveAnalyticsSection';
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
@@ -334,6 +337,9 @@ export const ManagementPortal: React.FC = () => {
             </div>
           )}
 
+          {/* Live Database-Backed Executive Analytics & Recharts */}
+          <LiveExecutiveAnalyticsSection mode="dashboard" />
+
           {/* Executive KPI Bento */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* AT&C Loss */}
@@ -465,46 +471,6 @@ export const ManagementPortal: React.FC = () => {
 
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={EXECUTIVE_MONTHLY_METRICS} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.15} />
-                    <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                    <YAxis domain={[11, 15]} stroke="#94a3b8" fontSize={11} tickLine={false} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#101C35',
-                        border: '1px solid #1E293B',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        color: '#FFFFFF'
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="atcLossPct"
-                      name="AT&C Loss %"
-                      stroke="#F59E0B"
-                      strokeWidth={3}
-                      dot={{ r: 4, fill: '#F59E0B' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Energy Billed vs Revenue Collections
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Billed Mega-Units (MUs) vs Net Inflow (₹ Crores)
-                  </p>
-                </div>
-              </div>
-
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={localizedMonthlyMetrics} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.15} />
                     <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
@@ -619,7 +585,8 @@ export const ManagementPortal: React.FC = () => {
       {/* VIEW 3: AI EXECUTIVE INSIGHTS */}
       {activeTab === 'ai-insights' && (
         <div className="space-y-6">
-          {/* Live ML SLA Risk Watchlist */}
+          {/* Live ML SLA Risk Watchlist & AI Governance */}
+          <LiveAiGovernancePanel />
           <LiveSlaRiskWatchlist />
           <div className="p-5 rounded-xl bg-gradient-to-r from-blue-900/20 to-teal-900/20 border border-teal-500/30 space-y-3">
             <div className="flex items-center gap-2">
@@ -779,6 +746,9 @@ export const ManagementPortal: React.FC = () => {
       {/* VIEW 4: SLA MONITORING */}
       {activeTab === 'sla' && (
         <div className="space-y-4 min-w-0">
+          <LiveAlertEnginePanel />
+          <LiveExecutiveAnalyticsSection mode="sla" />
+
           <div>
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">
               {tm.slaMatrixTitle}
@@ -839,6 +809,8 @@ export const ManagementPortal: React.FC = () => {
               {tm.clientSideDemoBadge}
             </span>
           </div>
+
+          <LiveExecutiveAnalyticsSection mode="reports" />
 
           {/* Exportable Report Packages */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

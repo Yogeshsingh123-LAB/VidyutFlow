@@ -15,11 +15,11 @@ PY
 }
 
 echo "== 1. BEFORE — live DB contents =="
-counts vidyutos.db
+counts vidyutflow.db
 
 echo "== 2. backup.sh =="
 ./scripts/backup.sh
-backup=$(ls -t backups/vidyutos-*.db | head -1)
+backup=$(ls -t backups/vidyutflow-*.db | head -1)
 echo "  selected: $backup"
 
 echo "== 3. checksum verification =="
@@ -35,14 +35,14 @@ else
   echo "  OK: tampered copy correctly REJECTED by sha256 verification"
 fi
 
-echo "== 5. disaster: wipe vidyutos.db =="
-rm -f vidyutos.db
-echo "  vidyutos.db deleted."
+echo "== 5. disaster: wipe vidyutflow.db =="
+rm -f vidyutflow.db
+echo "  vidyutflow.db deleted."
 
 echo "== 6. restore.sh =="
 ./scripts/restore.sh "$backup"
 
 echo "== 7. AFTER — restored DB contents =="
-counts vidyutos.db
+counts vidyutflow.db
 
 echo "== 8. drill complete — restart the API to serve the recovered database =="

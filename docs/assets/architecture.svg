@@ -8,7 +8,7 @@
   <text x="160" y="118" text-anchor="middle" fill="#22d3ee" font-size="13" font-weight="700">CONSUMER PORTAL (PWA)</text>
   <text x="160" y="142" text-anchor="middle" fill="#cbd5e1" font-size="11">New-connection wizard · status</text>
   <text x="160" y="162" text-anchor="middle" fill="#cbd5e1" font-size="11">bills/demo · complaints · ML feedback</text>
-  <text x="160" y="186" text-anchor="middle" fill="#64748b" font-size="10">React 19 · Tailwind · same login as API</text>
+  <text x="160" y="186" text-anchor="middle" fill="#64748b" font-size="10">React 19 · Vite 8 · Tailwind 4</text>
 
   <rect x="40" y="240" width="240" height="120" rx="10" fill="#101c35" stroke="#22d3ee" stroke-width="2"/>
   <text x="160" y="268" text-anchor="middle" fill="#22d3ee" font-size="13" font-weight="700">FIELD ENGINEER (EDGE PWA)</text>
@@ -42,7 +42,7 @@
   <text x="550" y="256" text-anchor="middle" fill="#93c5fd" font-size="10">category/severity · SLA-breach risk + reasons</text>
 
   <rect x="410" y="279" width="280" height="52" rx="8" fill="#12324a" stroke="#3b82f6" stroke-width="1.5"/>
-  <text x="550" y="300" text-anchor="middle" fill="#bfdbfe" font-size="12" font-weight="600">Policy assistant (TF-IDF RAG) + alerts</text>
+  <text x="550" y="300" text-anchor="middle" fill="#bfdbfe" font-size="12" font-weight="600">TF-IDF Policy RAG + optional Gemini UI</text>
   <text x="550" y="318" text-anchor="middle" fill="#93c5fd" font-size="10">sources cited · notification centre · SLA watchlist</text>
 
   <rect x="410" y="341" width="280" height="52" rx="8" fill="#12324a" stroke="#3b82f6" stroke-width="1.5"/>
@@ -53,7 +53,7 @@
   <text x="550" y="424" text-anchor="middle" fill="#bfdbfe" font-size="12" font-weight="600">Field sync contract</text>
   <text x="550" y="442" text-anchor="middle" fill="#93c5fd" font-size="10">JWT-authenticated · idempotent (client_uuid once)</text>
 
-  <text x="550" y="480" text-anchor="middle" fill="#64748b" font-size="10">28 backend tests · 7 frontend suites · CI · Compose</text>
+  <text x="550" y="480" text-anchor="middle" fill="#64748b" font-size="10">110 backend tests · 37 frontend suites · CI · Compose</text>
 
   <!-- DATA -->
   <rect x="760" y="130" width="150" height="90" rx="10" fill="#101c35" stroke="#34d399" stroke-width="2"/>

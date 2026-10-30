@@ -37,9 +37,12 @@ export function resetAuthRateLimitForTests(): void {
 }
 
 function getClientIp(req: IncomingMessage): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.trim()) {
-    return forwarded.split(',')[0].trim();
+  // Never trust spoofable X-Forwarded-For unless deployed behind an explicit trusted reverse proxy
+  if (process.env.TRUSTED_PROXY === 'true') {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (typeof forwarded === 'string' && forwarded.trim()) {
+      return forwarded.split(',')[0].trim();
+    }
   }
   return req.socket?.remoteAddress || 'local-client';
 }
@@ -429,6 +432,105 @@ export function createAuthApiHandler(options: AuthApiHandlerOptions = {}) {
         loggedOut: true,
         revoked
       });
+      return;
+    }
+
+    // -----------------------------------------------------------------------
+    // 5. GET /api/auth/sso/providers & POST /api/auth/sso — Simulated OIDC SSO (Item #18)
+    // -----------------------------------------------------------------------
+    if (pathname === '/sso/providers' || pathname === '/sso/providers/') {
+      if (method !== 'GET') {
+        sendJson(res, 405, { error: 'Method not allowed. Use GET.', code: 'METHOD_NOT_ALLOWED' });
+        return;
+      }
+      sendJson(res, 200, {
+        isSimulated: true,
+        enabled: process.env.NODE_ENV !== 'production',
+        disclosure:
+          'SIMULATED OIDC / MeriPehchaan Parichay Single Sign-On for demonstration only — not connected to live Government of Gujarat IdP.',
+        providers: [
+          {
+            id: 'parichay-gujarat-demo',
+            name: 'MeriPehchaan / Gujarat Parichay OIDC (Simulated Demo)',
+            audience: 'Consumers & Citizens'
+          },
+          {
+            id: 'ugvcl-workforce-oidc-demo',
+            name: 'UGVCL Corporate Workforce SSO (Simulated Demo)',
+            audience: 'Officers, Field Engineers, Management & IT Admin'
+          }
+        ]
+      });
+      return;
+    }
+
+    if (pathname === '/sso' || pathname === '/sso/') {
+      if (method !== 'POST') {
+        sendJson(res, 405, { error: 'Method not allowed. Use POST.', code: 'METHOD_NOT_ALLOWED' });
+        return;
+      }
+      const csrf = verifyCsrfProtection(req);
+      if (!csrf.valid) {
+        sendJson(res, 403, { error: csrf.message, code: csrf.code });
+        return;
+      }
+      const clientIp = getClientIp(req);
+      if (!checkAndRecordAuthRateLimit(clientIp, nowMs)) {
+        res.setHeader('Retry-After', '60');
+        sendJson(res, 429, {
+          authenticated: false,
+          error: 'Too many SSO attempts. Please wait a minute before trying again.',
+          code: 'RATE_LIMIT_EXCEEDED'
+        });
+        return;
+      }
+      try {
+        const body = await readJsonBody(req);
+        const email = typeof body.email === 'string' ? body.email : '';
+        const providerId = typeof body.providerId === 'string' ? body.providerId : '';
+        const state = typeof body.state === 'string' ? body.state : '';
+        const targetRole = typeof body.targetRole === 'string' ? (body.targetRole as UserRole) : undefined;
+        const { user, session } = authService.loginViaSimulatedSso({
+          email,
+          providerId,
+          state,
+          targetRole,
+          nowMs
+        });
+        res.setHeader(
+          'Set-Cookie',
+          serializeSessionCookie(session.signedToken, {
+            maxAgeMs: session.expiresAt - session.createdAt,
+            isProduction: isSecureCookie,
+            sameSite: 'Lax'
+          })
+        );
+        sendJson(res, 200, {
+          authenticated: true,
+          ssoSimulated: true,
+          providerId,
+          disclosure:
+            'SIMULATED OIDC / Gujarat Parichay SSO session issued for demonstration only.',
+          user,
+          role: session.role,
+          loginTime: new Date(session.createdAt).toISOString(),
+          expiresAt: session.expiresAt
+        });
+      } catch (err) {
+        if (err instanceof AuthSecurityError) {
+          sendJson(res, err.statusCode, {
+            authenticated: false,
+            error: err.message,
+            code: err.code
+          });
+          return;
+        }
+        sendJson(res, 500, {
+          authenticated: false,
+          error: 'An unexpected SSO error occurred.',
+          code: 'INTERNAL_SSO_ERROR'
+        });
+      }
       return;
     }
 

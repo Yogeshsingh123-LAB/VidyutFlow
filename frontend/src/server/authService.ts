@@ -467,6 +467,52 @@ export class ServerAuthService {
     };
   }
 
+  /**
+   * Simulated OIDC / Gujarat Parichay Single Sign-On (Item #18).
+   * Explicitly disabled in production (`NODE_ENV === 'production'`) unless real OIDC is configured.
+   */
+  public loginViaSimulatedSso(params: {
+    email: string;
+    providerId: string;
+    state: string;
+    targetRole?: UserRole;
+    nowMs?: number;
+  }): { user: PublicUserIdentity; session: ServerSessionRecord; cookieHeader: string } {
+    if (process.env.NODE_ENV === 'production') {
+      throw new AuthSecurityError(
+        403,
+        'SSO_DEMO_DISABLED_IN_PRODUCTION',
+        'Simulated OIDC / Parichay SSO is disabled in production.'
+      );
+    }
+    const allowedProviders = new Set(['parichay-gujarat-demo', 'ugvcl-workforce-oidc-demo']);
+    if (!allowedProviders.has(params.providerId)) {
+      throw new AuthSecurityError(400, 'INVALID_SSO_PROVIDER', 'Unsupported simulated SSO provider.');
+    }
+    if (!params.state || params.state.trim().length < 8) {
+      throw new AuthSecurityError(400, 'INVALID_SSO_STATE', 'Missing or invalid OIDC CSRF state parameter.');
+    }
+    const cleanEmail = (params.email || '').trim().toLowerCase();
+    const userRecord = this.usersByEmail.get(cleanEmail);
+    if (!userRecord) {
+      throw new AuthSecurityError(401, 'SSO_ACCOUNT_NOT_FOUND', 'SSO identity is not mapped to an active VidyutFlow account.');
+    }
+    if (params.targetRole && userRecord.role !== params.targetRole) {
+      throw new AuthSecurityError(
+        403,
+        'ROLE_MISMATCH',
+        `Account ${userRecord.email} is authorized for "${userRecord.role}", not "${params.targetRole}".`
+      );
+    }
+    const session = this.createSession(userRecord, this.defaultSessionTtlMs, params.nowMs);
+    const cookieHeader = serializeSessionCookie(session.signedToken, { maxAgeMs: this.defaultSessionTtlMs });
+    return {
+      user: toPublicUserIdentity(userRecord),
+      session,
+      cookieHeader
+    };
+  }
+
   private createSession(
     userRecord: ServerUserRecord,
     ttlMs: number = this.defaultSessionTtlMs,

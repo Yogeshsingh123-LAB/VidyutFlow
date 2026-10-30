@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Restore a backup produced by backup.sh, verifying its checksum first.
-# Usage: ./scripts/restore.sh backups/vidyutos-<stamp>.db        (SQLite)
-#        ./scripts/restore.sh backups/vidyutos-<stamp>.sql       (PostgreSQL via psql)
+# Usage: ./scripts/restore.sh backups/vidyutflow-<stamp>.db        (SQLite)
+#        ./scripts/restore.sh backups/vidyutflow-<stamp>.sql       (PostgreSQL via psql)
 set -euo pipefail
 src="${1:?Usage: ./scripts/restore.sh <backup-file>}"
 [ -f "$src" ] || { echo "No such backup: $src"; exit 1; }
@@ -17,8 +17,8 @@ case "$src" in
     echo "PostgreSQL restore applied from $src"
     ;;
   *.db)
-    cp -f "$src" vidyutos.db
-    echo "SQLite restore: $src -> vidyutos.db (restart the API to pick it up)"
+    cp -f "$src" vidyutflow.db
+    echo "SQLite restore: $src -> vidyutflow.db (restart the API to pick it up)"
     ;;
   *)
     echo "Unknown backup type: $src (expected .db or .sql)"; exit 1

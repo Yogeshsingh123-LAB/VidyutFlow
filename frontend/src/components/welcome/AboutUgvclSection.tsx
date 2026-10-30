@@ -82,9 +82,12 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
               <img
                 src="/assets/ugvcl/area_map_ugvcl.jpg"
                 alt="Official Area Map of UGVCL"
+                loading="lazy"
+                decoding="async"
                 className="w-full h-auto object-cover group-hover:scale-102 transition-transform duration-500"
               />
               <button
+                type="button"
                 onClick={() => onOpenPhoto('photo-area-map')}
                 className="absolute bottom-4 right-4 px-3.5 py-2 rounded-xl bg-slate-950/85 hover:bg-slate-950 text-white text-xs font-bold flex items-center gap-2 backdrop-blur-md transition-all shadow-md cursor-pointer hover:scale-105"
                 title="Expand and inspect official territory boundaries"

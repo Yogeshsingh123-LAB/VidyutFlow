@@ -1,0 +1,15 @@
+[security] WARNING: development SECRET_KEY in use; production startup rejects this default.
+== EMPIRICAL WORKLOAD MEASUREMENT (Real VidyutFlow End-to-End Execution) ==
+{
+  "consumer_fields_entered_once": 12,
+  "staff_applicant_fields_retyped": 0,
+  "staff_new_operational_fields_entered": 1,
+  "manual_routing_handoffs": 0,
+  "staff_portal_actions_to_complete": 3,
+  "distinct_staff_views_used": 2,
+  "erp_target_fields_auto_mapped": 11,
+  "final_status": "COMPLETED",
+  "erp_sync_events_recorded": 2
+}
+Summary: consumer_fields_entered_once=12 | staff_applicant_fields_retyped=0 | manual_routing_handoffs=0 | staff_actions=3 | erp_fields_auto_mapped=11
+Disclosure: counts measured directly on VidyutFlow's real API flow; office stopwatch % requires Tier 1 pilot.

@@ -123,6 +123,32 @@ export interface AdminUiDictionary {
   patchScheduleDefaultValue: string;
   saveConfigurationBtn: string;
   settingsSavedToast: string;
+
+  // ERP Adapter & Dead-Letter Queue (Item #16)
+  erpAdapterTitle: string;
+  erpAdapterSubtitle: string;
+  erpSimulatedBadge: string;
+  erpDisclosureBanner: string;
+  erpMappingHeading: string;
+  erpColSourceField: string;
+  erpColTargetField: string;
+  erpColTransformRule: string;
+  erpColRequiredStage: string;
+  erpSyncLogHeading: string;
+  erpFilterAll: string;
+  erpFilterFailedQueue: string;
+  erpFilterSynced: string;
+  erpBtnSyncRequest: string;
+  erpBtnSimulateFailure: string;
+  erpBtnRetrySync: string;
+  erpStatusSynced: string;
+  erpStatusFailed: string;
+  erpColApplicant: string;
+  erpColEvent: string;
+  erpColAttempts: string;
+  erpColRefOrError: string;
+  erpColAction: string;
+  erpEmptyLogs: string;
 }
 
 export const ADMIN_UI_TRANSLATIONS: Record<LanguageCode, AdminUiDictionary> = {
@@ -239,7 +265,32 @@ export const ADMIN_UI_TRANSLATIONS: Record<LanguageCode, AdminUiDictionary> = {
     patchScheduleLabel: 'Weekly Patch Maintenance Schedule',
     patchScheduleDefaultValue: 'Every Sunday 02:00 AM - 04:00 AM IST',
     saveConfigurationBtn: 'Save Configuration',
-    settingsSavedToast: 'Settings saved to volatile session (Demo)'
+    settingsSavedToast: 'Settings saved to volatile session (Demo)',
+
+    erpAdapterTitle: 'Outbound Utility ERP Webhook Adapter & Dead-Letter Queue',
+    erpAdapterSubtitle: 'Canonical SAP IS-U-style field mapping, outbound delivery log, failed-sync queue, and operator retry',
+    erpSimulatedBadge: 'Simulated ERP Adapter (No Live UGVCL Link)',
+    erpDisclosureBanner: 'Honesty Disclosure: Outbound payloads are validated and recorded against VidyutFlow’s internal mock ERP adapter; live connectivity to UGVCL production SAP / billing servers is a roadmap item.',
+    erpMappingHeading: 'Canonical VidyutFlow → Discom ERP Field Mapping Table',
+    erpColSourceField: 'VidyutFlow Field',
+    erpColTargetField: 'ERP Target Field',
+    erpColTransformRule: 'Transformation & Validation Rule',
+    erpColRequiredStage: 'Required Stage',
+    erpSyncLogHeading: 'ERP Sync Log & Failed-Sync Queue',
+    erpFilterAll: 'All Sync Logs',
+    erpFilterFailedQueue: 'Failed Queue',
+    erpFilterSynced: 'Synced',
+    erpBtnSyncRequest: 'Sync Request to ERP',
+    erpBtnSimulateFailure: 'Inject 503 Timeout (Test Failed Queue)',
+    erpBtnRetrySync: 'Retry Sync',
+    erpStatusSynced: 'SYNCED',
+    erpStatusFailed: 'FAILED',
+    erpColApplicant: 'Request & Applicant',
+    erpColEvent: 'Handoff Event',
+    erpColAttempts: 'Attempts',
+    erpColRefOrError: 'ERP Reference / Failure Reason',
+    erpColAction: 'Recovery Action',
+    erpEmptyLogs: 'No ERP sync entries match the selected filter.'
   },
 
   gu: {
@@ -355,7 +406,32 @@ export const ADMIN_UI_TRANSLATIONS: Record<LanguageCode, AdminUiDictionary> = {
     patchScheduleLabel: 'સાપ્તાહિક પેચ જાળવણી સમયપત્રક',
     patchScheduleDefaultValue: 'દર રવિવારે 02:00 AM - 04:00 AM IST',
     saveConfigurationBtn: 'રૂપરેખાંકન સાચવો',
-    settingsSavedToast: 'અસ્થાયી સત્રમાં સેટિંગ્સ સાચવવામાં આવી (ડેમો)'
+    settingsSavedToast: 'અસ્થાયી સત્રમાં સેટિંગ્સ સાચવવામાં આવી (ડેમો)',
+
+    erpAdapterTitle: 'આઉટબાઉન્ડ યુટિલિટી ERP વેબહુક એડેપ્ટર અને ફેઇલ્ડ-સિંક કતાર',
+    erpAdapterSubtitle: 'પ્રમાણભૂત SAP IS-U શૈલી ફિલ્ડ મેપિંગ, આઉટબાઉન્ડ સિંક લોગ, નિષ્ફળ કતાર અને પુનઃપ્રયાસ',
+    erpSimulatedBadge: 'સિમ્યુલેટેડ ERP એડેપ્ટર (લાઇવ UGVCL જોડાણ નથી)',
+    erpDisclosureBanner: 'સ્પષ્ટતા: આઉટબાઉન્ડ પેલોડ્સ VidyutFlow ના આંતરિક મોક ERP એડેપ્ટર પર ચકાસાય છે અને નોંધાય છે; UGVCL ના લાઇવ SAP/બિલિંગ સર્વર સાથે સીધું જોડાણ રોડમેપમાં છે.',
+    erpMappingHeading: 'પ્રમાણભૂત VidyutFlow → Discom ERP ફિલ્ડ મેપિંગ કોષ્ટક',
+    erpColSourceField: 'VidyutFlow ફિલ્ડ',
+    erpColTargetField: 'ERP લક્ષ્ય ફિલ્ડ',
+    erpColTransformRule: 'રૂપાંતરણ અને ચકાસણી નિયમ',
+    erpColRequiredStage: 'જરૂરી તબક્કો',
+    erpSyncLogHeading: 'ERP સિંક લોગ અને નિષ્ફળ-સિંક કતાર',
+    erpFilterAll: 'તમામ સિંક લોગ',
+    erpFilterFailedQueue: 'નિષ્ફળ કતાર',
+    erpFilterSynced: 'સિંક થયેલ',
+    erpBtnSyncRequest: 'ERP પર અરજી સિંક કરો',
+    erpBtnSimulateFailure: '503 ટાઇમઆઉટ ટેસ્ટ (નિષ્ફળ કતાર ચકાસો)',
+    erpBtnRetrySync: 'ફરી સિંક કરો',
+    erpStatusSynced: 'સિંક થયેલ',
+    erpStatusFailed: 'નિષ્ફળ',
+    erpColApplicant: 'અરજી અને અરજદાર',
+    erpColEvent: 'હેન્ડઓફ ઇવેન્ટ',
+    erpColAttempts: 'પ્રયાસો',
+    erpColRefOrError: 'ERP સંદર્ભ / નિષ્ફળતાનું કારણ',
+    erpColAction: 'પુનઃપ્રાપ્તિ પગલું',
+    erpEmptyLogs: 'પસંદ કરેલ ફિલ્ટર માટે કોઈ ERP સિંક નોંધ મળી નથી.'
   },
 
   hi: {
@@ -471,7 +547,32 @@ export const ADMIN_UI_TRANSLATIONS: Record<LanguageCode, AdminUiDictionary> = {
     patchScheduleLabel: 'साप्ताहिक पैच रखरखाव समय-सारणी',
     patchScheduleDefaultValue: 'प्रत्येक रविवार 02:00 AM - 04:00 AM IST',
     saveConfigurationBtn: 'कॉन्फ़िगरेशन सहेजें',
-    settingsSavedToast: 'अस्थायी सत्र में सेटिंग्स सहेजी गईं (डेमो)'
+    settingsSavedToast: 'अस्थायी सत्र में सेटिंग्स सहेजी गईं (डेमो)',
+
+    erpAdapterTitle: 'आउटबाउंड यूटिलिटी ERP वेबहुक एडेप्टर एवं विफल-सिंक कतार',
+    erpAdapterSubtitle: 'मानक SAP IS-U शैली फ़ील्ड मैपिंग, आउटबाउंड सिंक लॉग, विफल कतार और पुनः प्रयास',
+    erpSimulatedBadge: 'सिम्युलेटेड ERP एडेप्टर (लाइव UGVCL लिंक नहीं)',
+    erpDisclosureBanner: 'स्पष्टता सूचना: आउटबाउंड पेलोड VidyutFlow के आंतरिक मॉक ERP एडेप्टर पर सत्यापित व लॉग किए जाते हैं; UGVCL के लाइव SAP/बिलिंग सर्वर से संयोजन रोडमैप में है।',
+    erpMappingHeading: 'मानक VidyutFlow → Discom ERP फ़ील्ड मैपिंग तालिका',
+    erpColSourceField: 'VidyutFlow फ़ील्ड',
+    erpColTargetField: 'ERP लक्ष्य फ़ील्ड',
+    erpColTransformRule: 'रूपांतरण एवं सत्यापन नियम',
+    erpColRequiredStage: 'अनिवार्य चरण',
+    erpSyncLogHeading: 'ERP सिंक लॉग एवं विफल-सिंक कतार',
+    erpFilterAll: 'सभी सिंक लॉग',
+    erpFilterFailedQueue: 'विफल कतार',
+    erpFilterSynced: 'सिंक पूर्ण',
+    erpBtnSyncRequest: 'ERP पर अनुरोध सिंक करें',
+    erpBtnSimulateFailure: '503 टाइमआउट परीक्षण (विफल कतार जांचें)',
+    erpBtnRetrySync: 'पुनः सिंक करें',
+    erpStatusSynced: 'सिंक पूर्ण',
+    erpStatusFailed: 'विफल',
+    erpColApplicant: 'अनुरोध एवं आवेदक',
+    erpColEvent: 'हैंडऑफ़ इवेंट',
+    erpColAttempts: 'प्रयास',
+    erpColRefOrError: 'ERP संदर्भ / विफलता कारण',
+    erpColAction: 'पुनर्प्राप्ति कार्रवाई',
+    erpEmptyLogs: 'चयनित फ़िल्टर के लिए कोई ERP सिंक प्रविष्टि नहीं मिली।'
   },
 
   mr: {
@@ -587,7 +688,32 @@ export const ADMIN_UI_TRANSLATIONS: Record<LanguageCode, AdminUiDictionary> = {
     patchScheduleLabel: 'साप्ताहिक पॅच देखभाल वेळापत्रक',
     patchScheduleDefaultValue: 'दर रविवारी 02:00 AM - 04:00 AM IST',
     saveConfigurationBtn: 'कॉन्फिगरेशन जतन करा',
-    settingsSavedToast: 'तात्पुरत्या सत्रात सेटिंग्ज जतन केल्या (डेमो)'
+    settingsSavedToast: 'तात्पुरत्या सत्रात सेटिंग्ज जतन केल्या (डेमो)',
+
+    erpAdapterTitle: 'आउटबाउंड युटिलिटी ERP वेबहुक अडॅप्टर आणि अयशस्वी-सिंक रांग',
+    erpAdapterSubtitle: 'प्रमाणित SAP IS-U शैली फील्ड मॅपिंग, आउटबाउंड सिंक लॉग, अयशस्वी रांग आणि पुन्हा प्रयत्न',
+    erpSimulatedBadge: 'सिम्युलेटेड ERP अडॅप्टर (लाईव्ह UGVCL जोडणी नाही)',
+    erpDisclosureBanner: 'स्पष्टता सूचना: आउटबाउंड पेलोड्स VidyutFlow च्या अंतर्गत मॉक ERP अडॅप्टरवर तपासले व नोंदवले जातात; UGVCL च्या लाईव्ह SAP/बिलिंग सर्व्हरशी जोडणी रोडमॅपमध्ये आहे.',
+    erpMappingHeading: 'प्रमाणित VidyutFlow → Discom ERP फील्ड मॅपिंग तक्ता',
+    erpColSourceField: 'VidyutFlow फील्ड',
+    erpColTargetField: 'ERP लक्ष्य फील्ड',
+    erpColTransformRule: 'रूपांतरण आणि पडताळणी नियम',
+    erpColRequiredStage: 'आवश्यक टप्पा',
+    erpSyncLogHeading: 'ERP सिंक लॉग आणि अयशस्वी-सिंक रांग',
+    erpFilterAll: 'सर्व सिंक लॉग',
+    erpFilterFailedQueue: 'अयशस्वी रांग',
+    erpFilterSynced: 'सिंक पूर्ण',
+    erpBtnSyncRequest: 'ERP वर अर्ज सिंक करा',
+    erpBtnSimulateFailure: '503 टाईमआउट चाचणी (अयशस्वी रांग तपासा)',
+    erpBtnRetrySync: 'पुन्हा सिंक करा',
+    erpStatusSynced: 'सिंक पूर्ण',
+    erpStatusFailed: 'अयशस्वी',
+    erpColApplicant: 'अर्ज आणि अर्जदार',
+    erpColEvent: 'हँडऑफ इव्हेंट',
+    erpColAttempts: 'प्रयत्न',
+    erpColRefOrError: 'ERP संदर्भ / अपयशाचे कारण',
+    erpColAction: 'पुनर्प्राप्ती कृती',
+    erpEmptyLogs: 'निवडलेल्या फिल्टरसाठी कोणतीही ERP सिंक नोंद आढळली नाही.'
   }
 };
 
