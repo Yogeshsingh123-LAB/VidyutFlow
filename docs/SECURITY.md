@@ -6,7 +6,7 @@
 
 ---
 
-## 1. Defense-in-Depth Control Matrix (Live in Code vs. Enterprise Deployment)
+## 1. Application-Layer Security Control Matrix (Built Prototype vs. Proposed Infra Out of Scope)
 
 | Control Domain | Implemented & Tested in This Repository | Production DISCOM Extension |
 | :--- | :--- | :--- |

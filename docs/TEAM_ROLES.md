@@ -81,7 +81,7 @@ like data/maths → Role 3 · like servers/security → Role 4 · like writing/p
 - [x] Compose stack, Makefile targets, backup/demo-reset scripts, CORS allowlist, bcrypt/JWT *(in repo)*
 - [x] Test suite green from a clean machine (`make setup && make test`) — re-verify **weekly**
 - [ ] Before Nov 6: one full `make up` rehearsal on a clean checkout; change every demo password if the deck shows them publicly
-- [x] Own defense-in-depth security controls (`HttpOnly; SameSite=Lax` cookies, Redis-ready login throttle, `VFENC1` HKDF-SHA256 + AES-256-GCM upload & field encryption, SHA-256 hash-chained `AuditLog`, ArcSight/Wazuh `CEF:0` SIEM export, and automated backup & local restore drill) — [`docs/SECURITY.md`](SECURITY.md) & [`docs/DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md)
+- [x] Own application-layer security + backup script (infra hardening out of scope) (`HttpOnly; SameSite=Lax` cookies, Redis-ready login throttle, `VFENC1` HKDF-SHA256 + AES-256-GCM upload & field encryption, SHA-256 hash-chained `AuditLog`, ArcSight/Wazuh `CEF:0` SIEM export, and local backup & restore drill script) — [`docs/SECURITY.md`](SECURITY.md) & [`docs/DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md)
 - [ ] Before Dec 2: offline fallback kit — pre-trained models, local DB backup, recorded demo (with Role 5) if Wi-Fi fails
 
 **Reviews:** every PR touching `security.py` / `deps.py` / CORS needs this role's approval.

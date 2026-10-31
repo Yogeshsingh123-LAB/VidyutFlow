@@ -219,7 +219,7 @@ export function getApplicationStatusDisplayMeta(
 }
 
 /**
- * UGVCL ERP Integration Adapter Layer
+ * UGVCL ERP Integration (Simulated) Adapter Layer
  *
  * Provides a clean abstraction between UI portal components and backend microservices.
  * In development / demo environments without a live microservice cluster, it coordinates

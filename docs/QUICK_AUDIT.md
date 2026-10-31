@@ -11,8 +11,8 @@
 
 ## 1. Executive Summary & Core Capabilities
 
-1. **Non-Invasive Heterogeneous ERP API Gateway (*"Enter Once, Propagate Everywhere"*)**:
-   - **SAP S/4HANA FI-CA/IS-U OData v4-compatible gateway** (`/v1/erp/sap-odata/{metadata,ServiceOrders,ServiceOrders/inbound-ack}` — validated against OData v4 `$metadata` & `ServiceOrders` specification, ready for sandbox connection¹) + **UGVCL e-Urja CIS Billing** + **GUVNL 1912 Grievance CRM** fan-out via `POST /v1/erp/gateway/propagate/{request_id}` (`applicant_fields_retyped = 0`) and **Master Data Reconciliation** (`GET /v1/erp/reconcile` & `POST /v1/erp/reconcile/{request_id}`).
+1. **ERP integration (simulated) (*"Enter Once, Propagate Everywhere"*)**:
+   - **SAP-shaped OData v4 mock (simulated; not connected to SAP)** (`/v1/erp/sap-odata/{metadata,ServiceOrders,ServiceOrders/inbound-ack}`¹) + **3-System fan-out mock (simulated)** across mock SAP FI-CA/IS-U, e-Urja CIS Billing, and GUVNL 1912 Grievance CRM via `POST /v1/erp/gateway/propagate/{request_id}` (`applicant_fields_retyped = 0`) and in-repo simulated **Master Data Reconciliation** (`GET /v1/erp/reconcile` & `POST /v1/erp/reconcile/{request_id}`).
 2. **Cloud-to-Edge IT Infrastructure & Vendor-Sourced BOM (`docs/INFRASTRUCTURE.md`, `docs/INFRASTRUCTURE_BOM_SOURCES.md` & `docs/INFRASTRUCTURE_ROADMAP.md`)**:
    - **Substation Edge**: **500× Industrial Raspberry Pi 4 (`BRD-RPi4`) + Quectel EC200U-CN Dual-SIM 4G LTE module (`027-EC200UCNAA`, `₹980` ex-GST) + RS-485 DLMS bridge (`₹8,000/unit = ₹40.00 Lakh`)** + IP65 Android field handhelds running offline IndexedDB `client_uuid` sync (`POST /v1/requests/field-sync`).
    - **Network & Cloud**: Primary **BSNL/GFGNL MPLS L3VPN** + **FortiGate 60F SD-WAN failover**, 4-VLAN Zero-Trust segmentation, **Dell EMC PowerEdge R650xs** NVMe RAID-10 PostgreSQL 16 HA clusters, and costed 3-tier rollout (`₹14.80 Lakh` Subdivision · `₹1.18 Crore` Circle HA · `₹7.45 Crore` Full DISCOM).
@@ -25,7 +25,7 @@
    - `billing_anomaly_model.joblib`: `IsolationForest` + GERC RGPU slab verifier — **`0.9511` accuracy · `1.000` anomaly recall** (`POST /v1/assistant/billing-anomaly`)
    - `feeder_load_model.joblib`: `GradientBoostingRegressor` 24h 11kV feeder/DTR kVA forecast — **`R² = 0.9790` · `MAE = 8.89 kVA`** (`GET /v1/assistant/load-forecast`)
    - Plus offline `TF-IDF` policy RAG + live zone-breach SQL Q&A (`/v1/assistant/chat`) + optional `3,500ms`-bounded server-side `Gemini` (`/api/ai-chat`), strictly governed by human-only officer approvals (`models_can_approve_or_reject = False`).
-5. **Defense-in-Depth Cybersecurity (`docs/SECURITY.md` & `SECURITY.md`)**:
+5. **Application-Layer Security + Backup Script (Infra Hardening Out of Scope) (`docs/SECURITY.md` & `SECURITY.md`)**:
    - Zero `localStorage` tokens (`HttpOnly; SameSite=Lax` cookies + verified in-memory bridge), **HKDF-SHA256 + AES-256-GCM** field (`encrypt_field_aes256`) & KYC document vault (`VFENC1`) encryption at rest, `100%` parameterized ORM SQLi defense, XSS sanitization, `CSP`/`HSTS`/`X-Frame-Options: DENY`, fork-proof SHA-256 `AuditLog` hash chain, **ArcSight/Wazuh `CEF:0` SIEM export** (`/v1/system/siem-events`), and live crypto posture check (`/v1/system/security-posture`).
 
 ---
@@ -38,7 +38,7 @@
 │   ├── app/
 │   │   ├── assistant/                    # Local TF-IDF policy RAG + live zone-breach SQL Q&A
 │   │   ├── ml/                           # 5 scikit-learn models, unseen-template holdout & AI governance
-│   │   ├── routers/                      # auth, requests, workflows, staff, erp (SAP OData + 3-system gateway), assistant, notifications, system (SIEM + DR + security)
+│   │   ├── routers/                      # auth, requests, workflows, staff, erp (SAP-shaped OData v4 mock + 3-System fan-out mock (simulated)), assistant, notifications, system (SIEM + DR + security)
 │   │   ├── audit.py                      # Serialized fork-proof SHA-256 hash chain (AuditChainHead)
 │   │   ├── security.py                   # bcrypt, JWT, HKDF-SHA256 + AES-256-GCM field cipher & XSS sanitizer
 │   │   ├── uploads.py                    # %PDF-/PNG/JPEG/UTF-8 magic-byte check + always-on VFENC1 AES-256-GCM vault (uploads_encrypted/)
