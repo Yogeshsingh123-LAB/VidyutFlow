@@ -99,16 +99,16 @@ def build():
     ], size=16)
     notes(s, "Always state clearly in viva: the ERP gateway is OData v4-compatible and runs against a deterministic simulated in-repo target today — ready for UGVCL sandbox credentials, never claimed as live-integrated.")
 
-    # 4 Cloud-to-Edge IT Infrastructure
+    # 4 Cloud-to-Edge IT Infrastructure (Costed Reference Proposal)
     s = prs.slides.add_slide(blank); style_slide(s)
-    add_title(s, "Cloud-to-edge IT infrastructure & costed BOM")
+    add_title(s, "Cloud-to-edge IT infrastructure (costed reference proposal)")
     img = os.path.join(ASSETS, "architecture.png")
     if os.path.exists(img):
         s.shapes.add_picture(img, Inches(1.2), Inches(1.3), width=Inches(9.6))
     add_body(s, [
-        ("Substation Edge: 500× RPi4 + Quectel EC200U-CN Dual-SIM 4G (₹8,000 × 500 = ₹40L) · MPLS + FortiGate 60F SD-WAN · Tiers: ₹14.80L / ₹1.18Cr / ₹7.45Cr", ACCENT, True, 0),
+        ("Costed 3-tier reference plan: 500× RPi4 + Quectel EC200U-CN 4G (₹8,000 × 500 = ₹40L) · MPLS + FortiGate 60F SD-WAN · ₹14.80L / ₹1.18Cr / ₹7.45Cr", ACCENT, True, 0),
     ], top=6.35, size=13)
-    notes(s, "Vendor SKUs and datasheets documented in docs/INFRASTRUCTURE_BOM_SOURCES.md (Element14, Evelta, Dell R650xs, FortiGate 60F).")
+    notes(s, "Present strictly as a costed hardware & network reference proposal backed by vendor SKUs/datasheets in docs/INFRASTRUCTURE_BOM_SOURCES.md.")
 
     # 5 Live Multi-Portal & Offline Sync Demo
     s = prs.slides.add_slide(blank); style_slide(s)
@@ -122,18 +122,18 @@ def build():
     ], size=16)
     notes(s, "Demo airplane mode -> queue field inspection -> reconnect -> sync twice -> prove idempotency.")
 
-    # 6 Live Cold-Start <60s DR Failover Proof
+    # 6 Automated Backup, SHA-256 Checksum & Restore Drill
     s = prs.slides.add_slide(blank); style_slide(s)
-    add_title(s, "Cold-start <60s primary → hot-standby DR failover")
+    add_title(s, "Automated backup, SHA-256 verify & local restore drill")
     add_body(s, [
-        ("Live API (POST /v1/system/dr-failover-drill) & cold-start script (cold_start_dr_proof.py)", FG, True, 0),
+        ("Live backup & restore verification (POST /v1/system/dr-failover-drill & cold_start_dr_proof.py)", FG, True, 0),
         ("", FG, False, 0),
-        ("1 · Boot fresh DB & submit live citizen request (zero manual container pre-setup)", FG, False, 0),
-        ("2 · Replicate SHA-256 checksummed snapshot to isolated hot-standby vault", FG, False, 0),
-        ("3 · Destroy primary DB → verify SHA-256 → promote standby → PRAGMA integrity_check = ok", FG, False, 0),
-        ("Measured local SQLite RTO: ~3.5 ms (< 60s target) · 0 records lost", ACCENT, True, 0),
+        ("1 · Boot fresh SQLite DB & submit live citizen request", FG, False, 0),
+        ("2 · Write SHA-256 checksummed snapshot & reject 1-byte tampered copies (restore_drill.sh)", FG, False, 0),
+        ("3 · Wipe primary SQLite file → verify SHA-256 → restore snapshot → PRAGMA integrity_check = ok", FG, False, 0),
+        ("0 records lost in local restore drill · Multi-node PostgreSQL 16 streaming HA is Circle/DISCOM tier", ACCENT, True, 0),
     ], size=16)
-    notes(s, "Evidence in docs/verification/r4-cold-start-dr-proof.txt and r4-dr-failover-drill.txt.")
+    notes(s, "Call this what it is: a verified backup, tamper-rejection, and local SQLite restore drill — NOT multi-server HA failover (PostgreSQL 16 streaming HA is Tier 2/3 in INFRASTRUCTURE_ROADMAP.md).")
 
     # 7 5-Model Predictive AI Suite
     s = prs.slides.add_slide(blank); style_slide(s)
@@ -186,17 +186,17 @@ def build():
     ], top=5.65, size=13)
     notes(s, "Reproduce anytime via `make train`. Rolling runtime p50/p95/p99 latency is exposed live on GET /v1/system/performance.")
 
-    # 11 QA Coverage & Phased UGVCL Rollout
+    # 11 End-to-End Behavioral Verification & Phased UGVCL Rollout
     s = prs.slides.add_slide(blank); style_slide(s)
-    add_title(s, "100% API test coverage & phased UGVCL rollout")
+    add_title(s, "Behavioral API verification & phased UGVCL rollout")
     add_body(s, [
-        ("124 backend pytest tests · 55 / 55 (100%) OpenAPI HTTP operations tested · 38 frontend test suites", ACCENT, True, 0),
+        ("End-to-end behavioral pytest coverage across all 55 / 55 OpenAPI operations (124 repeatable tests)", ACCENT, True, 0),
         ("", FG, False, 0),
         ("Phase 1 — 1 Subdivision Pilot (₹14.80 Lakh): UGVCL sandbox OData credentials + governed historical ML retrain", FG, False, 0),
         ("Phase 2 — 1 Circle HA Deployment (₹1.18 Crore): PostgreSQL 16 streaming HA + 60 substation edge gateways", FG, False, 0),
         ("Phase 3 — Full DISCOM Scale-Out (₹7.45 Crore): 4 Circles, 500× RPi4 4G edge nodes, active-passive DC/DR", FG, False, 0),
     ], size=15)
-    notes(s, "CI template at docs/ci.yml mirrors `make coverage`, `make train`, `make dr-proof`, and `make build`.")
+    notes(s, "Emphasize behavioral end-to-end tests (submit -> validate -> triage -> route -> offline sync -> approve -> hash-chain audit) rather than raw check counts.")
 
     # 12 Team & Ownership
     s = prs.slides.add_slide(blank); style_slide(s)
