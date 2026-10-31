@@ -136,6 +136,30 @@ import {
   DuplicateSubmissionGuard
 } from '../utils/securityHardening';
 
+function calculateComplaintSlaDueTime(filedAt: string, slaTargetHours: number): string | null {
+  const filedAtDate = parseDateSafe(filedAt);
+  if (!filedAtDate || !Number.isFinite(slaTargetHours) || slaTargetHours <= 0) return null;
+  return formatErpDateTime(
+    new Date(filedAtDate.getTime() + slaTargetHours * 60 * 60 * 1000),
+    ''
+  ) || null;
+}
+
+function normalizeComplaintSlaDeadline(complaint: ComplaintRecord): ComplaintRecord {
+  // New complaints are account-linked. Correct deadlines saved by older builds,
+  // which used a fixed timestamp unrelated to the selected priority.
+  if (!complaint.accountId) return complaint;
+  const expectedDueAt = calculateComplaintSlaDueTime(complaint.filedAt, complaint.slaTargetHours);
+  if (!expectedDueAt) return complaint;
+
+  const currentDueDate = parseDateSafe(complaint.slaDueTime);
+  const expectedDueDate = parseDateSafe(expectedDueAt);
+  if (currentDueDate && expectedDueDate && Math.abs(currentDueDate.getTime() - expectedDueDate.getTime()) < 60_000) {
+    return complaint;
+  }
+  return { ...complaint, slaDueTime: expectedDueAt };
+}
+
 export type { ActiveUserIdentity, AuthMode, OperatingDataMode };
 export { getInitialsFromName };
 
@@ -1272,7 +1296,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'CMP-',
       8831,
       4
-    )
+    ).map(normalizeComplaintSlaDeadline)
   );
 
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>(() =>
@@ -4794,6 +4818,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
     const prio = data.priority || 'High';
     const slaHours = prio === 'Critical' ? 4 : prio === 'High' ? 12 : 24;
+    const filedAtDate = new Date();
+    const filedAt = formatErpDateTime(filedAtDate);
+    const slaDueTime = calculateComplaintSlaDueTime(filedAt, slaHours) || '';
 
     const currentUserId = demoSession?.user.id || 'anonymous';
     const currentUserName = demoSession?.user.name || data.consumerName || 'Citizen Consumer';
@@ -4810,14 +4837,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'Registered',
       subdivision: data.subdivision || 'Mehsana City North',
       feederName: data.feederName || 'Local Feeder',
-      filedAt: '15-Oct-2026 06:19',
+      filedAt,
       slaTargetHours: slaHours,
-      slaDueTime: '15-Oct-2026 18:19',
+      slaDueTime,
       slaBreached: false,
       accountId: currentUserId,
       timeline: [
         {
-          time: '15-Oct 06:19',
+          time: filedAt,
           stage: 'Registered',
           actor: 'Consumer Portal',
           remark: 'Grievance ticket registered. Assigned to sub-divisional service desk.'
