@@ -18,33 +18,43 @@
 
 ## 2. Architecture & PS000125 Coverage Matrix
 
-```text
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│  React 19 + TypeScript + Tailwind 4 (5 Role Portals · en/gu/hi/mr · Lazy Chunks) │
-│  • Consumer Wizard & Saved Premises  • Officer Queue & ERP Console               │
-│  • Field Engineer Offline IndexedDB  • Executive AI, Billing & 24h kVA Forecast  │
-│  • Admin Staff/Zone/Template Studio, Latency Percentiles & SIEM Security Stream  │
-└───────────────────────────────────────┬──────────────────────────────────────────┘
-                                        │  Same-origin /api & /api/v1
-                                        │  HttpOnly SameSite=Strict Cookie + Verified Bearer
-                                        ▼
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│  FastAPI Control Plane & Non-Invasive ERP Gateway (50 Paths / 55 Operations)     │
-│  • Configurable Workflow & Least-Loaded Zone Auto-Routing (workflow.py)          │
-│  • 5-Model scikit-learn Suite + Local TF-IDF Policy RAG + Optional Gemini Bridge │
-│  • 3-System ERP Gateway Fan-Out (SAP FI-CA/IS-U + e-Urja Billing + 1912 CRM)     │
-│  • Master Data Reconciliation Engine + SAP S/4HANA IS-U OData v4 Inbound/Outbound│
-│  • HKDF-SHA256 + AES-256-GCM Field & Vault Encryption + SHA-256 Audit + SIEM CEF │
-└───────────────────────────────────────┬──────────────────────────────────────────┘
-                                        ▼
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│  SQLAlchemy ORM (SQLite Demo / PostgreSQL 16 Production) + Automated DR Suite    │
-│  • backup.sh + offsite_replicate.sh (SHA-256 post-copy vault check)              │
-│  • restore_drill.sh (1-byte tamper rejection) + dr_failover_drill.py (0 loss)    │
-└──────────────────────────────────────────────────────────────────────────────────┘
+VidyutFlow has three main parts: user portals, a shared API service, and persistent data. Field staff can work offline and sync updates when the connection returns.
+
+```mermaid
+flowchart LR
+    USERS["Consumers · Officers · Field staff · Admins"] --> PORTAL["VidyutFlow portals<br/>React + TypeScript"]
+    PORTAL -->|"/api and /api/v1"| API["FastAPI service"]
+    PORTAL -. "Offline field updates" .-> QUEUE["On-device queue"]
+    QUEUE -->|"Reconnect and sync"| API
+    API --> WORK["Request workflows<br/>Validate · Prioritize · Route · Track"]
+    API --> SUPPORT["Decision support<br/>5 ML models · Policy assistant"]
+    API --> ERP["ERP gateway<br/>Sandbox connectors"]
+    WORK --> DATA[("SQLite demo / PostgreSQL")]
+    SUPPORT --> DATA
+    ERP --> DATA
 ```
 
-Full 12-area mapping to official `PS000125` requirements: [`docs/REQUIREMENT_MAPPING.md`](docs/REQUIREMENT_MAPPING.md).
+| Project part | Purpose |
+| :--- | :--- |
+| **Portals** | Five role-based workspaces for consumers, subdivision officers, field engineers, management, and system admins. |
+| **FastAPI service** | Shared API for authentication, request workflows, analytics, alerts, and integration endpoints. |
+| **Field sync** | Queues field updates offline and safely applies each update once after reconnection. |
+| **Decision support** | ML models and the policy assistant provide information to staff; authorized officers make final decisions. |
+| **Data and recovery** | SQLite supports local demos; PostgreSQL is available for deployment. Backup and restore tools support recovery. |
+
+### PS000125 coverage at a glance
+
+| PS000125 need | VidyutFlow response | Status |
+| :--- | :--- | :---: |
+| Reduce repeated entry and manual handoffs | Shared request records, automated validation, routing, and assignment. | **Built** |
+| Provide an integrated ERP and portal experience | Five role-based portals and API-based ERP gateway; external connectors use sandbox endpoints unless UGVCL systems are configured. | **Partly built** |
+| Improve security and accountability | Role-scoped access, encrypted document storage, audit chain, and SIEM event export. | **Built** |
+| Support field work with limited connectivity | Offline field queue with authenticated, duplicate-safe sync. | **Built** |
+| Give staff timely operational information | Dashboards, analytics, alerts, and SLA risk views. Some external alert channels are simulated. | **Partly built** |
+| Modernize infrastructure and disaster recovery | Backup, replication, and restore tooling are included; larger deployment infrastructure is documented as a proposal. | **Partly built** |
+| Enable AI and future integration | Five advisory models, policy assistant, and versioned APIs; model outputs do not approve or reject requests. | **Built** |
+
+**Status guide:** *Built* means available in this project. *Partly built* means the project includes a working component, while external integration or production rollout remains. See the [full PS000125 mapping and evidence](docs/REQUIREMENT_MAPPING.md).
 
 ---
 
