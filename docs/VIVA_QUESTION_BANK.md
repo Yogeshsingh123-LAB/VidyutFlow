@@ -44,7 +44,7 @@
 ### Level 4 — Judge Traps
 16. **"UGVCL already owns SAP and e-Urja. Why use your app?"** — Never replaces them (`replaces_existing_erp: false`). Sits in front as a workflow & orchestration layer: `/v1/erp/gateway/propagate/{id}` maps 1 approved request into SAP IS-U, e-Urja billing, and 1912 CRM payloads (`0` re-typed fields), and `/v1/erp/reconcile` detects master-data drift.
 17. **"Is your SAP gateway connected to real SAP?"** — No (`is_simulated: true` on every response). It implements OData v4 shape (`$metadata`, `ServiceOrders`, `inbound-ack`) against an in-repo simulated target so UGVCL sandbox credentials can plug in during a pilot. Always say **"OData v4-compatible, simulated"**, never *"integrated"*.
-18. **"What happens at 100,000 requests/day?"** — Today it is a single FastAPI service with process-local login throttling (`20/60s/IP`) and synchronous SQLite/PostgreSQL writes. High-throughput scale-out (PostgreSQL HA, Redis shared rate-limiting, async worker queue, multiple pods) is our Tier 2/3 roadmap.
+18. **"What happens at 100,000 requests/day?"** — Today it is a single FastAPI service (`login_limit.py` uses Redis `INCR` + `TTL` when `REDIS_URL` is configured, as in Docker Compose, with an in-memory fallback — tested with a fake Redis client rather than a live Redis server) and synchronous SQLite/PostgreSQL writes. High-throughput scale-out (PostgreSQL HA, live Redis cluster load-testing, async worker queue, multiple pods) is our Tier 2/3 roadmap.
 
 ---
 
@@ -97,7 +97,7 @@
 
 ### Level 1 & 2 — Controls & Code Walkthrough
 1. **Passwords & production secret guard?** — `bcrypt` (72-byte bounded) on FastAPI; `scryptSync` + `timingSafeEqual` on Node. `config.py` refuses production boot if `SECRET_KEY` is `<32` chars or starts with `dev-only`/`change-me`/`replace-with`/`your-`, and `main.py` refuses production boot if demo accounts exist.
-2. **HTTP security headers (`main.py:L229`)?** — `Content-Security-Policy` (`default-src 'self'; frame-ancestors 'none'; base-uri 'self'`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, and `Strict-Transport-Security` in production.
+2. **HTTP security headers (`main.py:L229` & `prodServer.ts:L44`)?** — `Content-Security-Policy` (`default-src 'self'; frame-ancestors 'none'; base-uri 'self'` on FastAPI; `prodServer.ts` sets CSP on HTML/static responses with `'unsafe-inline'` allowed for the theme bootstrap script and styles — nonce-based CSP is a production hardening step), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, and `Strict-Transport-Security` in production.
 3. **Upload pipeline (`uploads.py`)?** — `sanitize_uploaded_filename()` (`L79`) → `64 KiB` streaming `5 MiB` cap (`413`) + non-empty check → `validate_magic_bytes()` (`L28`: `%PDF-`, PNG, JPEG, valid UTF-8 `.txt` with no null/binary headers) → `encrypt_upload_at_rest()` (`L182`: HKDF-SHA256 per-file key + AES-256-GCM 12-byte nonce + filename bound as AAD + `VFENC1` header) → always written to `uploads_encrypted/` (`settings.upload_vault_dir`).
 4. **Audit hash chain (`audit.py`)?** — Starts from `prev_hash = ""` (empty string), increments `UNIQUE` `chain_seq` under `AuditChainHead` lock (`SELECT ... FOR UPDATE` on Postgres + process lock), and `GET /v1/requests/audit/verify` (`verify_chain`, `L178`) recomputes every SHA-256 digest. SIEM export at `/v1/system/siem-events?format=cef`.
 5. **Why are all 124 `pytest` tests repeatable?** — `tests/conftest.py` deletes stale `test_vidyutflow.db*` before collection, at `pytest_sessionstart`, and after `engine.dispose()` at `pytest_sessionfinish`, and isolates `upload_vault_dir` in `tmp_path_factory`.
@@ -105,7 +105,7 @@
 ### Level 3 & 4 — Judge Traps
 6. **"`%PDF-` followed by `<script>` passes your upload check!"** — Correct: `validate_magic_bytes()` blocks extension spoofing (`MZ`/`ELF` disguised as `.pdf`), not polyglot malware. Uploaded bytes are stored encrypted (`VFENC1`) and never served raw over HTTP, plus `nosniff` + `CSP`; production adds a DMZ ClamAV/ICAP CDR scanner.
 7. **"Your DR drill swaps SQLite in `3.5 ms` — is that HA failover?"** — No: it is an **automated backup, SHA-256 verify, tamper-rejection (`restore_drill.sh`), and local SQLite restore drill** (`0` records lost). Multi-node PostgreSQL 16 streaming HA failover is Tier 2/3 (`INFRASTRUCTURE_ROADMAP.md`).
-8. **"What would a VAPT still flag?"** — Single `SECRET_KEY` shared across JWT signing and HKDF derivation (production separates via KMS), process-local login rate-limit (`20/60s/IP`), `SameSite=Lax` cookie + bearer bridge without separate CSRF token, and CI kept as `docs/ci.yml` template until copied via GitHub Web UI.
+8. **"What would a VAPT still flag?"** — Single `SECRET_KEY` shared across JWT signing and HKDF derivation (production separates via KMS), Redis login limiter tested with a fake Redis client rather than a live Redis server (and Node `/api/ai-chat` rate-limiting + sessions remain in-memory), `prodServer.ts` HTML CSP allowing `'unsafe-inline'` rather than per-request nonces, `SameSite=Lax` cookie + bearer bridge without separate CSRF token, and CI kept as `docs/ci.yml` template until copied via GitHub Web UI.
 
 ---
 
