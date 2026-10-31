@@ -23,10 +23,10 @@ FastAPI Control Plane & Non-Invasive Enterprise API Gateway (50 Paths / 55 HTTP 
  │    1. Category Classifier (0.8824 acc)       2. Severity + Safety Guardrail (100% CRITICAL recall)
  │    3. SLA Breach Risk RF (0.8913 recall)     4. Billing Anomaly IsolationForest (0.9511 acc / 1.00 recall)
  │    5. 24h Feeder/DTR Load GBR (R² = 0.9790)  + Local TF-IDF Policy RAG (/v1/assistant/chat)
- ├─ Heterogeneous ERP Gateway ("Enter Once, Propagate Everywhere"):
- │    ├─ SAP S/4HANA FI-CA & IS-U OData v4 (/v1/erp/sap-odata/* — AUFNR + VKONT + inbound-ack)
- │    ├─ Multi-System Fan-Out (/v1/erp/gateway/propagate/{id} → SAP + e-Urja Billing + 1912 CRM)
- │    └─ Master Data Reconciliation (/v1/erp/reconcile — drift detection & 1-click sync)
+ ├─ ERP integration (simulated) ("Enter Once, Propagate Everywhere"):
+ │    ├─ SAP-shaped OData v4 mock (simulated; not connected to SAP) (/v1/erp/sap-odata/* — AUFNR + VKONT + inbound-ack)
+ │    ├─ 3-System fan-out mock (simulated) (/v1/erp/gateway/propagate/{id} → mock SAP + e-Urja Billing + 1912 CRM)
+ │    └─ Simulated Master Data Reconciliation (/v1/erp/reconcile — in-repo drift check & 1-click sync)
  └─ Edge Offline Sync & Live Hot-Standby DR:
       ├─ Idempotent Field Sync (POST /v1/requests/field-sync — client_uuid UNIQUE)
       └─ Automated Primary → Hot-Standby Failover Drill (POST /v1/system/dr-failover-drill — <1s RTO, 0 loss)

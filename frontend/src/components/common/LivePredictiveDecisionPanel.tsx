@@ -63,8 +63,8 @@ export const PREDICTIVE_PANEL_TRANSLATIONS: Record<
   en: {
     headerTitle: 'Trained Predictive Services: Billing Anomaly & 24h Feeder Load Forecast',
     headerSub:
-      'scikit-learn IsolationForest + GradientBoostingRegressor endpoints (/v1/assistant/*) paired with SAP IS-U OData v4 & SIEM CEF telemetry.',
-    modelBadge: '5 TRAINED SKLEARN MODELS · SYNTHETIC BENCHMARK',
+      'scikit-learn IsolationForest + GradientBoostingRegressor endpoints (/v1/assistant/*) paired with SAP-shaped OData v4 mock (simulated; not connected to SAP) & SIEM CEF telemetry.',
+    modelBadge: '5 TRAINED SKLEARN MODELS · SYNTHETIC HOLDOUT',
     billingTitle: '1. Billing Anomaly & GERC RGPU Slab Triage',
     billingSub: 'Flags abnormal kWh spikes, zero-read stuck meters, and tariff slab discrepancies before consumer dispute escalation.',
     btnSpikePreset: 'Preset: 4.5x Spike + Slab Error',
@@ -72,18 +72,18 @@ export const PREDICTIVE_PANEL_TRANSLATIONS: Record<
     btnAuditBill: 'Run IsolationForest Audit',
     loadTitle: '2. 24-Hour 11kV Feeder / DTR kVA Load Forecast',
     loadSub: 'Projects hourly kVA demand using zone capacity, ambient heat, and live pending new-connection kW sanctions.',
-    enterpriseStripTitle: 'Live Judge Verification: Multi-System ERP Fan-Out · <60s DR Kill-Switch Drill · Zone Breach AI · SIEM',
+    enterpriseStripTitle: 'Live Judge Verification: 3-System fan-out mock (simulated) · Local Backup & Restore Drill · Zone Breach AI · SIEM',
     btnBreachZone: 'Ask AI: Highest Breach-Risk Zone?',
-    btnSapOdata: 'Query SAP IS-U OData v4 Orders',
-    btnGatewayFanout: 'Propagate: SAP + Billing + 1912 CRM',
-    btnDrDrill: 'Live DR Drill: Kill DB & Failover',
+    btnSapOdata: 'Query SAP-shaped OData v4 mock (simulated)',
+    btnGatewayFanout: '3-System fan-out mock (simulated)',
+    btnDrDrill: 'Local Backup & Restore Drill',
     btnSiemStream: 'Inspect SIEM Hash-Chained Events',
   },
   gu: {
     headerTitle: 'ટ્રેન્ડ પ્રિડિક્ટિવ સેવાઓ: બિલિંગ વિસંગતતા અને 24-કલાક ફીડર લોડ પૂર્વાનુમાન',
     headerSub:
-      'scikit-learn IsolationForest + GradientBoostingRegressor (/v1/assistant/*) SAP IS-U OData v4 અને SIEM ટેલિમેટ્રી સાથે.',
-    modelBadge: '5 ટ્રેન્ડ SKLEARN મોડેલ્સ · સિન્થેટિક બેન્ચમાર્ક',
+      'scikit-learn IsolationForest + GradientBoostingRegressor (/v1/assistant/*) સિમ્યુલેટેડ SAP-આકાર OData v4 મોક (SAP સાથે જોડાયેલ નથી) અને SIEM ટેલિમેટ્રી સાથે.',
+    modelBadge: '5 ટ્રેન્ડ SKLEARN મોડેલ્સ · સિન્થેટિક હોલ્ડઆઉટ',
     billingTitle: '1. બિલિંગ વિસંગતતા અને GERC RGPU સ્લેબ ચકાસણી',
     billingSub: 'અસામાન્ય kWh ઉછાળા, શૂન્ય-રીડ મીટર અને ટેરિફ સ્લેબ તફાવતો શોધે છે.',
     btnSpikePreset: 'પ્રીસેટ: 4.5x ઉછાળો + સ્લેબ ભૂલ',
@@ -91,18 +91,18 @@ export const PREDICTIVE_PANEL_TRANSLATIONS: Record<
     btnAuditBill: 'IsolationForest ઓડિટ ચલાવો',
     loadTitle: '2. 24-કલાક 11kV ફીડર / DTR kVA લોડ પૂર્વાનુમાન',
     loadSub: 'ઝોન ક્ષમતા, તાપમાન અને પેન્ડિંગ નવા કનેક્શન લોડ પરથી કલાકદીઠ kVA માંગનો અંદાજ.',
-    enterpriseStripTitle: 'લાઈવ ચકાસણી: મલ્ટી-સિસ્ટમ ERP · DR ફેલઓવર ડ્રિલ · ઝોન બ્રીચ AI · SIEM સુરક્ષા સ્ટ્રીમ',
+    enterpriseStripTitle: 'લાઈવ ચકાસણી: 3-સિસ્ટમ ફેન-આઉટ મોક (સિમ્યુલેટેડ) · લોકલ બેકઅપ/રીસ્ટોર ડ્રિલ · ઝોન બ્રીચ AI · SIEM સ્ટ્રીમ',
     btnBreachZone: 'AI પૂછો: સૌથી વધુ જોખમી ઝોન?',
-    btnSapOdata: 'SAP IS-U OData v4 ઓર્ડર્સ જુઓ',
-    btnGatewayFanout: 'પ્રોપેગેટ: SAP + બિલિંગ + 1912 CRM',
-    btnDrDrill: 'લાઈવ DR ડ્રિલ: DB ફેલઓવર ચકાસો',
+    btnSapOdata: 'SAP-આકાર OData v4 મોક જુઓ (સિમ્યુલેટેડ)',
+    btnGatewayFanout: '3-સિસ્ટમ ફેન-આઉટ મોક (સિમ્યુલેટેડ)',
+    btnDrDrill: 'લોકલ બેકઅપ અને રીસ્ટોર ડ્રિલ',
     btnSiemStream: 'SIEM સુરક્ષા ઇવેન્ટ્સ તપાસો',
   },
   hi: {
     headerTitle: 'प्रशिक्षित प्रेडिक्टिव सेवाएँ: बिलिंग विसंगति व 24-घंटे फ़ीडर लोड पूर्वानुमान',
     headerSub:
-      'scikit-learn IsolationForest + GradientBoostingRegressor (/v1/assistant/*) SAP IS-U OData v4 और SIEM टेलीमेट्री के साथ।',
-    modelBadge: '5 प्रशिक्षित SKLEARN मॉडल · सिंथेटिक बेंचमार्क',
+      'scikit-learn IsolationForest + GradientBoostingRegressor (/v1/assistant/*) सिम्युलेटेड SAP-आकार OData v4 मॉक (SAP से असंबंधित) और SIEM टेलीमेट्री के साथ।',
+    modelBadge: '5 प्रशिक्षित SKLEARN मॉडल · सिंथेटिक होल्डआउट',
     billingTitle: '1. बिलिंग विसंगति व GERC RGPU स्लैब ऑडिट',
     billingSub: 'असामान्य kWh उछाल, शून्य-रीडिंग मीटर और टैरिफ़ स्लैब अंतर की तुरंत पहचान करता है।',
     btnSpikePreset: 'प्रीसेट: 4.5x उछाल + स्लैब त्रुटि',
@@ -110,18 +110,18 @@ export const PREDICTIVE_PANEL_TRANSLATIONS: Record<
     btnAuditBill: 'IsolationForest ऑडिट चलाएँ',
     loadTitle: '2. 24-घंटे 11kV फ़ीडर / DTR kVA लोड पूर्वानुमान',
     loadSub: 'ज़ोन क्षमता, तापमान और लंबित नए कनेक्शन kW लोड के आधार पर प्रति-घंटा kVA अनुमान।',
-    enterpriseStripTitle: 'लाइव सत्यापन: मल्टी-सिस्टम ERP · DR फ़ेलओवर ड्रिल · ज़ोन ब्रीच AI · SIEM सुरक्षा स्ट्रीम',
+    enterpriseStripTitle: 'लाइव सत्यापन: 3-सिस्टम फ़ैन-आउट मॉक (सिम्युलेटेड) · लोकल बैकअप/रीस्टोर ड्रिल · ज़ोन ब्रीच AI · SIEM स्ट्रीम',
     btnBreachZone: 'AI से पूछें: सर्वाधिक जोखिम वाला ज़ोन?',
-    btnSapOdata: 'SAP IS-U OData v4 ऑर्डर देखें',
-    btnGatewayFanout: 'प्रसारित करें: SAP + बिलिंग + 1912 CRM',
-    btnDrDrill: 'लाइव DR ड्रिल: DB फ़ेलओवर जाँचें',
+    btnSapOdata: 'SAP-आकार OData v4 मॉक देखें (सिम्युलेटेड)',
+    btnGatewayFanout: '3-सिस्टम फ़ैन-आउट मॉक (सिम्युलेटेड)',
+    btnDrDrill: 'लोकल बैकअप व रीस्टोर ड्रिल',
     btnSiemStream: 'SIEM सुरक्षा इवेंट जाँचें',
   },
   mr: {
     headerTitle: 'प्रशिक्षित प्रेडिक्टिव्ह सेवा: बिलिंग विसंगती व 24-तास फीडर लोड अंदाज',
     headerSub:
-      'scikit-learn IsolationForest + GradientBoostingRegressor (/v1/assistant/*) SAP IS-U OData v4 आणि SIEM टेलिमेट्रीसह.',
-    modelBadge: '5 प्रशिक्षित SKLEARN मॉडेल्स · सिंथेटिक बेंचमार्क',
+      'scikit-learn IsolationForest + GradientBoostingRegressor (/v1/assistant/*) सिम्युलेटेड SAP-आकार OData v4 मॉक (SAP शी न जोडलेले) आणि SIEM टेलिमेट्रीसह.',
+    modelBadge: '5 प्रशिक्षित SKLEARN मॉडेल्स · सिंथेटिक होल्डआउट',
     billingTitle: '1. बिलिंग विसंगती व GERC RGPU स्लॅब तपासणी',
     billingSub: 'असामान्य kWh वाढ, झिरो-रीड मीटर आणि टॅरिफ स्लॅब तफावत ओळखते.',
     btnSpikePreset: 'प्रीसेट: 4.5x वाढ + स्लॅब त्रुटी',
@@ -129,11 +129,11 @@ export const PREDICTIVE_PANEL_TRANSLATIONS: Record<
     btnAuditBill: 'IsolationForest ऑडिट चालवा',
     loadTitle: '2. 24-तास 11kV फीडर / DTR kVA लोड अंदाज',
     loadSub: 'झोन क्षमता, तापमान आणि प्रलंबित नवीन जोडणी kW भारावरून तासनिहाय kVA अंदाज.',
-    enterpriseStripTitle: 'लाइव्ह पडताळणी: मल्टी-सिस्टम ERP · DR फेलओव्हर ड्रिल · झोन ब्रीच AI · SIEM सुरक्षा स्ट्रीम',
+    enterpriseStripTitle: 'लाइव्ह पडताळणी: 3-सिस्टम फॅन-आउट मॉक (सिम्युलेटेड) · लोकल बॅकअप/रीस्टोर ड्रिल · झोन ब्रीच AI · SIEM स्ट्रीम',
     btnBreachZone: 'AI विचारा: सर्वाधिक जोखमीचा झोन?',
-    btnSapOdata: 'SAP IS-U OData v4 ऑर्डर्स पहा',
-    btnGatewayFanout: 'प्रसारित करा: SAP + बिलिंग + 1912 CRM',
-    btnDrDrill: 'लाइव्ह DR ड्रिल: DB फेलओव्हर तपासा',
+    btnSapOdata: 'SAP-आकार OData v4 मॉक पहा (सिम्युलेटेड)',
+    btnGatewayFanout: '3-सिस्टम फॅन-आउट मॉक (सिम्युलेटेड)',
+    btnDrDrill: 'लोकल बॅकअप व रीस्टोर ड्रिल',
     btnSiemStream: 'SIEM सुरक्षा इव्हेंट्स तपासा',
   },
 };
@@ -279,7 +279,7 @@ export const LivePredictiveDecisionPanel: React.FC = () => {
         );
         const top = res.value?.[0];
         setProbeOutput(
-          `[SAP S/4HANA IS-U OData v4 — SANDBOX] Orders=${res['@odata.count']} · Sample=${top ? `${top.AUFNR} (${top.WERKS_ZONE}, ${top.SYSTEM_STATUS})` : 'ready'}`,
+          `[SAP-shaped OData v4 mock (simulated; not connected to SAP)] Orders=${res['@odata.count']} · Sample=${top ? `${top.AUFNR} (${top.WERKS_ZONE}, ${top.SYSTEM_STATUS})` : 'ready'}`,
         );
       } else if (kind === 'fanout') {
         const rec = await fastApi<{ items: Array<{ request_id: string }> }>('/v1/erp/reconcile?top=5');
@@ -290,10 +290,10 @@ export const LivePredictiveDecisionPanel: React.FC = () => {
             jsonPayload('POST', {}),
           );
           setProbeOutput(
-            `[LIVE API GATEWAY FAN-OUT] Request ${reqId.slice(0, 8)} → Propagated=${prop.systems_propagated} systems (SAP FI-CA/IS-U + e-Urja Billing + 1912 CRM) · RetypedFields=${prop.applicant_fields_retyped}`,
+            `[3-System fan-out mock (simulated)] Request ${reqId.slice(0, 8)} → Propagated=${prop.systems_propagated} mock systems (SAP FI-CA/IS-U + e-Urja Billing + 1912 CRM) · RetypedFields=${prop.applicant_fields_retyped}`,
           );
         } else {
-          setProbeOutput('[LIVE API GATEWAY] Reconciler active · 0 drifted records.');
+          setProbeOutput('[ERP integration (simulated)] Reconciler active · 0 drifted mock records.');
         }
       } else if (kind === 'dr') {
         const dr = await fastApi<{ status: string; data_loss_records: number; rto_seconds: number; sqlite_integrity_check: string }>(
@@ -301,7 +301,7 @@ export const LivePredictiveDecisionPanel: React.FC = () => {
           jsonPayload('POST', {}),
         );
         setProbeOutput(
-          `[LIVE DR FAILOVER DRILL: ${dr.status}] Primary Killed → Hot-Standby Promoted · DataLoss=${dr.data_loss_records} records · RTO=${dr.rto_seconds}s (<60s SLA) · Integrity=${dr.sqlite_integrity_check}`,
+          `[LOCAL BACKUP & RESTORE DRILL: ${dr.status}] Local SQLite Snapshot Verified & Restored · DataLoss=${dr.data_loss_records} records · Elapsed=${dr.rto_seconds}s · Integrity=${dr.sqlite_integrity_check}`,
         );
       } else {
         const res = await fastApi<{ count: number; audit_chain_integrity: { valid: boolean; checked_entries: number } }>(
@@ -315,11 +315,11 @@ export const LivePredictiveDecisionPanel: React.FC = () => {
       if (kind === 'breach') {
         setProbeOutput('[OFFLINE DEMO PREVIEW] North zone has highest SLA-breach risk (avg 0.74): Elevated zone queue backlog + High requested load (>15 kW).');
       } else if (kind === 'sap') {
-        setProbeOutput('[SAP IS-U OData v4 — SANDBOX] /sap/opu/odata4/ugvcl/isu_srv_order/v4 · Entity=ISUServiceOrder · Bidirectional Inbound Ack Ready.');
+        setProbeOutput('[SAP-shaped OData v4 mock (simulated; not connected to SAP)] /v1/erp/sap-odata/ServiceOrders · Entity=ISUServiceOrder · is_simulated=true.');
       } else if (kind === 'fanout') {
-        setProbeOutput('[ENTER ONCE, PROPAGATE EVERYWHERE] 1 Record → SAP S/4HANA FI-CA/IS-U (AUFNR) + e-Urja CIS Billing + GUVNL 1912 CRM · 0 Re-typed Fields · Master Reconciled.');
+        setProbeOutput('[3-System fan-out mock (simulated)] 1 Record → Mock SAP FI-CA/IS-U + Mock e-Urja Billing + Mock 1912 CRM · 0 Re-typed Fields (is_simulated=true).');
       } else if (kind === 'dr') {
-        setProbeOutput('[DR FAILOVER DRILL PASS] Primary DB Killed → SHA-256 Verified Hot-Standby Promoted · Records Lost = 0 · RTO = 0.004s (<60s target) · PRAGMA integrity_check = ok.');
+        setProbeOutput('[LOCAL BACKUP & RESTORE DRILL] Local SQLite Snapshot SHA-256 Verified & Restored · Records Lost = 0 · PRAGMA integrity_check = ok (not geo-redundant HA).');
       } else {
         setProbeOutput('[SIEM CEF:0 STREAM PREVIEW] CEF:0|UGVCL|VidyutFlow|1.0|REQUEST_CREATED_WITH_DOC|enc=AES256GCM · SHA-256 Audit Chain Intact.');
       }

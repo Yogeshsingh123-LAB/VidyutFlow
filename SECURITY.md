@@ -4,7 +4,7 @@ Full STRIDE threat model, Zero-Trust VLAN segmentation, and cryptographic contro
 
 ## Scope
 
-VidyutFlow is an enterprise-ready utility orchestration & AI decision-support platform (`PS000125` — UGVCL) evaluated on leak-free synthetic datasets. It holds zero real UGVCL citizen PII in this repository.
+VidyutFlow is a working utility workflow & AI decision-support prototype (`PS000125` — UGVCL) evaluated on synthetic holdout datasets. It holds zero real UGVCL citizen PII in this repository, and infrastructure/network hardening is out of scope.
 
 ## Reporting a Vulnerability
 
@@ -13,7 +13,7 @@ Do **not** open a public issue for a suspected vulnerability. Contact the team l
 - reproduction steps (seeded demo accounts are listed in `README.md`),
 - security impact assessment.
 
-## Implemented Defense-in-Depth Controls
+## Implemented Application-Layer Security Controls (Infra Hardening Out of Scope)
 
 1. **Zero `localStorage` Tokens & Strict Session Isolation**:
    - `bcrypt` (72-byte bounded) + `scrypt` password hashing.
