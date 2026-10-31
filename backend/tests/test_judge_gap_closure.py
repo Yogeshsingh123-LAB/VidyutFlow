@@ -31,6 +31,9 @@ def test_ml_recall_and_predictive_decision_support_endpoints():
         assert m["sla_breach_predictor"]["breach_recall"] >= 0.85
         assert m["billing_anomaly_detector"]["anomaly_recall"] >= 0.90
         assert m["feeder_load_forecaster"]["r2_score"] >= 0.95
+        assert m["ood_field_benchmark"]["template_overlap_count"] == 0
+        assert m["ood_field_benchmark"]["category_accuracy"] >= 0.85
+        assert m["ood_field_benchmark"]["critical_safety_recall"] == 1.0
 
         # Normal bill check
         ok_bill = c.post(
@@ -199,6 +202,39 @@ def test_sap_odata_gateway_siem_export_encrypted_vault_and_dr_failover():
                 assert sec_json["encryption_at_rest"]["tamper_tag_rejection_verified"] is True
                 assert sec_json["application_defenses"]["xss_defense_verified"] is True
                 assert sec_json["audit_and_siem"]["hash_chain_valid"] is True
+
+                # Subdivision zone directory + Admin staff listing & duty status update (completing 55/55 op coverage)
+                zones_res = c.get("/v1/staff/zones", headers=officer)
+                assert zones_res.status_code == 200
+                assert any(z["code"] == "North" for z in zones_res.json()["items"])
+
+                assert c.get("/v1/staff/members", headers=officer).status_code == 403
+                members_res = c.get("/v1/staff/members", headers=admin)
+                assert members_res.status_code == 200
+                assert len(members_res.json()["items"]) >= 3
+
+                temp_staff = c.post(
+                    "/v1/staff/members",
+                    headers=admin,
+                    json={
+                        "email": "temp.je.south@vidyut.local",
+                        "name": "Temp South Junior Engineer",
+                        "role": "engineer",
+                        "zone": "South",
+                        "password": "TempPass@123",
+                        "is_active": True,
+                    },
+                )
+                assert temp_staff.status_code == 201
+                temp_uid = temp_staff.json()["id"]
+
+                patched_staff = c.patch(
+                    f"/v1/staff/members/{temp_uid}",
+                    headers=admin,
+                    json={"is_active": False, "claim_unassigned": False},
+                )
+                assert patched_staff.status_code == 200
+                assert patched_staff.json()["is_active"] is False
         finally:
             os.environ.pop("UPLOAD_VAULT_DIR", None)
 

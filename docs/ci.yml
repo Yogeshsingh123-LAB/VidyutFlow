@@ -19,8 +19,10 @@ jobs:
           cache: pip
       - name: Install backend dependencies
         run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
-      - name: Run backend test suite
-        run: cd backend && python -m pytest -q
+      - name: Run backend test suite & 55/55 OpenAPI coverage gate
+        run: cd backend && python scripts/audit_api_coverage.py
+      - name: Verify OOD GERC/CGRF NLP benchmark & cold-start DR failover proof
+        run: cd backend && python scripts/evaluate_realworld_benchmark.py && python scripts/cold_start_dr_proof.py
 
   frontend-tests-build:
     name: Frontend tests + build (make build)

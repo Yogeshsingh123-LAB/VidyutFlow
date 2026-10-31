@@ -56,7 +56,26 @@ async function run() {
   assert.ok(drillReport.includes('Status                         : PASS'), 'DR failover drill report PASSED');
   assert.ok(drillReport.includes('Records lost (replicated RPO)  : 0'), 'DR failover drill proved 0 records lost');
 
-  // 5. Ensure zero stale "Lite build" / "One working end-to-end" / "0.733" / "JWT in localStorage" across key docs
+  // 5. Verify OOD GERC/CGRF real-domain text eval, 100% (55/55) API coverage, Cold-Start DR proof & BOM sources
+  const oodEval = fs.readFileSync(path.join(repoRoot, 'docs/verification/r3-realworld-text-eval.txt'), 'utf8');
+  assert.ok(oodEval.includes('Synthetic Template Overlap: 0'), 'Zero overlap on OOD field benchmark');
+  assert.ok(oodEval.includes('Category Accuracy         : 0.9074'), 'OOD field benchmark >= 0.75 (0.9074)');
+
+  const apiCov = fs.readFileSync(path.join(repoRoot, 'docs/verification/r4-api-endpoint-coverage.txt'), 'utf8');
+  assert.ok(apiCov.includes('Operations Tested in Pytest: 55 / 55 (100.0%)'), '100% (55/55) OpenAPI operation coverage');
+
+  const coldDr = fs.readFileSync(path.join(repoRoot, 'docs/verification/r4-cold-start-dr-proof.txt'), 'utf8');
+  assert.ok(coldDr.includes('Data loss (records)             : 0'), 'Cold-start DR proof 0 data loss');
+
+  const bomSrc = fs.readFileSync(path.join(repoRoot, 'docs/INFRASTRUCTURE_BOM_SOURCES.md'), 'utf8');
+  assert.ok(bomSrc.includes('element14.com') && bomSrc.includes('evelta.com'), 'BOM sources cite Indian hardware distributors');
+
+  const vivaPlan = fs.readFileSync(path.join(repoRoot, 'docs/TEAM_COMMIT_AND_VIVA_PLAN.md'), 'utf8');
+  assert.ok(vivaPlan.includes('GradientBoostingRegressor'), 'Viva plan documents exact GBR hyperparameters');
+
+  // 6. Ensure zero stale "Lite build" / "simulated SAP" headline / "0.733" / "JWT in localStorage" across key docs
+  const readmeLower = fs.readFileSync(path.join(repoRoot, 'README.md'), 'utf8').toLowerCase();
+  assert.ok(!readmeLower.includes('simulated sap'), 'README.md headline must not call SAP gateway "simulated SAP"');
   for (const rel of [
     'README.md',
     'SECURITY.md',

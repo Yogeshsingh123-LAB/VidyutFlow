@@ -2774,7 +2774,7 @@
     },
     "/system/dr-failover-drill": {
       "post": {
-        "description": "Execute a live sandboxed Primary DB Kill -> Hot-Standby Replica Promotion drill (<60s RTO, 0 data loss).",
+        "description": "Execute a cold-start-ready live Primary DB Kill -> Hot-Standby Replica Promotion drill (<60s RTO, 0 data loss) using active DB rows.",
         "operationId": "execute_live_dr_failover_drill_system_dr_failover_drill_post",
         "responses": {
           "200": {

@@ -171,5 +171,14 @@
     "r2_score": 0.979,
     "mae_kva": 8.89,
     "test_size": 240
+  },
+  "ood_field_benchmark": {
+    "benchmark_id": "gerc-ugvcl-public-cgrf-colloquial-v1",
+    "sample_count": 54,
+    "template_overlap_count": 0,
+    "category_accuracy": 0.9074,
+    "category_macro_f1": 0.9013,
+    "severity_accuracy": 0.9815,
+    "critical_safety_recall": 1.0
   }
 }

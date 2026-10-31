@@ -149,11 +149,19 @@ def execute_live_dr_failover_drill(
     db: Session = Depends(get_db),
     u: User = Depends(require("admin")),
 ):
-    """Execute a live sandboxed Primary DB Kill -> Hot-Standby Replica Promotion drill (<60s RTO, 0 data loss)."""
+    """Execute a cold-start-ready live Primary DB Kill -> Hot-Standby Replica Promotion drill (<60s RTO, 0 data loss) using active DB rows."""
     from ..audit import audit
     from scripts.dr_failover_drill import run_failover_drill
 
-    drill = run_failover_drill()
+    live_reqs = [
+        (r.id, r.applicant_name, r.zone, r.status)
+        for r in db.query(ConnectionRequest).order_by(ConnectionRequest.created_at.desc()).limit(250).all()
+    ]
+    live_auds = [
+        (a.id, int(a.chain_seq or 0), a.action, a.entry_hash or "")
+        for a in db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(250).all()
+    ]
+    drill = run_failover_drill(live_requests=live_reqs, live_audits=live_auds)
     promo_ms = float(drill["measured_local_failover_ms"])
     rto_seconds = round(promo_ms / 1000.0, 4)
     audit(
@@ -162,7 +170,7 @@ def execute_live_dr_failover_drill(
         "DR_FAILOVER_DRILL_PASSED",
         "system",
         "hot_standby_replica",
-        f"loss={drill['data_loss_records']} rto_s={rto_seconds} integrity={drill['sqlite_integrity_check']}",
+        f"live_rows={drill['promoted_replica_requests']} loss={drill['data_loss_records']} rto_s={rto_seconds} integrity={drill['sqlite_integrity_check']}",
     )
     db.commit()
     return {
@@ -173,11 +181,11 @@ def execute_live_dr_failover_drill(
         "rto_sla_target_seconds": 60,
         "meets_60s_rto": rto_seconds < 60.0,
         "steps": [
-            "1. Seeded primary operational DB + hash-chained audit rows",
-            "2. Replicated SHA-256 verified snapshot to isolated hot-standby vault",
+            f"1. Captured {drill['primary_requests_before_outage']} live ConnectionRequest rows + {drill['promoted_replica_audit_entries']} AuditLog entries from active DB",
+            "2. Replicated SHA-256 verified snapshot to isolated hot-standby vault (zero external container dependencies)",
             "3. Simulated catastrophic outage by destroying primary DB file",
             f"4. Verified SHA-256 & promoted standby replica in {promo_ms} ms ({rto_seconds}s < 60s target)",
-            f"5. Confirmed PRAGMA integrity_check={drill['sqlite_integrity_check']} and {drill['data_loss_records']} records lost",
+            f"5. Confirmed PRAGMA integrity_check={drill['sqlite_integrity_check']}, latest='{drill['latest_recovered_applicant']}', and {drill['data_loss_records']} records lost",
         ],
     }
 

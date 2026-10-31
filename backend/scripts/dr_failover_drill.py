@@ -21,35 +21,44 @@ REPO_ROOT = BACKEND_DIR.parent
 OFFSITE_SCRIPT = BACKEND_DIR / "scripts" / "offsite_replicate.sh"
 
 
-def run_failover_drill() -> dict:
+def run_failover_drill(
+    live_requests: list[tuple[str, str, str, str]] | None = None,
+    live_audits: list[tuple[str, int, str, str]] | None = None,
+) -> dict:
     with tempfile.TemporaryDirectory(prefix="vidyut_dr_drill_") as tmp:
         tmp_path = Path(tmp)
         primary_db = tmp_path / "primary_vidyutflow.db"
         offsite_dir = tmp_path / "standby_replica_vault"
         promoted_db = tmp_path / "promoted_active_vidyutflow.db"
 
-        # 1. Populate realistic primary state
+        # 1. Populate primary state (uses live DB rows when invoked from cold-start/runtime API!)
         conn = sqlite3.connect(primary_db)
         conn.execute(
             "CREATE TABLE connection_requests (id TEXT PRIMARY KEY, applicant_name TEXT, zone TEXT, status TEXT)"
         )
         conn.execute(
-            "CREATE TABLE audit_logs (id INTEGER PRIMARY KEY, chain_seq INTEGER, action TEXT, entry_hash TEXT)"
+            "CREATE TABLE audit_logs (id TEXT PRIMARY KEY, chain_seq INTEGER, action TEXT, entry_hash TEXT)"
         )
-        sample_requests = [
-            ("req-dr-001", "Smt. Meenaben Patel", "North", "ASSIGNED"),
-            ("req-dr-002", "Arvindbhai Prajapati", "South", "FIELD_VERIFIED"),
-            ("req-dr-003", "GIDC Agro Cold Storage", "East", "IN_PROGRESS"),
-        ]
-        conn.executemany("INSERT INTO connection_requests VALUES (?, ?, ?, ?)", sample_requests)
-        conn.executemany(
-            "INSERT INTO audit_logs VALUES (?, ?, ?, ?)",
-            [
-                (1, 1, "REQUEST_CREATED", "a1b2c3d4" * 8),
-                (2, 2, "FIELD_SYNC", "e5f6a7b8" * 8),
-                (3, 3, "ERP_SYNC", "99887766" * 8),
-            ],
+        req_rows = (
+            live_requests
+            if live_requests is not None and len(live_requests) > 0
+            else [
+                ("req-dr-001", "Smt. Meenaben Patel", "North", "ASSIGNED"),
+                ("req-dr-002", "Arvindbhai Prajapati", "South", "FIELD_VERIFIED"),
+                ("req-dr-003", "GIDC Agro Cold Storage", "East", "IN_PROGRESS"),
+            ]
         )
+        aud_rows = (
+            live_audits
+            if live_audits is not None and len(live_audits) > 0
+            else [
+                ("aud-1", 1, "REQUEST_CREATED", "a1b2c3d4" * 8),
+                ("aud-2", 2, "FIELD_SYNC", "e5f6a7b8" * 8),
+                ("aud-3", 3, "ERP_SYNC", "99887766" * 8),
+            ]
+        )
+        conn.executemany("INSERT INTO connection_requests VALUES (?, ?, ?, ?)", req_rows)
+        conn.executemany("INSERT INTO audit_logs VALUES (?, ?, ?, ?)", aud_rows)
         conn.commit()
         conn.close()
 
@@ -98,18 +107,24 @@ def run_failover_drill() -> dict:
         integrity = promoted_conn.execute("PRAGMA integrity_check").fetchone()[0]
         req_count = promoted_conn.execute("SELECT COUNT(*) FROM connection_requests").fetchone()[0]
         audit_count = promoted_conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0]
+        latest_row = promoted_conn.execute(
+            "SELECT id, applicant_name FROM connection_requests LIMIT 1"
+        ).fetchone()
         promoted_conn.close()
         failover_ms = round((time.perf_counter() - t0) * 1000.0, 2)
 
         assert integrity == "ok"
-        assert req_count == 3 and audit_count == 3
+        assert req_count == len(req_rows) and audit_count == len(aud_rows)
 
         return {
             "status": "PASS",
-            "primary_requests_before_outage": 3,
+            "cold_start_self_contained": True,
+            "primary_requests_before_outage": len(req_rows),
             "promoted_replica_requests": req_count,
             "promoted_replica_audit_entries": audit_count,
-            "data_loss_records": 0,
+            "latest_recovered_request_id": latest_row[0] if latest_row else "",
+            "latest_recovered_applicant": latest_row[1] if latest_row else "",
+            "data_loss_records": len(req_rows) - req_count,
             "sqlite_integrity_check": integrity,
             "measured_local_failover_ms": failover_ms,
         }

@@ -1,0 +1,31 @@
+========================================================================
+VIDYUTFLOW OUT-OF-DISTRIBUTION FIELD TEXT BENCHMARK (GERC / CGRF / GUJ)
+========================================================================
+Benchmark ID              : gerc-ugvcl-public-cgrf-colloquial-v1
+Total Hand-Labeled Items  : 54 (9 per class across 6 classes)
+Synthetic Template Overlap: 0 (verified disjoint)
+Category Accuracy         : 0.9074 (49/54)
+Category Macro-F1         : 0.9013
+Severity Accuracy         : 0.9815
+CRITICAL Safety Recall    : 1.0 (9/9)
+
+Per-Class Category Report:
+                precision    recall  f1-score   support
+
+       BILLING     1.0000    1.0000    1.0000         9
+   METER_FAULT     0.8889    0.8889    0.8889         9
+NEW_CONNECTION     0.7500    1.0000    0.8571         9
+         OTHER     1.0000    0.5556    0.7143         9
+        OUTAGE     1.0000    1.0000    1.0000         9
+        SAFETY     0.9000    1.0000    0.9474         9
+
+      accuracy                         0.9074        54
+     macro avg     0.9231    0.9074    0.9013        54
+  weighted avg     0.9231    0.9074    0.9013        54
+
+Inspectable Boundary Misses:
+  - RW-31: true=METER_FAULT pred=NEW_CONNECTION | "Stolen three-phase energy meter from outdoor pillar box FIR attached need new meter installation"
+  - RW-49: true=OTHER pred=METER_FAULT | "Permanent disconnection PDC request and refund of security deposit as factory unit is vacated"
+  - RW-50: true=OTHER pred=NEW_CONNECTION | "Enhancement of sanctioned contracted load from 2 kW to 6 kW for residential AC installation"
+  - RW-52: true=OTHER pred=SAFETY | "Shifting of overhead service line obstructing balcony extension within private plot"
+  - RW-54: true=OTHER pred=NEW_CONNECTION | "General query regarding GERC tariff schedule documents required for agricultural category transfer"

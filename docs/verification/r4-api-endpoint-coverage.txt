@@ -1,0 +1,64 @@
+========================================================================
+VIDYUTFLOW OPENAPI HTTP ENDPOINT TEST COVERAGE AUDIT
+========================================================================
+OpenAPI Paths              : 50
+Total HTTP Operations      : 55
+Operations Tested in Pytest: 55 / 55 (100.0%)
+Untested Operations        : 0
+
+Verified Operations:
+  [COVERED] DELETE /auth/premises/{premise_id}
+  [COVERED] GET    /assistant/ai-governance
+  [COVERED] GET    /assistant/load-forecast
+  [COVERED] GET    /assistant/ml-metrics
+  [COVERED] GET    /auth/me
+  [COVERED] GET    /auth/premises
+  [COVERED] GET    /auth/sso/providers
+  [COVERED] GET    /auth/users
+  [COVERED] GET    /erp/logs
+  [COVERED] GET    /erp/mappings
+  [COVERED] GET    /erp/reconcile
+  [COVERED] GET    /erp/sap-odata/ServiceOrders
+  [COVERED] GET    /erp/sap-odata/metadata
+  [COVERED] GET    /health
+  [COVERED] GET    /notifications
+  [COVERED] GET    /notifications/alerts/dispatches
+  [COVERED] GET    /requests
+  [COVERED] GET    /requests/audit/logs
+  [COVERED] GET    /requests/audit/verify
+  [COVERED] GET    /requests/kpis/executive-analytics
+  [COVERED] GET    /requests/kpis/summary
+  [COVERED] GET    /requests/{request_id}
+  [COVERED] GET    /staff/members
+  [COVERED] GET    /staff/zones
+  [COVERED] GET    /system/demo-load-policy
+  [COVERED] GET    /system/performance
+  [COVERED] GET    /system/security-posture
+  [COVERED] GET    /system/siem-events
+  [COVERED] GET    /system/status
+  [COVERED] GET    /workflows/templates
+  [COVERED] PATCH  /requests/{request_id}/status
+  [COVERED] PATCH  /staff/members/{user_id}
+  [COVERED] PATCH  /workflows/templates/{template_code}
+  [COVERED] POST   /assistant/billing-anomaly
+  [COVERED] POST   /assistant/chat
+  [COVERED] POST   /auth/login
+  [COVERED] POST   /auth/logout
+  [COVERED] POST   /auth/premises
+  [COVERED] POST   /auth/register
+  [COVERED] POST   /auth/sso/login
+  [COVERED] POST   /erp/gateway/propagate/{request_id}
+  [COVERED] POST   /erp/logs/{log_id}/retry
+  [COVERED] POST   /erp/reconcile/{request_id}
+  [COVERED] POST   /erp/sap-odata/ServiceOrders/inbound-ack
+  [COVERED] POST   /erp/sync/{request_id}
+  [COVERED] POST   /notifications/alerts/evaluate
+  [COVERED] POST   /notifications/read-all
+  [COVERED] POST   /notifications/{notification_id}/read
+  [COVERED] POST   /requests
+  [COVERED] POST   /requests/field-sync
+  [COVERED] POST   /requests/with-document
+  [COVERED] POST   /staff/members
+  [COVERED] POST   /staff/zones
+  [COVERED] POST   /system/dr-failover-drill
+  [COVERED] POST   /workflows/templates

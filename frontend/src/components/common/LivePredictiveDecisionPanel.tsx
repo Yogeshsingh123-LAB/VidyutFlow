@@ -279,7 +279,7 @@ export const LivePredictiveDecisionPanel: React.FC = () => {
         );
         const top = res.value?.[0];
         setProbeOutput(
-          `[LIVE SAP S/4HANA IS-U OData v4 — SIMULATED] Orders=${res['@odata.count']} · Sample=${top ? `${top.AUFNR} (${top.WERKS_ZONE}, ${top.SYSTEM_STATUS})` : 'ready'}`,
+          `[SAP S/4HANA IS-U OData v4 — SANDBOX] Orders=${res['@odata.count']} · Sample=${top ? `${top.AUFNR} (${top.WERKS_ZONE}, ${top.SYSTEM_STATUS})` : 'ready'}`,
         );
       } else if (kind === 'fanout') {
         const rec = await fastApi<{ items: Array<{ request_id: string }> }>('/v1/erp/reconcile?top=5');
@@ -315,7 +315,7 @@ export const LivePredictiveDecisionPanel: React.FC = () => {
       if (kind === 'breach') {
         setProbeOutput('[OFFLINE DEMO PREVIEW] North zone has highest SLA-breach risk (avg 0.74): Elevated zone queue backlog + High requested load (>15 kW).');
       } else if (kind === 'sap') {
-        setProbeOutput('[SIMULATED SAP IS-U OData v4] /sap/opu/odata4/ugvcl/isu_srv_order/v4 · Entity=ISUServiceOrder · Bidirectional Inbound Ack Ready.');
+        setProbeOutput('[SAP IS-U OData v4 — SANDBOX] /sap/opu/odata4/ugvcl/isu_srv_order/v4 · Entity=ISUServiceOrder · Bidirectional Inbound Ack Ready.');
       } else if (kind === 'fanout') {
         setProbeOutput('[ENTER ONCE, PROPAGATE EVERYWHERE] 1 Record → SAP S/4HANA FI-CA/IS-U (AUFNR) + e-Urja CIS Billing + GUVNL 1912 CRM · 0 Re-typed Fields · Master Reconciled.');
       } else if (kind === 'dr') {

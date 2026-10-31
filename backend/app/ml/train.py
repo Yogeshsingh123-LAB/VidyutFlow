@@ -75,6 +75,7 @@ def train(out_dir="app/ml/models"):
     Xtr, Xte = [X[i] for i in train_idx], [X[i] for i in test_idx]
 
     cat_metrics = {}
+    trained_pipes = {}
     for target, name in [("category", "category"), ("severity", "severity")]:
         y = [r[target] for r in rows]
         ytr, yte = [y[i] for i in train_idx], [y[i] for i in test_idx]
@@ -86,6 +87,7 @@ def train(out_dir="app/ml/models"):
             ]
         )
         pipe.fit(Xtr, ytr)
+        trained_pipes[name] = pipe
         pred = pipe.predict(Xte)
         joblib.dump(pipe, f"{out_dir}/{name}_model.joblib")
         labels = sorted(set(y))
@@ -200,7 +202,48 @@ def train(out_dir="app/ml/models"):
             "test_size": len(yte_l),
         },
     }
-    with open(f"{out_dir}/metrics.json", "w") as fh:
+    from pathlib import Path
+    from .predict import SAFETY_CRITICAL_TERMS
+
+    bench_path = Path(__file__).resolve().parents[2] / "data" / "benchmarks" / "gerc_ugvcl_public_field_benchmark.json"
+    if bench_path.exists():
+        bench = json.loads(bench_path.read_text(encoding="utf-8"))
+        b_samples = bench["samples"]
+        synth_norm = {" ".join(r["text"].casefold().split()) for r in rows}
+        overlap_cnt = sum(
+            1 for s in b_samples if " ".join(s["text"].casefold().split()) in synth_norm
+        )
+        y_cat_b = [s["category"] for s in b_samples]
+        y_sev_b = [s["severity"] for s in b_samples]
+        p_cat_b, p_sev_b = [], []
+        for s in b_samples:
+            norm_txt = s["text"].casefold()
+            if any(term in norm_txt for term in SAFETY_CRITICAL_TERMS):
+                p_cat_b.append("SAFETY")
+                p_sev_b.append("CRITICAL")
+            else:
+                p_cat_b.append(str(trained_pipes["category"].predict([s["text"]])[0]))
+                p_sev_b.append(str(trained_pipes["severity"].predict([s["text"]])[0]))
+        crit_tot = sum(1 for y in y_sev_b if y == "CRITICAL")
+        crit_hit = sum(1 for yt, yp in zip(y_sev_b, p_sev_b) if yt == "CRITICAL" and yp == "CRITICAL")
+        metrics["ood_field_benchmark"] = {
+            "benchmark_id": bench["benchmark_id"],
+            "sample_count": len(b_samples),
+            "template_overlap_count": overlap_cnt,
+            "category_accuracy": round(
+                sum(1 for a, b in zip(y_cat_b, p_cat_b) if a == b) / len(b_samples), 4
+            ),
+            "category_macro_f1": round(
+                float(f1_score(y_cat_b, p_cat_b, average="macro", zero_division=0)), 4
+            ),
+            "severity_accuracy": round(
+                sum(1 for a, b in zip(y_sev_b, p_sev_b) if a == b) / len(b_samples), 4
+            ),
+            "critical_safety_recall": round(crit_hit / max(1, crit_tot), 4),
+        }
+
+    metrics_file = os.path.join(out_dir, "metrics.json")
+    with open(metrics_file, "w") as fh:
         json.dump(metrics, fh, indent=2)
     return metrics
 

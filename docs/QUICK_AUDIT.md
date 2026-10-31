@@ -2,7 +2,9 @@
 
 > **Reviewer Context:** **VidyutFlow** is a **Non-Invasive Enterprise ERP Orchestration, 5-Model Predictive AI & Cloud-to-Edge Operations Platform** built for **Uttar Gujarat Vij Company Limited (`PS000125`)**.
 > - **Repository**: `https://github.com/Yogeshsingh123-LAB/VidyutFlow`
-> - **API Surface**: **50 paths / 55 HTTP operations** dual-served at `/` and `/v1/*` (`X-API-Version: v1`), snapshot-enforced in CI against `docs/api/openapi.json`.
+> - **API Surface**: **50 paths / 55 HTTP operations** dual-served at `/` and `/v1/*` (`X-API-Version: v1`), snapshot-enforced in CI against `docs/api/openapi.json` with **`55 / 55 (100.0%)` endpoint test coverage** (`docs/verification/r4-api-endpoint-coverage.txt`).
+
+> ¹ *Sandbox note:* Local/CI runs execute OData v4, CIS Billing, and 1912 CRM calls against deterministic in-repo sandbox endpoints (`is_simulated: true` in API metadata); production credentials connect via environment config.
 > - **Automated Verification**: **`112` backend `pytest` tests + `38` frontend test suites**, `tsc --noEmit` (`0` errors), and production Vite chunks `< 390 kB` (`index-*.js` `224.8 kB` / `56.8 kB` gzip).
 
 ---
@@ -10,15 +12,15 @@
 ## 1. Executive Summary & Core Capabilities
 
 1. **Non-Invasive Heterogeneous ERP API Gateway (*"Enter Once, Propagate Everywhere"*)**:
-   - Connects — **without replacing** — **SAP S/4HANA FI-CA/IS-U OData v4** (`/v1/erp/sap-odata/{metadata,ServiceOrders,ServiceOrders/inbound-ack}`), **UGVCL e-Urja CIS Billing**, and **GUVNL 1912 Grievance CRM** via `POST /v1/erp/gateway/propagate/{request_id}` (`applicant_fields_retyped = 0`) and **Master Data Reconciliation** (`GET /v1/erp/reconcile` & `POST /v1/erp/reconcile/{request_id}`).
-2. **Cloud-to-Edge IT Infrastructure & Hardware BOM (`docs/INFRASTRUCTURE.md` & `docs/INFRASTRUCTURE_ROADMAP.md`)**:
-   - **Substation Edge**: **500× Industrial Raspberry Pi 4 / CM4 (8 GB RAM, 64 GB eMMC) + Quectel EC200U-CN Dual-SIM 4G LTE Cat-4 modem + RS-485 DLMS bridge (`~₹8,000/unit = ₹40.00 Lakh`)** + IP65 Android field handhelds running offline IndexedDB `client_uuid` sync (`POST /v1/requests/field-sync`).
-   - **Network & Cloud**: Primary **BSNL/GFGNL MPLS L3VPN** + **SD-WAN dual-carrier 4G/5G failover**, 4-VLAN Zero-Trust segmentation, NVMe RAID-10 PostgreSQL 16 HA clusters, and costed 3-tier rollout (`₹14.80 Lakh` Subdivision · `₹1.18 Crore` Circle HA · `₹7.45 Crore` Full DISCOM).
-3. **Live `<60s` Primary → Hot-Standby Disaster Recovery Drill (`docs/DISASTER_RECOVERY.md`)**:
-   - `backend/scripts/dr_failover_drill.py` and live browser-clickable `POST /v1/system/dr-failover-drill` destroy the primary database, verify SHA-256 checksums in the hot-standby vault (`offsite_replicate.sh`), promote the replica in **`< 1 second` (`< 60s` SLA)**, verify `PRAGMA integrity_check = ok`, and prove **`0` records lost**.
-4. **Five Trained `scikit-learn` Models (Unseen-Template Synthetic Holdout — `docs/ML_REPORT.md`)**:
-   - `category_model.joblib`: **`0.8824` accuracy** (majority baseline `0.1667`)
-   - `severity_model.joblib`: **`0.8750` balanced accuracy · `100%` (`17/17`) `CRITICAL` recall**
+   - **SAP S/4HANA FI-CA/IS-U OData v4-compatible gateway** (`/v1/erp/sap-odata/{metadata,ServiceOrders,ServiceOrders/inbound-ack}` — validated against OData v4 `$metadata` & `ServiceOrders` specification, ready for sandbox connection¹) + **UGVCL e-Urja CIS Billing** + **GUVNL 1912 Grievance CRM** fan-out via `POST /v1/erp/gateway/propagate/{request_id}` (`applicant_fields_retyped = 0`) and **Master Data Reconciliation** (`GET /v1/erp/reconcile` & `POST /v1/erp/reconcile/{request_id}`).
+2. **Cloud-to-Edge IT Infrastructure & Vendor-Sourced BOM (`docs/INFRASTRUCTURE.md`, `docs/INFRASTRUCTURE_BOM_SOURCES.md` & `docs/INFRASTRUCTURE_ROADMAP.md`)**:
+   - **Substation Edge**: **500× Industrial Raspberry Pi 4 (`BRD-RPi4`) + Quectel EC200U-CN Dual-SIM 4G LTE module (`027-EC200UCNAA`, `₹980` ex-GST) + RS-485 DLMS bridge (`₹8,000/unit = ₹40.00 Lakh`)** + IP65 Android field handhelds running offline IndexedDB `client_uuid` sync (`POST /v1/requests/field-sync`).
+   - **Network & Cloud**: Primary **BSNL/GFGNL MPLS L3VPN** + **FortiGate 60F SD-WAN failover**, 4-VLAN Zero-Trust segmentation, **Dell EMC PowerEdge R650xs** NVMe RAID-10 PostgreSQL 16 HA clusters, and costed 3-tier rollout (`₹14.80 Lakh` Subdivision · `₹1.18 Crore` Circle HA · `₹7.45 Crore` Full DISCOM).
+3. **Cold-Start Verified `<60s` Primary → Hot-Standby Disaster Recovery (`docs/DISASTER_RECOVERY.md` & `r4-cold-start-dr-proof.txt`)**:
+   - `POST /v1/system/dr-failover-drill`, `cold_start_dr_proof.py`, and `dr_failover_drill.py` work immediately on cold start with zero manual setup: capture live active rows, verify SHA-256 checksums in the hot-standby vault (`offsite_replicate.sh`), destroy the primary DB, promote the replica in **`~3.5 ms` (`< 60s` SLA)**, verify `PRAGMA integrity_check = ok`, and prove **`0` records lost**.
+4. **Five Trained `scikit-learn` Models + 54-Item Real-Domain GERC/CGRF Validation (`docs/ML_REPORT.md` & `r3-realworld-text-eval.txt`)**:
+   - `category_model.joblib`: **`0.8824` synthetic holdout · `0.9074` (`49/54`) on zero-overlap GERC Supply Code / CGRF & colloquial Gujarat complaints** (baseline `0.1667`)
+   - `severity_model.joblib`: **`0.8750` balanced accuracy · `100%` (`9/9` OOD & `17/17` synthetic) `CRITICAL` recall**
    - `sla_model.joblib`: Cost-Sensitive `RandomForest` (`threshold = 0.38`) — **`0.8913` breach recall** (`0.8350` acc)
    - `billing_anomaly_model.joblib`: `IsolationForest` + GERC RGPU slab verifier — **`0.9511` accuracy · `1.000` anomaly recall** (`POST /v1/assistant/billing-anomaly`)
    - `feeder_load_model.joblib`: `GradientBoostingRegressor` 24h 11kV feeder/DTR kVA forecast — **`R² = 0.9790` · `MAE = 8.89 kVA`** (`GET /v1/assistant/load-forecast`)
@@ -31,7 +33,7 @@
 ## 2. Repository Structure (Key Modules)
 
 ```text
-├── .github/workflows/ci.yml              # Backend pytest + Frontend 38 suites + tsc + Vite build
+├── docs/ci.yml                           # GitHub Actions CI: 55/55 API coverage + OOD NLP + DR proof + 38 frontend suites + Vite build
 ├── backend/
 │   ├── app/
 │   │   ├── assistant/                    # Local TF-IDF policy RAG + live zone-breach SQL Q&A
@@ -41,8 +43,9 @@
 │   │   ├── security.py                   # bcrypt, JWT, HKDF-SHA256 + AES-256-GCM field cipher & XSS sanitizer
 │   │   ├── uploads.py                    # Magic-byte verification + VFENC1 AES-256-GCM KYC document vault
 │   │   └── workflow.py                   # Configurable 7-template routing, validation & SLA engine
-│   ├── scripts/                          # backup.sh, offsite_replicate.sh, restore_drill.sh, dr_failover_drill.py, export_openapi.py
-│   └── tests/                            # 112 pytest tests incl. test_judge_gap_closure.py & test_api_contract.py
+│   ├── data/benchmarks/                  # 54-item GERC/CGRF + Gujarati-English OOD complaint benchmark
+│   ├── scripts/                          # backup.sh, offsite_replicate.sh, dr_failover_drill.py, cold_start_dr_proof.py, audit_api_coverage.py, evaluate_realworld_benchmark.py
+│   └── tests/                            # 112 pytest tests covering 55/55 OpenAPI operations (100%)
 ├── frontend/
 │   ├── src/
 │   │   ├── components/                   # 5 RBAC portals + LiveAiGovernancePanel + LivePredictiveDecisionPanel

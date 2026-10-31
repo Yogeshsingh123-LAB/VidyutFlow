@@ -18,9 +18,14 @@ All metrics are persisted in [`backend/app/ml/models/metrics.json`](../backend/a
 
 ---
 
-## 2. Why Template-Group Holdout Matters (Zero Data Leakage)
+## 2. Two-Stage Generalization Proof: Unseen Synthetic Holdout + 54-Item GERC/CGRF Real-Domain Benchmark
 
-Naive synthetic benchmarks split randomly across paraphrased rows generated from the same template list, producing artificial `0.99–1.00` scores via vocabulary memorization. In `backend/app/ml/train.py`, `GroupShuffleSplit` / explicit template-index holdout (`tpl_id == 8`) guarantees the test fold contains **only unseen phrasings** never observed during training.
+1. **Zero-Leakage Unseen-Template Holdout (`train.py`)**: Naive synthetic benchmarks split randomly across paraphrased rows generated from the same template list, producing artificial `0.99–1.00` scores via vocabulary memorization. In `backend/app/ml/train.py`, explicit template-index holdout (`tpl_id == 8`) guarantees the synthetic test fold contains **only unseen phrasings** never observed during training.
+2. **54-Item Out-of-Distribution GERC / UGVCL CGRF & Colloquial Gujarat Benchmark (`backend/data/benchmarks/gerc_ugvcl_public_field_benchmark.json`)**:
+   - Authored from public **GERC Supply Code 2015**, **GERC Standard of Performance clauses** (`Clause 4.10` burnt/creeping/stolen meters, `Clause 4.95` excess demand billing), **GERC Net Metering Regulations**, and colloquial North-Gujarat Hinglish / Gujarati-transliterated citizen complaints (zero private citizen PII; **`0` string overlap** with `synthetic.py`, enforced automatically by `backend/scripts/evaluate_realworld_benchmark.py`):
+   - **Category Accuracy**: **`0.9074` (`49 / 54`)** · **Macro-F1**: **`0.9013`**
+   - **Severity Accuracy**: **`0.9815` (`53 / 54`)** · **`CRITICAL` Life-Safety Recall**: **`1.0000` (`9 / 9`)**
+   - Full per-class table + all 5 boundary errors are published openly in [`docs/verification/r3-realworld-text-eval.txt`](verification/r3-realworld-text-eval.txt) and served via `ood_field_benchmark` in `GET /v1/assistant/ml-metrics`.
 
 Safety-critical keywords (`live wire`, `transformer fire`, `sparking`, `electric shock`, `electrocution`) additionally pass through a deterministic life-safety escalation rule in `predict.py` so life-safety reports can never be downgraded by probabilistic variance.
 
