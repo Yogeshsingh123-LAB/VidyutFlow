@@ -228,6 +228,7 @@ def train(out_dir="app/ml/models"):
         crit_hit = sum(1 for yt, yp in zip(y_sev_b, p_sev_b) if yt == "CRITICAL" and yp == "CRITICAL")
         metrics["ood_field_benchmark"] = {
             "benchmark_id": bench["benchmark_id"],
+            "labeling_provenance": "team-authored OOD sanity-check set (not independent utility data)",
             "sample_count": len(b_samples),
             "template_overlap_count": overlap_cnt,
             "category_accuracy": round(

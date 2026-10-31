@@ -18,8 +18,8 @@
    - **Network & Cloud**: Primary **BSNL/GFGNL MPLS L3VPN** + **FortiGate 60F SD-WAN failover**, 4-VLAN Zero-Trust segmentation, **Dell EMC PowerEdge R650xs** NVMe RAID-10 PostgreSQL 16 HA clusters, and costed 3-tier rollout (`₹14.80 Lakh` Subdivision · `₹1.18 Crore` Circle HA · `₹7.45 Crore` Full DISCOM).
 3. **Cold-Start Verified `<60s` Primary → Hot-Standby Disaster Recovery (`docs/DISASTER_RECOVERY.md` & `r4-cold-start-dr-proof.txt`)**:
    - `POST /v1/system/dr-failover-drill`, `cold_start_dr_proof.py`, and `dr_failover_drill.py` work immediately on cold start with zero manual setup: capture live active rows, verify SHA-256 checksums in the hot-standby vault (`offsite_replicate.sh`), destroy the primary DB, promote the replica in **`~3.5 ms` (`< 60s` SLA)**, verify `PRAGMA integrity_check = ok`, and prove **`0` records lost**.
-4. **Five Trained `scikit-learn` Models + 54-Item Real-Domain GERC/CGRF Validation (`docs/ML_REPORT.md` & `r3-realworld-text-eval.txt`)**:
-   - `category_model.joblib`: **`0.8824` synthetic holdout · `0.9074` (`49/54`) on zero-overlap GERC Supply Code / CGRF & colloquial Gujarat complaints** (baseline `0.1667`)
+4. **Five Trained `scikit-learn` Models + 54-Item Team-Authored OOD Sanity Check (`docs/ML_REPORT.md` & `r3-realworld-text-eval.txt`)**:
+   - `category_model.joblib`: **`0.8824` synthetic holdout · `0.9074` (`49/54`) on team-authored zero-overlap OOD sanity-check set** (grounded in public GERC/CGRF terminology; not independent utility data; baseline `0.1667`)
    - `severity_model.joblib`: **`0.8750` balanced accuracy · `100%` (`9/9` OOD & `17/17` synthetic) `CRITICAL` recall**
    - `sla_model.joblib`: Cost-Sensitive `RandomForest` (`threshold = 0.38`) — **`0.8913` breach recall** (`0.8350` acc)
    - `billing_anomaly_model.joblib`: `IsolationForest` + GERC RGPU slab verifier — **`0.9511` accuracy · `1.000` anomaly recall** (`POST /v1/assistant/billing-anomaly`)
@@ -33,7 +33,7 @@
 ## 2. Repository Structure (Key Modules)
 
 ```text
-├── docs/ci.yml                           # GitHub Actions CI: 55/55 API coverage + OOD NLP + DR proof + 38 frontend suites + Vite build
+├── docs/ci.yml                           # GitHub Actions CI workflow template (copy to .github/workflows/ci.yml to enable hosted runs)
 ├── backend/
 │   ├── app/
 │   │   ├── assistant/                    # Local TF-IDF policy RAG + live zone-breach SQL Q&A
@@ -41,11 +41,11 @@
 │   │   ├── routers/                      # auth, requests, workflows, staff, erp (SAP OData + 3-system gateway), assistant, notifications, system (SIEM + DR + security)
 │   │   ├── audit.py                      # Serialized fork-proof SHA-256 hash chain (AuditChainHead)
 │   │   ├── security.py                   # bcrypt, JWT, HKDF-SHA256 + AES-256-GCM field cipher & XSS sanitizer
-│   │   ├── uploads.py                    # Magic-byte verification + VFENC1 AES-256-GCM KYC document vault
+│   │   ├── uploads.py                    # %PDF-/PNG/JPEG/UTF-8 magic-byte check + always-on VFENC1 AES-256-GCM vault (uploads_encrypted/)
 │   │   └── workflow.py                   # Configurable 7-template routing, validation & SLA engine
-│   ├── data/benchmarks/                  # 54-item GERC/CGRF + Gujarati-English OOD complaint benchmark
+│   ├── data/benchmarks/                  # 54-item team-authored zero-overlap OOD complaint sanity-check set
 │   ├── scripts/                          # backup.sh, offsite_replicate.sh, dr_failover_drill.py, cold_start_dr_proof.py, audit_api_coverage.py, evaluate_realworld_benchmark.py
-│   └── tests/                            # 112 pytest tests covering 55/55 OpenAPI operations (100%)
+│   └── tests/                            # 124 pytest tests covering 55/55 OpenAPI operations (100%)
 ├── frontend/
 │   ├── src/
 │   │   ├── components/                   # 5 RBAC portals + LiveAiGovernancePanel + LivePredictiveDecisionPanel

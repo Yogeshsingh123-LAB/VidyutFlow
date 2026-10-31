@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Build the PS000125 defence deck (WORK_PLAN 3.1) from docs/DECK_OUTLINE.md.
+"""Build the PS000125 defence deck from docs/DECK_OUTLINE.md.
 
-Output: docs/deck/VidyutFlow_PS000125.pptx (regenerate after outline edits).
+Output: docs/deck/VidyutFlow_PS000125.pptx (regenerate after outline/metric edits).
 Usage: python3 scripts/build_deck.py
 """
 import os
@@ -9,7 +9,6 @@ import os
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 ASSETS = os.path.join(ROOT, "docs", "assets")
@@ -27,7 +26,7 @@ def style_slide(slide):
     slide.background.fill.fore_color.rgb = BG
 
 
-def add_title(slide, text, size=30):
+def add_title(slide, text, size=29):
     box = slide.shapes.add_textbox(Inches(0.6), Inches(0.35), Inches(12.1), Inches(1.0))
     tf = box.text_frame
     tf.text = text
@@ -37,8 +36,8 @@ def add_title(slide, text, size=30):
     p.font.color.rgb = FG
 
 
-def add_body(slide, lines, top=1.5, size=16):
-    box = slide.shapes.add_textbox(Inches(0.6), Inches(top), Inches(12.1), Inches(5.4))
+def add_body(slide, lines, top=1.45, size=16):
+    box = slide.shapes.add_textbox(Inches(0.6), Inches(top), Inches(12.1), Inches(5.5))
     tf = box.text_frame
     tf.word_wrap = True
     for i, (line, color, bold, indent) in enumerate(lines):
@@ -61,159 +60,155 @@ def build():
     prs.slide_height = Inches(7.5)
     blank = prs.slide_layouts[6]
 
-    # 1 Title
+    # 1 Title & Vision
     s = prs.slides.add_slide(blank); style_slide(s)
     add_body(s, [
         ("VidyutFlow", FG, True, 0),
-        ("Cloud-to-Edge Orchestration for Power Utilities", ACCENT, True, 0),
-        ("“Enter Once, Use Everywhere”", FG, False, 0),
+        ("Cloud-to-Edge Orchestration, Predictive AI & ERP Gateway for Power Utilities", ACCENT, True, 0),
+        ("“Enter Once, Propagate Everywhere”", FG, False, 0),
         ("", FG, False, 0),
         ("PS000125 · Future-Ready, Secure and Intelligent IT Infrastructure &", MUTED, False, 0),
         ("User-Friendly ERP/Portal Ecosystem · Uttar Gujarat Vij Company Ltd (UGVCL)", MUTED, False, 0),
         ("Seva First Innovation Challenge · Team: Yogesh (Lead) · Utsav · Aakash · Sandip · Arnav", MUTED, False, 0),
-    ], top=1.8, size=24)
-    notes(s, "30-second opener: one flow that removes re-entry, manual routing and blind SLA firefighting — with honest AI that assists, never decides.")
+    ], top=1.7, size=23)
+    notes(s, "30-second opener: non-invasive orchestration across citizen portal, field PWA, and simulated ERP adapters — AI advises, officers decide.")
 
-    # 2 Problem
+    # 2 The UGVCL Silo Problem
     s = prs.slides.add_slide(blank); style_slide(s)
-    add_title(s, "The problem — PS000125 pain points")
+    add_title(s, "The problem — PS000125 operational silos")
     add_body(s, [
-        ("Same applicant details re-typed across ERP, portals and field systems", FG, True, 0),
-        ("Requests moved manually between desks — routing takes hours (planning assumption), files stall", FG, False, 0),
-        ("Field work stops without network; naive re-sync creates duplicates", FG, False, 0),
-        ("SLA breaches discovered after the deadline; consumers visit offices for status", FG, False, 0),
+        ("Disconnected Citizen Portal ↔ SAP Finance/IS-U ↔ e-Urja Billing ↔ 1912 Grievance CRM", FG, True, 0),
+        ("Applicant details re-keyed across desks; manual routing stalls files", FG, False, 0),
+        ("Rural North Gujarat 2G/4G dead-zones halt field inspections; naive retries duplicate records", FG, False, 0),
+        ("Reactive SLA breach discovery & legacy infrastructure / DR / security gaps", FG, False, 0),
         ("", FG, False, 0),
-        ("PS points addressed head-on: 1, 2, 3, 4, 5, 8, 9, 11 (full map: REQUIREMENT_MAPPING.md)", MUTED, False, 0),
-    ], size=18)
-    notes(s, "Name PS points verbally. The 4-8h routing figure is a design-document planning assumption — label it if asked.")
-
-    # 3 One flow
-    s = prs.slides.add_slide(blank); style_slide(s)
-    add_title(s, "VidyutFlow — one click-and-get-work-done flow")
-    add_body(s, [
-        ("SUBMIT → VALIDATE → CLASSIFY (ML) → SLA-RISK (ML) → ROUTE & ASSIGN → FIELD (offline) → DECIDE", ACCENT, True, 0),
-        ("", FG, False, 0),
-        ("Consumer submits once — the SAME record feeds officer queue, engineer task, admin KPIs", FG, False, 0),
-        ("Rule validation + ML triage run automatically; SLA clock starts at submit", FG, False, 0),
-        ("Field engineer works offline; sync is idempotent (each UUID accepted once)", FG, False, 0),
-        ("The officer approves/rejects — every action is audit-logged", FG, True, 0),
+        ("Full 12-point problem & 14-outcome coverage matrix: docs/REQUIREMENT_MAPPING.md", MUTED, False, 0),
     ], size=17)
-    notes(s, "Emphasise: ML triages and explains; the officer decides. Core invariant.")
+    notes(s, "Emphasize that PS000125 covers BOTH software orchestration AND IT infrastructure/DR/security.")
 
-    # 4 Architecture
+    # 3 Non-Invasive ERP Gateway (Simulated / OData v4-Compatible)
     s = prs.slides.add_slide(blank); style_slide(s)
-    add_title(s, "Architecture — built (color) vs roadmap (grey)")
+    add_title(s, "Non-invasive ERP gateway (OData v4-compatible, simulated)")
+    add_body(s, [
+        ("NEVER rips or replaces existing DISCOM core systems (replaces_existing_erp = False)", ACCENT, True, 0),
+        ("", FG, False, 0),
+        ("12 citizen fields entered once → 0 staff re-typed fields across workflow & gateway", FG, False, 0),
+        ("Simulated OData v4-compatible SAP S/4HANA IS-U adapter (/v1/erp/sap-odata/*)", FG, False, 0),
+        ("3-system fan-out (/v1/erp/gateway/propagate/{id}) → simulated SAP + e-Urja CIS + 1912 CRM", FG, False, 0),
+        ("Master-data drift detection & 1-click reconciliation (/v1/erp/reconcile)", FG, True, 0),
+    ], size=16)
+    notes(s, "Always state clearly in viva: the ERP gateway is OData v4-compatible and runs against a deterministic simulated in-repo target today — ready for UGVCL sandbox credentials, never claimed as live-integrated.")
+
+    # 4 Cloud-to-Edge IT Infrastructure
+    s = prs.slides.add_slide(blank); style_slide(s)
+    add_title(s, "Cloud-to-edge IT infrastructure & costed BOM")
     img = os.path.join(ASSETS, "architecture.png")
     if os.path.exists(img):
-        s.shapes.add_picture(img, Inches(1.2), Inches(1.35), width=Inches(10.9))
-    notes(s, "Point at the grey dashed box FIRST: everything grey is honestly roadmap. API contracts stay stable while engines change.")
-
-    # 5 Workflow demo
-    s = prs.slides.add_slide(blank); style_slide(s)
-    add_title(s, "Workflow demo — the real backend, not mockups")
+        s.shapes.add_picture(img, Inches(1.2), Inches(1.3), width=Inches(9.6))
     add_body(s, [
-        ("1 · Consumer wizard submit → live API returns ML category/severity + SLA risk in the toast", FG, False, 0),
-        ("2 · Officer Live Request Queue — real rows, auto-refresh 45s, SLA-risk reasons visible", FG, False, 0),
-        ("3 · Management/Admin Live Workflow KPIs + SLA-Risk Watchlist (model output)", FG, False, 0),
-        ("4 · Server-side alert centre: notifications on submit / status change / field sync", FG, False, 0),
-        ("", FG, False, 0),
-        ("Screenshots pack: Utsav (before video shoot) · live demo path: docs/DEMO_SCRIPT.md", MUTED, False, 0),
-    ], size=17)
-    notes(s, "Say: 'this is the live API — one credential set covers portal and API'. Screenshot placeholders to be filled by Utsav.")
+        ("Substation Edge: 500× RPi4 + Quectel EC200U-CN Dual-SIM 4G (₹8,000 × 500 = ₹40L) · MPLS + FortiGate 60F SD-WAN · Tiers: ₹14.80L / ₹1.18Cr / ₹7.45Cr", ACCENT, True, 0),
+    ], top=6.35, size=13)
+    notes(s, "Vendor SKUs and datasheets documented in docs/INFRASTRUCTURE_BOM_SOURCES.md (Element14, Evelta, Dell R650xs, FortiGate 60F).")
 
-    # 6 Offline
+    # 5 Live Multi-Portal & Offline Sync Demo
     s = prs.slides.add_slide(blank); style_slide(s)
-    add_title(s, "Offline sync & de-duplication — plus backup/restore")
+    add_title(s, "Multi-portal workflow & idempotent offline field sync")
     add_body(s, [
-        ("Field PWA queues inspections with UUIDv4 keys while offline (airplane mode)", FG, False, 0),
-        ("Sync is JWT-authenticated; the server accepts each UUID exactly once", FG, False, 0),
-        ("Sync twice → duplicate:true, no second row (proven by regression test + demo)", FG, False, 0),
-        ("", FG, False, 0),
-        ("Backup → checksum verify → tamper-reject → wipe → restore → live-serve drill: PASS", ACCENT, True, 0),
-        ("Evidence: docs/verification/r4-backup-restore.txt", MUTED, False, 0),
-    ], size=17)
-    notes(s, "Live the demo step: airplane-mode → queue → sync → sync again. Then mention the restore drill as the data-permanence story.")
-
-    # 7 AI honest
-    s = prs.slides.add_slide(blank); style_slide(s)
-    add_title(s, "AI — honest by design")
-    add_body(s, [
-        ("Two small scikit-learn models: category/severity classifier + SLA-breach risk with REASONS", FG, False, 0),
-        ("TF-IDF policy assistant over 3 policy extracts — answers cite sources", FG, False, 0),
-        ("SLA-Risk Watchlist puts model output + reasons where officers act", FG, False, 0),
-        ("", FG, False, 0),
-        ("SYNTHETIC training data · triage probabilities, not verdicts · officer decides, always", AMBER, True, 0),
-        ("30-second honesty script: docs/ML_REPORT.md", MUTED, False, 0),
-    ], size=17)
-    notes(s, "Say the honesty script VERBATIM from ML_REPORT.md. Safety guardrail escalates unknown danger phrasing conservatively.")
-
-    # 8 Security
-    s = prs.slides.add_slide(blank); style_slide(s)
-    add_title(s, "Security — and practical accessibility")
-    add_body(s, [
-        ("JWT + RBAC + assignment/zone scoping (fail-closed) · bcrypt (72-byte safe) · CORS allowlist", FG, False, 0),
-        ("Tamper-evident audit log: sha256 hash chain + admin verify endpoint", FG, False, 0),
-        ("Login throttle (20/min/IP) · security headers · production guards reject dev secrets & demo data", FG, False, 0),
-        ("One credential set for portal + API; browser state grants nothing", FG, False, 0),
-        ("", FG, False, 0),
-        ("Known prototype gaps and their one-line defences: SECURITY.md", MUTED, False, 0),
+        ("5 RBAC portals (Consumer, Field Engineer, Sub-Divisional Officer, Management, IT Admin)", FG, False, 0),
+        ("4 languages (English, Gujarati, Hindi, Marathi) + 7 configurable utility workflows", FG, False, 0),
+        ("Field PWA queues inspections offline in IndexedDB with UUIDv4 client_uuid keys", FG, False, 0),
+        ("Replay-safe sync (/v1/requests/field-sync): duplicate replay returns duplicate:true, 0 extra rows", ACCENT, True, 0),
+        ("Server-side SLA alert engine (/v1/notifications/evaluate-alerts) + 1-click triage", FG, False, 0),
     ], size=16)
-    notes(s, "If challenged on localStorage JWT: 'documented prototype trade-off; production moves to HttpOnly cookies — listed in SECURITY.md'.")
+    notes(s, "Demo airplane mode -> queue field inspection -> reconnect -> sync twice -> prove idempotency.")
 
-    # 9 Results
+    # 6 Live Cold-Start <60s DR Failover Proof
     s = prs.slides.add_slide(blank); style_slide(s)
-    add_title(s, "Results — on SYNTHETIC data (labelled)")
+    add_title(s, "Cold-start <60s primary → hot-standby DR failover")
+    add_body(s, [
+        ("Live API (POST /v1/system/dr-failover-drill) & cold-start script (cold_start_dr_proof.py)", FG, True, 0),
+        ("", FG, False, 0),
+        ("1 · Boot fresh DB & submit live citizen request (zero manual container pre-setup)", FG, False, 0),
+        ("2 · Replicate SHA-256 checksummed snapshot to isolated hot-standby vault", FG, False, 0),
+        ("3 · Destroy primary DB → verify SHA-256 → promote standby → PRAGMA integrity_check = ok", FG, False, 0),
+        ("Measured local SQLite RTO: ~3.5 ms (< 60s target) · 0 records lost", ACCENT, True, 0),
+    ], size=16)
+    notes(s, "Evidence in docs/verification/r4-cold-start-dr-proof.txt and r4-dr-failover-drill.txt.")
+
+    # 7 5-Model Predictive AI Suite
+    s = prs.slides.add_slide(blank); style_slide(s)
+    add_title(s, "5-model predictive AI suite — advisory by design")
+    add_body(s, [
+        ("1 · Category Classifier (TF-IDF + LogReg): 0.8824 unseen-template synthetic · 0.9074 (49/54) team-authored OOD sanity check", FG, False, 0),
+        ("2 · Severity + Deterministic Safety Guardrail: 0.8750 balanced · 100% CRITICAL safety recall", FG, False, 0),
+        ("3 · Cost-Sensitive SLA Breach Predictor (RandomForest, thr=0.38): 0.8913 breach recall (0.8350 acc)", FG, False, 0),
+        ("4 · Billing Anomaly Detector (IsolationForest + GERC RGPU slab verifier): 0.9511 acc / 1.00 recall", FG, False, 0),
+        ("5 · 24h Feeder/DTR Load Forecaster (GradientBoostingRegressor): R² = 0.9790 (MAE 8.89 kVA)", FG, False, 0),
+        ("SYNTHETIC training data · models advise, human officers approve (models_can_approve_or_reject = False)", AMBER, True, 0),
+    ], size=15)
+    notes(s, "Be explicit: 0.8824 is held-out synthetic templates; 0.9074 (49/54) is our team-authored zero-overlap OOD sanity-check set grounded in public GERC/CGRF terminology, not independent utility data.")
+
+    # 8 Hybrid AI Governance
+    s = prs.slides.add_slide(blank); style_slide(s)
+    add_title(s, "Hybrid AI — local TF-IDF RAG + optional Gemini")
+    add_body(s, [
+        ("Zero external LLM dependency for core triage, SLA risk, billing anomaly, or policy Q&A", ACCENT, True, 0),
+        ("Backend /v1/assistant/chat: 100% local TF-IDF retrieval over policy docs + live zone-breach SQL", FG, False, 0),
+        ("Portal /api/ai-chat: optional server-side Gemini (3,500 ms bound) → deterministic Grounded Engine fallback", FG, False, 0),
+        ("Live AI Governance telemetry (/v1/assistant/ai-governance): drift, OOD load caps (>100 kW), human sign-off count", FG, False, 0),
+    ], size=16)
+    notes(s, "Works 100% air-gapped without GEMINI_API_KEY.")
+
+    # 9 Defense-in-Depth Cybersecurity
+    s = prs.slides.add_slide(blank); style_slide(s)
+    add_title(s, "Defense-in-depth cybersecurity & encrypted KYC vault")
+    add_body(s, [
+        ("Zero localStorage tokens: HttpOnly; SameSite=Strict session cookie + verified in-memory bridge", FG, False, 0),
+        ("Strict upload verification: %PDF-, PNG, JPEG & UTF-8 .txt magic-byte checks (blocks disguised EXEs)", ACCENT, True, 0),
+        ("Always-on VFENC1 HKDF-SHA256 + AES-256-GCM vault encryption (uploads_encrypted/) + field cipher", FG, False, 0),
+        ("Fork-proof SHA-256 hash-chained AuditLog (AuditChainHead) + ArcSight/Wazuh CEF:0 SIEM export", FG, False, 0),
+        ("CSP, HSTS, X-Frame-Options: DENY, 100% parameterized ORM queries & 4-VLAN Zero-Trust design", FG, False, 0),
+    ], size=15)
+    notes(s, "Live verification endpoint: GET /v1/system/security-posture and tests/test_document_upload_validation.py.")
+
+    # 10 Results (Synthetic & Team-Authored OOD — Labelled)
+    s = prs.slides.add_slide(blank); style_slide(s)
+    add_title(s, "ML evaluation charts — SYNTHETIC data (labelled)")
     img1 = os.path.join(ASSETS, "ml_confusion_matrices.png")
     img2 = os.path.join(ASSETS, "ml_risk_distribution.png")
     if os.path.exists(img1):
-        s.shapes.add_picture(img1, Inches(0.5), Inches(1.4), width=Inches(6.2))
+        s.shapes.add_picture(img1, Inches(0.5), Inches(1.35), width=Inches(6.2))
     if os.path.exists(img2):
-        s.shapes.add_picture(img2, Inches(6.9), Inches(1.4), width=Inches(6.2))
+        s.shapes.add_picture(img2, Inches(6.9), Inches(1.35), width=Inches(6.2))
     add_body(s, [
-        ("Category 0.733 vs 0.185 baseline · Severity 0.846 vs 0.328 · SLA 0.794 vs 0.625 (n=195/195/160)", FG, True, 0),
-        ("Latency measured LOCAL, SYNTHETIC: p50 3.1 ms · p95 4.5 ms · 100 reads · 0 errors — not a UGVCL figure", AMBER, False, 0),
-    ], top=5.6, size=13)
-    notes(s, "Never say 'accuracy is X for UGVCL'. Reproduce: make train (byte-identical metrics.json).")
+        ("Unseen-template synthetic: Category 0.8824 (vs 0.1667) · Severity 0.8750 · SLA 0.8350 acc / 0.8913 recall", FG, True, 0),
+        ("Team-authored 54-item OOD sanity check (0 synthetic overlap): 0.9074 acc (49/54) · 100% CRITICAL recall", AMBER, False, 0),
+    ], top=5.65, size=13)
+    notes(s, "Reproduce anytime via `make train`. Rolling runtime p50/p95/p99 latency is exposed live on GET /v1/system/performance.")
 
-    # 10 Requirements map
+    # 11 QA Coverage & Phased UGVCL Rollout
     s = prs.slides.add_slide(blank); style_slide(s)
-    add_title(s, "Requirement → solution map (PS000125)")
+    add_title(s, "100% API test coverage & phased UGVCL rollout")
     add_body(s, [
-        ("12 problem points: 7 fully built · 4 lite/partial · 1 proposal-only (hardware)", ACCENT, True, 0),
-        ("14 expected outcomes: 12 met · 1 measured-claim kept as target (productivity) · 1 hardware/DR as proposal", ACCENT, True, 0),
+        ("124 backend pytest tests · 55 / 55 (100%) OpenAPI HTTP operations tested · 38 frontend test suites", ACCENT, True, 0),
         ("", FG, False, 0),
-        ("Every row has named evidence in REQUIREMENT_MAPPING.md (built / lite / roadmap)", FG, False, 0),
-        ("We never claim a roadmap item as built — that rule is written into the repo", FG, False, 0),
-    ], size=17)
-    notes(s, "This slide pre-empts 'did you cover our PS?'. Pull up REQUIREMENT_MAPPING.md if asked for any row.")
+        ("Phase 1 — 1 Subdivision Pilot (₹14.80 Lakh): UGVCL sandbox OData credentials + governed historical ML retrain", FG, False, 0),
+        ("Phase 2 — 1 Circle HA Deployment (₹1.18 Crore): PostgreSQL 16 streaming HA + 60 substation edge gateways", FG, False, 0),
+        ("Phase 3 — Full DISCOM Scale-Out (₹7.45 Crore): 4 Circles, 500× RPi4 4G edge nodes, active-passive DC/DR", FG, False, 0),
+    ], size=15)
+    notes(s, "CI template at docs/ci.yml mirrors `make coverage`, `make train`, `make dr-proof`, and `make build`.")
 
-    # 11 Roadmap
+    # 12 Team & Ownership
     s = prs.slides.add_slide(blank); style_slide(s)
-    add_title(s, "Roadmap & scale-up (contracts stay stable)")
+    add_title(s, "Team ownership & pilot ask")
     add_body(s, [
-        ("1. Legacy ERP adapters (billing/HR/SCADA wrappers) — first item", FG, False, 0),
-        ("2. Kafka / Temporal orchestration · WebSockets · GraphQL + GIS", FG, False, 0),
-        ("3. Flutter/Couchbase edge client · on-device inference", FG, False, 0),
-        ("4. Fine-tuned LLM in VPC · Zero Trust · multi-AZ DR · Vault · WAF · SSO", FG, False, 0),
-        ("5. Hardware modernisation tiers — costed proposal (INFRASTRUCTURE_ROADMAP.md)", FG, False, 0),
+        ("R1 Backend, Workflow & ERP Gateway — Yogesh (Lead) · R2 Multilingual Portals & Offline PWA — Utsav", FG, False, 0),
+        ("R3 5-Model ML Suite & Policy RAG — Aakash · R4 Security, AES-256 Vault & DR — Sandip · R5 Infra BOM & QA — Arnav", FG, False, 0),
         ("", FG, False, 0),
-        ("The frozen API contract (20 ops) lets engines change without touching the workflow", MUTED, False, 0),
+        ("Pilot ask: 1 UGVCL subdivision sandbox + anonymized historical tickets to re-baseline productivity & SLA lift", ACCENT, True, 0),
+        ("Full defence Q&A & module walkthroughs: docs/DEFENCE_QA.md & docs/TEAM_COMMIT_AND_VIVA_PLAN.md", MUTED, False, 0),
     ], size=16)
-    notes(s, "Answer to outcome 8/10 lives here: hardware and DR are a proposal, the software runs on Compose today.")
-
-    # 12 Team & next
-    s = prs.slides.add_slide(blank); style_slide(s)
-    add_title(s, "Team & next steps")
-    add_body(s, [
-        ("R1 Backend & Workflow — Yogesh (Lead) · R2 Frontend & PWA — Utsav", FG, False, 0),
-        ("R3 ML & AI — Aakash · R4 DevOps/Security/QA — Sandip · R5 Docs & Demo — Arnav", FG, False, 0),
-        ("", FG, False, 0),
-        ("Pilot plan: governed UGVCL data → retrain → re-baseline → before/after timing study", ACCENT, True, 0),
-        ("That study is how outcome 13 (productivity) becomes a measured number", FG, False, 0),
-        ("", FG, False, 0),
-        ("Ask: approval for a scoped pilot on one subdivision's new-connection flow", FG, True, 0),
-    ], size=17)
-    notes(s, "Close on the measurement plan, not on claims. Q&A sheet: docs/DEFENCE_QA.md — every member has a copy.")
+    notes(s, "Close on disciplined measurement and zero-disruption pilot deployment.")
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     prs.save(OUT)

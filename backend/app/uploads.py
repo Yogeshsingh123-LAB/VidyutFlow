@@ -10,6 +10,58 @@ MAX_DOCUMENT_NAME_LEN = 120
 MULTIPART_OVERHEAD_BYTES = 65_536
 _READ_CHUNK_BYTES = 65_536
 
+_BINARY_DISGUISE_HEADERS = (
+    b"MZ",              # Windows PE / DOS executable
+    b"\x7fELF",         # Linux ELF binary
+    b"\xca\xfe\xba\xbe",# Mach-O / Java class
+    b"\xfe\xed\xfa\xce",# Mach-O 32-bit
+    b"\xfe\xed\xfa\xcf",# Mach-O 64-bit
+    b"\xcf\xfa\xed\xfe",# Mach-O 64-bit LE
+    b"PK\x03\x04",      # ZIP / JAR / APK / DOCX archive
+    b"Rar!\x1a\x07",    # RAR archive
+    b"%PDF-",           # PDF disguised as .txt
+    b"\x89PNG\r\n\x1a\n",
+    b"\xff\xd8\xff",
+)
+
+
+def validate_magic_bytes(clean_name: str, data: bytes) -> None:
+    """Enforce magic-byte file signature checks matching `clean_name`'s extension."""
+    ext = PurePosixPath(clean_name).suffix.lower()
+    if ext == ".pdf":
+        if not data.startswith(b"%PDF-"):
+            raise HTTPException(
+                400,
+                "Invalid PDF file signature: uploaded content does not start with %PDF- magic bytes",
+            )
+    elif ext == ".png":
+        if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+            raise HTTPException(
+                400,
+                "Invalid PNG file signature: uploaded content does not match PNG magic bytes",
+            )
+    elif ext in {".jpg", ".jpeg"}:
+        if not data.startswith(b"\xff\xd8\xff"):
+            raise HTTPException(
+                400,
+                "Invalid JPEG file signature: uploaded content does not match JPEG FF D8 FF magic bytes",
+            )
+    elif ext == ".txt":
+        if b"\x00" in data or any(data.startswith(sig) for sig in _BINARY_DISGUISE_HEADERS):
+            raise HTTPException(
+                400,
+                "Invalid text document: binary or executable signature detected in .txt upload",
+            )
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise HTTPException(
+                400,
+                "Invalid text document: .txt uploads must be valid UTF-8 text",
+            ) from exc
+    else:
+        raise HTTPException(400, f"Unsupported document file type: {ext}")
+
 _UNSAFE_STEM_RE = re.compile(r"[^A-Za-z0-9_-]+")
 _UNSAFE_REF_RE = re.compile(r"[^A-Za-z0-9._(), -]+")
 _MULTI_UNDERSCORE_RE = re.compile(r"_+")
@@ -87,22 +139,23 @@ def sanitize_document_reference(raw_name: str) -> str:
 
 
 async def validate_and_read_upload(document: UploadFile, max_bytes: int) -> str:
-    """Sanitize filename and enforce non-empty + max_bytes upload size before DB writes."""
+    """Sanitize filename and enforce non-empty, max_bytes, and magic-byte signature before DB writes."""
     try:
         clean_name = sanitize_uploaded_filename(document.filename)
-        total_bytes = 0
+        buf = bytearray()
         while True:
             chunk = await document.read(_READ_CHUNK_BYTES)
             if not chunk:
                 break
-            total_bytes += len(chunk)
-            if total_bytes > max_bytes:
+            buf.extend(chunk)
+            if len(buf) > max_bytes:
                 raise HTTPException(
                     413,
                     f"Uploaded document exceeds maximum allowed size of {max_bytes} bytes",
                 )
-        if total_bytes == 0:
+        if not buf:
             raise HTTPException(400, "Uploaded document must not be empty")
+        validate_magic_bytes(clean_name, bytes(buf))
         return clean_name
     finally:
         await document.close()
@@ -180,15 +233,22 @@ async def validate_and_encrypt_upload(
                 )
         if not buf:
             raise HTTPException(400, "Uploaded document must not be empty")
+        raw_bytes = bytes(buf)
+        validate_magic_bytes(clean_name, raw_bytes)
         key_material = master_secret if len(master_secret) >= 16 else (master_secret * 4)[:32]
-        encrypted_blob = encrypt_upload_at_rest(bytes(buf), key_material, aad=clean_name.encode("utf-8"))
+        encrypted_blob = encrypt_upload_at_rest(raw_bytes, key_material, aad=clean_name.encode("utf-8"))
         cipher_sha256 = hashlib.sha256(encrypted_blob).hexdigest()
-        effective_vault = vault_dir or _os.environ.get("UPLOAD_VAULT_DIR", "").strip()
-        if effective_vault:
-            _os.makedirs(effective_vault, exist_ok=True)
-            vault_path = _os.path.join(effective_vault, f"{cipher_sha256[:24]}_{clean_name}.enc")
-            with open(vault_path, "wb") as fh:
-                fh.write(encrypted_blob)
+        from .config import settings
+
+        effective_vault = (
+            vault_dir
+            or _os.environ.get("UPLOAD_VAULT_DIR", "").strip()
+            or settings.upload_vault_dir
+        )
+        _os.makedirs(effective_vault, exist_ok=True)
+        vault_path = _os.path.join(effective_vault, f"{cipher_sha256[:24]}_{clean_name}.enc")
+        with open(vault_path, "wb") as fh:
+            fh.write(encrypted_blob)
         return clean_name, cipher_sha256
     finally:
         await document.close()

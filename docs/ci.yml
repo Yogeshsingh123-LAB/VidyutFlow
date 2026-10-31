@@ -1,5 +1,6 @@
-# CI — Role 4 (DevOps/QA): every push/PR must keep the suites green.
-# Mirrors the Makefile contract: backend `make test`, frontend `npm test` + `make build`.
+# GitHub Actions CI Workflow Template (docs/ci.yml)
+# NOTE: Stored as a template at docs/ci.yml because fine-grained `contents`-only PATs cannot push `.github/workflows/*`.
+# To activate hosted GitHub Actions runs, copy this file to `.github/workflows/ci.yml` in the GitHub Web UI (or push with `workflow` PAT scope).
 name: CI
 
 on:

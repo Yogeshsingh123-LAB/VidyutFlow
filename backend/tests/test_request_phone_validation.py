@@ -33,7 +33,7 @@ def test_phone_validation_on_both_submission_paths(phone, valid, with_document):
         }
         if with_document:
             response = client.post('/requests/with-document', headers=headers, data=fields,
-                                   files={'document': ('id.pdf', b'test', 'application/pdf')})
+                                   files={'document': ('id.pdf', b'%PDF-1.4\ntest', 'application/pdf')})
         else:
             response = client.post('/requests', headers=headers,
                                    json={**fields, 'document_name': 'id.pdf'})

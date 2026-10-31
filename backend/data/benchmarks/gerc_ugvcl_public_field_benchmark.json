@@ -1,6 +1,6 @@
 {
   "benchmark_id": "gerc-ugvcl-public-cgrf-colloquial-v1",
-  "provenance": "54 hand-labeled out-of-distribution Indian electricity utility complaints grounded in public GERC Supply Code 2015, GERC Standard of Performance clauses, public Gujarat Electricity Ombudsman / CGRF case patterns, and colloquial North Gujarat Hinglish/Gujarati-transliterated citizen phrasings. Contains zero private citizen PII and zero template strings from synthetic.py.",
+  "provenance": "Team-authored 54-item out-of-distribution (OOD) sanity-check set (not an independent utility-labeled dataset), grounded in public GERC Supply Code 2015, GERC Standard of Performance clauses, public Gujarat Electricity Ombudsman / CGRF terminology, and colloquial North Gujarat Hinglish/Gujarati-transliterated phrasings. Contains zero private citizen PII and verified zero template overlap with synthetic.py.",
   "sources": [
     "https://gercin.org/viewdocument/cmVndWxhdGlvbl9lbmdfMTc2NzY4OTgwMF8xNTc1",
     "https://gercin.org/wp-content/uploads/2022/04/98-2021-Judgement.pdf",

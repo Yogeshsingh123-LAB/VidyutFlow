@@ -86,10 +86,11 @@ def evaluate_benchmark() -> dict:
     cls_rep = classification_report(y_cat_true, y_cat_pred, digits=4)
     report_lines = [
         "========================================================================",
-        "VIDYUTFLOW OUT-OF-DISTRIBUTION FIELD TEXT BENCHMARK (GERC / CGRF / GUJ)",
+        "VIDYUTFLOW TEAM-AUTHORED OOD SANITY-CHECK BENCHMARK (GERC / CGRF / GUJ)",
         "========================================================================",
         f"Benchmark ID              : {bench['benchmark_id']}",
-        f"Total Hand-Labeled Items  : {len(samples)} (9 per class across 6 classes)",
+        "Labeling Provenance       : Team-authored OOD sanity-check set (not independent utility data)",
+        f"Total Labeled Items       : {len(samples)} (9 per class across 6 classes)",
         f"Synthetic Template Overlap: 0 (verified disjoint)",
         f"Category Accuracy         : {cat_acc} ({sum(a==b for a,b in zip(y_cat_true,y_cat_pred))}/{len(samples)})",
         f"Category Macro-F1         : {cat_f1}",

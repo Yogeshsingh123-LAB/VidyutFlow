@@ -73,12 +73,17 @@ async function run() {
   const vivaPlan = fs.readFileSync(path.join(repoRoot, 'docs/TEAM_COMMIT_AND_VIVA_PLAN.md'), 'utf8');
   assert.ok(vivaPlan.includes('GradientBoostingRegressor'), 'Viva plan documents exact GBR hyperparameters');
 
-  // 6. Ensure zero stale "Lite build" / "simulated SAP" headline / "0.733" / "JWT in localStorage" across key docs
+  const uploadsPy = fs.readFileSync(path.join(repoRoot, 'backend/app/uploads.py'), 'utf8');
+  assert.ok(uploadsPy.includes('def validate_magic_bytes') && uploadsPy.includes('b"%PDF-"'), 'Magic-byte upload validation enforced in uploads.py');
+  assert.ok(uploadsPy.includes('settings.upload_vault_dir'), 'Uploads always persisted encrypted to default vault dir');
+
+  // 6. Ensure zero stale "Lite build" / "simulated SAP" headline / "0.733" / "JWT in localStorage" across key docs & deck script
   const readmeLower = fs.readFileSync(path.join(repoRoot, 'README.md'), 'utf8').toLowerCase();
   assert.ok(!readmeLower.includes('simulated sap'), 'README.md headline must not call SAP gateway "simulated SAP"');
   for (const rel of [
     'README.md',
     'SECURITY.md',
+    'scripts/build_deck.py',
     'docs/QUICK_AUDIT.md',
     'docs/SYNOPSIS_ABSTRACT.md',
     'docs/DECK_OUTLINE.md',
@@ -87,7 +92,7 @@ async function run() {
     'docs/TEAM_ROLES.md',
   ]) {
     const txt = fs.readFileSync(path.join(repoRoot, rel), 'utf8').toLowerCase();
-    for (const banned of ['lite build', 'vidyutflow (lite)', 'one working end-to-end', '0.733', '0.794', 'jwt in localstorage']) {
+    for (const banned of ['lite build', 'vidyutflow (lite)', 'one working end-to-end', '0.733', '0.794', 'jwt in localstorage', 'localstorage jwt']) {
       assert.ok(!txt.includes(banned), `Stale phrase "${banned}" must not appear in ${rel}`);
     }
   }

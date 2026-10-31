@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     demo_load_review_threshold_kw: float = Field(default=100.0, gt=0, allow_inf_nan=False)
     # Maximum uploaded supporting document size in bytes (default 5 MiB).
     max_upload_bytes: int = Field(default=5 * 1024 * 1024, gt=0, le=50 * 1024 * 1024)
+    # Default directory where encrypted KYC / supporting documents (VFENC1 AES-256-GCM) are persisted.
+    upload_vault_dir: str = "uploads_encrypted"
     # Operational alert engine thresholds (Item #17 — simulated SMS/email + in-app + audit log).
     alert_sla_risk_threshold: float = Field(default=0.70, ge=0.0, le=1.0, allow_inf_nan=False)
     alert_unassigned_hours: float = Field(default=4.0, ge=0.0, le=720.0, allow_inf_nan=False)

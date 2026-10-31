@@ -19,7 +19,7 @@ def test_load_review_policy(monkeypatch, with_document, load, needs_correction):
                   'zone': 'North', 'request_type': 'new_connection', 'requested_load_kw': str(load)}
         if with_document:
             response = client.post('/requests/with-document', headers=headers, data=fields,
-                                   files={'document': ('id.pdf', b'test', 'application/pdf')})
+                                   files={'document': ('id.pdf', b'%PDF-1.4\ntest', 'application/pdf')})
         else:
             response = client.post('/requests', headers=headers, json={**fields, 'document_name': 'id.pdf'})
         assert response.status_code == 201, response.text
@@ -47,7 +47,7 @@ def test_nonfinite_load_is_rejected(with_document, load):
         if with_document:
             fields.pop('document_name')
             response = client.post('/requests/with-document', headers=headers, data=fields,
-                                   files={'document': ('id.pdf', b'test', 'application/pdf')})
+                                   files={'document': ('id.pdf', b'%PDF-1.4\ntest', 'application/pdf')})
         else:
             response = client.post('/requests', headers=headers, json=fields)
         assert response.status_code == 422, response.text

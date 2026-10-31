@@ -99,7 +99,7 @@ def test_sap_odata_gateway_siem_export_encrypted_vault_and_dr_failover():
                 admin = login(c, "admin@vidyut.local", "Admin@123")
 
                 # Upload KYC document and verify AES-256-GCM encrypted file at rest (zero plaintext)
-                secret_doc = b"CONFIDENTIAL_GUJARAT_AADHAAR_KYC_RECORD_998877"
+                secret_doc = b"%PDF-1.4\nCONFIDENTIAL_GUJARAT_AADHAAR_KYC_RECORD_998877\n%%EOF"
                 up = c.post(
                     "/v1/requests/with-document",
                     headers=consumer,

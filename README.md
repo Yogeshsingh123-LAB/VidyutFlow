@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary
 
-**VidyutFlow** replaces fragmented paper registers, disconnected spreadsheets, and manual inter-departmental handoffs across electricity subdivisions with a unified, role-governed digital operations platform spanning **5 operational portals** (`Consumer`, `Subdivision Officer`, `Field Engineer`, `Executive Management`, `System Admin`), **7 configurable utility workflow templates** (`New Connection`, `Load Enhancement/Reduction`, `Rooftop Solar Net-Metering`, `Billing Dispute`, `Meter Fault`, `Outage Escalation`, `Safety Hazard`), **5 trained `scikit-learn` decision-support & predictive models** (validated on both unseen synthetic holdouts and a **54-item zero-overlap GERC/CGRF & colloquial Gujarat field complaint benchmark at `0.9074` accuracy**), a **SAP S/4HANA IS-U OData v4-compatible gateway** validated against the OData v4 `$metadata` & `ServiceOrders` specification¹, **offline-resilient field inspection sync**, and **defense-in-depth security + cold-start DR failover verification**.
+**VidyutFlow** replaces fragmented paper registers, disconnected spreadsheets, and manual inter-departmental handoffs across electricity subdivisions with a unified, role-governed digital operations platform spanning **5 operational portals** (`Consumer`, `Subdivision Officer`, `Field Engineer`, `Executive Management`, `System Admin`), **7 configurable utility workflow templates** (`New Connection`, `Load Enhancement/Reduction`, `Rooftop Solar Net-Metering`, `Billing Dispute`, `Meter Fault`, `Outage Escalation`, `Safety Hazard`), **5 trained `scikit-learn` decision-support & predictive models** (validated on unseen synthetic holdouts at `0.8824` plus a **team-authored 54-item zero-overlap OOD sanity-check set at `0.9074` accuracy**), a **SAP S/4HANA IS-U OData v4-compatible gateway** validated against the OData v4 `$metadata` & `ServiceOrders` specification¹, **offline-resilient field inspection sync**, and **defense-in-depth security + cold-start DR failover verification**.
 
 - **Zero manual re-entry**: `0` applicant fields re-typed across staff stages; `0` manual routing handoffs; `3` staff transitions from submission to completion ([`docs/WORKLOAD_MEASUREMENT.md`](docs/WORKLOAD_MEASUREMENT.md)).
 - **Multilingual citizen & staff UX**: Full 4-language parity across **English, Gujarati (`ગુજરાતી`), Hindi (`हिन्दी`), and Marathi (`मराठी`)**.
@@ -54,7 +54,7 @@ Full 12-area mapping to official `PS000125` requirements: [`docs/REQUIREMENT_MAP
 
 | # | Model | Pipeline | Held-Out Synthetic Metric | Majority Baseline | Live Endpoint / Screen |
 | :-: | :--- | :--- | :--- | :--- | :--- |
-| 1 | **Category Triage** | Word `(1,2)` `TfidfVectorizer` + `LogisticRegression` | **Synthetic `0.8824` · Real-Domain OOD `0.9074` (`49/54`)** | `0.1667` | `POST /v1/requests` auto-routing |
+| 1 | **Category Triage** | Word `(1,2)` `TfidfVectorizer` + `LogisticRegression` | **Synthetic `0.8824` · Team-Authored OOD `0.9074` (`49/54`)** | `0.1667` | `POST /v1/requests` auto-routing |
 | 2 | **Severity & Safety Escalation** | Balanced `TF-IDF` + `LogisticRegression` + life-safety rule guardrail | **Balanced Acc `0.8750` · OOD `CRITICAL` Recall `100%` (`9/9`)** | `0.3333` | Emergency queue prioritization |
 | 3 | **Calibrated SLA Breach Risk** | `OneHotEncoder` + Cost-Sensitive `RandomForest` (`threshold = 0.38`) | **Breach Recall `0.8913`** · Accuracy `0.8350` | `0.5400` | `LiveSlaRiskWatchlist` + reason codes |
 | 4 | **Billing Anomaly Detector** | `IsolationForest` + deterministic GERC RGPU tariff-slab verifier | **Accuracy `0.9511`** · **Anomaly Recall `1.000`** · F1 `0.8706` | `0.8356` | `POST /v1/assistant/billing-anomaly` & `LivePredictiveDecisionPanel` |
@@ -69,7 +69,7 @@ Full 12-area mapping to official `PS000125` requirements: [`docs/REQUIREMENT_MAP
 ## 4. Cybersecurity, ERP Interoperability, DR & Infrastructure Readiness
 
 - **Zero `localStorage` Tokens**: Sessions use `HttpOnly; SameSite=Strict` cookies (`/auth/login?use_cookie=true`) paired with an in-memory, portal-verified session bridge (`backendSession.ts`) that purges legacy storage keys and fails closed on cross-tab mismatches.
-- **Magic-Byte Validation & AES-256-GCM Encryption at Rest**: `POST /v1/requests/with-document` verifies `%PDF-` / PNG / JPEG / UTF-8 magic signatures, enforces `MAX_UPLOAD_BYTES` (`5 MiB`), and encrypts document bytes using **HKDF-SHA256 + AES-256-GCM (`VFENC1` envelope)** before vault storage (`UPLOAD_VAULT_DIR`).
+- **Magic-Byte Validation & Always-On AES-256-GCM Vault**: `POST /v1/requests/with-document` enforces `%PDF-`, PNG (`\x89PNG\r\n\x1a\n`), JPEG (`FF D8 FF`), and valid UTF-8 `.txt` magic-byte checks (`validate_magic_bytes` in `uploads.py` — blocking disguised PE/MZ & ELF executables with `400`), enforces `MAX_UPLOAD_BYTES` (`5 MiB`), and **always** persists encrypted document bytes (`VFENC1` HKDF-SHA256 + AES-256-GCM envelope) into `uploads_encrypted/` (`settings.upload_vault_dir`, overrideable via `UPLOAD_VAULT_DIR`).
 - **Tamper-Evident Audit Chain & SIEM Export**: Every state transition, ERP sync, alert dispatch, and template edit appends to a serialized, fork-proof **SHA-256 hash chain** (`AuditChainHead` + `GET /v1/requests/audit/verify`) exportable by Admins in **ArcSight/Wazuh `CEF:0` or JSON** (`GET /v1/system/siem-events`).
 - **HTTP Security Headers**: `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` on `/auth/*`, and production `Strict-Transport-Security`.
 - **Non-Invasive Multi-System ERP Gateway ("Enter Once, Propagate Everywhere")**: SAP S/4HANA FI-CA/IS-U OData v4-compatible gateway (`/v1/erp/sap-odata/*`, validated against OData v4 `$metadata` & `ServiceOrders`, ready for UGVCL sandbox connection¹) + **UGVCL e-Urja CIS Billing** + **GUVNL 1912 Grievance CRM** fan-out via `POST /v1/erp/gateway/propagate/{id}` (`0` re-typed fields) + automated **Master Data Reconciliation** (`GET /v1/erp/reconcile` & `POST /v1/erp/reconcile/{id}`).
@@ -114,12 +114,14 @@ docker compose up --build
 ## 6. Automated Verification Gates
 
 ```bash
-# Backend: 112 pytest assertions (RBAC, transitions, 5 ML models, OData v4, AES-256-GCM vault, SIEM, DR drill, OpenAPI)
+# Backend: 124 pytest assertions (55/55 OpenAPI ops, magic-byte & default vault, 5 ML models, OData v4, SIEM, DR drill)
 cd backend && ../.venv/bin/pytest -q tests
 
 # Frontend: TypeScript strict check + 38 end-to-end/unit/i18n/security suites + production bundle build
 cd frontend && npm run lint && npm test && npm run build
 ```
+
+> **CI workflow template (`docs/ci.yml`):** Ready-to-enable GitHub Actions workflow template mirroring `make coverage`, `make train`, `make dr-proof`, and `make build`. Stored at `docs/ci.yml` because fine-grained `contents`-only PATs block pushing `.github/workflows/*` — copy to `.github/workflows/ci.yml` via the GitHub Web UI or push with a `workflow`-scoped token to enable hosted Actions runs.
 
 ---
 

@@ -14,6 +14,7 @@ services:
       REDIS_URL: "redis://redis:6379/0"
       APP_ENV: ${APP_ENV:-production}
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in the root .env file}
+      UPLOAD_VAULT_DIR: "/code/uploads_encrypted"
     depends_on: { db: { condition: service_healthy } }
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
@@ -22,7 +23,9 @@ services:
       retries: 30
       start_period: 20s
     ports: ["8000:8000"]
-    volumes: ["./backend/app/ml/models:/code/app/ml/models"]
+    volumes:
+      - "./backend/app/ml/models:/code/app/ml/models"
+      - "upload_vault:/code/uploads_encrypted"
   frontend:
     build: ./frontend
     depends_on: { backend: { condition: service_healthy } }
@@ -33,4 +36,4 @@ services:
       retries: 20
     ports: ["5173:5173"]
     environment: { VITE_PROXY_TARGET: "http://backend:8000" }
-volumes: { pgdata: {} }
+volumes: { pgdata: {}, upload_vault: {} }

@@ -1,8 +1,9 @@
 ========================================================================
-VIDYUTFLOW OUT-OF-DISTRIBUTION FIELD TEXT BENCHMARK (GERC / CGRF / GUJ)
+VIDYUTFLOW TEAM-AUTHORED OOD SANITY-CHECK BENCHMARK (GERC / CGRF / GUJ)
 ========================================================================
 Benchmark ID              : gerc-ugvcl-public-cgrf-colloquial-v1
-Total Hand-Labeled Items  : 54 (9 per class across 6 classes)
+Labeling Provenance       : Team-authored OOD sanity-check set (not independent utility data)
+Total Labeled Items       : 54 (9 per class across 6 classes)
 Synthetic Template Overlap: 0 (verified disjoint)
 Category Accuracy         : 0.9074 (49/54)
 Category Macro-F1         : 0.9013
