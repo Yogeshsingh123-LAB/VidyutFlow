@@ -14,7 +14,7 @@ from ..notify import notify, notify_request_parties, notify_zone_officers
 from ..access import visible_requests, require_request_access
 from ..config import settings
 from ..transitions import apply_transition
-from ..uploads import sanitize_document_reference, validate_and_read_upload
+from ..uploads import sanitize_document_reference, validate_and_encrypt_upload, validate_and_read_upload
 from ..erp_adapter import record_erp_sync
 from ..alerts import evaluate_and_dispatch_alerts
 from ..workflow_templates import resolve_active_template
@@ -92,12 +92,16 @@ async def create_with_doc(applicant_name: str = Form(...), phone: str = Form(...
     effective_zone = "North" if zone is None else zone
     canonical_zone = resolve_active_zone(db, effective_zone)
     tpl = resolve_active_template(db, request_type)
-    # Lite: validate size + sanitize filename; store metadata only (object storage is roadmap). Never log file contents.
-    name = await validate_and_read_upload(document, settings.max_upload_bytes) if document else ""
+    # Validate size + sanitize filename + envelope-encrypt payload with AES-256-GCM (never log plaintext).
+    name, enc_sha = (
+        await validate_and_encrypt_upload(document, settings.max_upload_bytes, settings.secret_key)
+        if document
+        else ("", "")
+    )
     r = ConnectionRequest(consumer_id=u.id, applicant_name=applicant_name, phone=phone, address=address, zone=canonical_zone,
         pin_code=pin_code, latitude=lat, longitude=lon, request_type=tpl.template_code, description=description, requested_load_kw=requested_load_kw, document_name=name,
         tariff_category=tariff_category, phase=phase, premises_type=premises_type)
-    db.add(r); db.flush(); run_workflow(db, r); audit(db, u, "REQUEST_CREATED_WITH_DOC", "request", r.id, r.status)
+    db.add(r); db.flush(); run_workflow(db, r); audit(db, u, "REQUEST_CREATED_WITH_DOC", "request", r.id, f"{r.status}{f' enc=AES256GCM:{enc_sha[:12]}' if enc_sha else ''}")
     _notify_submission(db, r, u)
     if r.sla_breach_risk >= settings.alert_sla_risk_threshold or r.status == "NEEDS_CORRECTION":
         evaluate_and_dispatch_alerts(db, actor=u, zone_filter=r.zone)

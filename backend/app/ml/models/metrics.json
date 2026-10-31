@@ -2,14 +2,16 @@
   "data_notice": "SYNTHETIC data only \u2014 not UGVCL real-world performance.",
   "evaluation": {
     "classifier_split": "held-out source templates; wording variants from each held-out template stay out of training",
-    "sla_split": "stratified random split of synthetic rows"
+    "sla_split": "stratified random split of synthetic rows (cost-sensitive risk triage threshold=0.38)",
+    "billing_anomaly_split": "IsolationForest fit on normal synthetic bills only; evaluated on stratified 25% holdout with injected spikes, zero-reads & tariff mismatches",
+    "load_forecast_split": "20% held-out hourly synthetic 11kV feeder/DTR demand rows"
   },
   "category_classifier": {
-    "accuracy": 0.7333,
-    "balanced_accuracy": 0.7443,
-    "precision_macro": 0.7718,
-    "recall_macro": 0.7443,
-    "f1_macro": 0.7189,
+    "accuracy": 0.8824,
+    "balanced_accuracy": 0.8824,
+    "precision_macro": 0.9207,
+    "recall_macro": 0.8824,
+    "f1_macro": 0.862,
     "labels": [
       "BILLING",
       "METER_FAULT",
@@ -20,7 +22,7 @@
     ],
     "confusion_matrix": [
       [
-        28,
+        17,
         0,
         0,
         0,
@@ -29,54 +31,54 @@
       ],
       [
         0,
-        36,
+        5,
         0,
         0,
-        0,
-        0
-      ],
-      [
-        0,
-        0,
-        24,
-        2,
-        0,
-        0
-      ],
-      [
-        21,
-        0,
-        0,
-        13,
-        0,
+        10,
         2
       ],
       [
         0,
         0,
+        17,
         0,
         0,
-        36,
         0
       ],
       [
         0,
         0,
         0,
-        27,
+        17,
         0,
-        6
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        17,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        17
       ]
     ],
-    "test_size": 195,
-    "majority_baseline": 0.1846
+    "test_size": 102,
+    "majority_baseline": 0.1667
   },
   "severity_classifier": {
-    "accuracy": 0.8462,
-    "balanced_accuracy": 0.774,
-    "precision_macro": 0.9202,
-    "recall_macro": 0.774,
-    "f1_macro": 0.7612,
+    "accuracy": 0.8333,
+    "balanced_accuracy": 0.875,
+    "precision_macro": 0.8671,
+    "recall_macro": 0.875,
+    "f1_macro": 0.8707,
     "labels": [
       "CRITICAL",
       "HIGH",
@@ -85,57 +87,89 @@
     ],
     "confusion_matrix": [
       [
-        5,
+        17,
         0,
-        28,
+        0,
         0
       ],
       [
         0,
-        34,
-        2,
-        0
-      ],
-      [
+        17,
         0,
-        0,
-        64,
         0
       ],
       [
         0,
         0,
+        25,
+        9
+      ],
+      [
+        1,
         0,
-        62
+        7,
+        26
       ]
     ],
-    "test_size": 195,
-    "majority_baseline": 0.3282
+    "test_size": 102,
+    "majority_baseline": 0.3333
   },
   "sla_breach_predictor": {
-    "accuracy": 0.7937,
-    "balanced_accuracy": 0.7583,
-    "precision_macro": 0.7918,
-    "recall_macro": 0.7583,
-    "f1_macro": 0.7683,
+    "accuracy": 0.835,
+    "balanced_accuracy": 0.8392,
+    "precision_macro": 0.8378,
+    "recall_macro": 0.8392,
+    "f1_macro": 0.835,
     "labels": [
       0,
       1
     ],
     "confusion_matrix": [
       [
-        90,
-        10
+        85,
+        23
       ],
       [
-        23,
+        10,
+        82
+      ]
+    ],
+    "test_size": 200,
+    "triage_threshold": 0.38,
+    "breach_precision": 0.781,
+    "breach_recall": 0.8913,
+    "breach_f1": 0.8325,
+    "majority_baseline": 0.54
+  },
+  "billing_anomaly_detector": {
+    "accuracy": 0.9511,
+    "balanced_accuracy": 0.9707,
+    "precision_macro": 0.8854,
+    "recall_macro": 0.9707,
+    "f1_macro": 0.9202,
+    "labels": [
+      0,
+      1
+    ],
+    "confusion_matrix": [
+      [
+        177,
+        11
+      ],
+      [
+        0,
         37
       ]
     ],
-    "test_size": 160,
-    "breach_precision": 0.7872,
-    "breach_recall": 0.6167,
-    "breach_f1": 0.6916,
-    "majority_baseline": 0.625
+    "test_size": 225,
+    "anomaly_precision": 0.7708,
+    "anomaly_recall": 1.0,
+    "anomaly_f1": 0.8706,
+    "majority_baseline": 0.8356
+  },
+  "feeder_load_forecaster": {
+    "r2_score": 0.979,
+    "mae_kva": 8.89,
+    "test_size": 240
   }
 }

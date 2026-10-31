@@ -21,7 +21,7 @@ The machine-readable [OpenAPI snapshot](api/openapi.json) is generated from `app
 
 Officer zone scope is a prototype assumption, pending UGVCL confirmation. Collection/KPI/assistant queries use this policy. Officer audit logs include only request events for visible requests. Existing cross-zone assignments are not migrated automatically. Routing selects active same-zone staff, without cross-zone fallback.
 
-## Operation inventory — 44 operations across 39 paths
+## Operation inventory — 50 operations across 45 paths
 
 | Method and path | Access | Success / response |
 |---|---|---|
@@ -43,7 +43,7 @@ Officer zone scope is a prototype assumption, pending UGVCL confirmation. Collec
 | PATCH `/staff/members/{user_id}` | Admin | 200: reassign staff zone / duty status |
 | GET `/requests` | Authenticated, scoped | 200: request array including submission-time `validation_issues`, newest first; no pagination |
 | POST `/requests` | Consumer only | 201: request and structured `validation_issues`; submitting user becomes consumer_id |
-| POST `/requests/with-document` | Consumer only | 201: request and structured `validation_issues`; enforces `MAX_UPLOAD_BYTES` (default 5 MiB, 413 if exceeded), non-empty file + allowed extension (`.pdf,.jpg,.jpeg,.png,.txt`, 400 on violation), and stores sanitized filename metadata only |
+| POST `/requests/with-document` | Consumer only | 201: request and structured `validation_issues`; enforces `MAX_UPLOAD_BYTES` (default 5 MiB, 413 if exceeded), magic-byte content signature inspection, HKDF-SHA256 + AES-256-GCM authenticated encryption (`VFENC1` envelope into `UPLOAD_VAULT_DIR` when configured), and sanitized filename metadata |
 | GET `/requests/{request_id}` | Scoped | 200: request |
 | PATCH `/requests/{request_id}/status` | Officer/admin or assigned engineer | 200: updated request |
 | GET `/requests/kpis/summary` | Authenticated, scoped | 200: KPI object |
@@ -56,16 +56,22 @@ Officer zone scope is a prototype assumption, pending UGVCL confirmation. Collec
 | POST `/notifications/{notification_id}/read` | Owner or admin | 200: updated notification; another user's row returns 403 |
 | GET `/notifications/alerts/dispatches` | Officer scoped / Admin global | 200: simulated SMS/Email + in-app alert dispatch log (`?channel=ALL|SIMULATED_SMS|SIMULATED_EMAIL|IN_APP`, `?rule_code=...`) + summary & thresholds |
 | POST `/notifications/alerts/evaluate` | Officer scoped / Admin global | 200: evaluates `SLA_BREACH_RISK`, `UNASSIGNED_STALE`, and `REPEATED_ZONE_FAILURES` idempotently and logs hash-chained `ALERT_DISPATCHED` audit rows |
-| POST `/assistant/chat` | Authenticated | 200: answer plus branch-dependent data/sources |
-| GET `/assistant/ml-metrics` | Authenticated | 200: synthetic model metrics; no real-world performance claim |
-| GET `/assistant/ai-governance` | Officer scoped / Admin global | 200: versioned model registry, live inference/drift counters, `X-API-Version: v1` contract (`/` and `/v1/*`), and human-approval audit proof |
+| POST `/assistant/chat` | Authenticated | 200: answer plus branch-dependent data/sources (including live zone-ranked SLA breach risk & causal drivers) |
+| POST `/assistant/billing-anomaly` | Authenticated | 200: `IsolationForest` + GERC RGPU slab billing anomaly verdict, score, expected vs billed ₹, and reasons |
+| GET `/assistant/load-forecast` | Engineer / Officer / Admin | 200: `GradientBoostingRegressor` 24-hour 11kV feeder / DTR kVA curve, peak hour, utilization %, and overload advisory |
+| GET `/assistant/ml-metrics` | Authenticated | 200: held-out synthetic model metrics for all 5 scikit-learn models; no real-world performance claim |
+| GET `/assistant/ai-governance` | Officer scoped / Admin global | 200: versioned model registry + `predictive_services_registry`, live inference/drift counters, `X-API-Version: v1` contract (`/` and `/v1/*`), and human-approval audit proof |
 | GET `/system/status` | Admin only | 200: global technical status/counts + `performance` report |
 | GET `/system/performance` | Admin only | 200: live rolling HTTP latency percentiles (`p50_ms,p95_ms,p99_ms`), epoch-invalidated cache stats, and DB index verification |
+| GET `/system/siem-events` | Admin only | 200: structured SIEM / SOC security event stream (`?format=json|cef`, ArcSight/Wazuh CEF 0.1) with live `verify_chain` hash-chain integrity status |
 | GET `/system/demo-load-policy` | Public | 200: `review_threshold_kw`, `is_demo`; demo-only, not an official UGVCL limit |
 | GET `/erp/mappings` | Officer / Admin | 200: canonical field mapping specification + explicit simulated-adapter disclosure |
 | GET `/erp/logs` | Officer scoped / Admin global | 200: `summary` (`total,synced,failed_queue`) + `items[]` (`?status=ALL|SYNCED|FAILED`) |
 | POST `/erp/sync/{request_id}` | Officer scoped / Admin global | 200: triggers simulated outbound ERP sync (`simulate_failure` optional) and logs hash-chained audit entry |
 | POST `/erp/logs/{log_id}/retry` | Officer scoped / Admin global | 200: retries a `FAILED` sync log row (`409` if already `SYNCED`) with optional `meter_serial` override |
+| GET `/erp/sap-odata/metadata` | Officer / Admin | 200: simulated SAP S/4HANA IS-U OData v4 `$metadata` (`ISUServiceOrder` entity & status mapping) |
+| GET `/erp/sap-odata/ServiceOrders` | Officer scoped / Admin global | 200: simulated SAP IS-U OData v4 `ServiceOrders` feed mapped from live scoped utility requests |
+| POST `/erp/sap-odata/ServiceOrders/inbound-ack` | Officer scoped / Admin global | 200: simulated SAP inbound `AUFNR` order + meter equipment acknowledgment writing hash-chained `SAP_ODATA_INBOUND_ACK` |
 | GET `/workflows/templates` | Authenticated | 200: active configurable workflow templates (`?include_inactive=true` for admin) driving SLA hours, document & field-visit flags, load caps, and step stages |
 | POST `/workflows/templates` | Admin only | 201: creates a custom workflow template and records hash-chained `WORKFLOW_TEMPLATE_CREATED` audit row (`409` on duplicate code) |
 | PATCH `/workflows/templates/{template_code}` | Admin only | 200: updates SLA hours, document/field flags, max auto-load kW, steps, or active flag (`400` if deactivating `new_connection`) and records `WORKFLOW_TEMPLATE_UPDATED` |

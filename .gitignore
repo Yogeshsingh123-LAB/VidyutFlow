@@ -11,6 +11,8 @@ venv/
 # databases & backups (local demo state)
 *.db
 backups/
+uploads_encrypted/
+backend/uploads_encrypted/
 # ML binaries are retrained on startup (see backend/scripts/train_models.py); metrics.json stays tracked
 backend/app/ml/models/*.joblib
 # node / frontend build

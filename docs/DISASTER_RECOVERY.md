@@ -26,3 +26,6 @@
    - Verifies `.sha256` before touching the target database; aborts immediately on 1-byte corruption.
 4. **`./scripts/restore_drill.sh`**
    - End-to-end automated backup → SHA-256 verify → 1-byte tamper rejection → DB wipe → clean restore verification (`docs/verification/r4-backup-restore.txt`).
+5. **`./scripts/dr_failover_drill.py`**
+   - Automated Primary → Offsite Standby Failover Drill: seeds primary operational database + audit log, replicates a SHA-256 checksummed snapshot into an isolated standby vault via `offsite_replicate.sh`, destroys the primary database to simulate catastrophic node failure, promotes the standby replica, verifies `PRAGMA integrity_check = ok`, confirms **0 records lost**, and writes `docs/verification/r4-dr-failover-drill.txt` (enforced in CI via `test_judge_gap_closure.py`).
+

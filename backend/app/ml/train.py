@@ -1,19 +1,51 @@
-"""Train both models on synthetic data; write models + metrics.json (held-out test)."""
-import json, os
+"""Train all 5 scikit-learn models on synthetic data; write models + metrics.json (held-out test).
+
+Models trained:
+  1. Category classifier (TF-IDF + LogisticRegression, strict source-template holdout)
+  2. Severity classifier (TF-IDF + LogisticRegression, strict source-template holdout)
+  3. SLA-breach risk triage predictor (cost-sensitive RandomForest, triage threshold 0.38 for high breach recall)
+  4. Billing anomaly detector (IsolationForest over kWh ratio, kWh/kW, slab discrepancy & zero-read flags)
+  5. 24-hour Transformer/Feeder kVA load forecaster (GradientBoostingRegressor)
+"""
+import json
+import os
 from collections import Counter
+import joblib
+import pandas as pd
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import GradientBoostingRegressor, IsolationForest, RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.pipeline import Pipeline
+from sklearn.metrics import (
+    accuracy_score,
+    balanced_accuracy_score,
+    confusion_matrix,
+    f1_score,
+    mean_absolute_error,
+    precision_score,
+    r2_score,
+    recall_score,
+)
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import (accuracy_score, balanced_accuracy_score, confusion_matrix,
-                             f1_score, precision_score, recall_score)
+from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.compose import ColumnTransformer
-import joblib, pandas as pd
-from .synthetic import make_classifier_rows, make_sla_rows, SLA_FEATURES
 
-def majority_baseline(y): return Counter(y).most_common(1)[0][1] / len(y)
+from .synthetic import (
+    BILLING_ANOMALY_FEATURES,
+    LOAD_FORECAST_FEATURES,
+    SLA_FEATURES,
+    make_billing_anomaly_rows,
+    make_classifier_rows,
+    make_load_forecast_rows,
+    make_sla_rows,
+)
+
+SLA_TRIAGE_THRESHOLD = 0.38
+
+
+def majority_baseline(y):
+    return Counter(y).most_common(1)[0][1] / len(y)
+
 
 def classifier_metrics(y_true, y_pred, labels):
     return {
@@ -27,45 +59,151 @@ def classifier_metrics(y_true, y_pred, labels):
         "test_size": len(y_true),
     }
 
+
 def train(out_dir="app/ml/models"):
     os.makedirs(out_dir, exist_ok=True)
-    # 1) Category + severity classifiers (shared TF-IDF text pipeline)
-    rows = make_classifier_rows(); X = [r["text"] for r in rows]
-    # Hold out complete source templates, so wording variants of a template cannot
-    # appear on both sides of the evaluation split.
-    held_out_groups = {sorted({r["template_group"] for r in rows if r["category"] == cat})[-1]
-                       for cat in {r["category"] for r in rows}}
+
+    # 1) Category + severity classifiers (strict held-out source templates — 1 unseen template per class)
+    rows = make_classifier_rows()
+    X = [r["text"] for r in rows]
+    held_out_groups = {
+        sorted({r["template_group"] for r in rows if r["category"] == cat})[-1]
+        for cat in {r["category"] for r in rows}
+    }
     train_idx = [i for i, row in enumerate(rows) if row["template_group"] not in held_out_groups]
     test_idx = [i for i, row in enumerate(rows) if row["template_group"] in held_out_groups]
     Xtr, Xte = [X[i] for i in train_idx], [X[i] for i in test_idx]
-    for target, name in [("category","category"), ("severity","severity")]:
+
+    cat_metrics = {}
+    for target, name in [("category", "category"), ("severity", "severity")]:
         y = [r[target] for r in rows]
         ytr, yte = [y[i] for i in train_idx], [y[i] for i in test_idx]
-        clf = LogisticRegression(max_iter=1000, class_weight="balanced" if target == "severity" else None)
-        pipe = Pipeline([("tfidf", TfidfVectorizer(ngram_range=(1,2))), ("clf", clf)])
-        pipe.fit(Xtr, ytr); pred = pipe.predict(Xte)
+        clf = LogisticRegression(max_iter=1000, C=2.0, class_weight="balanced")
+        pipe = Pipeline(
+            [
+                ("tfidf", TfidfVectorizer(ngram_range=(1, 2), sublinear_tf=True)),
+                ("clf", clf),
+            ]
+        )
+        pipe.fit(Xtr, ytr)
+        pred = pipe.predict(Xte)
         joblib.dump(pipe, f"{out_dir}/{name}_model.joblib")
         labels = sorted(set(y))
-        globals()[f"_{name}"] = {**classifier_metrics(yte, pred, labels),
-                                 "majority_baseline": round(float(majority_baseline(yte)),4)}
-    # 2) SLA breach risk
+        cat_metrics[name] = {
+            **classifier_metrics(yte, pred, labels),
+            "majority_baseline": round(float(majority_baseline(yte)), 4),
+        }
+
+    # 2) Recall-prioritized SLA breach risk triage predictor
     df = pd.DataFrame(make_sla_rows())
-    X = df[SLA_FEATURES + ["category","severity"]]; y = df["breach"]
-    Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=.2, random_state=42, stratify=y)
-    pre = ColumnTransformer([("cat", OneHotEncoder(handle_unknown="ignore"), ["category","severity"])], remainder="passthrough")
-    sla = Pipeline([("pre", pre), ("clf", RandomForestClassifier(n_estimators=200, random_state=42))])
-    sla.fit(Xtr, ytr); sla_pred = sla.predict(Xte)
+    X_sla = df[SLA_FEATURES + ["category", "severity"]]
+    y_sla = df["breach"]
+    Xtr_s, Xte_s, ytr_s, yte_s = train_test_split(
+        X_sla, y_sla, test_size=0.2, random_state=42, stratify=y_sla
+    )
+    pre = ColumnTransformer(
+        [("cat", OneHotEncoder(handle_unknown="ignore"), ["category", "severity"])],
+        remainder="passthrough",
+    )
+    sla = Pipeline(
+        [
+            ("pre", pre),
+            (
+                "clf",
+                RandomForestClassifier(
+                    n_estimators=250,
+                    class_weight={0: 1, 1: 2.0},
+                    min_samples_leaf=2,
+                    random_state=42,
+                ),
+            ),
+        ]
+    )
+    sla.fit(Xtr_s, ytr_s)
+    pos_idx = list(sla.classes_).index(1)
+    sla_proba = sla.predict_proba(Xte_s)[:, pos_idx]
+    sla_pred = [1 if p >= SLA_TRIAGE_THRESHOLD else 0 for p in sla_proba]
     joblib.dump(sla, f"{out_dir}/sla_model.joblib")
-    metrics = {"data_notice": "SYNTHETIC data only — not UGVCL real-world performance.",
-      "evaluation": {"classifier_split": "held-out source templates; wording variants from each held-out template stay out of training",
-                     "sla_split": "stratified random split of synthetic rows"},
-      "category_classifier": globals()["_category"], "severity_classifier": globals()["_severity"],
-      "sla_breach_predictor": {**classifier_metrics(yte, sla_pred, [0, 1]),
-                               "breach_precision": round(float(precision_score(yte, sla_pred, pos_label=1, zero_division=0)), 4),
-                               "breach_recall": round(float(recall_score(yte, sla_pred, pos_label=1, zero_division=0)), 4),
-                               "breach_f1": round(float(f1_score(yte, sla_pred, pos_label=1, zero_division=0)), 4),
-                               "majority_baseline": round(float(majority_baseline(yte)),4)}}
-    json.dump(metrics, open(f"{out_dir}/metrics.json","w"), indent=2); return metrics
+
+    # 3) Billing Anomaly Detector (IsolationForest trained on normal consumption + evaluated on mixed holdout)
+    bill_df = pd.DataFrame(make_billing_anomaly_rows())
+    bill_tr, bill_te = train_test_split(
+        bill_df, test_size=0.25, random_state=42, stratify=bill_df["is_anomaly"]
+    )
+    normal_tr = bill_tr[bill_tr["is_anomaly"] == 0][BILLING_ANOMALY_FEATURES]
+    iso = IsolationForest(
+        n_estimators=200,
+        contamination=0.06,
+        random_state=42,
+    )
+    iso.fit(normal_tr)
+    raw_iso_pred = iso.predict(bill_te[BILLING_ANOMALY_FEATURES])
+    iso_pred = [1 if v == -1 else 0 for v in raw_iso_pred]
+    y_bill_te = list(bill_te["is_anomaly"])
+    joblib.dump(iso, f"{out_dir}/billing_anomaly_model.joblib")
+
+    # 4) 24-Hour Feeder / Transformer Load Forecaster (GradientBoostingRegressor)
+    load_df = pd.DataFrame(make_load_forecast_rows())
+    X_lf = load_df[LOAD_FORECAST_FEATURES]
+    y_lf = load_df["load_kva"]
+    Xtr_l, Xte_l, ytr_l, yte_l = train_test_split(X_lf, y_lf, test_size=0.2, random_state=42)
+    gbr = GradientBoostingRegressor(
+        n_estimators=220,
+        max_depth=4,
+        learning_rate=0.06,
+        random_state=42,
+    )
+    gbr.fit(Xtr_l, ytr_l)
+    lf_pred = gbr.predict(Xte_l)
+    joblib.dump(gbr, f"{out_dir}/load_forecast_model.joblib")
+
+    metrics = {
+        "data_notice": "SYNTHETIC data only — not UGVCL real-world performance.",
+        "evaluation": {
+            "classifier_split": "held-out source templates; wording variants from each held-out template stay out of training",
+            "sla_split": f"stratified random split of synthetic rows (cost-sensitive risk triage threshold={SLA_TRIAGE_THRESHOLD})",
+            "billing_anomaly_split": "IsolationForest fit on normal synthetic bills only; evaluated on stratified 25% holdout with injected spikes, zero-reads & tariff mismatches",
+            "load_forecast_split": "20% held-out hourly synthetic 11kV feeder/DTR demand rows",
+        },
+        "category_classifier": cat_metrics["category"],
+        "severity_classifier": cat_metrics["severity"],
+        "sla_breach_predictor": {
+            **classifier_metrics(list(yte_s), sla_pred, [0, 1]),
+            "triage_threshold": SLA_TRIAGE_THRESHOLD,
+            "breach_precision": round(
+                float(precision_score(yte_s, sla_pred, pos_label=1, zero_division=0)), 4
+            ),
+            "breach_recall": round(
+                float(recall_score(yte_s, sla_pred, pos_label=1, zero_division=0)), 4
+            ),
+            "breach_f1": round(
+                float(f1_score(yte_s, sla_pred, pos_label=1, zero_division=0)), 4
+            ),
+            "majority_baseline": round(float(majority_baseline(list(yte_s))), 4),
+        },
+        "billing_anomaly_detector": {
+            **classifier_metrics(y_bill_te, iso_pred, [0, 1]),
+            "anomaly_precision": round(
+                float(precision_score(y_bill_te, iso_pred, pos_label=1, zero_division=0)), 4
+            ),
+            "anomaly_recall": round(
+                float(recall_score(y_bill_te, iso_pred, pos_label=1, zero_division=0)), 4
+            ),
+            "anomaly_f1": round(
+                float(f1_score(y_bill_te, iso_pred, pos_label=1, zero_division=0)), 4
+            ),
+            "majority_baseline": round(float(majority_baseline(y_bill_te)), 4),
+        },
+        "feeder_load_forecaster": {
+            "r2_score": round(float(r2_score(yte_l, lf_pred)), 4),
+            "mae_kva": round(float(mean_absolute_error(yte_l, lf_pred)), 2),
+            "test_size": len(yte_l),
+        },
+    }
+    with open(f"{out_dir}/metrics.json", "w") as fh:
+        json.dump(metrics, fh, indent=2)
+    return metrics
+
 
 if __name__ == "__main__":
     print(json.dumps(train(), indent=2))

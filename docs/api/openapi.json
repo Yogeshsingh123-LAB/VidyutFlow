@@ -46,6 +46,55 @@
         "title": "AlertEvaluateBody",
         "type": "object"
       },
+      "BillingAnomalyRequest": {
+        "properties": {
+          "billed_energy_inr": {
+            "anyOf": [
+              {
+                "maximum": 10000000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Billed Energy Inr"
+          },
+          "consumer_no": {
+            "default": "04281-99231",
+            "maxLength": 40,
+            "minLength": 3,
+            "title": "Consumer No",
+            "type": "string"
+          },
+          "historical_avg_kwh": {
+            "maximum": 500000.0,
+            "minimum": 1.0,
+            "title": "Historical Avg Kwh",
+            "type": "number"
+          },
+          "sanctioned_load_kw": {
+            "default": 3.0,
+            "maximum": 5000.0,
+            "minimum": 0.5,
+            "title": "Sanctioned Load Kw",
+            "type": "number"
+          },
+          "units_kwh": {
+            "maximum": 500000.0,
+            "minimum": 0.0,
+            "title": "Units Kwh",
+            "type": "number"
+          }
+        },
+        "required": [
+          "units_kwh",
+          "historical_avg_kwh"
+        ],
+        "title": "BillingAnomalyRequest",
+        "type": "object"
+      },
       "Body_create_with_doc_requests_with_document_post": {
         "properties": {
           "address": {
@@ -562,6 +611,34 @@
         "title": "RetryErpSyncRequest",
         "type": "object"
       },
+      "SapInboundAckPayload": {
+        "properties": {
+          "equipment_meter_no": {
+            "default": "",
+            "title": "Equipment Meter No",
+            "type": "string"
+          },
+          "posting_status": {
+            "default": "POSTED_IN_SAP_ISU",
+            "title": "Posting Status",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "sap_order_no": {
+            "title": "Sap Order No",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "sap_order_no"
+        ],
+        "title": "SapInboundAckPayload",
+        "type": "object"
+      },
       "SimulatedSsoLoginBody": {
         "properties": {
           "email": {
@@ -935,6 +1012,51 @@
         ]
       }
     },
+    "/assistant/billing-anomaly": {
+      "post": {
+        "description": "AI-assisted billing consumption & RGPU slab anomaly triage (IsolationForest + tariff rules).",
+        "operationId": "billing_anomaly_check_assistant_billing_anomaly_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingAnomalyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Billing Anomaly Check",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
     "/assistant/chat": {
       "post": {
         "operationId": "chat_assistant_chat_post",
@@ -974,6 +1096,85 @@
           }
         ],
         "summary": "Chat",
+        "tags": [
+          "assistant"
+        ]
+      }
+    },
+    "/assistant/load-forecast": {
+      "get": {
+        "description": "24-hour 11kV feeder / DTR transformer kVA load forecast factoring live pending load in zone.",
+        "operationId": "feeder_load_forecast_assistant_load_forecast_get",
+        "parameters": [
+          {
+            "description": "UGVCL zone code (North/South/East/West/Central)",
+            "in": "query",
+            "name": "zone",
+            "required": false,
+            "schema": {
+              "default": "North",
+              "description": "UGVCL zone code (North/South/East/West/Central)",
+              "title": "Zone",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ambient_temp_c",
+            "required": false,
+            "schema": {
+              "default": 36.0,
+              "maximum": 52.0,
+              "minimum": 10.0,
+              "title": "Ambient Temp C",
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rated_kva",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 5000.0,
+                  "minimum": 25.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rated Kva"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Feeder Load Forecast",
         "tags": [
           "assistant"
         ]
@@ -1473,6 +1674,125 @@
           }
         ],
         "summary": "Get Erp Mappings",
+        "tags": [
+          "erp"
+        ]
+      }
+    },
+    "/erp/sap-odata/ServiceOrders": {
+      "get": {
+        "description": "Expose visible VidyutFlow requests as SAP S/4HANA IS-U OData v4 `ServiceOrder` entities.",
+        "operationId": "sap_odata_service_orders_erp_sap_odata_ServiceOrders_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "top",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Top",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Sap Odata Service Orders",
+        "tags": [
+          "erp"
+        ]
+      }
+    },
+    "/erp/sap-odata/ServiceOrders/inbound-ack": {
+      "post": {
+        "description": "Receive simulated inbound SAP IS-U order/meter confirmation and record in ErpSyncLog.",
+        "operationId": "sap_odata_inbound_ack_erp_sap_odata_ServiceOrders_inbound_ack_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SapInboundAckPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Sap Odata Inbound Ack",
+        "tags": [
+          "erp"
+        ]
+      }
+    },
+    "/erp/sap-odata/metadata": {
+      "get": {
+        "description": "Simulated SAP S/4HANA IS-U OData v4 $metadata contract for ServiceOrders & MeterInstallations.",
+        "operationId": "sap_odata_metadata_erp_sap_odata_metadata_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Sap Odata Metadata",
         "tags": [
           "erp"
         ]
@@ -2331,6 +2651,67 @@
           }
         ],
         "summary": "Performance Telemetry",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/system/siem-events": {
+      "get": {
+        "description": "Admin-only structured SIEM / SOC security telemetry stream (CEF 0.1 or JSON).",
+        "operationId": "export_siem_security_events_system_siem_events_get",
+        "parameters": [
+          {
+            "description": "Export format: json or cef (ArcSight/Wazuh CEF 0.1)",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "description": "Export format: json or cef (ArcSight/Wazuh CEF 0.1)",
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 250,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Export Siem Security Events",
         "tags": [
           "system"
         ]

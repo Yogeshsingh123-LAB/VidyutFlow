@@ -1,0 +1,11 @@
+================================================================
+VIDYUTFLOW PRIMARY -> STANDBY DR FAILOVER DRILL (LOCAL SYNTHETIC)
+================================================================
+Status                         : PASS
+Primary requests pre-outage    : 3
+Promoted standby requests      : 3
+Promoted standby audit entries : 3
+Records lost (replicated RPO)  : 0
+SQLite PRAGMA integrity_check  : ok
+Measured local promotion time  : 3.3 ms
+Note: Local SQLite replica drill; Tier-2 PostgreSQL streaming + WAL archive target is 15-min RPO / <60-min RTO.

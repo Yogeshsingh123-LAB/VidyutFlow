@@ -148,3 +148,104 @@ def retry_erp_log(
     kpi_cache.bump_epoch()
     db.refresh(log)
     return serialize_erp_log(log, r)
+
+
+# ---------------------------------------------------------------------------
+# Simulated SAP S/4HANA IS-U OData v4 ServiceOrder Gateway
+# ---------------------------------------------------------------------------
+class SapInboundAckPayload(BaseModel):
+    request_id: str
+    sap_order_no: str
+    equipment_meter_no: str = ""
+    posting_status: str = "POSTED_IN_SAP_ISU"
+
+
+@router.get("/sap-odata/metadata")
+def sap_odata_metadata(u: User = Depends(require("officer", "admin"))):
+    """Simulated SAP S/4HANA IS-U OData v4 $metadata contract for ServiceOrders & MeterInstallations."""
+    return {
+        "@odata.version": "4.0",
+        "is_simulated": True,
+        "namespace": "ZUGVCL_ISU_SRV",
+        "disclosure": ERP_ADAPTER_DISCLOSURE,
+        "entity_sets": [
+            {
+                "name": "ServiceOrders",
+                "entity_type": "ZUGVCL_ISU_SRV.ServiceOrder",
+                "keys": ["AUFNR"],
+                "properties": [
+                    "AUFNR",
+                    "EXTERNAL_REQ_ID",
+                    "PARTNER_NAME",
+                    "WERKS_ZONE",
+                    "TARIFTYP",
+                    "SANCTIONED_KW",
+                    "EQUNR_METER",
+                    "PRIOK",
+                    "SYSTEM_STATUS",
+                    "SYNC_STATUS",
+                ],
+            }
+        ],
+    }
+
+
+@router.get("/sap-odata/ServiceOrders")
+def sap_odata_service_orders(
+    top: int = Query(25, ge=1, le=100),
+    db: Session = Depends(get_db),
+    u: User = Depends(require("officer", "admin")),
+):
+    """Expose visible VidyutFlow requests as SAP S/4HANA IS-U OData v4 `ServiceOrder` entities."""
+    rows = visible_requests(db, u).order_by(ConnectionRequest.created_at.desc()).limit(top).all()
+    prio_map = {"CRITICAL": "1", "HIGH": "2", "MEDIUM": "3", "LOW": "4"}
+    values = []
+    for r in rows:
+        values.append(
+            {
+                "AUFNR": f"400{r.id.replace('-', '')[:9].upper()}",
+                "EXTERNAL_REQ_ID": r.id,
+                "PARTNER_NAME": r.applicant_name,
+                "WERKS_ZONE": f"UGVCL-{r.zone.upper()}",
+                "TARIFTYP": r.tariff_category,
+                "SANCTIONED_KW": r.requested_load_kw,
+                "EQUNR_METER": r.meter_serial or "",
+                "PRIOK": prio_map.get(r.severity, "3"),
+                "SYSTEM_STATUS": r.status,
+                "UPDATED_AT": r.updated_at.isoformat() if r.updated_at else None,
+            }
+        )
+    return {
+        "@odata.context": "$metadata#ServiceOrders",
+        "@odata.count": len(values),
+        "is_simulated": True,
+        "disclosure": ERP_ADAPTER_DISCLOSURE,
+        "value": values,
+    }
+
+
+@router.post("/sap-odata/ServiceOrders/inbound-ack")
+def sap_odata_inbound_ack(
+    body: SapInboundAckPayload,
+    db: Session = Depends(get_db),
+    u: User = Depends(require("officer", "admin")),
+):
+    """Receive simulated inbound SAP IS-U order/meter confirmation and record in ErpSyncLog."""
+    r = db.get(ConnectionRequest, body.request_id)
+    if not r:
+        raise HTTPException(404, "Request not found")
+    require_request_access(db, u, r)
+    if body.equipment_meter_no.strip() and not r.meter_serial:
+        r.meter_serial = body.equipment_meter_no.strip()[:64]
+    log = record_erp_sync(db, r, u, f"SAP_ODATA_INBOUND:{body.posting_status[:24]}")
+    log.erp_reference_id = body.sap_order_no.strip()[:64]
+    db.commit()
+    kpi_cache.bump_epoch()
+    db.refresh(log)
+    return {
+        "acknowledged": True,
+        "is_simulated": True,
+        "sap_order_no": log.erp_reference_id,
+        "sync_log": serialize_erp_log(log, r),
+    }
+

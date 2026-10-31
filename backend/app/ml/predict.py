@@ -16,7 +16,15 @@ def _load(name):
     return _cache[name]
 
 def ensure_models():
-    if _load("category_model.joblib") is None:
+    required = (
+        "category_model.joblib",
+        "severity_model.joblib",
+        "sla_model.joblib",
+        "billing_anomaly_model.joblib",
+        "load_forecast_model.joblib",
+    )
+    if any(_load(name) is None for name in required):
+        _cache.clear()
         from .train import train; train(settings.model_dir)
 
 def classify_text(text: str):

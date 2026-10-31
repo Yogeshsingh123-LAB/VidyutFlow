@@ -154,3 +154,43 @@ def decrypt_upload_at_rest(blob: bytes, master_secret: str, aad: bytes = b"") ->
     key = _derive_aes256_key(master_secret, salt)
     return AESGCM(key).decrypt(nonce, ciphertext, aad or None)
 
+
+async def validate_and_encrypt_upload(
+    document: UploadFile,
+    max_bytes: int,
+    master_secret: str,
+    vault_dir: str | None = None,
+) -> tuple[str, str]:
+    """Validate upload, encrypt payload via HKDF-SHA256 + AES-256-GCM, and return (clean_name, ciphertext_sha256)."""
+    import hashlib
+    import os as _os
+
+    try:
+        clean_name = sanitize_uploaded_filename(document.filename)
+        buf = bytearray()
+        while True:
+            chunk = await document.read(_READ_CHUNK_BYTES)
+            if not chunk:
+                break
+            buf.extend(chunk)
+            if len(buf) > max_bytes:
+                raise HTTPException(
+                    413,
+                    f"Uploaded document exceeds maximum allowed size of {max_bytes} bytes",
+                )
+        if not buf:
+            raise HTTPException(400, "Uploaded document must not be empty")
+        key_material = master_secret if len(master_secret) >= 16 else (master_secret * 4)[:32]
+        encrypted_blob = encrypt_upload_at_rest(bytes(buf), key_material, aad=clean_name.encode("utf-8"))
+        cipher_sha256 = hashlib.sha256(encrypted_blob).hexdigest()
+        effective_vault = vault_dir or _os.environ.get("UPLOAD_VAULT_DIR", "").strip()
+        if effective_vault:
+            _os.makedirs(effective_vault, exist_ok=True)
+            vault_path = _os.path.join(effective_vault, f"{cipher_sha256[:24]}_{clean_name}.enc")
+            with open(vault_path, "wb") as fh:
+                fh.write(encrypted_blob)
+        return clean_name, cipher_sha256
+    finally:
+        await document.close()
+
+

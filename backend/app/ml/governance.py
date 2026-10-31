@@ -116,6 +116,8 @@ def build_ai_governance_report(db: Session, u: User) -> dict[str, Any]:
     cat_m = raw_metrics.get("category_classifier", {})
     sev_m = raw_metrics.get("severity_classifier", {})
     sla_m = raw_metrics.get("sla_breach_predictor", {})
+    bill_m = raw_metrics.get("billing_anomaly_detector", {})
+    load_m = raw_metrics.get("feeder_load_forecaster", {})
 
     return {
         "api_version": API_CONTRACT_VERSION,
@@ -151,14 +153,31 @@ def build_ai_governance_report(db: Session, u: User) -> dict[str, Any]:
                 "test_samples": sev_m.get("n_test"),
             },
             {
-                "model_id": "vidyutflow-sla-logreg-v1.0",
-                "task": "SLA Breach Probability + Reason Codes",
-                "algorithm": "OneHot + StandardScaler + LogisticRegression (OOD load-capped)",
+                "model_id": "vidyutflow-sla-rf-v1.1",
+                "task": "SLA Breach Risk Triage + Reason Codes",
+                "algorithm": "OneHot + Cost-Sensitive RandomForest (threshold=0.38, OOD load-capped)",
                 "dataset": "Synthetic workload holdout",
                 "held_out_accuracy": sla_m.get("accuracy"),
-                "roc_auc": sla_m.get("roc_auc"),
+                "breach_recall": sla_m.get("breach_recall"),
                 "majority_baseline": sla_m.get("majority_baseline"),
-                "test_samples": sla_m.get("n_test"),
+                "test_samples": sla_m.get("test_size"),
+            },
+        ],
+        "predictive_services_registry": [
+            {
+                "model_id": "vidyutflow-billing-isoforest-v1.0",
+                "task": "Billing Consumption & RGPU Slab Anomaly Triage",
+                "algorithm": "IsolationForest + Deterministic GERC Slab Audit",
+                "held_out_accuracy": bill_m.get("accuracy"),
+                "anomaly_recall": bill_m.get("anomaly_recall"),
+                "majority_baseline": bill_m.get("majority_baseline"),
+            },
+            {
+                "model_id": "vidyutflow-feeder-gbr-v1.0",
+                "task": "24-Hour 11kV Feeder / DTR kVA Load Forecast",
+                "algorithm": "GradientBoostingRegressor",
+                "r2_score": load_m.get("r2_score"),
+                "mae_kva": load_m.get("mae_kva"),
             },
         ],
         "monitoring": {

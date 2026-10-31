@@ -2,6 +2,7 @@ import { LiveWorkflowKpis } from '../common/LiveWorkflowKpis';
 import { LiveSlaRiskWatchlist } from '../common/LiveSlaRiskWatchlist';
 import { LiveAlertEnginePanel } from '../common/LiveAlertEnginePanel';
 import { LiveAiGovernancePanel } from '../common/LiveAiGovernancePanel';
+import { LivePredictiveDecisionPanel } from '../common/LivePredictiveDecisionPanel';
 import { LiveExecutiveAnalyticsSection } from './LiveExecutiveAnalyticsSection';
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
@@ -585,8 +586,9 @@ export const ManagementPortal: React.FC = () => {
       {/* VIEW 3: AI EXECUTIVE INSIGHTS */}
       {activeTab === 'ai-insights' && (
         <div className="space-y-6">
-          {/* Live ML SLA Risk Watchlist & AI Governance */}
+          {/* Live ML SLA Risk Watchlist, Predictive Services & AI Governance */}
           <LiveAiGovernancePanel />
+          <LivePredictiveDecisionPanel />
           <LiveSlaRiskWatchlist />
           <div className="p-5 rounded-xl bg-gradient-to-r from-blue-900/20 to-teal-900/20 border border-teal-500/30 space-y-3">
             <div className="flex items-center gap-2">
