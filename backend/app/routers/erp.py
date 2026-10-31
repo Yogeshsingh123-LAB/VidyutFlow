@@ -249,3 +249,203 @@ def sap_odata_inbound_ack(
         "sync_log": serialize_erp_log(log, r),
     }
 
+
+def _expected_heterogeneous_targets(r: ConnectionRequest) -> list[dict]:
+    req_short = r.id.replace("-", "")[:8].upper()
+    deposit_inr = round(max(1.0, float(r.requested_load_kw or 1.0)) * 1200.0, 2)
+    return [
+        {
+            "system_code": "SAP_S4_FICA_ISU",
+            "system_name": "SAP S/4HANA Finance (FI-CA) & IS-U Work Management",
+            "protocol": "OData v4 (/sap/opu/odata4/ugvcl/isu_srv_order/v4)",
+            "external_ref": f"AUFNR-400{req_short}",
+            "canonical_fields": {
+                "VKONT_CONTRACT_ACCT": f"CA-{r.zone[:2].upper()}-{req_short}",
+                "SECURITY_DEPOSIT_INR": deposit_inr,
+                "WERKS_PLANT": f"UGVCL-{r.zone.upper()}",
+                "EQUNR_METER": r.meter_serial or "PENDING_COMMISSION",
+                "SYSTEM_STATUS": r.status,
+            },
+        },
+        {
+            "system_code": "E_URJA_CIS_BILLING",
+            "system_name": "UGVCL e-Urja Consumer Information & Billing Engine",
+            "protocol": "REST JSON (/cis/v2/consumer-master)",
+            "external_ref": f"CIS-{r.zone[:1].upper()}-{req_short}",
+            "canonical_fields": {
+                "CONSUMER_NAME": r.applicant_name,
+                "TARIFF_SLAB": r.tariff_category,
+                "SANCTIONED_LOAD_KW": r.requested_load_kw,
+                "PHASE": r.phase,
+                "BILLING_READY": r.status == "COMPLETED" and bool(r.meter_serial),
+            },
+        },
+        {
+            "system_code": "GUVNL_1912_CRM",
+            "system_name": "UGVCL / GUVNL 1912 Consumer Grievance & SLA Portal",
+            "protocol": "Webhook EventBridge (/crm/v1/tickets/events)",
+            "external_ref": f"CRM1912-{req_short}",
+            "canonical_fields": {
+                "REQUEST_CATEGORY": r.category,
+                "SEVERITY": r.severity,
+                "SLA_RISK_SCORE": round(float(r.sla_breach_risk or 0.0), 3),
+                "LIFECYCLE_STATUS": r.status,
+            },
+        },
+    ]
+
+
+@router.post("/gateway/propagate/{request_id}")
+def propagate_across_heterogeneous_systems(
+    request_id: str,
+    db: Session = Depends(get_db),
+    u: User = Depends(require("officer", "admin")),
+):
+    """API Gateway Fan-Out ('Enter Once, Propagate Everywhere'):
+    Syncs one canonical VidyutFlow request across SAP S/4HANA FI-CA/IS-U, e-Urja CIS Billing,
+    and GUVNL 1912 Grievance CRM without replacing existing DISCOM systems or re-typing fields.
+    """
+    from ..audit import audit
+
+    r = db.get(ConnectionRequest, request_id)
+    if not r:
+        raise HTTPException(404, "Request not found")
+    require_request_access(db, u, r)
+
+    targets = _expected_heterogeneous_targets(r)
+    receipts = []
+    for t in targets:
+        log = record_erp_sync(db, r, u, f"GATEWAY_FANOUT:{t['system_code']}")
+        log.erp_reference_id = t["external_ref"]
+        receipts.append(
+            {
+                "system_code": t["system_code"],
+                "system_name": t["system_name"],
+                "protocol": t["protocol"],
+                "external_ref": t["external_ref"],
+                "status": "SYNCED",
+                "payload_propagated": t["canonical_fields"],
+            }
+        )
+    audit(
+        db,
+        u,
+        "ERP_GATEWAY_PROPAGATED",
+        "erp_gateway",
+        r.id,
+        f"targets=SAP_S4_FICA_ISU,E_URJA_CIS_BILLING,GUVNL_1912_CRM status={r.status} load_kw={r.requested_load_kw}",
+    )
+    db.commit()
+    kpi_cache.bump_epoch()
+    return {
+        "is_simulated": True,
+        "integration_pattern": "API_GATEWAY_EVENT_FANOUT_NON_INVASIVE",
+        "replaces_existing_erp": False,
+        "applicant_fields_retyped": 0,
+        "request_id": r.id,
+        "systems_propagated": len(receipts),
+        "targets": receipts,
+    }
+
+
+@router.get("/reconcile")
+def check_master_data_reconciliation(
+    top: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    u: User = Depends(require("officer", "admin")),
+):
+    """Compare canonical VidyutFlow records against SAP FI-CA/IS-U, e-Urja Billing, and 1912 CRM sync logs."""
+    rows = visible_requests(db, u).order_by(ConnectionRequest.created_at.desc()).limit(top).all()
+    items = []
+    in_sync_count = 0
+    drift_count = 0
+
+    for r in rows:
+        logs = (
+            db.query(ErpSyncLog)
+            .filter(ErpSyncLog.request_id == r.id, ErpSyncLog.status == "SYNCED")
+            .order_by(ErpSyncLog.created_at.desc())
+            .all()
+        )
+        seen_codes = {
+            lg.event_type.split(":", 1)[1]
+            for lg in logs
+            if lg.event_type and lg.event_type.startswith(("GATEWAY_FANOUT:", "MASTER_RECONCILED:"))
+        }
+        missing_systems = [
+            code
+            for code in ("SAP_S4_FICA_ISU", "E_URJA_CIS_BILLING", "GUVNL_1912_CRM")
+            if code not in seen_codes
+        ]
+        latest_sync_at = logs[0].created_at if logs else None
+        stale_after_update = bool(
+            latest_sync_at and r.updated_at and r.updated_at > latest_sync_at and missing_systems
+        )
+        has_drift = len(missing_systems) > 0 or stale_after_update
+        if has_drift:
+            drift_count += 1
+        else:
+            in_sync_count += 1
+        items.append(
+            {
+                "request_id": r.id,
+                "applicant_name": r.applicant_name,
+                "zone": r.zone,
+                "status": r.status,
+                "requested_load_kw": r.requested_load_kw,
+                "meter_serial": r.meter_serial or "",
+                "reconciliation_state": "DRIFT_DETECTED" if has_drift else "IN_SYNC",
+                "synced_systems": sorted(seen_codes),
+                "missing_or_stale_systems": missing_systems,
+            }
+        )
+    return {
+        "is_simulated": True,
+        "summary": {
+            "checked_requests": len(items),
+            "in_sync": in_sync_count,
+            "drift_detected": drift_count,
+        },
+        "items": items,
+    }
+
+
+@router.post("/reconcile/{request_id}")
+def reconcile_master_data_for_request(
+    request_id: str,
+    db: Session = Depends(get_db),
+    u: User = Depends(require("officer", "admin")),
+):
+    """Reconcile master-data drift across SAP S/4HANA FI-CA/IS-U, e-Urja CIS Billing & 1912 CRM."""
+    from ..audit import audit
+
+    r = db.get(ConnectionRequest, request_id)
+    if not r:
+        raise HTTPException(404, "Request not found")
+    require_request_access(db, u, r)
+
+    targets = _expected_heterogeneous_targets(r)
+    reconciled_refs = {}
+    for t in targets:
+        lg = record_erp_sync(db, r, u, f"MASTER_RECONCILED:{t['system_code']}")
+        lg.erp_reference_id = t["external_ref"]
+        reconciled_refs[t["system_code"]] = t["external_ref"]
+
+    audit(
+        db,
+        u,
+        "ERP_MASTER_RECONCILED",
+        "erp_gateway",
+        r.id,
+        f"reconciled=3 load_kw={r.requested_load_kw} meter={r.meter_serial or 'NA'}",
+    )
+    db.commit()
+    kpi_cache.bump_epoch()
+    return {
+        "is_simulated": True,
+        "request_id": r.id,
+        "reconciliation_state": "IN_SYNC",
+        "reconciled_systems": reconciled_refs,
+    }
+
+

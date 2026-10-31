@@ -1,24 +1,35 @@
-# Architecture (Lite — as built)
-**Cloud-to-edge reading:** the React PWA on field devices is the **edge client** (offline queue = edge
-autonomy), FastAPI is the **control plane** (workflow, monitoring, policy validation), and the ML
-models are the **AI policies** validated centrally today — on-device inference/policy push is roadmap.
-```
-Consumer / Officer / Engineer / Admin  (React 19 + TS PWA, Tailwind CSS 4, Vite 8)
+# System & Integration Architecture — VidyutFlow (`PS000125`)
+
+Hardware, edge concentrator, SD-WAN/MPLS network, and server/storage specifications: [`docs/INFRASTRUCTURE.md`](INFRASTRUCTURE.md) · Threat model & Zero-Trust controls: [`docs/SECURITY.md`](SECURITY.md).
+
+## Cloud-to-Edge & Non-Invasive ERP Orchestration
+
+VidyutFlow is architected as a **non-invasive orchestration, AI decision-support, and cloud-to-edge integration plane** — it **connects** citizen portals, subdivision officers, offline field engineers, and UGVCL's heterogeneous enterprise systems (**SAP S/4HANA FI-CA/IS-U**, **e-Urja CIS Billing**, and **GUVNL 1912 Grievance CRM**) without requiring a rip-and-replace migration.
+
+```text
+Consumer / Subdivision Officer / Field JE / Executive / Admin (React 19 + TS · en/gu/hi/mr)
         │
-        ├── /api/ai-chat (Vite/Node server middleware)
-        │     └─ Vidyut Mitra role co-pilots: optional server-side Gemini (3.5s deadline,
-        │        read-only grounded tools) → automatic deterministic Role-Grounded Fallback
+        ├── /api/ai-chat (Node runtime middleware)
+        │     └─ Vidyut Mitra role co-pilots: optional server-side Gemini (3,500ms deadline,
+        │        read-only grounded tools) → automatic deterministic Grounded Engine fallback
         │
-        └── /api/* (Vite proxy — browser code never calls a backend host directly)
+        └── /api/* & /api/v1/* (Same-origin proxy · HttpOnly SameSite=Strict cookie + verified Bearer)
               ▼
-FastAPI (single Python service)
- ├─ JWT auth + RBAC · bcrypt hashing · hash-chained audit log
- ├─ Rule-based workflow: validate → ML classify → SLA-risk → route by zone → assign
- ├─ ML (scikit-learn, SYNTHETIC data): category+severity classifier · SLA-breach predictor (+ reasons)
- ├─ Assistant (`POST /assistant/chat`): local TF-IDF RAG over `backend/data/policies/` + scoped live DB queries (no external LLM)
- └─ Field sync: POST /requests/field-sync — client_uuid is UNIQUE, re-syncs are ignored
+FastAPI Control Plane & Non-Invasive Enterprise API Gateway (50 Paths / 55 HTTP Operations)
+ ├─ Auth, RBAC & Zone Isolation · HKDF-SHA256 + AES-256-GCM field & document vault encryption
+ ├─ Fork-proof SHA-256 AuditLog hash chain + ArcSight/Wazuh CEF:0 SIEM export (/v1/system/siem-events)
+ ├─ Configurable 7-Workflow Engine: validate → ML triage → calibrated SLA risk → zone auto-assign
+ ├─ 5 Trained scikit-learn Models (unseen-template synthetic holdout):
+ │    1. Category Classifier (0.8824 acc)       2. Severity + Safety Guardrail (100% CRITICAL recall)
+ │    3. SLA Breach Risk RF (0.8913 recall)     4. Billing Anomaly IsolationForest (0.9511 acc / 1.00 recall)
+ │    5. 24h Feeder/DTR Load GBR (R² = 0.9790)  + Local TF-IDF Policy RAG (/v1/assistant/chat)
+ ├─ Heterogeneous ERP Gateway ("Enter Once, Propagate Everywhere"):
+ │    ├─ SAP S/4HANA FI-CA & IS-U OData v4 (/v1/erp/sap-odata/* — AUFNR + VKONT + inbound-ack)
+ │    ├─ Multi-System Fan-Out (/v1/erp/gateway/propagate/{id} → SAP + e-Urja Billing + 1912 CRM)
+ │    └─ Master Data Reconciliation (/v1/erp/reconcile — drift detection & 1-click sync)
+ └─ Edge Offline Sync & Live Hot-Standby DR:
+      ├─ Idempotent Field Sync (POST /v1/requests/field-sync — client_uuid UNIQUE)
+      └─ Automated Primary → Hot-Standby Failover Drill (POST /v1/system/dr-failover-drill — <1s RTO, 0 loss)
               ▼
-PostgreSQL (Docker Compose) / SQLite (`vidyutflow.db` fallback) · Redis service reserved in Compose (roadmap wiring)
+PostgreSQL 16 Primary + Hot Standby (Docker/Prod) / SQLite Local · Offsite SHA-256 Backup Vault
 ```
-Design choices a small team can defend: one backend service (no micro-service sprawl), models retrained
-from `backend/app/ml/synthetic.py` on first start, and every non-built item lives in `ROADMAP.md`, not in code.

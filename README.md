@@ -12,7 +12,7 @@
 
 - **Zero manual re-entry**: `0` applicant fields re-typed across staff stages; `0` manual routing handoffs; `3` staff transitions from submission to completion ([`docs/WORKLOAD_MEASUREMENT.md`](docs/WORKLOAD_MEASUREMENT.md)).
 - **Multilingual citizen & staff UX**: Full 4-language parity across **English, Gujarati (`ગુજરાતી`), Hindi (`हिन्दी`), and Marathi (`मराठी`)**.
-- **Versioned API contract**: **45 paths / 50 HTTP operations** dual-served at `/` and `/v1/*` (`X-API-Version: v1`), snapshot-enforced in CI against [`docs/api/openapi.json`](docs/api/openapi.json).
+- **Versioned API contract**: **50 paths / 55 HTTP operations** dual-served at `/` and `/v1/*` (`X-API-Version: v1`), snapshot-enforced in CI against [`docs/api/openapi.json`](docs/api/openapi.json).
 
 ---
 
@@ -29,12 +29,12 @@
                                         │  HttpOnly SameSite=Strict Cookie + Verified Bearer
                                         ▼
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│  FastAPI Application Layer (45 Paths / 50 Operations · X-API-Version: v1)        │
+│  FastAPI Control Plane & Non-Invasive ERP Gateway (50 Paths / 55 Operations)     │
 │  • Configurable Workflow & Least-Loaded Zone Auto-Routing (workflow.py)          │
 │  • 5-Model scikit-learn Suite + Local TF-IDF Policy RAG + Optional Gemini Bridge │
-│  • Simulated SAP S/4HANA IS-U OData v4 ServiceOrder Outbound/Inbound Gateway     │
-│  • HKDF-SHA256 + AES-256-GCM Encrypted Upload Vault + Fork-Proof SHA-256 Audit   │
-│  • Admin SIEM Export (ArcSight/Wazuh CEF:0 & JSON) + Rolling p50/p95/p99 Monitor │
+│  • 3-System ERP Gateway Fan-Out (SAP FI-CA/IS-U + e-Urja Billing + 1912 CRM)     │
+│  • Master Data Reconciliation Engine + SAP S/4HANA IS-U OData v4 Inbound/Outbound│
+│  • HKDF-SHA256 + AES-256-GCM Field & Vault Encryption + SHA-256 Audit + SIEM CEF │
 └───────────────────────────────────────┬──────────────────────────────────────────┘
                                         ▼
 ┌──────────────────────────────────────────────────────────────────────────────────┐
@@ -72,9 +72,9 @@ Full 12-area mapping to official `PS000125` requirements: [`docs/REQUIREMENT_MAP
 - **Magic-Byte Validation & AES-256-GCM Encryption at Rest**: `POST /v1/requests/with-document` verifies `%PDF-` / PNG / JPEG / UTF-8 magic signatures, enforces `MAX_UPLOAD_BYTES` (`5 MiB`), and encrypts document bytes using **HKDF-SHA256 + AES-256-GCM (`VFENC1` envelope)** before vault storage (`UPLOAD_VAULT_DIR`).
 - **Tamper-Evident Audit Chain & SIEM Export**: Every state transition, ERP sync, alert dispatch, and template edit appends to a serialized, fork-proof **SHA-256 hash chain** (`AuditChainHead` + `GET /v1/requests/audit/verify`) exportable by Admins in **ArcSight/Wazuh `CEF:0` or JSON** (`GET /v1/system/siem-events`).
 - **HTTP Security Headers**: `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` on `/auth/*`, and production `Strict-Transport-Security`.
-- **Simulated SAP S/4HANA IS-U OData v4 Gateway**: Outbox retry queue (`/v1/erp/logs/{id}/retry`) plus OData v4 `$metadata`, `ServiceOrders` feed, and bidirectional `ServiceOrders/inbound-ack` (`AUFNR` + meter equipment posting).
-- **Automated Backup, Tamper-Rejection & Primary→Standby DR Failover Drills**: `backup.sh`, `offsite_replicate.sh`, `restore_drill.sh`, and `dr_failover_drill.py` (`0` records lost, `PRAGMA integrity_check = ok`) with explicit tier-bound RPO/RTO targets ([`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md)).
-- **Costed 3-Tier Hardware & Network Architecture**: Subdivision (`₹14.80 Lakh`), Circle HA (`₹1.18 Crore`), and Full UGVCL DISCOM (`₹7.45 Crore`) server, storage, SD-WAN, and field-device BOM ([`docs/INFRASTRUCTURE_ROADMAP.md`](docs/INFRASTRUCTURE_ROADMAP.md)).
+- **Non-Invasive Multi-System ERP Gateway ("Enter Once, Propagate Everywhere")**: Connects — without replacing — **SAP S/4HANA FI-CA/IS-U OData v4** (`/v1/erp/sap-odata/*`), **UGVCL e-Urja CIS Billing**, and **GUVNL 1912 Grievance CRM** via `POST /v1/erp/gateway/propagate/{id}` (`0` re-typed fields) plus automated **Master Data Reconciliation** (`GET /v1/erp/reconcile` & `POST /v1/erp/reconcile/{id}`).
+- **Live `<60s` Primary → Hot-Standby DR Failover Drill**: `backup.sh`, `offsite_replicate.sh`, `restore_drill.sh`, `dr_failover_drill.py`, and live browser-clickable `POST /v1/system/dr-failover-drill` (`<1s` promotion, `0` records lost, `PRAGMA integrity_check = ok`) ([`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md)).
+- **Cloud-to-Edge IT Infrastructure & Hardware BOM**: Substation **Raspberry Pi 4 + Quectel Dual-SIM 4G LTE Cat-4 edge concentrators (`~₹8,000 × 500 = ₹40L`)**, IP65 field handhelds, BSNL/GFGNL MPLS + SD-WAN failover, and 3-tier Subdivision (`₹14.80 Lakh`), Circle HA (`₹1.18 Crore`), and Full UGVCL DISCOM (`₹7.45 Crore`) BOM ([`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md), [`docs/INFRASTRUCTURE_ROADMAP.md`](docs/INFRASTRUCTURE_ROADMAP.md)).
 
 ---
 
@@ -125,9 +125,9 @@ cd frontend && npm run lint && npm test && npm run build
 
 - [`docs/PS000125_OFFICIAL.md`](docs/PS000125_OFFICIAL.md) — Verbatim official problem statement
 - [`docs/REQUIREMENT_MAPPING.md`](docs/REQUIREMENT_MAPPING.md) — Complete 12-area PS000125 mapping & honesty boundaries
-- [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) & [`docs/api/openapi.json`](docs/api/openapi.json) — Frozen 45-path / 50-operation API specification
-- [`docs/ML_REPORT.md`](docs/ML_REPORT.md) & [`docs/AI_GOVERNANCE.md`](docs/AI_GOVERNANCE.md) — 5-model synthetic evaluation, template holdout & human-approval governance
-- [`docs/SECURITY_POSTURE.md`](docs/SECURITY_POSTURE.md) — Auth, RBAC, AES-256-GCM upload vault, hash-chained audit & SIEM export
-- [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md) — RPO/RTO matrix, offsite SHA-256 vault replication & Primary→Standby failover drill
-- [`docs/INFRASTRUCTURE_ROADMAP.md`](docs/INFRASTRUCTURE_ROADMAP.md) — Costed 3-tier UGVCL hardware, network, storage & edge sizing
+- [`docs/INFRASTRUCTURE.md`](docs/INFRASTRUCTURE.md) & [`docs/INFRASTRUCTURE_ROADMAP.md`](docs/INFRASTRUCTURE_ROADMAP.md) — Edge hardware (`Raspberry Pi 4 + 4G`), MPLS/SD-WAN, NVMe RAID-10 & 3-tier BOM
+- [`docs/SECURITY.md`](docs/SECURITY.md) & [`SECURITY.md`](SECURITY.md) — STRIDE threat model, Zero-Trust VLANs, AES-256-GCM field/vault encryption & SIEM `CEF:0`
+- [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) & [`docs/api/openapi.json`](docs/api/openapi.json) — Frozen 50-path / 55-operation `/v1` API specification
+- [`docs/ML_REPORT.md`](docs/ML_REPORT.md) — 5-model `scikit-learn` evaluation, template holdout & human-approval governance
+- [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md) — RPO/RTO matrix, offsite SHA-256 vault replication & `<60s` Primary→Standby failover drill
 - [`docs/TEAM_ROLES.md`](docs/TEAM_ROLES.md) & [`docs/DEFENCE_QA.md`](docs/DEFENCE_QA.md) — 5-member ownership map & viva defense Q&A

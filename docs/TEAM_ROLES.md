@@ -81,7 +81,7 @@ like data/maths → Role 3 · like servers/security → Role 4 · like writing/p
 - [x] Compose stack, Makefile targets, backup/demo-reset scripts, CORS allowlist, bcrypt/JWT *(in repo)*
 - [x] Test suite green from a clean machine (`make setup && make test`) — re-verify **weekly**
 - [ ] Before Nov 6: one full `make up` rehearsal on a clean checkout; change every demo password if the deck shows them publicly
-- [x] Own the known-gaps list (JWT in localStorage, no rate-limit, filename-only uploads) and their one-line defences — `SECURITY.md` §Known-gaps one-liners (22 Oct; note: login throttle is now built, not missing)
+- [x] Own defense-in-depth security controls (`HttpOnly; SameSite=Strict` cookies, Redis-ready login throttle, `VFENC1` HKDF-SHA256 + AES-256-GCM upload & field encryption, SHA-256 hash-chained `AuditLog`, ArcSight/Wazuh `CEF:0` SIEM export, and `<60s` Primary → Hot-Standby DR failover drill) — [`docs/SECURITY.md`](SECURITY.md) & [`docs/DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md)
 - [ ] Before Dec 2: offline fallback kit — pre-trained models, local DB backup, recorded demo (with Role 5) if Wi-Fi fails
 
 **Reviews:** every PR touching `security.py` / `deps.py` / CORS needs this role's approval.
@@ -140,3 +140,24 @@ deck file · demo video · portal submission · this file
 - One issue per unchecked box above, assigned to the role owner; milestone **“Synopsis – Nov 6”** and **“Finale – Dec 2”**
 - Fill in the name column in this file in the same PR that creates the first issue
 **Remaining work, task-by-task with deadlines:** [WORK_PLAN.md](WORK_PLAN.md) (Phases 0–3: registration lock → freeze → synopsis → finale).
+
+---
+
+## Live Judge Viva Deep-Dive Cheat Sheet (Every Member Must Defend Their Module)
+
+1. **Role 1 — Yogesh Kumar Singh (Backend, Workflow & Heterogeneous ERP Gateway)**:
+   - **Files**: `backend/app/workflow.py`, `backend/app/routers/{requests,erp,workflows,staff}.py`.
+   - **Key Defense**: Explains the 7 configurable `WorkflowTemplate` definitions, least-loaded active zone auto-routing (`0` manual handoffs), and how `POST /v1/erp/gateway/propagate/{id}` + `GET /v1/erp/reconcile` synchronize **SAP S/4HANA FI-CA/IS-U OData v4 (`AUFNR` + `VKONT`)**, **e-Urja CIS Billing**, and **GUVNL 1912 CRM** without replacing legacy ERP systems (`0` re-typed fields).
+2. **Role 2 — Utsav (React 19 Frontend, Multilingual UX & Offline Field PWA)**:
+   - **Files**: `frontend/src/components/{consumer,employee,field,management,admin,common}/`, `frontend/src/utils/{backendSession,offlineQueue}.ts`.
+   - **Key Defense**: Explains 5 role-isolated portals, 4-language parity (`en`/`gu`/`hi`/`mr`) split into lazy chunks (`index-*.js < 230 kB`), `HttpOnly` cookie + tab-memory session verification (`BroadcastChannel` fail-closed), and IndexedDB `client_uuid` offline field sync.
+3. **Role 3 — Aakash Kumar Singh (5-Model `scikit-learn` Suite & Hybrid RAG)**:
+   - **Files**: `backend/app/ml/{synthetic,train,predict,predictive_services,governance}.py`, `backend/app/assistant/rag.py`.
+   - **Key Defense**: Explains unseen template-group holdout (`tpl_id == 8` held out per class to prevent vocabulary leakage), Category `TF-IDF + LogisticRegression` (`0.8824`), Severity balanced classifier + life-safety rule guardrail (`100%` `CRITICAL` recall), Cost-Sensitive `RandomForest` at `triage_threshold = 0.38` lifting SLA breach recall from `0.617 → 0.8913`, `IsolationForest` + GERC RGPU slab billing anomaly audit (`0.9511` acc / `1.00` recall), `GradientBoostingRegressor` 24h feeder kVA load forecast (`R² = 0.9790`), and offline `TF-IDF` policy RAG + optional `3.5s`-bounded server `Gemini`.
+4. **Role 4 — Sandip (Cybersecurity, AES-256-GCM, SIEM & Live DR Failover)**:
+   - **Files**: `backend/app/{security,uploads,audit}.py`, `backend/routers/system.py`, `backend/scripts/{offsite_replicate.sh,restore_drill.sh,dr_failover_drill.py}`.
+   - **Key Defense**: Explains HKDF-SHA256 + AES-256-GCM field & `VFENC1` KYC upload vault encryption, serialized `AuditChainHead` SHA-256 hash chain, ArcSight/Wazuh `CEF:0` SIEM export (`/v1/system/siem-events`), and the `<1s` (`<60s` SLA) Primary Kill → Hot-Standby promotion failover drill (`0` records lost).
+5. **Role 5 — Arnav (PS000125 Coverage, Cloud-to-Edge IT BOM & Live Demo Flow)**:
+   - **Files**: `README.md`, `docs/{REQUIREMENT_MAPPING,INFRASTRUCTURE,INFRASTRUCTURE_ROADMAP,SECURITY,DEMO_SCRIPT,DEFENCE_QA}.md`.
+   - **Key Defense**: Explains all 12 official `PS000125` requirement areas, the **500× Substation Raspberry Pi 4 + Dual-SIM 4G LTE concentrator (`₹8,000/unit = ₹40L`)** edge layer, BSNL/GFGNL MPLS + SD-WAN failover, and the 3-tier `₹14.80L / ₹1.18Cr / ₹7.45Cr` UGVCL rollout plan.
+

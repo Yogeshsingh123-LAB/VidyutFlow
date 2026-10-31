@@ -21,7 +21,7 @@ The machine-readable [OpenAPI snapshot](api/openapi.json) is generated from `app
 
 Officer zone scope is a prototype assumption, pending UGVCL confirmation. Collection/KPI/assistant queries use this policy. Officer audit logs include only request events for visible requests. Existing cross-zone assignments are not migrated automatically. Routing selects active same-zone staff, without cross-zone fallback.
 
-## Operation inventory — 50 operations across 45 paths
+## Operation inventory — 55 operations across 50 paths
 
 | Method and path | Access | Success / response |
 |---|---|---|
@@ -64,6 +64,8 @@ Officer zone scope is a prototype assumption, pending UGVCL confirmation. Collec
 | GET `/system/status` | Admin only | 200: global technical status/counts + `performance` report |
 | GET `/system/performance` | Admin only | 200: live rolling HTTP latency percentiles (`p50_ms,p95_ms,p99_ms`), epoch-invalidated cache stats, and DB index verification |
 | GET `/system/siem-events` | Admin only | 200: structured SIEM / SOC security event stream (`?format=json|cef`, ArcSight/Wazuh CEF 0.1) with live `verify_chain` hash-chain integrity status |
+| POST `/system/dr-failover-drill` | Admin only | 200: executes live sandboxed Primary DB Kill → SHA-256 Verified Hot-Standby Promotion drill (`data_loss_records=0`, `meets_60s_rto=true`) and records `DR_FAILOVER_DRILL_PASSED` |
+| GET `/system/security-posture` | Admin only | 200: live HKDF-SHA256 + AES-256-GCM field round-trip + tamper-rejection self-test, XSS sanitizer check, SQLi ORM posture, and Zero-Trust network profile |
 | GET `/system/demo-load-policy` | Public | 200: `review_threshold_kw`, `is_demo`; demo-only, not an official UGVCL limit |
 | GET `/erp/mappings` | Officer / Admin | 200: canonical field mapping specification + explicit simulated-adapter disclosure |
 | GET `/erp/logs` | Officer scoped / Admin global | 200: `summary` (`total,synced,failed_queue`) + `items[]` (`?status=ALL|SYNCED|FAILED`) |
@@ -72,6 +74,9 @@ Officer zone scope is a prototype assumption, pending UGVCL confirmation. Collec
 | GET `/erp/sap-odata/metadata` | Officer / Admin | 200: simulated SAP S/4HANA IS-U OData v4 `$metadata` (`ISUServiceOrder` entity & status mapping) |
 | GET `/erp/sap-odata/ServiceOrders` | Officer scoped / Admin global | 200: simulated SAP IS-U OData v4 `ServiceOrders` feed mapped from live scoped utility requests |
 | POST `/erp/sap-odata/ServiceOrders/inbound-ack` | Officer scoped / Admin global | 200: simulated SAP inbound `AUFNR` order + meter equipment acknowledgment writing hash-chained `SAP_ODATA_INBOUND_ACK` |
+| POST `/erp/gateway/propagate/{request_id}` | Officer scoped / Admin global | 200: non-invasive API Gateway fan-out (*"Enter Once, Propagate Everywhere"*) across `SAP_S4_FICA_ISU`, `E_URJA_CIS_BILLING`, and `GUVNL_1912_CRM` (`applicant_fields_retyped=0`) |
+| GET `/erp/reconcile` | Officer scoped / Admin global | 200: compares canonical VidyutFlow records against all 3 external enterprise systems (`DRIFT_DETECTED` vs `IN_SYNC`) |
+| POST `/erp/reconcile/{request_id}` | Officer scoped / Admin global | 200: reconciles master-data drift across SAP FI-CA/IS-U, e-Urja Billing, and 1912 CRM in 1 idempotent call |
 | GET `/workflows/templates` | Authenticated | 200: active configurable workflow templates (`?include_inactive=true` for admin) driving SLA hours, document & field-visit flags, load caps, and step stages |
 | POST `/workflows/templates` | Admin only | 201: creates a custom workflow template and records hash-chained `WORKFLOW_TEMPLATE_CREATED` audit row (`409` on duplicate code) |
 | PATCH `/workflows/templates/{template_code}` | Admin only | 200: updates SLA hours, document/field flags, max auto-load kW, steps, or active flag (`400` if deactivating `new_connection`) and records `WORKFLOW_TEMPLATE_UPDATED` |

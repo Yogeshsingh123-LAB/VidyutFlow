@@ -1547,6 +1547,52 @@
         ]
       }
     },
+    "/erp/gateway/propagate/{request_id}": {
+      "post": {
+        "description": "API Gateway Fan-Out ('Enter Once, Propagate Everywhere'):\nSyncs one canonical VidyutFlow request across SAP S/4HANA FI-CA/IS-U, e-Urja CIS Billing,\nand GUVNL 1912 Grievance CRM without replacing existing DISCOM systems or re-typing fields.",
+        "operationId": "propagate_across_heterogeneous_systems_erp_gateway_propagate__request_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Propagate Across Heterogeneous Systems",
+        "tags": [
+          "erp"
+        ]
+      }
+    },
     "/erp/logs": {
       "get": {
         "description": "List ERP sync logs & failed-sync dead-letter queue (zone-scoped for officers).",
@@ -1674,6 +1720,101 @@
           }
         ],
         "summary": "Get Erp Mappings",
+        "tags": [
+          "erp"
+        ]
+      }
+    },
+    "/erp/reconcile": {
+      "get": {
+        "description": "Compare canonical VidyutFlow records against SAP FI-CA/IS-U, e-Urja Billing, and 1912 CRM sync logs.",
+        "operationId": "check_master_data_reconciliation_erp_reconcile_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "top",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Top",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Check Master Data Reconciliation",
+        "tags": [
+          "erp"
+        ]
+      }
+    },
+    "/erp/reconcile/{request_id}": {
+      "post": {
+        "description": "Reconcile master-data drift across SAP S/4HANA FI-CA/IS-U, e-Urja CIS Billing & 1912 CRM.",
+        "operationId": "reconcile_master_data_for_request_erp_reconcile__request_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Reconcile Master Data For Request",
         "tags": [
           "erp"
         ]
@@ -2631,6 +2772,31 @@
         ]
       }
     },
+    "/system/dr-failover-drill": {
+      "post": {
+        "description": "Execute a live sandboxed Primary DB Kill -> Hot-Standby Replica Promotion drill (<60s RTO, 0 data loss).",
+        "operationId": "execute_live_dr_failover_drill_system_dr_failover_drill_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Execute Live Dr Failover Drill",
+        "tags": [
+          "system"
+        ]
+      }
+    },
     "/system/performance": {
       "get": {
         "description": "Admin-only rolling HTTP latency percentiles, TTL cache stats, and DB index check.",
@@ -2651,6 +2817,31 @@
           }
         ],
         "summary": "Performance Telemetry",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/system/security-posture": {
+      "get": {
+        "description": "Admin defense-in-depth verification: live AES-256-GCM field & vault encryption self-test, XSS sanitizer, SQLi ORM posture, and Zero-Trust network profile.",
+        "operationId": "get_security_posture_and_crypto_selftest_system_security_posture_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Get Security Posture And Crypto Selftest",
         "tags": [
           "system"
         ]

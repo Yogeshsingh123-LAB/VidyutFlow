@@ -156,6 +156,49 @@ def test_sap_odata_gateway_siem_export_encrypted_vault_and_dr_failover():
                 siem_cef = c.get("/v1/system/siem-events?format=cef", headers=admin)
                 assert siem_cef.status_code == 200
                 assert "CEF:0|UGVCL|VidyutFlow|1.0|" in siem_cef.text
+
+                # Heterogeneous 3-System ERP Gateway Fan-Out ("Enter Once, Propagate Everywhere") & Master Reconciliation
+                rec_before = c.get("/v1/erp/reconcile", headers=officer)
+                assert rec_before.status_code == 200
+                target_row = next(x for x in rec_before.json()["items"] if x["request_id"] == req_id)
+                assert target_row["reconciliation_state"] == "DRIFT_DETECTED"
+
+                fanout = c.post(f"/v1/erp/gateway/propagate/{req_id}", headers=officer)
+                assert fanout.status_code == 200
+                fb = fanout.json()
+                assert fb["replaces_existing_erp"] is False
+                assert fb["applicant_fields_retyped"] == 0
+                assert fb["systems_propagated"] == 3
+                assert {t["system_code"] for t in fb["targets"]} == {
+                    "SAP_S4_FICA_ISU",
+                    "E_URJA_CIS_BILLING",
+                    "GUVNL_1912_CRM",
+                }
+
+                rec_after = c.get("/v1/erp/reconcile", headers=officer).json()
+                target_synced = next(x for x in rec_after["items"] if x["request_id"] == req_id)
+                assert target_synced["reconciliation_state"] == "IN_SYNC"
+
+                rec_fix = c.post(f"/v1/erp/reconcile/{req_id}", headers=officer)
+                assert rec_fix.status_code == 200
+                assert rec_fix.json()["reconciliation_state"] == "IN_SYNC"
+
+                # Live <60s Primary Kill -> Hot-Standby Failover Drill API & AES-256-GCM Security Posture API
+                live_dr = c.post("/v1/system/dr-failover-drill", headers=admin)
+                assert live_dr.status_code == 200
+                dr_json = live_dr.json()
+                assert dr_json["primary_db_killed"] is True
+                assert dr_json["standby_promoted"] is True
+                assert dr_json["data_loss_records"] == 0
+                assert dr_json["meets_60s_rto"] is True
+
+                sec = c.get("/v1/system/security-posture", headers=admin)
+                assert sec.status_code == 200
+                sec_json = sec.json()
+                assert sec_json["encryption_at_rest"]["roundtrip_verified"] is True
+                assert sec_json["encryption_at_rest"]["tamper_tag_rejection_verified"] is True
+                assert sec_json["application_defenses"]["xss_defense_verified"] is True
+                assert sec_json["audit_and_siem"]["hash_chain_valid"] is True
         finally:
             os.environ.pop("UPLOAD_VAULT_DIR", None)
 
