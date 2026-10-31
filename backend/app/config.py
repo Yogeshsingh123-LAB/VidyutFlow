@@ -1,6 +1,9 @@
+from pathlib import Path
 from typing import Literal
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings
+
+_DEFAULT_MODEL_DIR = str(Path(__file__).resolve().parent / "ml" / "models")
 
 class Settings(BaseSettings):
     app_name: str = "VidyutFlow"
@@ -28,7 +31,7 @@ class Settings(BaseSettings):
     # Performance caching & rolling latency telemetry (Item #20).
     kpi_cache_ttl_seconds: float = Field(default=15.0, ge=0.0, le=300.0, allow_inf_nan=False)
     latency_window_size: int = Field(default=1000, ge=50, le=10000)
-    model_dir: str = "app/ml/models"
+    model_dir: str = _DEFAULT_MODEL_DIR
 
     class Config:
         env_file = ".env"
