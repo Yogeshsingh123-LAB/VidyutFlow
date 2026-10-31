@@ -115,7 +115,7 @@ def build():
     add_title(s, "Multi-portal workflow & idempotent offline field sync")
     add_body(s, [
         ("5 RBAC portals (Consumer, Field Engineer, Sub-Divisional Officer, Management, IT Admin)", FG, False, 0),
-        ("4 languages (English, Gujarati, Hindi, Marathi) + 7 configurable utility workflows", FG, False, 0),
+        ("4 languages (English, Gujarati, Hindi, Marathi) + 5 seeded configurable utility workflows", FG, False, 0),
         ("Field PWA queues inspections offline in IndexedDB with UUIDv4 client_uuid keys", FG, False, 0),
         ("Replay-safe sync (/v1/requests/field-sync): duplicate replay returns duplicate:true, 0 extra rows", ACCENT, True, 0),
         ("Server-side SLA alert engine (/v1/notifications/evaluate-alerts) + 1-click triage", FG, False, 0),
@@ -163,7 +163,7 @@ def build():
     s = prs.slides.add_slide(blank); style_slide(s)
     add_title(s, "Defense-in-depth cybersecurity & encrypted KYC vault")
     add_body(s, [
-        ("Zero localStorage tokens: HttpOnly; SameSite=Strict session cookie + verified in-memory bridge", FG, False, 0),
+        ("Zero localStorage tokens: HttpOnly; SameSite=Lax session cookie + verified in-memory bridge", FG, False, 0),
         ("Strict upload verification: %PDF-, PNG, JPEG & UTF-8 .txt magic-byte checks (blocks disguised EXEs)", ACCENT, True, 0),
         ("Always-on VFENC1 HKDF-SHA256 + AES-256-GCM vault encryption (uploads_encrypted/) + field cipher", FG, False, 0),
         ("Fork-proof SHA-256 hash-chained AuditLog (AuditChainHead) + ArcSight/Wazuh CEF:0 SIEM export", FG, False, 0),

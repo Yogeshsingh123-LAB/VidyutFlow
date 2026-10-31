@@ -17,7 +17,7 @@ Do **not** open a public issue for a suspected vulnerability. Contact the team l
 
 1. **Zero `localStorage` Tokens & Strict Session Isolation**:
    - `bcrypt` (72-byte bounded) + `scrypt` password hashing.
-   - `HttpOnly; SameSite=Strict` cookies (`/auth/login?use_cookie=true`) paired with an in-memory, portal-verified session bridge (`backendSession.ts`) that purges legacy storage keys and fails closed across tabs via `BroadcastChannel`.
+   - `HttpOnly; SameSite=Lax` cookies (`/auth/login?use_cookie=true`) paired with an in-memory, portal-verified session bridge (`backendSession.ts`) that purges legacy storage keys and fails closed across tabs via `BroadcastChannel`.
 2. **AES-256-GCM Encryption at Rest (Fields + Document Vault)**:
    - **Field-level PII cipher (`backend/app/security.py`)**: `encrypt_field_aes256` / `decrypt_field_aes256` using **HKDF-SHA256 + AES-256-GCM** (96-bit random nonce + 128-bit GCM auth tag).
    - **Encrypted KYC Upload Vault (`backend/app/uploads.py`)**: Magic-byte signature inspection (`%PDF-`, PNG, JPEG, UTF-8) + `MAX_UPLOAD_BYTES` (`5 MiB`) + **`VFENC1` HKDF-SHA256 + AES-256-GCM** encryption at rest on `POST /v1/requests/with-document` (zero plaintext stored on disk).

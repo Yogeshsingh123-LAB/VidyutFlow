@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary
 
-**VidyutFlow** replaces fragmented paper registers, disconnected spreadsheets, and manual inter-departmental handoffs across electricity subdivisions with a unified, role-governed digital operations platform spanning **5 operational portals** (`Consumer`, `Subdivision Officer`, `Field Engineer`, `Executive Management`, `System Admin`), **7 configurable utility workflow templates** (`New Connection`, `Load Enhancement/Reduction`, `Rooftop Solar Net-Metering`, `Billing Dispute`, `Meter Fault`, `Outage Escalation`, `Safety Hazard`), **5 trained `scikit-learn` decision-support & predictive models** (validated on unseen synthetic holdouts at `0.8824` plus a **team-authored 54-item zero-overlap OOD sanity-check set at `0.9074` accuracy**), a **SAP S/4HANA IS-U OData v4-compatible gateway** validated against the OData v4 `$metadata` & `ServiceOrders` specification¹, **offline-resilient field inspection sync**, and **defense-in-depth security + automated backup, SHA-256 checksum & restore verification drills**.
+**VidyutFlow** replaces fragmented paper registers, disconnected spreadsheets, and manual inter-departmental handoffs across electricity subdivisions with a unified, role-governed digital operations platform spanning **5 operational portals** (`Consumer`, `Subdivision Officer`, `Field Engineer`, `Executive Management`, `System Admin`), **5 seeded configurable utility workflow templates** (`new_connection`, `load_extension`, `meter_replacement`, `billing_dispute`, `outage_safety`, plus Admin-created custom templates), **5 trained `scikit-learn` decision-support & predictive models** (validated on unseen synthetic holdouts at `0.8824` plus a **team-authored 54-item zero-overlap OOD sanity-check set at `0.9074` accuracy**), a **SAP S/4HANA IS-U OData v4-compatible gateway** validated against the OData v4 `$metadata` & `ServiceOrders` specification¹, **offline-resilient field inspection sync**, and **defense-in-depth security + automated backup, SHA-256 checksum & restore verification drills**.
 
 - **Zero manual re-entry**: `0` applicant fields re-typed across staff stages; `0` manual routing handoffs; `3` staff transitions from submission to completion ([`docs/WORKLOAD_MEASUREMENT.md`](docs/WORKLOAD_MEASUREMENT.md)).
 - **Multilingual citizen & staff UX**: Full 4-language parity across **English, Gujarati (`ગુજરાતી`), Hindi (`हिन्दी`), and Marathi (`मराठी`)**.
@@ -22,8 +22,8 @@ VidyutFlow has three main parts: user portals, a shared API service, and persist
 
 ```mermaid
 flowchart LR
-    USERS["Consumers · Officers · Field staff · Admins"] --> PORTAL["VidyutFlow portals<br/>React + TypeScript"]
-    PORTAL -->|"/api and /api/v1"| API["FastAPI service"]
+    USERS["Consumers · Officers · Field staff · Admins"] --> PORTAL["VidyutFlow portals<br/>React 19 + TypeScript + Tailwind 4"]
+    PORTAL -->|"/api and /api/v1 (HttpOnly SameSite=Lax)"| API["FastAPI service"]
     PORTAL -. "Offline field updates" .-> QUEUE["On-device queue"]
     QUEUE -->|"Reconnect and sync"| API
     API --> WORK["Request workflows<br/>Validate · Prioritize · Route · Track"]
@@ -78,7 +78,7 @@ flowchart LR
 
 ## 4. Cybersecurity, ERP Interoperability, DR & Infrastructure Readiness
 
-- **Zero `localStorage` Tokens**: Sessions use `HttpOnly; SameSite=Strict` cookies (`/auth/login?use_cookie=true`) paired with an in-memory, portal-verified session bridge (`backendSession.ts`) that purges legacy storage keys and fails closed on cross-tab mismatches.
+- **Zero `localStorage` Tokens**: Sessions use `HttpOnly; SameSite=Lax` cookies (`/auth/login?use_cookie=true`) paired with an in-memory, portal-verified session bridge (`backendSession.ts`) that purges legacy storage keys and fails closed on cross-tab mismatches.
 - **Magic-Byte Header Check & Always-On AES-256-GCM Vault**: `POST /v1/requests/with-document` checks `%PDF-`, PNG (`\x89PNG\r\n\x1a\n`), JPEG (`FF D8 FF`), and valid UTF-8 `.txt` header signatures (`validate_magic_bytes` in `uploads.py` — blocking extension-spoofed PE/MZ & ELF binaries with `400`; full antivirus/CDR scanning is a production DMZ ICAP/ClamAV layer), enforces `MAX_UPLOAD_BYTES` (`5 MiB`), and **always** persists encrypted document bytes (`VFENC1` HKDF-SHA256 + AES-256-GCM envelope, never served directly as raw files) into `uploads_encrypted/` (`settings.upload_vault_dir`, overrideable via `UPLOAD_VAULT_DIR`).
 - **Tamper-Evident Audit Chain & SIEM Export**: Every state transition, ERP sync, alert dispatch, and template edit appends to a serialized, fork-proof **SHA-256 hash chain** (`AuditChainHead` + `GET /v1/requests/audit/verify`) exportable by Admins in **ArcSight/Wazuh `CEF:0` or JSON** (`GET /v1/system/siem-events`).
 - **HTTP Security Headers**: `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` on `/auth/*`, and production `Strict-Transport-Security`.
@@ -95,7 +95,7 @@ flowchart LR
 ### Option A — Local Development (Backend + Frontend)
 
 ```bash
-# 1. Backend (FastAPI on :8000 — auto-seeds demo users, 7 workflow templates & trains 5 sklearn models)
+# 1. Backend (FastAPI on :8000 — auto-seeds demo users, 5 workflow templates & trains 5 sklearn models)
 python3 -m venv .venv
 .venv/bin/pip install -r backend/requirements.txt
 cd backend && ../.venv/bin/uvicorn app.main:app --reload --port 8000

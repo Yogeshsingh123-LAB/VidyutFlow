@@ -13,7 +13,7 @@ Consumer / Subdivision Officer / Field JE / Executive / Admin (React 19 + TS · 
         │     └─ Vidyut Mitra role co-pilots: optional server-side Gemini (3,500ms deadline,
         │        read-only grounded tools) → automatic deterministic Grounded Engine fallback
         │
-        └── /api/* & /api/v1/* (Same-origin proxy · HttpOnly SameSite=Strict cookie + verified Bearer)
+        └── /api/* & /api/v1/* (Same-origin proxy · HttpOnly SameSite=Lax cookie + verified Bearer)
               ▼
 FastAPI Control Plane & Non-Invasive Enterprise API Gateway (50 Paths / 55 HTTP Operations)
  ├─ Auth, RBAC & Zone Isolation · HKDF-SHA256 + AES-256-GCM field & document vault encryption

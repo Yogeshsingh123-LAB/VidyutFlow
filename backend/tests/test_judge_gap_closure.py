@@ -206,6 +206,7 @@ def test_sap_odata_gateway_siem_export_encrypted_vault_and_dr_failover():
                 # Subdivision zone directory + Admin staff listing & duty status update (completing 55/55 op coverage)
                 zones_res = c.get("/v1/staff/zones", headers=officer)
                 assert zones_res.status_code == 200
+                assert "frame-ancestors 'none'" in zones_res.headers.get("Content-Security-Policy", "")
                 assert any(z["code"] == "North" for z in zones_res.json()["items"])
 
                 assert c.get("/v1/staff/members", headers=officer).status_code == 403

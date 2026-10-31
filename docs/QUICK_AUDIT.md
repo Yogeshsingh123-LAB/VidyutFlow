@@ -26,7 +26,7 @@
    - `feeder_load_model.joblib`: `GradientBoostingRegressor` 24h 11kV feeder/DTR kVA forecast — **`R² = 0.9790` · `MAE = 8.89 kVA`** (`GET /v1/assistant/load-forecast`)
    - Plus offline `TF-IDF` policy RAG + live zone-breach SQL Q&A (`/v1/assistant/chat`) + optional `3,500ms`-bounded server-side `Gemini` (`/api/ai-chat`), strictly governed by human-only officer approvals (`models_can_approve_or_reject = False`).
 5. **Defense-in-Depth Cybersecurity (`docs/SECURITY.md` & `SECURITY.md`)**:
-   - Zero `localStorage` tokens (`HttpOnly; SameSite=Strict` cookies + verified in-memory bridge), **HKDF-SHA256 + AES-256-GCM** field (`encrypt_field_aes256`) & KYC document vault (`VFENC1`) encryption at rest, `100%` parameterized ORM SQLi defense, XSS sanitization, `CSP`/`HSTS`/`X-Frame-Options: DENY`, fork-proof SHA-256 `AuditLog` hash chain, **ArcSight/Wazuh `CEF:0` SIEM export** (`/v1/system/siem-events`), and live crypto posture check (`/v1/system/security-posture`).
+   - Zero `localStorage` tokens (`HttpOnly; SameSite=Lax` cookies + verified in-memory bridge), **HKDF-SHA256 + AES-256-GCM** field (`encrypt_field_aes256`) & KYC document vault (`VFENC1`) encryption at rest, `100%` parameterized ORM SQLi defense, XSS sanitization, `CSP`/`HSTS`/`X-Frame-Options: DENY`, fork-proof SHA-256 `AuditLog` hash chain, **ArcSight/Wazuh `CEF:0` SIEM export** (`/v1/system/siem-events`), and live crypto posture check (`/v1/system/security-posture`).
 
 ---
 
@@ -42,7 +42,7 @@
 │   │   ├── audit.py                      # Serialized fork-proof SHA-256 hash chain (AuditChainHead)
 │   │   ├── security.py                   # bcrypt, JWT, HKDF-SHA256 + AES-256-GCM field cipher & XSS sanitizer
 │   │   ├── uploads.py                    # %PDF-/PNG/JPEG/UTF-8 magic-byte check + always-on VFENC1 AES-256-GCM vault (uploads_encrypted/)
-│   │   └── workflow.py                   # Configurable 7-template routing, validation & SLA engine
+│   │   └── workflow.py                   # Configurable 5-template routing, validation & SLA engine
 │   ├── data/benchmarks/                  # 54-item team-authored zero-overlap OOD complaint sanity-check set
 │   ├── scripts/                          # backup.sh, offsite_replicate.sh, dr_failover_drill.py, cold_start_dr_proof.py, audit_api_coverage.py, evaluate_realworld_benchmark.py
 │   └── tests/                            # 124 pytest tests covering 55/55 OpenAPI operations (100%)

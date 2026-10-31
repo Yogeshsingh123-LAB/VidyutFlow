@@ -6,7 +6,7 @@
 
 ## 1. Before vs. After Comparison (1 New-Connection Lifecycle)
 
-| Operational Metric | Disconnected Multi-Register Process (Illustrative Legacy Baseline) | VidyutFlow "Enter Once, Use Everywhere" (Measured in Code) | Measured Delta |
+| Operational Metric | Assumed Disconnected Legacy Baseline *(Not Measured — Pilot Baseline Target)* | VidyutFlow "Enter Once, Use Everywhere" (Measured in Code) | Structural Delta |
 | :--- | :--- | :--- | :--- |
 | **Applicant / Premise Fields Entered by Consumer** | 12 fields (paper / standalone portal form) | **12 fields** (`POST /v1/requests`, entered once) | Same consumer intake |
 | **Applicant / Premise Fields Re-Typed by Staff** | **23 field re-entries** *(9 at subdivision inward register + 6 on JE survey sheet + 8 into billing/ERP sanction screen)* | **0 fields re-typed** *(Officer, Field Engineer, and ERP adapter read the single `ConnectionRequest` record)* | **−23 re-entries (100% duplicate entry eliminated)** |

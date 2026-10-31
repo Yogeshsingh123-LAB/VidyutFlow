@@ -81,7 +81,7 @@ like data/maths → Role 3 · like servers/security → Role 4 · like writing/p
 - [x] Compose stack, Makefile targets, backup/demo-reset scripts, CORS allowlist, bcrypt/JWT *(in repo)*
 - [x] Test suite green from a clean machine (`make setup && make test`) — re-verify **weekly**
 - [ ] Before Nov 6: one full `make up` rehearsal on a clean checkout; change every demo password if the deck shows them publicly
-- [x] Own defense-in-depth security controls (`HttpOnly; SameSite=Strict` cookies, Redis-ready login throttle, `VFENC1` HKDF-SHA256 + AES-256-GCM upload & field encryption, SHA-256 hash-chained `AuditLog`, ArcSight/Wazuh `CEF:0` SIEM export, and `<60s` Primary → Hot-Standby DR failover drill) — [`docs/SECURITY.md`](SECURITY.md) & [`docs/DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md)
+- [x] Own defense-in-depth security controls (`HttpOnly; SameSite=Lax` cookies, Redis-ready login throttle, `VFENC1` HKDF-SHA256 + AES-256-GCM upload & field encryption, SHA-256 hash-chained `AuditLog`, ArcSight/Wazuh `CEF:0` SIEM export, and automated backup & local restore drill) — [`docs/SECURITY.md`](SECURITY.md) & [`docs/DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md)
 - [ ] Before Dec 2: offline fallback kit — pre-trained models, local DB backup, recorded demo (with Role 5) if Wi-Fi fails
 
 **Reviews:** every PR touching `security.py` / `deps.py` / CORS needs this role's approval.
@@ -147,7 +147,7 @@ deck file · demo video · portal submission · this file
 
 1. **Role 1 — Yogesh Kumar Singh (Backend, Workflow & Heterogeneous ERP Gateway)**:
    - **Files**: `backend/app/workflow.py`, `backend/app/routers/{requests,erp,workflows,staff}.py`.
-   - **Key Defense**: Explains the 7 configurable `WorkflowTemplate` definitions, least-loaded active zone auto-routing (`0` manual handoffs), and how `POST /v1/erp/gateway/propagate/{id}` + `GET /v1/erp/reconcile` synchronize **SAP S/4HANA FI-CA/IS-U OData v4 (`AUFNR` + `VKONT`)**, **e-Urja CIS Billing**, and **GUVNL 1912 CRM** without replacing legacy ERP systems (`0` re-typed fields).
+   - **Key Defense**: Explains the 5 seeded configurable `WorkflowTemplate` definitions (`new_connection`, `load_extension`, `meter_replacement`, `billing_dispute`, `outage_safety`), active zone auto-routing (`0` manual handoffs), and how `POST /v1/erp/gateway/propagate/{id}` + `GET /v1/erp/reconcile` synchronize simulated **SAP S/4HANA FI-CA/IS-U OData v4 (`AUFNR` + `VKONT`)**, **e-Urja CIS Billing**, and **GUVNL 1912 CRM** payloads without replacing legacy ERP systems (`0` re-typed fields).
 2. **Role 2 — Utsav (React 19 Frontend, Multilingual UX & Offline Field PWA)**:
    - **Files**: `frontend/src/components/{consumer,employee,field,management,admin,common}/`, `frontend/src/utils/{backendSession,offlineQueue}.ts`.
    - **Key Defense**: Explains 5 role-isolated portals, 4-language parity (`en`/`gu`/`hi`/`mr`) split into lazy chunks (`index-*.js < 230 kB`), `HttpOnly` cookie + tab-memory session verification (`BroadcastChannel` fail-closed), and IndexedDB `client_uuid` offline field sync.

@@ -133,7 +133,7 @@ def export_siem_security_events(
             "broken_at_id": chain_broken,
         },
         "security_posture_summary": {
-            "auth_cookie_mode": "HttpOnly; SameSite=Strict",
+            "auth_cookie_mode": "HttpOnly; SameSite=Lax",
             "rate_limiter_backend": "redis+memory_sliding_window",
             "upload_encryption": "HKDF-SHA256 + AES-256-GCM",
             "erp_dlq_failed_items": failed_erp,
@@ -221,7 +221,7 @@ def get_security_posture_and_crypto_selftest(
             "tamper_tag_rejection_verified": tamper_rejected,
         },
         "application_defenses": {
-            "session_storage": "HttpOnly; SameSite=Strict cookie + verified in-memory session bridge (zero localStorage JWTs)",
+            "session_storage": "HttpOnly; SameSite=Lax cookie + verified in-memory session bridge (zero localStorage JWTs)",
             "sqli_prevention": "100% SQLAlchemy bound parameters (zero string-concatenated SQL)",
             "xss_defense_verified": xss_sanitized_ok,
             "http_security_headers": [
