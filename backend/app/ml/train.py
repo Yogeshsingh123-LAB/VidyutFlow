@@ -47,15 +47,33 @@ def majority_baseline(y):
     return Counter(y).most_common(1)[0][1] / len(y)
 
 
-def classifier_metrics(y_true, y_pred, labels):
+def classifier_metrics(y_true, y_pred, labels, label_names=None):
+    matrix = confusion_matrix(y_true, y_pred, labels=labels)
+    display_labels = label_names or labels
+    per_class = {}
+    for i, label in enumerate(labels):
+        true_positive = int(matrix[i, i])
+        predicted = int(matrix[:, i].sum())
+        actual = int(matrix[i, :].sum())
+        precision = true_positive / predicted if predicted else 0.0
+        recall = true_positive / actual if actual else 0.0
+        per_class[str(display_labels[i])] = {
+            "precision": round(precision, 4),
+            "recall": round(recall, 4),
+            "f1": round(2 * precision * recall / (precision + recall), 4)
+            if precision + recall
+            else 0.0,
+            "support": actual,
+        }
     return {
         "accuracy": round(float(accuracy_score(y_true, y_pred)), 4),
         "balanced_accuracy": round(float(balanced_accuracy_score(y_true, y_pred)), 4),
         "precision_macro": round(float(precision_score(y_true, y_pred, average="macro", zero_division=0)), 4),
         "recall_macro": round(float(recall_score(y_true, y_pred, average="macro", zero_division=0)), 4),
         "f1_macro": round(float(f1_score(y_true, y_pred, average="macro", zero_division=0)), 4),
-        "labels": list(labels),
-        "confusion_matrix": confusion_matrix(y_true, y_pred, labels=labels).tolist(),
+        "labels": list(display_labels),
+        "per_class": per_class,
+        "confusion_matrix": matrix.tolist(),
         "test_size": len(y_true),
     }
 
@@ -170,7 +188,7 @@ def train(out_dir="app/ml/models"):
         "category_classifier": cat_metrics["category"],
         "severity_classifier": cat_metrics["severity"],
         "sla_breach_predictor": {
-            **classifier_metrics(list(yte_s), sla_pred, [0, 1]),
+            **classifier_metrics(list(yte_s), sla_pred, [0, 1], ["NO_BREACH", "BREACH"]),
             "triage_threshold": SLA_TRIAGE_THRESHOLD,
             "breach_precision": round(
                 float(precision_score(yte_s, sla_pred, pos_label=1, zero_division=0)), 4
@@ -184,7 +202,7 @@ def train(out_dir="app/ml/models"):
             "majority_baseline": round(float(majority_baseline(list(yte_s))), 4),
         },
         "billing_anomaly_detector": {
-            **classifier_metrics(y_bill_te, iso_pred, [0, 1]),
+            **classifier_metrics(y_bill_te, iso_pred, [0, 1], ["NORMAL", "ANOMALY"]),
             "anomaly_precision": round(
                 float(precision_score(y_bill_te, iso_pred, pos_label=1, zero_division=0)), 4
             ),

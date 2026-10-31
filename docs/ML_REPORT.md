@@ -16,6 +16,8 @@
 
 All metrics are persisted in [`backend/app/ml/models/metrics.json`](../backend/app/ml/models/metrics.json) and served live at `GET /v1/assistant/ml-metrics` and `GET /v1/assistant/ai-governance`.
 
+Classification metrics include per-class precision, recall, F1, and support alongside the confusion matrix. This makes weak categories visible even when an aggregate score looks strong; binary results use named classes such as `BREACH` and `ANOMALY` rather than opaque numeric labels.
+
 ---
 
 ## 2. Two-Stage Generalization Proof: Unseen Synthetic Holdout + 54-Item Team-Authored OOD Sanity-Check Set

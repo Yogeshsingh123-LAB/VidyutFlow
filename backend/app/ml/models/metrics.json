@@ -20,6 +20,44 @@
       "OUTAGE",
       "SAFETY"
     ],
+    "per_class": {
+      "BILLING": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 17
+      },
+      "METER_FAULT": {
+        "precision": 1.0,
+        "recall": 0.2941,
+        "f1": 0.4545,
+        "support": 17
+      },
+      "NEW_CONNECTION": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 17
+      },
+      "OTHER": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 17
+      },
+      "OUTAGE": {
+        "precision": 0.6296,
+        "recall": 1.0,
+        "f1": 0.7727,
+        "support": 17
+      },
+      "SAFETY": {
+        "precision": 0.8947,
+        "recall": 1.0,
+        "f1": 0.9444,
+        "support": 17
+      }
+    },
     "confusion_matrix": [
       [
         17,
@@ -85,6 +123,32 @@
       "LOW",
       "MEDIUM"
     ],
+    "per_class": {
+      "CRITICAL": {
+        "precision": 0.9444,
+        "recall": 1.0,
+        "f1": 0.9714,
+        "support": 17
+      },
+      "HIGH": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 17
+      },
+      "LOW": {
+        "precision": 0.7812,
+        "recall": 0.7353,
+        "f1": 0.7576,
+        "support": 34
+      },
+      "MEDIUM": {
+        "precision": 0.7429,
+        "recall": 0.7647,
+        "f1": 0.7536,
+        "support": 34
+      }
+    },
     "confusion_matrix": [
       [
         17,
@@ -121,9 +185,23 @@
     "recall_macro": 0.8392,
     "f1_macro": 0.835,
     "labels": [
-      0,
-      1
+      "NO_BREACH",
+      "BREACH"
     ],
+    "per_class": {
+      "NO_BREACH": {
+        "precision": 0.8947,
+        "recall": 0.787,
+        "f1": 0.8374,
+        "support": 108
+      },
+      "BREACH": {
+        "precision": 0.781,
+        "recall": 0.8913,
+        "f1": 0.8325,
+        "support": 92
+      }
+    },
     "confusion_matrix": [
       [
         85,
@@ -148,9 +226,23 @@
     "recall_macro": 0.9707,
     "f1_macro": 0.9202,
     "labels": [
-      0,
-      1
+      "NORMAL",
+      "ANOMALY"
     ],
+    "per_class": {
+      "NORMAL": {
+        "precision": 1.0,
+        "recall": 0.9415,
+        "f1": 0.9699,
+        "support": 188
+      },
+      "ANOMALY": {
+        "precision": 0.7708,
+        "recall": 1.0,
+        "f1": 0.8706,
+        "support": 37
+      }
+    },
     "confusion_matrix": [
       [
         177,
@@ -174,12 +266,12 @@
   },
   "ood_field_benchmark": {
     "benchmark_id": "gerc-ugvcl-public-cgrf-colloquial-v1",
-    "n_samples": 54,
+    "labeling_provenance": "team-authored OOD sanity-check set (not independent utility data)",
+    "sample_count": 54,
     "template_overlap_count": 0,
     "category_accuracy": 0.9074,
-    "category_f1_macro": 0.9013,
+    "category_macro_f1": 0.9013,
     "severity_accuracy": 0.9815,
-    "critical_safety_recall": 1.0,
-    "provenance_note": "Team-authored 54-item out-of-distribution (OOD) sanity-check set (not an independent utility-labeled dataset), grounded in public GERC Supply Code 2015, GERC Standard of Performance clauses, public Gujarat Electricity Ombudsman / CGRF terminology, and colloquial North Gujarat Hinglish/Gujarati-transliterated phrasings. Contains zero private citizen PII and verified zero template overlap with synthetic.py."
+    "critical_safety_recall": 1.0
   }
 }
