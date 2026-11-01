@@ -137,6 +137,7 @@ export const ManagementPortal: React.FC = () => {
         <div className="flex flex-col min-[420px]:flex-row sm:flex-nowrap items-stretch min-[420px]:items-center gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800/80 shrink-0">
           <select
             value={timePeriod}
+            aria-label="Select reporting period"
             onChange={e => setTimePeriod(e.target.value as any)}
             className="flex-1 sm:flex-initial min-h-11 sm:min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 dark:bg-[#131D31] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
           >

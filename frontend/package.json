@@ -35,7 +35,9 @@
     "test:request-status": "tsx tests/request-submission-status.test.ts",
     "test:load-policy": "tsx tests/demo-load-policy.test.ts",
     "test:backend-session": "tsx tests/backend-session-boundary.test.ts",
-    "test:document-upload": "tsx tests/document-upload.test.ts"
+    "test:document-upload": "tsx tests/document-upload.test.ts",
+    "test:playwright": "playwright test",
+    "test:playwright:a11y": "playwright test e2e/accessibility.spec.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -51,6 +53,8 @@
     "vite": "^8.3.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

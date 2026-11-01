@@ -43,3 +43,29 @@ jobs:
         run: cd frontend && npm run lint
       - name: Production build
         run: cd frontend && npm run build
+
+  playwright-e2e-a11y:
+    name: Playwright browser E2E & WCAG axe-core suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install backend & frontend dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          cd frontend && npm ci
+          npx playwright install --with-deps chromium --only-shell
+      - name: Start FastAPI backend & run Playwright Chromium E2E + a11y suite
+        run: |
+          cd backend && uvicorn app.main:app --host 127.0.0.1 --port 8008 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8008/health && break; sleep 1; done
+          cd ../frontend && npm run test:playwright
+
