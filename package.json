@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-tesseract-assets.mjs",
+    "predev:3000": "node scripts/copy-tesseract-assets.mjs",
     "dev": "vite --port=3000 --host=0.0.0.0",
     "start": "tsx src/server/prodServer.ts",
     "build": "node scripts/copy-tesseract-assets.mjs && vite build",

@@ -20,6 +20,7 @@ node_modules/
 dist/
 .vite/
 *.tsbuildinfo
+public/vendor/tesseract/
 .DS_Store
 playwright-report/
 test-results/
