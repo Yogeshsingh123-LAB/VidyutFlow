@@ -7,7 +7,7 @@ import { normalizeDisplayedReading, type MeterConfiguration, type MeterReadingRe
 import { enqueueOfflineMeterReading, isFieldEffectivelyOffline } from '../../utils/offlineFieldSync';
 import { validateExistingBill } from '../../services/billingValidation';
 
-type Copy = { title: string; subtitle: string; open: string; close: string; connection: string; meter: string; reading: string; date: string; multiplier: string; precision: string; config: string; saveConfig: string; configVersion: string; takePhoto: string; gallery: string; photoHelp: string; rotate: string; runOcr: string; readingCheck: string; identityCheck: string; localOcr: string; submit: string; pending: string; review: string; approve: string; reject: string; reread: string; note: string; noReadings: string; metrics: string; anomalies: string; history: string; confidence: string; billReview: string; expected: string; recorded: string; demo: string; privacy: string; queuedOffline: string; loading: string; error: string; retry: string; notifications: string; configHelp: string; };
+type Copy = { title: string; subtitle: string; open: string; close: string; connection: string; meter: string; reading: string; date: string; multiplier: string; precision: string; config: string; saveConfig: string; configVersion: string; takePhoto: string; capturePhoto: string; closeCamera: string; gallery: string; photoHelp: string; rotate: string; runOcr: string; readingCheck: string; identityCheck: string; localOcr: string; submit: string; pending: string; review: string; approve: string; reject: string; reread: string; note: string; noReadings: string; metrics: string; anomalies: string; history: string; confidence: string; billReview: string; expected: string; recorded: string; demo: string; privacy: string; queuedOffline: string; loading: string; error: string; retry: string; notifications: string; configHelp: string; };
 const EVENT_COPY = {
   en: { label: 'Reading event', ordinary: 'Ordinary', replacement: 'Meter replaced', rollover: 'Meter rollover', limit: 'Rollover limit' },
   gu: { label: 'રીડિંગ ઘટના', ordinary: 'સામાન્ય', replacement: 'મીટર બદલાયું', rollover: 'મીટર રોલઓવર', limit: 'રોલઓવર મર્યાદા' },
@@ -15,10 +15,10 @@ const EVENT_COPY = {
   mr: { label: 'रीडिंग घटना', ordinary: 'सामान्य', replacement: 'मीटर बदलले', rollover: 'मीटर रोलओव्हर', limit: 'रोलओव्हर मर्यादा' }
 } as const;
 const COPY: Record<'en' | 'gu' | 'hi' | 'mr', Copy> = {
-  en: { title: 'Meter Reading & Bill Review', subtitle: 'Photo assisted readings with human approval and explainable checks.', open: 'Open meter workspace', close: 'Close', connection: 'Connection', meter: 'Meter number', reading: 'Reading shown on meter', date: 'Reading date', multiplier: 'Meter multiplier', precision: 'Decimal places', config: 'Meter configuration', saveConfig: 'Save meter configuration', configVersion: 'Configuration version', takePhoto: 'Take a photo', gallery: 'Choose from gallery', photoHelp: 'Frame the complete display and meter label. JPEG, PNG or WebP up to 5 MiB.', rotate: 'Rotate', runOcr: 'Read photo on this device', readingCheck: 'Review the detected digits. Correct them before submission if needed.', identityCheck: 'The meter label is not treated as verified unless a reviewer confirms it.', localOcr: 'OCR runs on this device. The image is not sent to an AI provider. The English OCR model may download from the Tesseract project CDN on first use.', submit: 'Submit for employee review', pending: 'Pending review', review: 'Readings to review', approve: 'Approve reading', reject: 'Reject', reread: 'Request re-reading', note: 'Review note', noReadings: 'No meter readings have been submitted.', metrics: 'Reading quality overview', anomalies: 'Review flags', history: 'Verified history', confidence: 'OCR confidence', billReview: 'Read-only bill validation', expected: 'Expected', recorded: 'Recorded', demo: 'DEMO data · not an official UGVCL billing decision', privacy: 'Photos are re-encoded to remove metadata and held privately in the demo server memory. They are unavailable after that server restarts.', queuedOffline: 'Reading and photo saved in the Field Engineer offline queue.', loading: 'Working…', error: 'The request could not be completed.', retry: 'Try again', notifications: 'Notifications', configHelp: 'Configure these values from the meter nameplate or verified utility records. Seeded demo defaults are not verified meter specifications.' },
-  gu: { title: 'મીટર રીડિંગ અને બિલ સમીક્ષા', subtitle: 'ફોટોથી સહાયિત રીડિંગ, માનવીય મંજૂરી અને સમજાવી શકાય તેવી તપાસ.', open: 'મીટર વર્કસ્પેસ ખોલો', close: 'બંધ કરો', connection: 'કનેક્શન', meter: 'મીટર નંબર', reading: 'મીટર પરનું રીડિંગ', date: 'રીડિંગની તારીખ', multiplier: 'મીટર ગુણક', precision: 'દશાંશ સ્થાન', config: 'મીટર ગોઠવણી', saveConfig: 'મીટર ગોઠવણી સાચવો', configVersion: 'ગોઠવણી આવૃત્તિ', takePhoto: 'ફોટો લો', gallery: 'ગેલેરીમાંથી પસંદ કરો', photoHelp: 'આખું ડિસ્પ્લે અને મીટર લેબલ ફ્રેમમાં લો. 5 MiB સુધી JPEG, PNG અથવા WebP.', rotate: 'ફેરવો', runOcr: 'આ ઉપકરણ પર ફોટો વાંચો', readingCheck: 'મળેલા અંકો તપાસો. સબમિટ કરતાં પહેલાં જરૂર હોય તો સુધારો.', identityCheck: 'સમીક્ષક પુષ્ટિ કરે ત્યાં સુધી મીટર લેબલ ચકાસાયેલ ગણાતું નથી.', localOcr: 'OCR આ ઉપકરણ પર ચાલે છે. ફોટો AI પ્રદાતાને મોકલાતો નથી. પ્રથમ ઉપયોગે અંગ્રેજી OCR મોડેલ Tesseract CDN પરથી ડાઉનલોડ થઈ શકે છે.', submit: 'કર્મચારી સમીક્ષા માટે મોકલો', pending: 'સમીક્ષા બાકી', review: 'સમીક્ષા માટેના રીડિંગ', approve: 'રીડિંગ મંજૂર કરો', reject: 'નકારો', reread: 'ફરીથી રીડિંગ માંગો', note: 'સમીક્ષા નોંધ', noReadings: 'કોઈ મીટર રીડિંગ સબમિટ થયું નથી.', metrics: 'રીડિંગ ગુણવત્તા સારાંશ', anomalies: 'સમીક્ષા ચિહ્નો', history: 'ચકાસાયેલ ઇતિહાસ', confidence: 'OCR વિશ્વાસ', billReview: 'ફક્ત વાંચવા માટે બિલ તપાસ', expected: 'અપેક્ષિત', recorded: 'નોંધાયેલ', demo: 'DEMO ડેટા · સત્તાવાર UGVCL બિલિંગ નિર્ણય નથી', privacy: 'મેટાડેટા દૂર કરવા ફોટો ફરી એન્કોડ થાય છે અને ડેમો સર્વર મેમરીમાં ખાનગી રહે છે. સર્વર ફરી શરૂ થાય પછી ઉપલબ્ધ નહીં હોય.', queuedOffline: 'રીડિંગ અને ફોટો Field Engineer ઓફલાઇન કતારમાં સાચવ્યા.', loading: 'પ્રક્રિયા ચાલુ…', error: 'વિનંતી પૂર્ણ થઈ શકી નથી.', retry: 'ફરી પ્રયાસ કરો', notifications: 'સૂચનાઓ', configHelp: 'મીટર પ્લેટ અથવા ચકાસેલા યુટિલિટી રેકોર્ડ મુજબ આ મૂલ્યો ગોઠવો. ડેમોના મૂળભૂત મૂલ્યો ચકાસેલી મીટર વિગતો નથી.' },
-  hi: { title: 'मीटर रीडिंग और बिल समीक्षा', subtitle: 'फोटो से सहायता, मानव स्वीकृति और समझने योग्य जाँच।', open: 'मीटर कार्यक्षेत्र खोलें', close: 'बंद करें', connection: 'कनेक्शन', meter: 'मीटर नंबर', reading: 'मीटर पर दिखी रीडिंग', date: 'रीडिंग की तारीख', multiplier: 'मीटर गुणक', precision: 'दशमलव स्थान', config: 'मीटर कॉन्फ़िगरेशन', saveConfig: 'मीटर कॉन्फ़िगरेशन सहेजें', configVersion: 'कॉन्फ़िगरेशन संस्करण', takePhoto: 'फोटो लें', gallery: 'गैलरी से चुनें', photoHelp: 'पूरा डिस्प्ले और मीटर लेबल फ्रेम में रखें। 5 MiB तक JPEG, PNG या WebP।', rotate: 'घुमाएँ', runOcr: 'इस डिवाइस पर फोटो पढ़ें', readingCheck: 'पहचाने गए अंक जाँचें। सबमिट करने से पहले ज़रूरत हो तो सुधारें।', identityCheck: 'समीक्षक की पुष्टि तक मीटर लेबल सत्यापित नहीं माना जाएगा।', localOcr: 'OCR इसी डिवाइस पर चलता है। फोटो किसी AI प्रदाता को नहीं भेजी जाती। पहली बार अंग्रेज़ी OCR मॉडल Tesseract CDN से डाउनलोड हो सकता है।', submit: 'कर्मचारी समीक्षा के लिए भेजें', pending: 'समीक्षा लंबित', review: 'समीक्षा हेतु रीडिंग', approve: 'रीडिंग स्वीकृत करें', reject: 'अस्वीकार करें', reread: 'दोबारा रीडिंग माँगें', note: 'समीक्षा टिप्पणी', noReadings: 'कोई मीटर रीडिंग सबमिट नहीं हुई।', metrics: 'रीडिंग गुणवत्ता सारांश', anomalies: 'समीक्षा संकेत', history: 'सत्यापित इतिहास', confidence: 'OCR विश्वास', billReview: 'केवल-पठन बिल जाँच', expected: 'अपेक्षित', recorded: 'दर्ज', demo: 'DEMO डेटा · आधिकारिक UGVCL बिलिंग निर्णय नहीं', privacy: 'मेटाडेटा हटाने के लिए फोटो दोबारा एन्कोड होती है और डेमो सर्वर मेमोरी में निजी रहती है। सर्वर रीस्टार्ट के बाद उपलब्ध नहीं होगी।', queuedOffline: 'रीडिंग और फोटो Field Engineer ऑफलाइन कतार में सहेजी गई।', loading: 'काम हो रहा है…', error: 'अनुरोध पूरा नहीं हुआ।', retry: 'फिर प्रयास करें', notifications: 'सूचनाएँ', configHelp: 'मीटर नेमप्लेट या सत्यापित उपयोगिता रिकॉर्ड से ये मान तय करें। डेमो के शुरुआती मान सत्यापित मीटर विनिर्देश नहीं हैं।' },
-  mr: { title: 'मीटर रीडिंग आणि बिल पुनरावलोकन', subtitle: 'फोटो सहाय्यित रीडिंग, मानवी मंजुरी आणि समजण्याजोग्या तपासण्या.', open: 'मीटर कार्यक्षेत्र उघडा', close: 'बंद करा', connection: 'जोडणी', meter: 'मीटर क्रमांक', reading: 'मीटरवरील रीडिंग', date: 'रीडिंगची तारीख', multiplier: 'मीटर गुणक', precision: 'दशांश स्थाने', config: 'मीटर संरचना', saveConfig: 'मीटर संरचना जतन करा', configVersion: 'संरचना आवृत्ती', takePhoto: 'फोटो काढा', gallery: 'गॅलरीतून निवडा', photoHelp: 'पूर्ण डिस्प्ले आणि मीटर लेबल फ्रेममध्ये घ्या. 5 MiB पर्यंत JPEG, PNG किंवा WebP.', rotate: 'फिरवा', runOcr: 'या उपकरणावर फोटो वाचा', readingCheck: 'ओळखलेले अंक तपासा. सबमिट करण्यापूर्वी आवश्यक असल्यास दुरुस्त करा.', identityCheck: 'पुनरावलोककाने खात्री करेपर्यंत मीटर लेबल पडताळलेले मानले जाणार नाही.', localOcr: 'OCR या उपकरणावर चालते. फोटो AI पुरवठादाराकडे पाठवला जात नाही. पहिल्या वापरावेळी इंग्रजी OCR मॉडेल Tesseract CDN वरून डाउनलोड होऊ शकते.', submit: 'कर्मचारी पुनरावलोकनासाठी पाठवा', pending: 'पुनरावलोकन बाकी', review: 'पुनरावलोकनासाठी रीडिंग', approve: 'रीडिंग मंजूर करा', reject: 'नकारा', reread: 'पुन्हा रीडिंग मागवा', note: 'पुनरावलोकन नोंद', noReadings: 'कोणतेही मीटर रीडिंग सबमिट केलेले नाही.', metrics: 'रीडिंग गुणवत्ता सारांश', anomalies: 'पुनरावलोकन सूचना', history: 'पडताळलेला इतिहास', confidence: 'OCR विश्वास', billReview: 'केवळ-वाचन बिल तपासणी', expected: 'अपेक्षित', recorded: 'नोंदलेले', demo: 'DEMO डेटा · अधिकृत UGVCL बिलिंग निर्णय नाही', privacy: 'मेटाडेटा काढण्यासाठी फोटो पुन्हा एन्कोड केला जातो आणि डेमो सर्व्हर मेमरीमध्ये खाजगी ठेवला जातो. सर्व्हर रीस्टार्टनंतर उपलब्ध नसेल.', queuedOffline: 'रीडिंग आणि फोटो Field Engineer ऑफलाइन रांगेत जतन केले.', loading: 'काम सुरू आहे…', error: 'विनंती पूर्ण होऊ शकली नाही.', retry: 'पुन्हा प्रयत्न करा', notifications: 'सूचना', configHelp: 'मीटर नेमप्लेट किंवा पडताळलेल्या उपयोगिता नोंदींवरून ही मूल्ये ठरवा. डेमोचे सुरुवातीचे मूल्य हे पडताळलेले मीटर तपशील नाहीत.' }
+  en: { title: 'Meter Reading & Bill Review', subtitle: 'Photo assisted readings with human approval and explainable checks.', open: 'Open meter workspace', close: 'Close', connection: 'Connection', meter: 'Meter number', reading: 'Reading shown on meter', date: 'Reading date', multiplier: 'Meter multiplier', precision: 'Decimal places', config: 'Meter configuration', saveConfig: 'Save meter configuration', configVersion: 'Configuration version', takePhoto: 'Take a photo', capturePhoto: 'Capture photo', closeCamera: 'Close camera', gallery: 'Choose from gallery', photoHelp: 'Frame the complete display and meter label. JPEG, PNG or WebP up to 5 MiB.', rotate: 'Rotate', runOcr: 'Read photo on this device', readingCheck: 'Review the detected digits. Correct them before submission if needed.', identityCheck: 'The meter label is not treated as verified unless a reviewer confirms it.', localOcr: 'OCR runs on this device. The image is not sent to an AI provider. The English OCR model may download from the Tesseract project CDN on first use.', submit: 'Submit for employee review', pending: 'Pending review', review: 'Readings to review', approve: 'Approve reading', reject: 'Reject', reread: 'Request re-reading', note: 'Review note', noReadings: 'No meter readings have been submitted.', metrics: 'Reading quality overview', anomalies: 'Review flags', history: 'Verified history', confidence: 'OCR confidence', billReview: 'Read-only bill validation', expected: 'Expected', recorded: 'Recorded', demo: 'DEMO data · not an official UGVCL billing decision', privacy: 'Photos are re-encoded to remove metadata and held privately in the demo server memory. They are unavailable after that server restarts.', queuedOffline: 'Reading and photo saved in the Field Engineer offline queue.', loading: 'Working…', error: 'The request could not be completed.', retry: 'Try again', notifications: 'Notifications', configHelp: 'Configure these values from the meter nameplate or verified utility records. Seeded demo defaults are not verified meter specifications.' },
+  gu: { title: 'મીટર રીડિંગ અને બિલ સમીક્ષા', subtitle: 'ફોટોથી સહાયિત રીડિંગ, માનવીય મંજૂરી અને સમજાવી શકાય તેવી તપાસ.', open: 'મીટર વર્કસ્પેસ ખોલો', close: 'બંધ કરો', connection: 'કનેક્શન', meter: 'મીટર નંબર', reading: 'મીટર પરનું રીડિંગ', date: 'રીडिंगની તારીખ', multiplier: 'મીટર ગુણક', precision: 'દશાંશ સ્થાન', config: 'મીટર ગોઠવણી', saveConfig: 'મીટર ગોઠવણી સાચવો', configVersion: 'ગોઠવણી આવૃત્તિ', takePhoto: 'ફોટો લો', capturePhoto: 'ફોટો કેપ્ચર કરો', closeCamera: 'કેમેરા બંધ કરો', gallery: 'ગેલેરીમાંથી પસંદ કરો', photoHelp: 'આખું ડિસ્પ્લે અને મીટર લેબલ ફ્રેમમાં લો. 5 MiB સુધી JPEG, PNG અથવા WebP.', rotate: 'ફેરવો', runOcr: 'આ ઉપકરણ પર ફોટો વાંચો', readingCheck: 'મળેલા અંકો તપાસો. સબમિટ કરતાં પહેલાં જરૂર હોય તો સુધારો.', identityCheck: 'સમીક્ષક પુષ્ટિ કરે ત્યાં સુધી મીટર લેબલ ચકાસાયેલ ગણાતું નથી.', localOcr: 'OCR આ ઉપકરણ પર ચાલે છે. ફોટો AI પ્રદાતાને મોકલાતો નથી. પ્રથમ ઉપયોગે અંગ્રેજી OCR મોડેલ Tesseract CDN પરથી ડાઉનલોડ થઈ શકે છે.', submit: 'કર્મચારી સમીક્ષા માટે મોકલો', pending: 'સમીક્ષા બાકી', review: 'સમીક્ષા માટેના રીડિંગ', approve: 'રીડિંગ મંજૂર કરો', reject: 'નકારો', reread: 'ફરીથી રીડિંગ માંગો', note: 'સમીક્ષા નોંધ', noReadings: 'કોઈ મીટર રીડિંગ સબમિટ થયું નથી.', metrics: 'રીડિંગ ગુણવત્તા સારાંશ', anomalies: 'સમીક્ષા ચિહ્નો', history: 'ચકાસાયેલ ઇતિહાસ', confidence: 'OCR વિશ્વાસ', billReview: 'ફક્ત વાંચવા માટે બિલ તપાસ', expected: 'અપેક્ષિત', recorded: 'નોંધાયેલ', demo: 'DEMO ડેટા · સત્તાવાર UGVCL બિલિંગ નિર્ણય નથી', privacy: 'મેટાડેટા દૂર કરવા ફોટો ફરી એન્કોડ થાય છે અને ડેમો સર્વર મેમરીમાં ખાનગી રહે છે. સર્વર ફરી શરૂ થાય પછી ઉપલબ્ધ નહીં હોય.', queuedOffline: 'રીडिंग અને ફોટો Field Engineer ઓફલાઇન કતારમાં સાચવ્યા.', loading: 'પ્રક્રિયા ચાલુ…', error: 'વિનંતી પૂર્ણ થઈ શકી નથી.', retry: 'ફરી પ્રયાસ કરો', notifications: 'સૂચનાઓ', configHelp: 'મીટર પ્લેટ અથવા ચકાસેલા યુટિલિટી રેકોર્ડ મુજબ આ મૂલ્યો ગોઠવો. ડેમોના મૂળભૂત મૂલ્યો ચકાસેલી મીટર વિગતો નથી.' },
+  hi: { title: 'मीटर रीडिंग और बिल समीक्षा', subtitle: 'फोटो से सहायता, मानव स्वीकृति और समझने योग्य जाँच।', open: 'मीटर कार्यक्षेत्र खोलें', close: 'बंद करें', connection: 'कनेक्शन', meter: 'मीटर नंबर', reading: 'मीटर पर दिखी रीडिंग', date: 'रीडिंग की तारीख', multiplier: 'मीटर गुणक', precision: 'दशमलव स्थान', config: 'मीटर कॉन्फ़िगरेशन', saveConfig: 'मीटर कॉन्फ़िगरेशन सहेजें', configVersion: 'कॉन्फ़िगरेशन संस्करण', takePhoto: 'फोटो लें', capturePhoto: 'फोटो कैप्चर करें', closeCamera: 'कैमरा बंद करें', gallery: 'गैलरी से चुनें', photoHelp: 'पूरा डिस्प्ले और मीटर लेबल फ्रेम में रखें। 5 MiB तक JPEG, PNG या WebP।', rotate: 'घुमाएँ', runOcr: 'इस डिवाइस पर फोटो पढ़ें', readingCheck: 'पहचाने गए अंक जाँचें। सबमिट करने से पहले ज़रूरत हो तो सुधारें।', identityCheck: 'समीक्षक की पुष्टि तक मीटर लेबल सत्यापित नहीं माना जाएगा।', localOcr: 'OCR इसी डिवाइस पर चलता है। फोटो किसी AI प्रदाता को नहीं भेजी जाती। पहली बार अंग्रेज़ी OCR मॉडल Tesseract CDN से डाउनलोड हो सकता है।', submit: 'कर्मचारी समीक्षा के लिए भेजें', pending: 'समीक्षा लंबित', review: 'समीक्षा हेतु रीडिंग', approve: 'रीडिंग स्वीकृत करें', reject: 'अस्वीकार करें', reread: 'दोबारा रीडिंग माँगें', note: 'समीक्षा टिप्पणी', noReadings: 'कोई मीटर रीडिंग सबमिट नहीं हुई।', metrics: 'रीडिंग गुणवत्ता सारांश', anomalies: 'समीक्षा संकेत', history: 'सत्यापित इतिहास', confidence: 'OCR विश्वास', billReview: 'केवल-पठन बिल जाँच', expected: 'अपेक्षित', recorded: 'दर्ज', demo: 'DEMO डेटा · आधिकारिक UGVCL बिलिंग निर्णय नहीं', privacy: 'मेटाडेटा हटाने के लिए फोटो दोबारा एन्कोड होती है और डेमो सर्वर मेमोरी में निजी रहती है। सर्वर रीस्टार्ट के बाद उपलब्ध नहीं होगी।', queuedOffline: 'रीडिंग और फोटो Field Engineer ऑफलाइन कतार में सहेजी गई।', loading: 'काम हो रहा है…', error: 'अनुरोध पूरा नहीं हुआ।', retry: 'फिर प्रयास करें', notifications: 'सूचनाएँ', configHelp: 'मीटर नेमप्लेट या सत्यापित उपयोगिता रिकॉर्ड से ये मान तय करें। डेमो के शुरुआती मान सत्यापित मीटर विनिर्देश नहीं हैं।' },
+  mr: { title: 'मीटर रीडिंग आणि बिल पुनरावलोकन', subtitle: 'फोटो सहाय्यित रीडिंग, मानवी मंजुरी आणि समजण्याजोग्या तपासण्या.', open: 'मीटर कार्यक्षेत्र उघडा', close: 'बंद करा', connection: 'जोडणी', meter: 'मीटर क्रमांक', reading: 'मीटरवरील रीडिंग', date: 'रीडिंगची तारीख', multiplier: 'मीटर गुणक', precision: 'दशांश स्थाने', config: 'मीटर संरचना', saveConfig: 'मीटर संरचना जतन करा', configVersion: 'संरचना आवृत्ती', takePhoto: 'फोटो काढा', capturePhoto: 'फोटो टिपा', closeCamera: 'कॅमेरा बंद करा', gallery: 'गॅलरीतून निवडा', photoHelp: 'पूर्ण डिस्प्ले आणि मीटर लेबल फ्रेममध्ये घ्या. 5 MiB पर्यंत JPEG, PNG किंवा WebP.', rotate: 'फिरवा', runOcr: 'या उपकरणावर फोटो वाचा', readingCheck: 'ओळखलेले अंक तपासा. सबमिट करण्यापूर्वी आवश्यक असल्यास दुरुस्त करा.', identityCheck: 'पुनरावलोककाने खात्री करेपर्यंत मीटर लेबल पडताळलेले मानले जाणार नाही.', localOcr: 'OCR या उपकरणावर चालते. फोटो AI पुरवठादाराकडे पाठवला जात नाही. पहिल्या वापरावेळी इंग्रजी OCR मॉडेल Tesseract CDN वरून डाउनलोड होऊ शकते.', submit: 'कर्मचारी पुनरावलोकनासाठी पाठवा', pending: 'पुनरावलोकन बाकी', review: 'पुनरावलोकनासाठी रीडिंग', approve: 'रीडिंग मंजूर करा', reject: 'नकारा', reread: 'पुन्हा रीडिंग मागवा', note: 'पुनरावलोकन नोंद', noReadings: 'कोणतेही मीटर रीडिंग सबमिट केलेले नाही.', metrics: 'रीडिंग गुणवत्ता सारांश', anomalies: 'पुनरावलोकन सूचना', history: 'पडताळलेला इतिहास', confidence: 'OCR विश्वास', billReview: 'केवळ-वाचन बिल तपासणी', expected: 'अपेक्षित', recorded: 'नोंदलेले', demo: 'DEMO डेटा · अधिकृत UGVCL बिलिंग निर्णय नाही', privacy: 'मेटाडेटा काढण्यासाठी फोटो पुन्हा एन्कोड केला जातो आणि डेमो सर्व्हर मेमरीमध्ये खाजगी ठेवला जातो. सर्व्हर रीस्टार्टनंतर उपलब्ध नसेल.', queuedOffline: 'रीडिंग आणि फोटो Field Engineer ऑफलाइन रांगेत जतन केले.', loading: 'काम सुरू आहे…', error: 'विनंती पूर्ण होऊ शकली नाही.', retry: 'पुन्हा प्रयत्न करा', notifications: 'सूचना', configHelp: 'मीटर नेमप्लेट किंवा पडताळलेल्या उपयोगिता नोंदींवरून ही मूल्ये ठरवा. डेमोचे सुरुवातीचे मूल्य हे पडताळलेले मीटर तपशील नाहीत.' }
 };
 
 async function request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
@@ -43,7 +43,11 @@ export const MeterReadingWorkspace: React.FC = () => {
   const [meterEvent, setMeterEvent] = useState<'ordinary' | 'replacement' | 'rollover'>('ordinary');
   const [file, setFile] = useState<File | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const openRef = useRef(open);
+  openRef.current = open;
   const cameraVideo = useRef<HTMLVideoElement>(null);
+  const requestedPhotoIds = useRef<Set<string>>(new Set());
   const [preview, setPreview] = useState('');
   const [photoPayload, setPhotoPayload] = useState('');
   const [rotation, setRotation] = useState(0);
@@ -61,24 +65,48 @@ export const MeterReadingWorkspace: React.FC = () => {
   const visibleBills = currentRole === 'consumer' ? userBills : bills;
   const visiblePayments = currentRole === 'consumer' ? userPayments : payments;
 
+  const closeCamera = () => {
+    cameraStreamRef.current?.getTracks().forEach(track => track.stop());
+    cameraStreamRef.current = null;
+    if (cameraVideo.current) cameraVideo.current.srcObject = null;
+    setCameraStream(prev => {
+      prev?.getTracks().forEach(track => track.stop());
+      return null;
+    });
+  };
+
   useEffect(() => {
-    if (cameraVideo.current && cameraStream) cameraVideo.current.srcObject = cameraStream;
-    return () => cameraStream?.getTracks().forEach(track => track.stop());
-  }, [cameraStream]);
+    if (open && cameraVideo.current && cameraStream) {
+      cameraVideo.current.srcObject = cameraStream;
+    }
+  }, [open, cameraStream]);
+
+  useEffect(() => {
+    if (!open || (currentRole !== 'consumer' && currentRole !== 'field')) {
+      closeCamera();
+    }
+  }, [open, currentRole, demoSession?.user.id]);
+
+  useEffect(() => () => {
+    cameraStreamRef.current?.getTracks().forEach(track => track.stop());
+    cameraStreamRef.current = null;
+  }, []);
 
   const startCamera = async () => {
     setError('');
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera access requires HTTPS or localhost and a browser that supports camera access.');
-      setCameraStream(await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }));
+      closeCamera();
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+      if (!openRef.current) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      cameraStreamRef.current = stream;
+      setCameraStream(stream);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to open the camera. Check browser camera permission and try again.');
     }
-  };
-
-  const closeCamera = () => {
-    cameraStream?.getTracks().forEach(track => track.stop());
-    setCameraStream(null);
   };
 
   const captureCameraPhoto = () => {
@@ -115,6 +143,7 @@ export const MeterReadingWorkspace: React.FC = () => {
     } catch (err) { setError(err instanceof Error ? err.message : text.error); }
   };
 
+  useEffect(() => { requestedPhotoIds.current.clear(); setReviewPhotos({}); }, [demoSession?.user.id]);
   useEffect(() => { if (open && demoSession) void refresh(); }, [open, demoSession, currentRole]);
   useEffect(() => {
     if (!open || !selectedConnection || currentRole === 'management') return;
@@ -123,10 +152,11 @@ export const MeterReadingWorkspace: React.FC = () => {
   useEffect(() => {
     if (!open || !isStaffReview) return;
     for (const record of records) {
-      if (!record.photoId || reviewPhotos[record.id]) continue;
+      if (!record.photoId || reviewPhotos[record.id] || requestedPhotoIds.current.has(record.id)) continue;
+      requestedPhotoIds.current.add(record.id);
       void request<{ photo: string }>(`/api/meter-readings/${record.id}/photo`).then(result => setReviewPhotos(current => ({ ...current, [record.id]: result.photo }))).catch(() => undefined);
     }
-  }, [open, isStaffReview, records, reviewPhotos]);
+  }, [open, isStaffReview, records]);
   useEffect(() => { if (!candidates.some(c => c.consumerNo === connectionNo)) setConnectionNo(candidates[0]?.consumerNo || ''); }, [candidates, connectionNo]);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
@@ -134,6 +164,7 @@ export const MeterReadingWorkspace: React.FC = () => {
     if (!next) return;
     const issue = validateMeterPhoto(next);
     if (issue) { setError(issue); return; }
+    closeCamera();
     if (preview) URL.revokeObjectURL(preview);
     setFile(next);
     setPreview(URL.createObjectURL(next));
@@ -163,14 +194,19 @@ export const MeterReadingWorkspace: React.FC = () => {
     setBusy(true); setError('');
     try {
       if (!meterConfiguration) throw new Error('The administrator-configured meter format is not available.');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(readingAt) || Number.isNaN(Date.parse(`${readingAt}T12:00:00Z`))) {
+        throw new Error('Choose a valid reading date.');
+      }
+      const readingIso = new Date(`${readingAt}T12:00:00Z`).toISOString();
       const normalized = normalizeDisplayedReading(reading, meterConfiguration.decimalPlaces);
+      closeCamera();
       if (currentRole === 'field' && isFieldEffectivelyOffline(isOfflineSimulated)) {
         let offlinePhoto: Blob | undefined;
         if (file) offlinePhoto = await prepareMeterPhoto(file, rotation);
         await enqueueOfflineMeterReading({
           requestId: selectedConnection.consumerNo, title: `Meter reading · ${selectedConnection.consumerNo}`,
           actorEmail: demoSession?.user.email || activeUser.email || '',
-          meterReading: { consumerNo: selectedConnection.consumerNo, meterNo: meterConfiguration.meterNo, displayedReading: reading.trim(), readingKwh: normalized, multiplier: meterConfiguration.multiplier, readingAt: new Date(`${readingAt}T12:00:00Z`).toISOString(), decimalPlaces: meterConfiguration.decimalPlaces, meterEvent, ...(ocr ? { ocr } : {}) },
+          meterReading: { consumerNo: selectedConnection.consumerNo, meterNo: meterConfiguration.meterNo, displayedReading: reading.trim(), readingKwh: normalized, multiplier: meterConfiguration.multiplier, readingAt: readingIso, decimalPlaces: meterConfiguration.decimalPlaces, meterEvent, ...(ocr ? { ocr } : {}) },
           ...(offlinePhoto ? { photo: offlinePhoto } : {})
         });
         setReading(''); setFile(null); setOcr(undefined); setPhotoPayload(''); setPreview('');
@@ -186,7 +222,7 @@ export const MeterReadingWorkspace: React.FC = () => {
       await request('/api/meter-readings', 'POST', {
         clientUuid: crypto.randomUUID(), consumerNo: selectedConnection.consumerNo,
         meterNo: meterConfiguration.meterNo, displayedReading: reading.trim(), readingKwh: normalized,
-        multiplier: meterConfiguration.multiplier, readingAt: new Date(`${readingAt}T12:00:00Z`).toISOString(), decimalPlaces: meterConfiguration.decimalPlaces, meterEvent,
+        multiplier: meterConfiguration.multiplier, readingAt: readingIso, decimalPlaces: meterConfiguration.decimalPlaces, meterEvent,
         ...(ocr ? { ocr } : {}), ...(submittedPhotoPayload ? { photoDataUrl: submittedPhotoPayload } : {})
       });
       setReading(''); setFile(null); setOcr(undefined); setPhotoPayload(''); setPreview('');
@@ -256,7 +292,7 @@ export const MeterReadingWorkspace: React.FC = () => {
           <div className="space-y-3 rounded-xl border border-dashed border-slate-300 p-3 dark:border-slate-700">
             <p className="text-xs text-slate-600 dark:text-slate-300">{text.photoHelp}</p>
             <div className="flex flex-wrap gap-2"><button type="button" onClick={() => cameraStream ? closeCamera() : void startCamera()} className="rounded-lg border px-3 py-2 text-xs font-semibold"><Camera className="mr-1 inline" size={15} />{text.takePhoto}</button><label className="cursor-pointer rounded-lg border px-3 py-2 text-xs font-semibold"><Upload className="mr-1 inline" size={15} />{text.gallery}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={event => chooseFile(event.target.files?.[0] || null)} /></label>{file && <button type="button" onClick={() => setRotation(value => (value + 90) % 360)} className="rounded-lg border px-3 py-2 text-xs"><RotateCw className="mr-1 inline" size={14} />{text.rotate}</button>}</div>
-            {cameraStream && <div className="space-y-2"><video ref={cameraVideo} autoPlay playsInline muted className="max-h-80 w-full rounded-lg bg-black object-contain" /><div className="flex gap-2"><button type="button" onClick={captureCameraPhoto} className="rounded-lg bg-cyan-700 px-3 py-2 text-xs font-semibold text-white">Capture photo</button><button type="button" onClick={closeCamera} className="rounded-lg border px-3 py-2 text-xs">Close camera</button></div></div>}
+            {cameraStream && <div className="space-y-2"><video ref={cameraVideo} autoPlay playsInline muted className="max-h-80 w-full rounded-lg bg-black object-contain" /><div className="flex gap-2"><button type="button" onClick={captureCameraPhoto} className="rounded-lg bg-cyan-700 px-3 py-2 text-xs font-semibold text-white">{text.capturePhoto}</button><button type="button" onClick={closeCamera} className="rounded-lg border px-3 py-2 text-xs">{text.closeCamera}</button></div></div>}
             {preview && <img src={preview} alt="Meter photo preview" className="max-h-64 w-full rounded-lg bg-slate-100 object-contain" style={{ transform: `rotate(${rotation}deg)` }} />}
             {file && <button type="button" disabled={busy} onClick={() => void runOcr()} className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? `${text.loading} ${progress}%` : text.runOcr}</button>}
             {ocr && <div className="rounded-lg bg-cyan-50 p-3 text-xs text-cyan-950 dark:bg-cyan-950/40 dark:text-cyan-100"><strong>{text.readingCheck}</strong><p className="mt-1">{ocr.candidateReading || '—'} · {text.confidence}: {ocr.confidence === undefined ? 'not provided' : `${ocr.confidence}%`}</p><p className="mt-1 break-all text-slate-500">{ocr.rawText}</p></div>}

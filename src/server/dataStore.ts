@@ -620,6 +620,9 @@ export class ServerDataStore {
 
   public setMeterConfiguration(signedToken: string, input: { consumerNo: string; multiplier: number; decimalPlaces: number; rolloverAt?: number }, nowMs?: number): MeterConfiguration {
     const session = requireServerRole(this.authService, signedToken, ['admin'], nowMs);
+    if (!input || typeof input !== 'object' || typeof input.consumerNo !== 'string' || !input.consumerNo.trim()) {
+      throw new AuthSecurityError(400, 'CONNECTION_REQUIRED', 'Choose a connection to update its meter configuration.');
+    }
     const connection = this.connections.find(item => item.consumerNo === input.consumerNo);
     if (!connection) throw new AuthSecurityError(400, 'CONNECTION_NOT_FOUND', 'Connection was not found.');
     if (!Number.isFinite(input.multiplier) || input.multiplier <= 0 || input.multiplier > 10000 || !Number.isInteger(input.decimalPlaces) || input.decimalPlaces < 0 || input.decimalPlaces > 2 || (input.rolloverAt !== undefined && (!Number.isFinite(input.rolloverAt) || input.rolloverAt <= 0))) {
@@ -634,17 +637,39 @@ export class ServerDataStore {
 
   public setMeterThresholds(signedToken: string, input: Omit<MeterThresholds, 'version'>, nowMs?: number): MeterThresholds {
     const session = requireServerRole(this.authService, signedToken, ['admin'], nowMs);
+    if (!input || typeof input !== 'object') {
+      throw new AuthSecurityError(400, 'INVALID_THRESHOLDS', 'Thresholds must be positive, bounded and use at least two history periods.');
+    }
     const values = [input.minimumHistory, input.highDailyRatio, input.lowDailyRatio, input.highDailyUnits];
     if (values.some(v => !Number.isFinite(v) || v <= 0) || input.minimumHistory < 2 || input.minimumHistory > 12 || input.highDailyRatio <= 1 || input.lowDailyRatio >= 1) {
       throw new AuthSecurityError(400, 'INVALID_THRESHOLDS', 'Thresholds must be positive, bounded and use at least two history periods.');
     }
-    this.meterThresholds = { ...input, version: this.meterThresholds.version + 1 };
+    this.meterThresholds = {
+      minimumHistory: input.minimumHistory,
+      highDailyRatio: input.highDailyRatio,
+      lowDailyRatio: input.lowDailyRatio,
+      highDailyUnits: input.highDailyUnits,
+      version: this.meterThresholds.version + 1
+    };
     this.appendServerAuditLog(session, 'METER_THRESHOLDS_UPDATED', 'meter-reading-policy', `threshold_version=${this.meterThresholds.version}`);
     return { ...this.meterThresholds };
   }
 
   public submitMeterReading(signedToken: string, input: MeterReadingSubmission, nowMs?: number): MeterReadingRecord {
-    const session = requireServerRole(this.authService, signedToken, ['consumer', 'employee', 'field'], nowMs);
+    const session = requireServerRole(this.authService, signedToken, ['consumer', 'field'], nowMs);
+    if (!input || typeof input !== 'object') throw new AuthSecurityError(400, 'INVALID_BODY', 'A JSON object is required.');
+    if (typeof input.consumerNo !== 'string' || !input.consumerNo.trim()) throw new AuthSecurityError(400, 'CONNECTION_REQUIRED', 'Choose a valid connection.');
+    if (typeof input.meterNo !== 'string' || !input.meterNo.trim()) throw new AuthSecurityError(400, 'INVALID_METER_NO', 'A valid meter number is required.');
+    if (typeof input.clientUuid !== 'string' || !/^[A-Za-z0-9_-]{8,80}$/.test(input.clientUuid)) throw new AuthSecurityError(400, 'INVALID_CLIENT_UUID', 'A valid unique submission ID is required.');
+    if (typeof input.displayedReading !== 'string' || input.displayedReading.trim().length === 0 || input.displayedReading.length > 24 || !Number.isFinite(input.readingKwh) || input.readingKwh < 0) {
+      throw new AuthSecurityError(400, 'INVALID_READING', 'The meter reading is invalid.');
+    }
+    if (typeof input.readingAt !== 'string' || !Number.isFinite(Date.parse(input.readingAt))) {
+      throw new AuthSecurityError(400, 'INVALID_READING_DATE', 'Provide a valid ISO reading date.');
+    }
+    if (input.photoDataUrl !== undefined && typeof input.photoDataUrl !== 'string') {
+      throw new AuthSecurityError(400, 'INVALID_PHOTO', 'Photo must be a JPEG, PNG, or WebP image.');
+    }
     const conn = this.getConnectionByNumber(signedToken, input.consumerNo, nowMs);
     const meterConfig = this.meterConfigurations.get(conn.connectionId);
     if (!meterConfig || input.meterNo !== meterConfig.meterNo) throw new AuthSecurityError(409, 'METER_IDENTITY_MISMATCH', 'Selected meter does not match the active meter configuration.');
@@ -656,13 +681,11 @@ export class ServerDataStore {
       const assigned = this.workOrders.some(w => w.consumerNo === conn.consumerNo && (w.assignedTo.toLowerCase().includes(session.user.name.toLowerCase()) || w.assignedTo.toLowerCase().includes(session.user.email.toLowerCase())));
       if (!assigned) throw new AuthSecurityError(403, 'METER_ASSIGNMENT_REQUIRED', 'Field engineers may submit readings only for a meter assigned to them.');
     }
-    if (!/^[A-Za-z0-9_-]{8,80}$/.test(input.clientUuid)) throw new AuthSecurityError(400, 'INVALID_CLIENT_UUID', 'A valid unique submission ID is required.');
     const priorClient = this.meterReadings.find(r => r.clientUuid === input.clientUuid);
     if (priorClient) return deepClone(priorClient);
     if (input.meterEvent && !['ordinary', 'rollover', 'replacement'].includes(input.meterEvent)) throw new AuthSecurityError(400, 'INVALID_METER_EVENT', 'Choose an ordinary reading, rollover, or meter replacement.');
     if (input.meterEvent === 'rollover' && (!meterConfig.rolloverAt || meterConfig.rolloverAt <= 0)) throw new AuthSecurityError(400, 'INVALID_ROLLOVER_LIMIT', 'No rollover limit is configured for this meter. Ask an administrator to verify the meter specification.');
     if (input.multiplier !== meterConfig.multiplier) throw new AuthSecurityError(409, 'METER_MULTIPLIER_MISMATCH', 'Submitted multiplier does not match the administrator-configured meter multiplier.');
-    if (!Number.isFinite(input.readingKwh) || input.readingKwh < 0 || input.displayedReading.length > 24) throw new AuthSecurityError(400, 'INVALID_READING', 'The meter reading is invalid.');
     const decimalPlaces = input.decimalPlaces ?? meterConfig.decimalPlaces;
     if (decimalPlaces !== meterConfig.decimalPlaces) throw new AuthSecurityError(409, 'METER_FORMAT_MISMATCH', 'Submitted display precision does not match the administrator-configured meter format.');
     if (!Number.isInteger(decimalPlaces) || decimalPlaces < 0 || decimalPlaces > 2) throw new AuthSecurityError(400, 'INVALID_METER_FORMAT', 'Meter precision must be between zero and two decimal places.');
@@ -734,6 +757,9 @@ export class ServerDataStore {
     const session = requireServerRole(this.authService, signedToken, ['employee', 'admin'], nowMs);
     const record = this.meterReadings.find(r => r.id === readingId);
     if (!record) throw new AuthSecurityError(400, 'METER_READING_NOT_FOUND', 'Meter reading was not found.');
+    if (record.submittedBy.toLowerCase() === session.user.name.toLowerCase() && session.role !== 'admin') {
+      throw new AuthSecurityError(403, 'SELF_REVIEW_FORBIDDEN', 'Submitters cannot review their own meter reading.');
+    }
     if (record.status !== 'PENDING_REVIEW') throw new AuthSecurityError(409, 'METER_READING_ALREADY_REVIEWED', 'Only pending readings can be reviewed.');
     if (action === 'APPROVE' && record.anomalies.length > 0 && !note.trim()) throw new AuthSecurityError(409, 'REVIEW_NOTE_REQUIRED', 'Add a review note that records how the flagged evidence was checked.');
     if (action === 'APPROVE' && (record.anomalies.some(a => a.severity === 'HIGH') || record.consumedUnits === undefined)) throw new AuthSecurityError(409, 'METER_READING_REQUIRES_REVIEW', 'Resolve high severity identity, duplicate or arithmetic issues before approval.');

@@ -86,7 +86,20 @@ export interface FlushFieldQueueSummary {
 export const OFFLINE_FIELD_QUEUE_KEY = 'vidyutflow_field_offline_queue';
 export const OFFLINE_MANUAL_OVERRIDE_KEY = 'vidyutflow_field_offline_override';
 const IDB_NAME = 'vidyutflow_offline_db';
+const IDB_VERSION = 3;
 const IDB_STORE = 'field_sync_queue';
+
+function upgradeOfflineDb(db: IDBDatabase): void {
+  if (!db.objectStoreNames.contains(IDB_STORE)) {
+    db.createObjectStore(IDB_STORE, { keyPath: 'client_uuid' });
+  }
+  if (!db.objectStoreNames.contains('meter_reading_photos')) {
+    db.createObjectStore('meter_reading_photos', { keyPath: 'client_uuid' });
+  }
+  if (!db.objectStoreNames.contains('field_evidence_photos')) {
+    db.createObjectStore('field_evidence_photos', { keyPath: 'id' });
+  }
+}
 
 let memoryQueue: OfflineFieldQueueItem[] | null = null;
 let activeFlushPromise: Promise<FlushFieldQueueSummary> | null = null;
@@ -181,15 +194,8 @@ function readQueueFromLocalStorage(): OfflineFieldQueueItem[] {
 function writeQueueToIndexedDb(items: OfflineFieldQueueItem[]): void {
   if (typeof indexedDB === 'undefined') return;
   try {
-    const openReq = indexedDB.open(IDB_NAME, 3);
-    openReq.onupgradeneeded = () => {
-      const db = openReq.result;
-      if (!db.objectStoreNames.contains(IDB_STORE)) {
-        db.createObjectStore(IDB_STORE, { keyPath: 'client_uuid' });
-      }
-      if (!db.objectStoreNames.contains('meter_reading_photos')) db.createObjectStore('meter_reading_photos', { keyPath: 'client_uuid' });
-      if (!db.objectStoreNames.contains('field_evidence_photos')) db.createObjectStore('field_evidence_photos', { keyPath: 'id' });
-    };
+    const openReq = indexedDB.open(IDB_NAME, IDB_VERSION);
+    openReq.onupgradeneeded = () => upgradeOfflineDb(openReq.result);
     openReq.onsuccess = () => {
       try {
         const db = openReq.result;
@@ -243,14 +249,8 @@ export async function hydrateFieldQueueFromIndexedDb(): Promise<OfflineFieldQueu
 
   return new Promise(resolve => {
     try {
-    const openReq = indexedDB.open(IDB_NAME, 2);
-      openReq.onupgradeneeded = () => {
-        const db = openReq.result;
-        if (!db.objectStoreNames.contains(IDB_STORE)) {
-          db.createObjectStore(IDB_STORE, { keyPath: 'client_uuid' });
-        }
-      if (!db.objectStoreNames.contains('meter_reading_photos')) db.createObjectStore('meter_reading_photos', { keyPath: 'client_uuid' });
-      };
+      const openReq = indexedDB.open(IDB_NAME, IDB_VERSION);
+      openReq.onupgradeneeded = () => upgradeOfflineDb(openReq.result);
       openReq.onerror = () => resolve(current);
       openReq.onsuccess = () => {
         try {
@@ -331,12 +331,8 @@ export function enqueueFieldInspection(input: EnqueueFieldInspectionInput): Offl
 export async function storeQueuedMeterPhoto(clientUuid: string, photo: Blob): Promise<void> {
   if (typeof indexedDB === 'undefined') throw new Error('Offline photo storage is not available in this browser.');
   await new Promise<void>((resolve, reject) => {
-    const open = indexedDB.open(IDB_NAME, 2);
-    open.onupgradeneeded = () => {
-      const db = open.result;
-      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE, { keyPath: 'client_uuid' });
-      if (!db.objectStoreNames.contains('meter_reading_photos')) db.createObjectStore('meter_reading_photos', { keyPath: 'client_uuid' });
-    };
+    const open = indexedDB.open(IDB_NAME, IDB_VERSION);
+    open.onupgradeneeded = () => upgradeOfflineDb(open.result);
     open.onerror = () => reject(new Error('Could not open offline photo storage.'));
     open.onsuccess = () => {
       const db = open.result;
@@ -401,12 +397,8 @@ export function enqueueWorkOrderCompletion(input: {
 export async function getQueuedMeterPhoto(clientUuid: string): Promise<Blob | undefined> {
   if (typeof indexedDB === 'undefined') return undefined;
   return new Promise(resolve => {
-    const open = indexedDB.open(IDB_NAME, 2);
-    open.onupgradeneeded = () => {
-      const db = open.result;
-      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE, { keyPath: 'client_uuid' });
-      if (!db.objectStoreNames.contains('meter_reading_photos')) db.createObjectStore('meter_reading_photos', { keyPath: 'client_uuid' });
-    };
+    const open = indexedDB.open(IDB_NAME, IDB_VERSION);
+    open.onupgradeneeded = () => upgradeOfflineDb(open.result);
     open.onerror = () => resolve(undefined);
     open.onsuccess = () => {
       const db = open.result;
@@ -421,7 +413,8 @@ export async function getQueuedMeterPhoto(clientUuid: string): Promise<Blob | un
 export async function deleteQueuedMeterPhoto(clientUuid: string): Promise<void> {
   if (typeof indexedDB === 'undefined') return;
   await new Promise<void>(resolve => {
-    const open = indexedDB.open(IDB_NAME, 2);
+    const open = indexedDB.open(IDB_NAME, IDB_VERSION);
+    open.onupgradeneeded = () => upgradeOfflineDb(open.result);
     open.onsuccess = () => {
       const db = open.result;
       if (!db.objectStoreNames.contains('meter_reading_photos')) { db.close(); resolve(); return; }
@@ -751,7 +744,8 @@ export function clearOfflineFieldQueue(): void {
   }
   if (typeof indexedDB !== 'undefined') {
     try {
-      const openReq = indexedDB.open(IDB_NAME, 3);
+      const openReq = indexedDB.open(IDB_NAME, IDB_VERSION);
+      openReq.onupgradeneeded = () => upgradeOfflineDb(openReq.result);
       openReq.onsuccess = () => {
         try {
           const db = openReq.result;

@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ServerAuthService, AuthSecurityError } from '../src/server/authService';
 import { ServerDataStore } from '../src/server/dataStore';
+import { createProductionRequestHandler } from '../src/server/prodServer';
 import { DEFAULT_DEMO_ACCOUNTS } from '../src/data/demoAuthData';
 import { INITIAL_CONNECTIONS, INITIAL_BILLS, INITIAL_PAYMENTS } from '../src/data/mockData';
 import { calculateMeterConsumption, detectConsumptionAnomalies, detectIdentityMismatch, normalizeDisplayedReading, MeterReadingError } from '../src/services/meterReading';
 import { validateMeterPhoto } from '../src/services/meterOcr';
 import { validateExistingBill } from '../src/services/billingValidation';
+import { deleteQueuedMeterPhoto, getQueuedMeterPhoto, hydrateFieldQueueFromIndexedDb, storeQueuedMeterPhoto } from '../src/utils/offlineFieldSync';
 
 function check(name: string, fn: () => void) { fn(); console.log(`✓ ${name}`); }
 
@@ -97,5 +102,134 @@ check('management metrics expose aggregate counts without consumer identifiers',
   assert.equal('consumerNo' in metrics, false);
   assert.throws(() => store.getMeterReadings(auth.login({ ...DEFAULT_DEMO_ACCOUNTS.management, targetRole: 'management' }).session.signedToken));
 });
+
+check('missing clientUuid, malformed payloads, and employee self-submission are rejected cleanly', () => {
+  assert.throws(
+    () => store.submitMeterReading(consumer.session.signedToken, { ...base, clientUuid: undefined as unknown as string }),
+    (error: unknown) => error instanceof AuthSecurityError && error.statusCode === 400 && error.code === 'INVALID_CLIENT_UUID'
+  );
+  assert.throws(
+    () => store.submitMeterReading(consumer.session.signedToken, { ...base, clientUuid: 'meter-client-uuid-bad-date', readingAt: 'not-a-valid-date' }),
+    (error: unknown) => error instanceof AuthSecurityError && error.statusCode === 400 && error.code === 'INVALID_READING_DATE'
+  );
+  assert.throws(
+    () => store.submitMeterReading(consumer.session.signedToken, { ...base, clientUuid: 'meter-client-uuid-bad-disp', displayedReading: undefined as unknown as string }),
+    (error: unknown) => error instanceof AuthSecurityError && error.statusCode === 400 && error.code === 'INVALID_READING'
+  );
+  assert.throws(
+    () => store.submitMeterReading(employee.session.signedToken, { ...base, clientUuid: 'meter-client-uuid-emp-01' }),
+    (error: unknown) => error instanceof AuthSecurityError && error.statusCode === 403
+  );
+});
+
+check('production server CSP permits Tesseract WASM, worker, and data/blob fetches', () => {
+  const handler = createProductionRequestHandler();
+  const headers = new Map<string, string>();
+  const req = { url: '/api/health', method: 'GET', headers: {} } as unknown as IncomingMessage;
+  const mockRes = {
+    statusCode: 200,
+    writableEnded: false,
+    setHeader(name: string, value: string) { headers.set(name.toLowerCase(), String(value)); },
+    end() { mockRes.writableEnded = true; }
+  };
+  handler(req, mockRes as unknown as ServerResponse);
+  const csp = headers.get('content-security-policy') || '';
+  assert.match(csp, /'wasm-unsafe-eval'/);
+  assert.match(csp, /worker-src 'self' blob:/);
+  assert.match(csp, /connect-src 'self' data: blob: https:\/\/tessdata\.projectnaptha\.com/);
+});
+
+check('meter workspace localizes camera controls, stops camera tracks on collapse, and deduplicates photo loads', () => {
+  const workspaceSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/components/common/MeterReadingWorkspace.tsx'), 'utf8');
+  assert.match(workspaceSrc, /capturePhoto:\s*'Capture photo'/);
+  assert.match(workspaceSrc, /capturePhoto:\s*'ફોટો કેપ્ચર કરો'/);
+  assert.match(workspaceSrc, /capturePhoto:\s*'फोटो कैप्चर करें'/);
+  assert.match(workspaceSrc, /capturePhoto:\s*'फोटो टिपा'/);
+  assert.match(workspaceSrc, /if \(!open \|\| \(currentRole !== 'consumer' && currentRole !== 'field'\)\)\s*\{\s*closeCamera\(\);/);
+  assert.match(workspaceSrc, /requestedPhotoIds\.current\.has\(record\.id\)/);
+});
+
+await (async () => {
+  const prevIdb = (globalThis as { indexedDB?: unknown }).indexedDB;
+  const dbVersions = new Map<string, number>([['vidyutflow_offline_db', 3]]);
+  const storesByDb = new Map<string, Map<string, Map<string, unknown>>>([
+    ['vidyutflow_offline_db', new Map([
+      ['field_sync_queue', new Map()],
+      ['meter_reading_photos', new Map()],
+      ['field_evidence_photos', new Map()]
+    ])]
+  ]);
+
+  const fakeIndexedDb = {
+    open(name: string, requestedVersion?: number) {
+      const currentVersion = dbVersions.get(name) ?? 0;
+      const targetVersion = requestedVersion ?? Math.max(currentVersion, 1);
+      const req: Record<string, unknown> = { result: null, onupgradeneeded: null, onsuccess: null, onerror: null };
+      queueMicrotask(() => {
+        if (requestedVersion !== undefined && requestedVersion < currentVersion) {
+          (req.onerror as (() => void) | null)?.();
+          return;
+        }
+        if (!storesByDb.has(name)) storesByDb.set(name, new Map());
+        const dbStores = storesByDb.get(name)!;
+        const makeStore = (storeName: string) => ({
+          put(val: Record<string, unknown>) {
+            const key = String(val.client_uuid ?? val.id);
+            dbStores.get(storeName)!.set(key, val);
+          },
+          get(key: string) {
+            const getReq: Record<string, unknown> = { result: dbStores.get(storeName)!.get(key), onsuccess: null, onerror: null };
+            queueMicrotask(() => (getReq.onsuccess as (() => void) | null)?.());
+            return getReq;
+          },
+          getAll() {
+            const allReq: Record<string, unknown> = { result: Array.from(dbStores.get(storeName)!.values()), onsuccess: null, onerror: null };
+            queueMicrotask(() => (allReq.onsuccess as (() => void) | null)?.());
+            return allReq;
+          },
+          delete(key: string) { dbStores.get(storeName)!.delete(key); },
+          clear() { dbStores.get(storeName)!.clear(); }
+        });
+        const db = {
+          objectStoreNames: { contains: (s: string) => dbStores.has(s) },
+          createObjectStore(s: string) { dbStores.set(s, new Map()); return makeStore(s); },
+          transaction(_names: string | string[]) {
+            const tx: Record<string, unknown> = {
+              objectStore: (s: string) => makeStore(s),
+              oncomplete: null,
+              onerror: null
+            };
+            queueMicrotask(() => (tx.oncomplete as (() => void) | null)?.());
+            return tx;
+          },
+          close() {}
+        };
+        req.result = db;
+        if (targetVersion > currentVersion) {
+          dbVersions.set(name, targetVersion);
+          (req.onupgradeneeded as (() => void) | null)?.();
+        }
+        (req.onsuccess as (() => void) | null)?.();
+      });
+      return req;
+    }
+  };
+
+  (globalThis as { indexedDB?: unknown }).indexedDB = fakeIndexedDb;
+  try {
+    const sampleBlob = new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' });
+    await storeQueuedMeterPhoto('offline-uuid-v3-check', sampleBlob);
+    const loaded = await getQueuedMeterPhoto('offline-uuid-v3-check');
+    assert.ok(loaded instanceof Blob && loaded.size === 3);
+    await deleteQueuedMeterPhoto('offline-uuid-v3-check');
+    assert.equal(await getQueuedMeterPhoto('offline-uuid-v3-check'), undefined);
+    const hydrated = await hydrateFieldQueueFromIndexedDb();
+    assert.ok(Array.isArray(hydrated));
+    console.log('✓ offline meter photo queue operates cleanly on IndexedDB schema v3 without VersionError');
+  } finally {
+    if (prevIdb === undefined) delete (globalThis as { indexedDB?: unknown }).indexedDB;
+    else (globalThis as { indexedDB?: unknown }).indexedDB = prevIdb;
+  }
+})();
 
 console.log('\nMeter reading, privacy, review, anomaly and bill-check tests passed.');

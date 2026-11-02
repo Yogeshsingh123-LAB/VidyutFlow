@@ -42,4 +42,4 @@ The existing project has a tariff calculation helper and sample bills, but no ca
 
 ## Validation
 
-The focused suite is `frontend/tests/meter-reading.test.ts`, included in the frontend `npm test` command. It covers reading normalization, image validation, arithmetic and rollover/replacement, anomaly evidence, identity mismatch, append-only storage, duplicate/idempotent submissions, role permissions, review rules, bill validation and aggregate metrics.
+The focused suite is `tests/meter-reading.test.ts`, included in the root `npm test` command. It covers reading normalization, image validation, arithmetic and rollover/replacement, anomaly evidence, identity mismatch, append-only storage, duplicate/idempotent submissions, role permissions, review rules, bill validation, IndexedDB v3 offline photo compatibility, production CSP headers for Tesseract WASM, and aggregate metrics.

@@ -27,7 +27,8 @@ const MIME_BY_EXT: Record<string, string> = {
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
   '.ico': 'image/x-icon',
-  '.woff2': 'font/woff2'
+  '.woff2': 'font/woff2',
+  '.wasm': 'application/wasm'
 };
 
 const FASTAPI_PREFIXES = [
@@ -48,7 +49,7 @@ function applySecurityHeaders(res: ServerResponse) {
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; worker-src 'self'; connect-src 'self' https://tessdata.projectnaptha.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://*.tile.openstreetmap.org; worker-src 'self' blob:; connect-src 'self' data: blob: https://tessdata.projectnaptha.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
   );
 }
 
