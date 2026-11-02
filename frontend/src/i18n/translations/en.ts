@@ -562,6 +562,8 @@ export const en: TranslationDictionary = {
     navApiIntegrations: 'API Integrations',
     navInfraDb: 'Infrastructure & DB',
     navSystemSettings: 'System Settings',
+    navOutageMap: 'Outage Map & Timeline',
+    navConsumerOutageStatus: 'Area Outage Status',
     menu: 'Menu',
     activePortal: 'Active Portal',
     consumerServices: 'Consumer Services',

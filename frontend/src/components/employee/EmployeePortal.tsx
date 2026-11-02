@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { LiveRequestQueue } from '../common/LiveRequestQueue';
+import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
 import {
@@ -1888,6 +1889,8 @@ export const EmployeePortal: React.FC = () => {
           </div>
         </div>
       )}
+
+      {activeTab === 'outage-map' && <LazyOutageMapSection />}
     </div>
   );
 };

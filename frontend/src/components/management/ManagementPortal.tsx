@@ -4,6 +4,7 @@ import { LiveAlertEnginePanel } from '../common/LiveAlertEnginePanel';
 import { LiveAiGovernancePanel } from '../common/LiveAiGovernancePanel';
 import { LivePredictiveDecisionPanel } from '../common/LivePredictiveDecisionPanel';
 import { LiveExecutiveAnalyticsSection } from './LiveExecutiveAnalyticsSection';
+import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
@@ -961,6 +962,8 @@ export const ManagementPortal: React.FC = () => {
           </div>
         </div>
       )}
+
+      {activeTab === 'outage-map' && <LazyOutageMapSection />}
     </div>
   );
 };

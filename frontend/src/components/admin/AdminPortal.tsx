@@ -5,6 +5,7 @@ import { LiveErpAdapterPanel } from './LiveErpAdapterPanel';
 import { LiveWorkflowTemplatesPanel } from './LiveWorkflowTemplatesPanel';
 import { LiveStaffAssignmentPanel } from './LiveStaffAssignmentPanel';
 import { LivePerformanceTelemetryPanel } from './LivePerformanceTelemetryPanel';
+import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -757,6 +758,8 @@ export const AdminPortal: React.FC = () => {
         </div>
         </div>
       )}
+
+      {activeTab === 'outage-map' && <LazyOutageMapSection />}
     </div>
   );
 };

@@ -562,6 +562,8 @@ export const gu: TranslationDictionary = {
     navApiIntegrations: 'API એકીકરણ',
     navInfraDb: 'ઇન્ફ્રાસ્ટ્રક્ચર અને DB',
     navSystemSettings: 'સિસ્ટમ સેટિંગ્સ',
+    navOutageMap: 'આઉટેજ નકશો અને ટાઇમલાઇન',
+    navConsumerOutageStatus: 'વિસ્તાર વીજ સ્થિતિ',
     menu: 'મેનુ',
     activePortal: 'સક્રિય પોર્ટલ',
     consumerServices: 'ગ્રાહક સેવાઓ',

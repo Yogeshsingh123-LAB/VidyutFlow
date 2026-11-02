@@ -9,6 +9,7 @@ import { FALLBACK_WORKFLOW_TEMPLATES } from '../admin/LiveWorkflowTemplatesPanel
 import { validateDocumentUpload, uploadPolicyText } from '../../utils/documentUpload';
 import { subscribeBackendSession } from '../../utils/backendSession';
 import { LiveConsumerRequests } from './LiveConsumerRequests';
+import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 import { policyText, validLoad, formatValidationIssue, requiresDemoReview } from '../../utils/demoLoadPolicy';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { submissionNoticeFromResponse, submissionNoticeText, type SubmissionNotice } from '../../utils/requestSubmissionStatus';
@@ -3166,6 +3167,8 @@ export const ConsumerPortal: React.FC = () => {
           </div>
         </div>
       )}
+
+      {activeTab === 'outage-map' && <LazyOutageMapSection />}
     </div>
   );
 };

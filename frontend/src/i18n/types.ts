@@ -578,6 +578,8 @@ export interface TranslationDictionary {
     navApiIntegrations: string;
     navInfraDb: string;
     navSystemSettings: string;
+    navOutageMap: string;
+    navConsumerOutageStatus: string;
     menu: string;
     activePortal: string;
     consumerServices: string;

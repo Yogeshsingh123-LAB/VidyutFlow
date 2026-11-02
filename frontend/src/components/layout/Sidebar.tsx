@@ -37,7 +37,8 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Home
+  Home,
+  MapPin
 } from 'lucide-react';
 import { UgvclBrandIdentity } from '../common/UgvclBrandIdentity';
 
@@ -109,6 +110,11 @@ export const Sidebar: React.FC = () => {
             badge: activeConsumerCmps > 0 ? activeConsumerCmps : undefined
           },
           {
+            id: 'outage-map',
+            label: t.erp.navConsumerOutageStatus,
+            icon: <MapPin className="w-4 h-4" />
+          },
+          {
             id: 'requests',
             label: t.erp.navServiceRequests,
             icon: <FileText className="w-4 h-4" />,
@@ -127,6 +133,7 @@ export const Sidebar: React.FC = () => {
         return [
           { id: 'dashboard', label: t.erp.navErpOverview, icon: <LayoutDashboard className="w-4 h-4" /> },
           { id: 'incidents', label: t.erp.navIncidentControlDesk, icon: <AlertTriangle className="w-4 h-4" />, badge: activeEmployeeIncidents > 0 ? activeEmployeeIncidents : undefined },
+          { id: 'outage-map', label: t.erp.navOutageMap, icon: <MapPin className="w-4 h-4" /> },
           { id: 'applications', label: t.erp.navApplicationQueue, icon: <Inbox className="w-4 h-4" />, badge: pendingApps > 0 ? pendingApps : undefined },
           { id: 'consumers', label: t.erp.navConsumerLedger, icon: <Database className="w-4 h-4" /> },
           { id: 'complaints', label: t.erp.navComplaintQueue, icon: <MessageSquareWarning className="w-4 h-4" />, badge: activeCmps > 0 ? activeCmps : undefined },
@@ -138,6 +145,7 @@ export const Sidebar: React.FC = () => {
       case 'field':
         return [
           { id: 'dashboard', label: t.erp.navFieldConsole, icon: <LayoutDashboard className="w-4 h-4" /> },
+          { id: 'outage-map', label: t.erp.navOutageMap, icon: <MapPin className="w-4 h-4" /> },
           { id: 'workorders', label: t.erp.navWorkOrders, icon: <Wrench className="w-4 h-4" />, badge: pendingWos > 0 ? pendingWos : undefined },
           { id: 'inspections', label: t.erp.navSiteFeasibility, icon: <ClipboardCheck className="w-4 h-4" /> },
           { id: 'maintenance', label: t.erp.navFeederPatrol, icon: <HardHat className="w-4 h-4" /> },
@@ -148,6 +156,7 @@ export const Sidebar: React.FC = () => {
       case 'management':
         return [
           { id: 'dashboard', label: t.erp.navExecutiveCockpit, icon: <LineChart className="w-4 h-4" /> },
+          { id: 'outage-map', label: t.erp.navOutageMap, icon: <MapPin className="w-4 h-4" /> },
           { id: 'analytics', label: t.erp.navRevenueDemand, icon: <PieChart className="w-4 h-4" /> },
           { id: 'sla', label: t.erp.navSlaRedressal, icon: <Clock className="w-4 h-4" /> },
           { id: 'feeders', label: t.erp.navFeederOverloads, icon: <Cpu className="w-4 h-4" />, badge: `1 ${t.erp.alertSuffix}` },
@@ -158,6 +167,7 @@ export const Sidebar: React.FC = () => {
       case 'admin':
         return [
           { id: 'overview', label: t.erp.navSystemOverview, icon: <Activity className="w-4 h-4" /> },
+          { id: 'outage-map', label: t.erp.navOutageMap, icon: <MapPin className="w-4 h-4" /> },
           { id: 'users', label: t.erp.navUsersRoles, icon: <Users className="w-4 h-4" />, badge: 12 },
           { id: 'access', label: t.erp.navAccessMatrix, icon: <KeyRound className="w-4 h-4" /> },
           { id: 'audit', label: t.erp.navAuditTrail, icon: <FileSearch className="w-4 h-4" /> },

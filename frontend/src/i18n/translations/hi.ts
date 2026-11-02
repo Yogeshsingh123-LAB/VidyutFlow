@@ -562,6 +562,8 @@ export const hi: TranslationDictionary = {
     navApiIntegrations: 'API एकीकरण',
     navInfraDb: 'इंफ्रास्ट्रक्चर एवं DB',
     navSystemSettings: 'सिस्टम सेटिंग्स',
+    navOutageMap: 'आउटेज मानचित्र व टाइमलाइन',
+    navConsumerOutageStatus: 'क्षेत्र विद्युत स्थिति',
     menu: 'मेनू',
     activePortal: 'सक्रिय पोर्टल',
     consumerServices: 'उपभोक्ता सेवाएं',

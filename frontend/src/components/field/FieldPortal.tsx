@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { UGVCL_LOGO_PATH, FEEDER_METRICS } from '../../data/mockData';
@@ -1902,6 +1903,8 @@ export const FieldPortal: React.FC = () => {
           )}
         </div>
       )}
+
+      {activeTab === 'outage-map' && <LazyOutageMapSection />}
     </div>
   );
 };
