@@ -226,24 +226,33 @@ app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_credentials=Tru
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
-    """Baseline security headers + rolling latency monitor for every response."""
+    """Baseline security headers + DoS payload length protection + rolling latency monitor."""
     t0 = time.perf_counter()
     response = None
-    if request.method == "POST" and request.url.path.rstrip("/").endswith("/requests/with-document"):
-        raw_len = request.headers.get("content-length")
-        if raw_len is not None:
-            try:
-                if int(raw_len) > settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES:
-                    response = JSONResponse(
-                        status_code=413,
-                        content={
-                            "detail": f"Uploaded payload exceeds maximum allowed size of {settings.max_upload_bytes} bytes"
-                        },
-                    )
-            except ValueError:
-                pass
+
+    raw_len = request.headers.get("content-length")
+    if raw_len is not None and request.method in ("POST", "PUT", "PATCH"):
+        try:
+            cl = int(raw_len)
+            is_multipart = request.url.path.rstrip("/").endswith("/requests/with-document")
+            max_allowed = (
+                settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES
+                if is_multipart
+                else settings.max_json_body_bytes
+            )
+            if cl > max_allowed:
+                response = JSONResponse(
+                    status_code=413,
+                    content={
+                        "detail": f"Uploaded payload exceeds maximum allowed size of {max_allowed} bytes"
+                    },
+                )
+        except ValueError:
+            pass
+
     if response is None:
         response = await call_next(request)
+
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
     matched_route = request.scope.get("route")
     route_path = getattr(matched_route, "path", None) or request.url.path
@@ -254,13 +263,14 @@ async def security_headers(request: Request, call_next):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("Cache-Control", "no-store")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(self)")
     if not request.url.path.startswith(("/docs", "/redoc", "/openapi.json")):
         response.headers.setdefault(
             "Content-Security-Policy",
-            "default-src 'self'; frame-ancestors 'none'; base-uri 'self'",
+            "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
         )
     if settings.app_env == "production":
-        response.headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+        response.headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
     return response
 
 app.add_middleware(ApiVersionPrefixMiddleware)

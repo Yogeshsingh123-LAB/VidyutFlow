@@ -1,11 +1,13 @@
 from pathlib import Path
 from typing import Literal
 from pydantic import Field, model_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _DEFAULT_MODEL_DIR = str(Path(__file__).resolve().parent / "ml" / "models")
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
     app_name: str = "VidyutFlow"
     app_env: Literal["development", "production"] = "development"
     secret_key: str = "dev-only-change-me-in-production-please-32-chars"
@@ -27,6 +29,8 @@ class Settings(BaseSettings):
     demo_load_review_threshold_kw: float = Field(default=100.0, gt=0, allow_inf_nan=False)
     # Maximum uploaded supporting document size in bytes (default 5 MiB).
     max_upload_bytes: int = Field(default=5 * 1024 * 1024, gt=0, le=50 * 1024 * 1024)
+    # Maximum JSON request body size in bytes (default 2 MiB for DoS protection).
+    max_json_body_bytes: int = Field(default=2 * 1024 * 1024, gt=0, le=50 * 1024 * 1024)
     # Default directory where encrypted KYC / supporting documents (VFENC1 AES-256-GCM) are persisted.
     upload_vault_dir: str = "uploads_encrypted"
     # Operational alert engine thresholds (Item #17 — simulated SMS/email + in-app + audit log).
@@ -38,23 +42,22 @@ class Settings(BaseSettings):
     latency_window_size: int = Field(default=1000, ge=50, le=10000)
     model_dir: str = _DEFAULT_MODEL_DIR
 
-    class Config:
-        env_file = ".env"
-        # The root .env (and Compose) also carries frontend-only keys (SESSION_SECRET,
-        # APP_URL, VITE_PROXY_TARGET). Backend settings must tolerate their presence.
-        extra = "ignore"
-
     @model_validator(mode="after")
     def validate_production_secret(self):
         secret = self.secret_key.casefold()
-        if self.app_env == "production" and (
-            len(self.secret_key) < 32
-            or secret.startswith(("dev-only", "change-me", "replace-with", "your-"))
-        ):
-            raise ValueError(
-                "Production requires a SECRET_KEY of at least 32 characters "
-                "that is not a development placeholder"
-            )
+        if self.app_env == "production":
+            if (
+                len(self.secret_key) < 32
+                or secret.startswith(("dev-only", "change-me", "replace-with", "your-"))
+            ):
+                raise ValueError(
+                    "Production requires a SECRET_KEY of at least 32 characters "
+                    "that is not a development placeholder"
+                )
+            if "*" in [o.strip() for o in self.cors_origins.split(",")]:
+                raise ValueError(
+                    "Production CORS origins must not contain wildcard '*' when allow_credentials=True"
+                )
         return self
 
 settings = Settings()
