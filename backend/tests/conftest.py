@@ -60,5 +60,16 @@ def isolated_session_upload_vault(tmp_path_factory):
 def isolated_login_throttle(monkeypatch):
     # A fresh limiter per test: test order must not consume another test's budget.
     from app import login_limit
+    from app.config import settings
 
     monkeypatch.setattr(login_limit, "login_limiter", login_limit.LoginLimiter(20, 60))
+    monkeypatch.setattr(
+        login_limit,
+        "account_limiter",
+        login_limit.LoginLimiter(
+            settings.login_account_max_attempts,
+            settings.login_account_lockout_seconds,
+            namespace="vidyutflow:rl:auth:account",
+            error_message="Account temporarily locked due to excessive failed attempts. Please try again later.",
+        ),
+    )

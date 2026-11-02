@@ -91,8 +91,9 @@ def test_passwords_over_bcrypt_byte_limit_are_rejected():
 
 
 def test_production_requires_non_placeholder_secret_and_skips_demo_seeding(monkeypatch):
+    monkeypatch.delenv("SECRET_KEY", raising=False)
     with pytest.raises(ValueError, match='Production requires a SECRET_KEY'):
-        Settings(app_env='production')
+        Settings(_env_file=None, app_env='production')
     with pytest.raises(ValueError, match='Production requires a SECRET_KEY'):
         Settings(app_env='production', secret_key='replace-with-a-random-secret-at-least-32-characters')
 

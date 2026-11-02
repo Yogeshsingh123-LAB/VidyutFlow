@@ -12,9 +12,16 @@ from ..workflow import run_workflow
 from ..audit import audit, verify_chain
 from ..notify import notify, notify_request_parties, notify_zone_officers
 from ..access import visible_requests, require_request_access
+from pathlib import PurePosixPath
 from ..config import settings
+from ..security import sanitize_untrusted_text
 from ..transitions import apply_transition
-from ..uploads import sanitize_document_reference, validate_and_encrypt_upload, validate_and_read_upload
+from ..uploads import (
+    sanitize_document_reference,
+    validate_and_encrypt_upload,
+    validate_and_read_upload,
+    retrieve_decrypted_document,
+)
 from ..erp_adapter import record_erp_sync
 from ..alerts import evaluate_and_dispatch_alerts
 from ..workflow_templates import resolve_active_template
@@ -66,6 +73,11 @@ def create(body: CreateReq, db: Session = Depends(get_db), u: User = Depends(req
     canonical_zone = resolve_active_zone(db, body.zone)
     tpl = resolve_active_template(db, body.request_type)
     payload = body.model_dump()
+    payload["applicant_name"] = sanitize_untrusted_text(payload.get("applicant_name", ""))
+    payload["address"] = sanitize_untrusted_text(payload.get("address", ""))
+    payload["description"] = sanitize_untrusted_text(payload.get("description", ""))
+    payload["pin_code"] = sanitize_untrusted_text(payload.get("pin_code", "")).strip()
+    payload["phone"] = sanitize_untrusted_text(payload.get("phone", "")).strip()
     payload["zone"] = canonical_zone
     payload["latitude"] = lat
     payload["longitude"] = lon
@@ -92,14 +104,19 @@ async def create_with_doc(applicant_name: str = Form(...), phone: str = Form(...
     effective_zone = "North" if zone is None else zone
     canonical_zone = resolve_active_zone(db, effective_zone)
     tpl = resolve_active_template(db, request_type)
+    clean_applicant_name = sanitize_untrusted_text(applicant_name)
+    clean_address = sanitize_untrusted_text(address)
+    clean_description = sanitize_untrusted_text(description)
+    clean_pin_code = sanitize_untrusted_text(pin_code).strip()
+    clean_phone = sanitize_untrusted_text(phone).strip()
     # Validate size + sanitize filename + envelope-encrypt payload with AES-256-GCM (never log plaintext).
     name, enc_sha = (
         await validate_and_encrypt_upload(document, settings.max_upload_bytes, settings.secret_key)
         if document
         else ("", "")
     )
-    r = ConnectionRequest(consumer_id=u.id, applicant_name=applicant_name, phone=phone, address=address, zone=canonical_zone,
-        pin_code=pin_code, latitude=lat, longitude=lon, request_type=tpl.template_code, description=description, requested_load_kw=requested_load_kw, document_name=name,
+    r = ConnectionRequest(consumer_id=u.id, applicant_name=clean_applicant_name, phone=clean_phone, address=clean_address, zone=canonical_zone,
+        pin_code=clean_pin_code, latitude=lat, longitude=lon, request_type=tpl.template_code, description=clean_description, requested_load_kw=requested_load_kw, document_name=name,
         tariff_category=tariff_category, phase=phase, premises_type=premises_type)
     db.add(r); db.flush(); run_workflow(db, r); audit(db, u, "REQUEST_CREATED_WITH_DOC", "request", r.id, f"{r.status}{f' enc=AES256GCM:{enc_sha[:12]}' if enc_sha else ''}")
     _notify_submission(db, r, u)
@@ -122,6 +139,68 @@ def get_one(request_id: str, db: Session = Depends(get_db), u: User = Depends(cu
         raise HTTPException(403, "Request is not assigned to you")
     return out(r)
 
+@router.get("/{request_id}/document")
+def get_document(request_id: str, db: Session = Depends(get_db), u: User = Depends(current_user)):
+    r = db.get(ConnectionRequest, request_id)
+    if not r:
+        raise HTTPException(404, "Request not found")
+    require_request_access(db, u, r)
+    if u.role == "consumer" and r.consumer_id != u.id:
+        raise HTTPException(403, "Not your request")
+    if u.role == "engineer" and r.assigned_engineer_id != u.id:
+        raise HTTPException(403, "Request is not assigned to you")
+    if not r.document_name:
+        raise HTTPException(404, "No document attached to this request")
+
+    clean_name = r.document_name
+    prefix = None
+    audit_row = (
+        db.query(AuditLog)
+        .filter(AuditLog.entity_id == r.id, AuditLog.action == "REQUEST_CREATED_WITH_DOC")
+        .order_by(AuditLog.created_at.desc())
+        .first()
+    )
+    if audit_row and "enc=AES256GCM:" in (audit_row.detail or ""):
+        try:
+            prefix = audit_row.detail.split("enc=AES256GCM:")[1].split()[0].strip()
+        except Exception:
+            prefix = None
+
+    try:
+        content = retrieve_decrypted_document(
+            clean_name=clean_name,
+            master_secret=settings.secret_key,
+            vault_dir=settings.upload_vault_dir,
+            prefix=prefix,
+        )
+    except FileNotFoundError:
+        raise HTTPException(404, "Document file not found in storage vault")
+    except Exception:
+        raise HTTPException(500, "Document decryption or integrity check failed")
+
+    audit(db, u, "DOCUMENT_DOWNLOADED", "request", r.id, f"file={clean_name} role={u.role}")
+    db.commit()
+
+    ext = PurePosixPath(clean_name).suffix.lower()
+    media_types = {
+        ".pdf": "application/pdf",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".txt": "text/plain; charset=utf-8",
+    }
+    media_type = media_types.get(ext, "application/octet-stream")
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{clean_name}"',
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store, private",
+        },
+    )
+
 ENGINEER_STATUSES = {"IN_PROGRESS", "FIELD_VERIFIED", "COMPLETED"}
 
 class StatusUpdate(BaseModel): status: str; notes: str = ""
@@ -136,7 +215,8 @@ def update_status(request_id: str, body: StatusUpdate, db: Session = Depends(get
         raise HTTPException(403, "Request is assigned to another engineer")
     if u.role == "engineer" and body.status not in ENGINEER_STATUSES:
         raise HTTPException(403, "Engineers may only update field-work statuses")
-    changes = {"validation_notes": body.notes} if body.notes else {}
+    clean_notes = sanitize_untrusted_text(body.notes) if body.notes else ""
+    changes = {"validation_notes": clean_notes} if clean_notes else {}
     apply_transition(db, r, body.status, **changes)
     audit(db, u, "STATUS_UPDATED", "request", r.id, body.status)
     if body.status in ("APPROVED", "COMPLETED"):
@@ -386,7 +466,9 @@ def field_sync(body: FieldSync, db: Session = Depends(get_db), u: User = Depends
         if existing.request_id != body.request_id or existing.engineer_id != u.id:
             raise HTTPException(409, "client_uuid belongs to another sync operation")
         return {"duplicate": True, "synced": False, "field_update_id": existing.id, "message": "Already synced — duplicate ignored"}
-    changes = {"meter_serial": body.meter_serial} if body.meter_serial else {}
+    clean_meter = sanitize_untrusted_text(body.meter_serial) if body.meter_serial else ""
+    clean_notes = sanitize_untrusted_text(body.notes) if body.notes else ""
+    changes = {"meter_serial": clean_meter} if clean_meter else {}
     try:
         apply_transition(db, r, body.task_status, **changes)
     except HTTPException as conflict:
@@ -397,7 +479,7 @@ def field_sync(body: FieldSync, db: Session = Depends(get_db), u: User = Depends
             return {"duplicate": True, "synced": False, "field_update_id": existing.id, "message": "Already synced — duplicate ignored"}
         raise conflict
     fu = FieldUpdate(client_uuid=body.client_uuid, request_id=body.request_id, engineer_id=u.id,
-                     task_status=body.task_status, notes=body.notes, meter_serial=body.meter_serial, created_offline_at=body.created_offline_at)
+                     task_status=body.task_status, notes=clean_notes, meter_serial=clean_meter, created_offline_at=body.created_offline_at)
     db.add(fu)
     audit(db, u, "FIELD_SYNC", "request", r.id, f"{body.task_status} uuid={body.client_uuid}")
     if body.task_status == "COMPLETED":

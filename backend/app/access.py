@@ -1,6 +1,6 @@
 """Shared request visibility policy; officer zone scope is a prototype assumption."""
 from fastapi import HTTPException
-from sqlalchemy import false
+from sqlalchemy import false, func
 from .models import ConnectionRequest
 
 
@@ -13,7 +13,7 @@ def visible_requests(db, user):
     if user.role == "engineer":
         return q.filter(ConnectionRequest.assigned_engineer_id == user.id)
     if user.role == "officer" and user.zone and user.zone.strip():
-        return q.filter(ConnectionRequest.zone == user.zone)
+        return q.filter(func.lower(ConnectionRequest.zone) == user.zone.strip().lower())
     return q.filter(false())
 
 

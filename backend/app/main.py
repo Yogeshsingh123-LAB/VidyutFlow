@@ -160,12 +160,35 @@ def migrate_validation_issues(db_engine):
         if db_engine.dialect.name != "sqlite" or "duplicate column name" not in str(exc).lower():
             raise
 
+def migrate_auth_session_security(db_engine):
+    """Add additive MFA columns to users table and create session/reset tables if upgrading an older DB."""
+    inspector = sa_inspect(db_engine)
+    if "users" not in inspector.get_table_names():
+        return
+    existing = {col["name"] for col in inspector.get_columns("users")}
+    clause = " IF NOT EXISTS" if db_engine.dialect.name == "postgresql" else ""
+    cols_to_add = [
+        ("mfa_enabled", "BOOLEAN DEFAULT FALSE"),
+        ("mfa_secret_encrypted", "VARCHAR"),
+        ("mfa_recovery_hashes_json", "TEXT"),
+    ]
+    with db_engine.begin() as conn:
+        for col_name, col_type in cols_to_add:
+            if col_name not in existing:
+                try:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN{clause} {col_name} {col_type}"))
+                except OperationalError as exc:
+                    if db_engine.dialect.name != "sqlite" or "duplicate column name" not in str(exc).lower():
+                        raise
+
+
 @asynccontextmanager
 async def lifespan(_app):
     Base.metadata.create_all(bind=engine)
     migrate_audit_chain()
     migrate_validation_issues(engine)
     migrate_geo_columns(engine)
+    migrate_auth_session_security(engine)
     ensure_performance_indexes(engine)
     bump_all_caches()
     try: ensure_models()
@@ -203,24 +226,33 @@ app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_credentials=Tru
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
-    """Baseline security headers + rolling latency monitor for every response."""
+    """Baseline security headers + DoS payload length protection + rolling latency monitor."""
     t0 = time.perf_counter()
     response = None
-    if request.method == "POST" and request.url.path.rstrip("/").endswith("/requests/with-document"):
-        raw_len = request.headers.get("content-length")
-        if raw_len is not None:
-            try:
-                if int(raw_len) > settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES:
-                    response = JSONResponse(
-                        status_code=413,
-                        content={
-                            "detail": f"Uploaded payload exceeds maximum allowed size of {settings.max_upload_bytes} bytes"
-                        },
-                    )
-            except ValueError:
-                pass
+
+    raw_len = request.headers.get("content-length")
+    if raw_len is not None and request.method in ("POST", "PUT", "PATCH"):
+        try:
+            cl = int(raw_len)
+            is_multipart = request.url.path.rstrip("/").endswith("/requests/with-document")
+            max_allowed = (
+                settings.max_upload_bytes + MULTIPART_OVERHEAD_BYTES
+                if is_multipart
+                else settings.max_json_body_bytes
+            )
+            if cl > max_allowed:
+                response = JSONResponse(
+                    status_code=413,
+                    content={
+                        "detail": f"Uploaded payload exceeds maximum allowed size of {max_allowed} bytes"
+                    },
+                )
+        except ValueError:
+            pass
+
     if response is None:
         response = await call_next(request)
+
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
     matched_route = request.scope.get("route")
     route_path = getattr(matched_route, "path", None) or request.url.path
@@ -231,13 +263,14 @@ async def security_headers(request: Request, call_next):
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("Cache-Control", "no-store")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(self)")
     if not request.url.path.startswith(("/docs", "/redoc", "/openapi.json")):
         response.headers.setdefault(
             "Content-Security-Policy",
-            "default-src 'self'; frame-ancestors 'none'; base-uri 'self'",
+            "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
         )
     if settings.app_env == "production":
-        response.headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+        response.headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
     return response
 
 app.add_middleware(ApiVersionPrefixMiddleware)

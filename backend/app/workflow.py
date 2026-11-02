@@ -28,6 +28,9 @@ def validation_issues(req: ConnectionRequest, tpl: WorkflowTemplate | None = Non
         issues.append({"code": "PHONE_INVALID", "message": "Valid 10-digit phone is required"})
     if not req.address.strip():
         issues.append({"code": "ADDRESS_REQUIRED", "message": "Address is missing"})
+    pin = (req.pin_code or "").strip()
+    if pin and (len(pin) != 6 or not pin.isascii() or not pin.isdigit() or pin.startswith("0")):
+        issues.append({"code": "PIN_CODE_INVALID", "message": "Valid 6-digit Indian PIN code is required"})
     threshold = _effective_load_threshold(tpl)
     if req.requested_load_kw <= 0:
         issues.append({"code": "LOAD_NONPOSITIVE", "message": "Requested load must be > 0 kW"})

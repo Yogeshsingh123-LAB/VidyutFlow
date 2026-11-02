@@ -7,7 +7,8 @@
 | 5 role-based portals | ✅ Built | Consumer, Subdivision Officer, Field Engineer, Executive Management, System Admin |
 | 5 workflow templates | ✅ Built | `new_connection`, `load_extension`, `meter_replacement`, `billing_dispute`, `outage_safety` |
 | Offline field sync (queue + replay) | ✅ Built (see [docs/OFFLINE.md](docs/OFFLINE.md)) | IndexedDB + `localStorage` queue, `client_uuid` dedupe; no version-vector merge |
-| AES-256-GCM document vault | ✅ Built (application-layer) | `VFENC1` HKDF-SHA256 + AES-256-GCM in `uploads_encrypted/` |
+| AES-256-GCM document vault & polyglot defense | ✅ Built (application-layer) | `VFENC1` HKDF-SHA256 + AES-256-GCM in `uploads_encrypted/` + anti-polyglot magic-byte validation |
+| Hardened Auth & MFA (Cloudflare-aligned) | ✅ Built | 15-min JWTs, `UserSession` server revocation, 384-bit rotating refresh tokens with reuse detection, Staff RFC 6238 TOTP MFA, BOLA isolation |
 | SHA-256 audit chain | ✅ Built | Serialized `AuditChainHead` + `GET /v1/requests/audit/verify` |
 | 5 ML models | ⚠️ Synthetic-trained (not validated on UGVCL data) | Trained on `backend/app/ml/synthetic.py`; strictly advisory |
 | SAP S/4HANA IS-U OData gateway | 🟡 Simulated (is_simulated: true) | SAP-shaped OData v4 mock (simulated; not connected to SAP) |
@@ -98,15 +99,42 @@ These metrics reflect performance on a team-generated synthetic holdout set. The
 
 ---
 
-## 4. Application-Layer Security, Simulated ERP Gateway, Backup Scripts & Infra Proposal
+## 4. Application-Layer Security, Hardening & Audit Controls
 
-- **Zero `localStorage` Tokens**: Sessions use `HttpOnly; SameSite=Lax` cookies (`/auth/login?use_cookie=true`) paired with an in-memory, portal-verified session bridge (`backendSession.ts`) that purges legacy storage keys and fails closed on cross-tab mismatches.
-- **Magic-Byte Header Check & Always-On AES-256-GCM Vault**: `POST /v1/requests/with-document` checks `%PDF-`, PNG (`\x89PNG\r\n\x1a\n`), JPEG (`FF D8 FF`), and valid UTF-8 `.txt` header signatures (`validate_magic_bytes` in `uploads.py` — blocking extension-spoofed PE/MZ & ELF binaries with `400`; full antivirus/CDR scanning is out of scope), enforces `MAX_UPLOAD_BYTES` (`5 MiB`), and **always** persists encrypted document bytes (`VFENC1` HKDF-SHA256 + AES-256-GCM envelope, never served directly as raw files) into `uploads_encrypted/` (`settings.upload_vault_dir`, overrideable via `UPLOAD_VAULT_DIR`).
-- **Tamper-Evident Audit Chain & SIEM Export**: Every state transition, simulated ERP sync, alert dispatch, and template edit appends to a serialized, fork-proof **SHA-256 hash chain** (`AuditChainHead` + `GET /v1/requests/audit/verify`) exportable by Admins in **ArcSight/Wazuh `CEF:0` or JSON** (`GET /v1/system/siem-events`).
-- **HTTP Security Headers**: `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` on `/auth/*`, and production `Strict-Transport-Security`.
-- **ERP integration (simulated)**: SAP-shaped OData v4 mock (simulated; not connected to SAP) (`/v1/erp/sap-odata/*`¹) + 3-System fan-out mock (simulated) across mock SAP FI-CA/IS-U, e-Urja CIS Billing, and GUVNL 1912 Grievance CRM targets via `POST /v1/erp/gateway/propagate/{id}` + in-repo simulated drift check (`GET /v1/erp/reconcile` & `POST /v1/erp/reconcile/{id}`).
-- **Backup, SHA-256 Checksum & Local Restore Drill Scripts**: Self-contained `POST /v1/system/dr-failover-drill`, `cold_start_dr_proof.py` ([`docs/verification/r4-cold-start-dr-proof.txt`](docs/verification/r4-cold-start-dr-proof.txt)), `backup.sh`, `offsite_replicate.sh`, and `restore_drill.sh` — verifies local SQLite snapshot checksums, 1-byte tamper rejection, and local file restore (`0` records lost, `PRAGMA integrity_check = ok`; not geo-redundant high availability).
-- **Infrastructure Modernisation Proposal (Out of Delivered Scope)**: Hardware and network modernisation are out of scope for this software prototype; proposed reference architecture and indicative BOM are documented separately in [`docs/INFRA_PROPOSAL.md`](docs/INFRA_PROPOSAL.md) and [`docs/INFRASTRUCTURE_BOM_SOURCES.md`](docs/INFRASTRUCTURE_BOM_SOURCES.md).
+- **Phase 1 — Authentication, Session Security & Staff MFA**:
+  - 15-minute JWT access tokens with standard RFC 7519 claims (`jti`, `iss`, `aud`, `token_type`).
+  - Active session tracking via database-backed `UserSession` model with server-side revocation on logout (`POST /v1/auth/logout`) and password change.
+  - 384-bit cryptographically secure rotating refresh tokens (`POST /v1/auth/refresh`) stored as SHA-256 digests; automatic family revocation upon detected token reuse.
+  - Staff TOTP MFA (RFC 6238) with AES-256-GCM encrypted secrets, QR provisioning (`POST /v1/auth/mfa/setup`), verification (`POST /v1/auth/mfa/verify`), and 8 single-use hashed emergency recovery codes.
+  - Distributed-ready login rate limiting (5 failed attempts per 300s window) with IP and account lockout; generic registration responses reducing username enumeration.
+- **Phase 2 — Authorization & BOLA/IDOR Access Control**:
+  - Horizontal consumer isolation (Broken Object Level Authorization defense) across all connection requests.
+  - Premise IDOR protection concealing resource existence with HTTP 404 for unauthorized tenant queries.
+  - Vertical privilege escalation blocks preventing non-admin role modification; case-insensitive subdivision officer zone containment (`func.lower()`); field engineer assignment containment (unassigned engineers receive HTTP 403).
+- **Phase 3 — File Upload Security & Cryptographic Envelope**:
+  - Strict magic-byte validation (`%PDF-`, `\x89PNG\r\n\x1a\n`, `\xff\xd8\xff`, and valid UTF-8 text); anti-polyglot inspection blocking executable HTML/XML/SVG script tags in uploaded documents.
+  - Filename sanitization stripping double-extensions (`deed.php.pdf` $\to$ `deed_php.pdf`), path traversals, and non-whitelisted characters.
+  - NIST SP 800-38D AES-256-GCM envelope encryption at rest (`VFENC1`) with AAD bound to filename and zero plaintext stored on disk.
+  - Secure document retrieval endpoint (`GET /v1/requests/{request_id}/document`) with BOLA authorization, `nosniff`, `Content-Disposition: attachment`, and `Cache-Control: no-store`.
+- **Phase 4 — Input Validation, Injection Defense & Model Hardening**:
+  - Stored XSS defense via `sanitize_untrusted_text` stripping dangerous HTML tags, DOM event handlers (`onerror=`, `onload=`), and active schemes (`javascript:`, `vbscript:`, `data:`).
+  - Strict 6-digit Indian PIN code format enforcement (`[1-9][0-9]{5}`) yielding `NEEDS_CORRECTION` on invalid format in workflow requests and HTTP 422 in premise profiles.
+  - 100% ORM parameterized query coverage across all database operations (SQL injection immunity).
+- **Phase 5 — Audit Log Integrity & Anti-Repudiation**:
+  - Tamper-evident sequential SHA-256 hash chain: $\text{entry\_hash} = \text{SHA-256}(\text{canonical\_payload} + \text{prev\_hash})$ with `AuditChainHead` single-row lock anchor preventing multi-process chain forks.
+  - Comprehensive audit coverage including `LOGIN_SUCCESS`, `LOGIN_FAILED`, `LOGOUT`, and KYC `DOCUMENT_DOWNLOADED`.
+  - On-demand verification walk (`GET /v1/requests/audit/verify`) detecting modified, reordered, or deleted audit rows.
+  - SIEM ArcSight/Wazuh CEF (`CEF:0|UGVCL|VidyutFlow|1.0|...`) and JSON export (`GET /v1/system/siem-events`) + cryptographic self-test (`GET /v1/system/security-posture`).
+- **Phase 6 — Transport Security & Denial-of-Service Defense**:
+  - Request body length DoS limit: middleware aborts JSON payloads exceeding 2 MiB (`max_json_body_bytes = 2097152`) with HTTP 413.
+  - Restrictive `Permissions-Policy: camera=(), microphone=(), geolocation=(self)`.
+  - Hardened `Content-Security-Policy` with `object-src 'none'` and `frame-ancestors 'none'`.
+  - Production `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` and CORS wildcard prohibition with credentials.
+- **Simulated ERP Gateway & Backup Drill Scripts**:
+  - SAP-shaped OData v4 mock (simulated; not connected to SAP) (`/v1/erp/sap-odata/*`¹) + 3-System fan-out mock across mock SAP FI-CA/IS-U, e-Urja CIS Billing, and GUVNL 1912 Grievance CRM targets via `POST /v1/erp/gateway/propagate/{id}`.
+  - Self-contained `POST /v1/system/dr-failover-drill`, `cold_start_dr_proof.py`, `backup.sh`, `offsite_replicate.sh`, and `restore_drill.sh` verifying SQLite snapshot checksums and 1-byte tamper rejection.
+- **Infrastructure Modernisation Proposal (Out of Delivered Scope)**: Proposed reference architecture and indicative BOM documented in [`docs/INFRA_PROPOSAL.md`](docs/INFRA_PROPOSAL.md) and [`docs/INFRASTRUCTURE_BOM_SOURCES.md`](docs/INFRASTRUCTURE_BOM_SOURCES.md).
+- **Audit Verification Report**: Complete Cloudflare-aligned remediation matrix and findings documented in [`docs/SECURITY_AUDIT_REPORT.md`](docs/SECURITY_AUDIT_REPORT.md).
 
 > ¹ *Simulation disclosure:* All OData v4, CIS Billing, and 1912 CRM endpoints execute against deterministic in-repo mocks (`is_simulated: true` in API metadata) and are not connected to any real SAP or UGVCL server.
 
@@ -146,7 +174,7 @@ docker compose up --build
 ## 6. Automated Verification Gates
 
 ```bash
-# Backend: 124 pytest assertions (55/55 OpenAPI ops, magic-byte & default vault, 5 ML models, OData v4 mock, SIEM, backup drill)
+# Backend: 105 pytest suites (57 paths / 62 ops OpenAPI contract, Phase 1-6 security hardening, magic-byte vault, 5 ML models, OData v4 mock, SIEM, backup drill)
 cd backend && ../.venv/bin/pytest -q tests
 
 # Frontend: TypeScript strict check + 38 end-to-end/unit/i18n/security suites + production bundle build
@@ -159,13 +187,15 @@ cd frontend && npm run lint && npm test && npm run build
 
 ## 7. Key Documentation Index
 
+- [`docs/SECURITY_AUDIT_REPORT.md`](docs/SECURITY_AUDIT_REPORT.md) — Cloudflare-aligned Security Audit & Hardening Remediation Report (Phases 1–6)
+- [`docs/SECURITY.md`](docs/SECURITY.md) & [`SECURITY.md`](SECURITY.md) — Application-layer threat model, AES-256-GCM field/vault encryption & SIEM `CEF:0`
+- [`docs/PENETRATION_TEST_PLAN.md`](docs/PENETRATION_TEST_PLAN.md) — CERT-In aligned VAPT test plan across authentication, authorization, and cryptographic layers
 - [`docs/PS_GAP_ANALYSIS.md`](docs/PS_GAP_ANALYSIS.md) — Blunt requirement-by-requirement gap analysis against official `PS000125`
 - [`docs/OFFLINE.md`](docs/OFFLINE.md) — Offline field sync: what is implemented vs. unimplemented conflict/version-vector gaps
 - [`docs/INFRA_PROPOSAL.md`](docs/INFRA_PROPOSAL.md) — Infrastructure modernisation proposal (explicitly not delivered by prototype)
 - [`docs/PS000125_OFFICIAL.md`](docs/PS000125_OFFICIAL.md) — Verbatim official problem statement
 - [`docs/REQUIREMENT_MAPPING.md`](docs/REQUIREMENT_MAPPING.md) — Detailed 12-area PS000125 mapping & honesty boundaries
-- [`docs/SECURITY.md`](docs/SECURITY.md) & [`SECURITY.md`](SECURITY.md) — Application-layer threat model, AES-256-GCM field/vault encryption & SIEM `CEF:0`
-- [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) & [`docs/api/openapi.json`](docs/api/openapi.json) — Frozen 50-path / 55-operation `/v1` API specification (`100%` endpoint test coverage in `r4-api-endpoint-coverage.txt`)
+- [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) & [`docs/api/openapi.json`](docs/api/openapi.json) — OpenAPI 3.1.0 specification (57 paths / 62 operations Dual-served `/` and `/v1`)
 - [`docs/ML_REPORT.md`](docs/ML_REPORT.md) — 5-model `scikit-learn` evaluation (`0.9074` accuracy (synthetic holdout) on team-authored synthetic/OOD sanity-check set) & human-approval governance
 - [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md) — Local SQLite backup, SHA-256 checksum & restore drill scripts
 - [`docs/TEAM_ROLES.md`](docs/TEAM_ROLES.md), [`docs/VIVA_QUESTION_BANK.md`](docs/VIVA_QUESTION_BANK.md) & [`docs/DEFENCE_QA.md`](docs/DEFENCE_QA.md) — 5-member viva bank & Q&A

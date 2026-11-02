@@ -21,6 +21,7 @@ class LoginLimiter:
         clock=time.monotonic,
         redis_url: str = "",
         namespace: str = "vidyutflow:rl:auth",
+        error_message: str = "Too many login attempts. Try again later.",
     ):
         self.attempts = attempts
         self.window = window
@@ -28,6 +29,7 @@ class LoginLimiter:
         self.clock = clock
         self.redis_url = redis_url
         self.namespace = namespace
+        self.error_message = error_message
         self._redis = None
         self._buckets: dict[str, tuple[float, int]] = {}
         self._lock = Lock()
@@ -71,7 +73,7 @@ class LoginLimiter:
                 return
             raise HTTPException(
                 429,
-                "Too many authentication attempts. Try again later.",
+                self.error_message,
                 headers={"Retry-After": str(max(1, math.ceil(retry_s)))},
             )
 
@@ -88,14 +90,48 @@ class LoginLimiter:
                 return
         raise HTTPException(
             429,
-            "Too many login attempts. Try again later.",
+            self.error_message,
             headers={"Retry-After": str(max(1, math.ceil(retry)))},
         )
 
 
-login_limiter = LoginLimiter(settings.login_max_attempts, settings.login_window_seconds)
+login_limiter = LoginLimiter(
+    settings.login_max_attempts,
+    settings.login_window_seconds,
+    namespace="vidyutflow:rl:auth:ip",
+)
+
+account_limiter = LoginLimiter(
+    settings.login_account_max_attempts,
+    settings.login_account_lockout_seconds,
+    namespace="vidyutflow:rl:auth:account",
+    error_message="Account temporarily locked due to excessive failed attempts. Please try again later.",
+)
 
 
 def enforce_login_limit(request: Request):
     # Never parse user-supplied X-Forwarded-For here. Trust configuration belongs to deployment.
     login_limiter.check(request.client.host if request.client else "unknown")
+
+
+def enforce_account_limit(identifier: str):
+    """Throttle targeted brute force against a specific username or email account."""
+    if not identifier:
+        return
+    norm = identifier.strip().lower()
+    account_limiter.check(norm)
+
+
+def reset_account_limit(identifier: str):
+    """Clear failed attempt bucket upon successful authentication."""
+    if not identifier:
+        return
+    norm = identifier.strip().lower()
+    r = account_limiter._get_redis()
+    if r is not None:
+        try:
+            r.delete(f"{account_limiter.namespace}:{norm}")
+        except Exception:
+            pass
+    with account_limiter._lock:
+        account_limiter._buckets.pop(norm, None)
