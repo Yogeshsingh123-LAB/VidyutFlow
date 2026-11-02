@@ -231,8 +231,11 @@ def login(
     db: Session = Depends(get_db),
 ):
     enforce_account_limit(form.username)
+    client_ip = request.client.host if request.client else ""
     u = db.query(User).filter(func.lower(User.email) == form.username.strip().lower()).first()
     if not u or not u.is_active or not verify_password(form.password, u.hashed_password):
+        audit(db, None, "LOGIN_FAILED", "user", form.username.strip().lower(), f"ip={client_ip}")
+        db.commit()
         raise HTTPException(401, "Invalid email or password")
 
     reset_account_limit(form.username)
@@ -257,7 +260,6 @@ def login(
     now_utc = datetime.now(timezone.utc)
     exp_refresh = now_utc + timedelta(days=settings.refresh_token_days)
 
-    client_ip = request.client.host if request.client else ""
     user_agent = request.headers.get("user-agent", "")[:250]
     session_row = UserSession(
         user_id=u.id,
@@ -271,6 +273,7 @@ def login(
         expires_at=exp_refresh,
     )
     db.add(session_row)
+    audit(db, u, "LOGIN_SUCCESS", "user", u.id, f"ip={client_ip} jti={jti[:8]}")
     db.commit()
 
     issue_cookie = bool(use_cookie or x_use_cookie_session in ("1", "true"))
@@ -387,6 +390,9 @@ def logout(
             db.query(UserSession).filter(UserSession.jti == jti).update(
                 {"is_revoked": True, "revoked_at": now_utc, "revoked_reason": "LOGOUT"}
             )
+            sub = p.get("sub", "")
+            actor = db.get(User, sub) if sub else None
+            audit(db, actor or sub, "LOGOUT", "session", jti, f"jti={jti[:8]} revoked=true")
             db.commit()
 
     # If a refresh token cookie is present, revoke that session record too

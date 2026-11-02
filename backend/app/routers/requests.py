@@ -178,6 +178,9 @@ def get_document(request_id: str, db: Session = Depends(get_db), u: User = Depen
     except Exception:
         raise HTTPException(500, "Document decryption or integrity check failed")
 
+    audit(db, u, "DOCUMENT_DOWNLOADED", "request", r.id, f"file={clean_name} role={u.role}")
+    db.commit()
+
     ext = PurePosixPath(clean_name).suffix.lower()
     media_types = {
         ".pdf": "application/pdf",
