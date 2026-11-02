@@ -27,7 +27,6 @@ import {
   PieChart,
   Clock,
   Cpu,
-  Sparkles,
   ShieldCheck,
   Users,
   KeyRound,
@@ -160,7 +159,7 @@ export const Sidebar: React.FC = () => {
           { id: 'analytics', label: t.erp.navRevenueDemand, icon: <PieChart className="w-4 h-4" /> },
           { id: 'sla', label: t.erp.navSlaRedressal, icon: <Clock className="w-4 h-4" /> },
           { id: 'feeders', label: t.erp.navFeederOverloads, icon: <Cpu className="w-4 h-4" />, badge: `1 ${t.erp.alertSuffix}` },
-          { id: 'ai-insights', label: t.erp.navAiInsights, icon: <Sparkles className="w-4 h-4" /> },
+          { id: 'ai-insights', label: t.erp.navAiInsights, icon: <Activity className="w-4 h-4" /> },
           { id: 'reports', label: t.erp.navExecutiveExport, icon: <BarChart3 className="w-4 h-4" /> }
         ];
 
@@ -328,7 +327,7 @@ export const Sidebar: React.FC = () => {
           }`}
           title={t.erp.vidyutMitraAiAssistant}
         >
-          <Sparkles className="w-4 h-4 text-teal-400 shrink-0" />
+          <Cpu className="w-4 h-4 text-teal-400 shrink-0" />
           {!isCollapsed && <span className="truncate font-medium">{t.erp.vidyutMitraAi}</span>}
         </button>
       </div>

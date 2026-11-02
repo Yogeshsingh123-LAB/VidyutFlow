@@ -16,8 +16,7 @@ import {
   ArrowRight,
   UserCheck,
   Lock,
-  FileText,
-  Sparkles
+  FileText
 } from 'lucide-react';
 import { AIActionRecommendation } from '../../types';
 import { validateApprovalPermission } from '../../utils/aiRecommendationEngine';
@@ -151,7 +150,7 @@ export const HumanApprovalModal: React.FC<HumanApprovalModalProps> = ({
                 {locRec.title}
               </h2>
               <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
-                <Sparkles className="w-3.5 h-3.5 text-teal-500" />
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 <span>
                   {te.approvalModalRecommendedByPrefix} <strong>{locRec.agentPersonaName}</strong> ({t.erp.roleEmployee})
                 </span>

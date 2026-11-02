@@ -52,7 +52,6 @@ import {
   ShieldCheck,
   TrendingUp,
   MapPin,
-  Sparkles,
   Layers,
   Phone,
   Mail,

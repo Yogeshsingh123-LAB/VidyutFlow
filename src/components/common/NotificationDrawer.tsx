@@ -47,7 +47,6 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowUpRight,
-  Sparkles,
   History,
   Check,
   Trash2,
@@ -572,7 +571,7 @@ export const NotificationDrawer: React.FC = () => {
                 className="text-[10px] font-bold px-2 py-1 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 hover:bg-amber-200 border border-amber-300 dark:border-amber-800 transition-colors flex items-center gap-1 cursor-pointer"
                 title="Trigger simulated critical overload for demonstration"
               >
-                <Sparkles className="w-3 h-3 text-amber-600" />
+                <AlertTriangle className="w-3 h-3 text-amber-600" />
                 <span>{t.erp.simulateCriticalIncident}</span>
               </button>
             </div>

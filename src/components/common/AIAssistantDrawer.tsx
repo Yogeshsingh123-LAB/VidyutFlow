@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
-  Sparkles,
   X,
   Send,
   Info,
@@ -485,7 +484,7 @@ export const AIAssistantDrawer: React.FC = () => {
         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
           <div className="flex items-center gap-3">
             <div className={`w-9 h-9 rounded-lg ${currentPersona.avatarBg} flex items-center justify-center text-white shadow-sm shrink-0`}>
-              <Sparkles className="w-5 h-5" />
+              <Cpu className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -569,7 +568,7 @@ export const AIAssistantDrawer: React.FC = () => {
                       activeUser.name
                     ) : (
                       <>
-                        <Sparkles className="w-3 h-3 text-teal-600 shrink-0" />
+                        <Cpu className="w-3 h-3 text-teal-600 shrink-0" />
                         <span>{m.personaName || currentPersona.name}</span>
                         {m.isFallback ? (
                           <span className="text-[9px] font-mono font-medium text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
@@ -630,8 +629,8 @@ export const AIAssistantDrawer: React.FC = () => {
 
           {/* Loading Indicator */}
           {isLoading && (
-            <div className="flex items-center gap-2.5 text-xs text-slate-600 p-3 rounded-lg bg-teal-50/80 border border-teal-200 w-fit animate-pulse">
-              <Sparkles className="w-4 h-4 text-teal-600 animate-spin" />
+            <div className="flex items-center gap-2.5 text-xs text-slate-600 p-3 rounded-lg bg-teal-50/80 border border-teal-200 w-fit">
+              <RefreshCw className="w-4 h-4 text-teal-600 animate-spin" />
               <span>{currentPersona.name} is inspecting authorized ERP records & telemetry...</span>
             </div>
           )}
@@ -658,8 +657,8 @@ export const AIAssistantDrawer: React.FC = () => {
         {recommendations.filter(r => r.status === 'PENDING_APPROVAL' && (r.requiredApprovingRole === currentRole || currentRole === 'management' || currentRole === 'admin')).length > 0 && (
           <div className="px-4 py-2.5 bg-indigo-50/70 border-t border-indigo-100 shrink-0 space-y-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-950">
-                <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-950">
+                <Cpu className="w-3.5 h-3.5 text-teal-600" />
                 <span>AI Action Recommendations (Human Concurrence Required)</span>
               </div>
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">

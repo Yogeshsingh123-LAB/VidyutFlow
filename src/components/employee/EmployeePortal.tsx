@@ -54,7 +54,7 @@ import {
   MapPin,
   Calendar,
   Layers,
-  Sparkles,
+  Lightbulb,
   Building2,
   HardHat,
   ShieldCheck,
@@ -433,8 +433,8 @@ export const EmployeePortal: React.FC = () => {
             {/* Smart Suggestions */}
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-teal-500" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                <Lightbulb className="w-4 h-4 text-amber-500" />
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
                   {te.smartSuggestionsTitle}
                 </h3>
               </div>

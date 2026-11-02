@@ -4,7 +4,7 @@
  * Fully localized in English, Gujarati, Hindi, and Marathi (Item #32).
  */
 import React from 'react';
-import { AlertTriangle, RefreshCw, Sparkles, Wifi, WifiOff } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Activity, Wifi, WifiOff } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { LanguageCode } from '../../i18n/types';
 import { fetchLiveRequests, useLivePoll, type LiveRequestRow } from '../../utils/liveData';
@@ -103,11 +103,11 @@ export const LiveSlaRiskWatchlist: React.FC = () => {
   return (
     <section
       aria-label={t.sectionAria}
-      className="rounded-xl border border-teal-200 dark:border-teal-900/60 bg-teal-50/50 dark:bg-teal-950/20 p-4 sm:p-5"
+      className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/40 p-4 sm:p-5"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 min-w-0 leading-snug">
-          <Sparkles className="w-4 h-4 text-teal-600 shrink-0" aria-hidden="true" />
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2 min-w-0 leading-snug">
+          <Activity className="w-4 h-4 text-slate-700 dark:text-slate-300 shrink-0" aria-hidden="true" />
           <span className="break-words">{t.heading}</span>
         </h2>
         <div className="flex items-center gap-2 shrink-0">

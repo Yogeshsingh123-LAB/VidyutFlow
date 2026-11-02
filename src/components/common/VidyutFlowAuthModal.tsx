@@ -18,7 +18,7 @@ import {
   User,
   Phone,
   Home,
-  Sparkles,
+  KeyRound,
   ChevronDown
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -509,7 +509,7 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
                     className="w-full px-4 py-3 text-left flex items-center justify-between text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <KeyRound className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
                       <span className="font-semibold text-slate-800 dark:text-slate-200">
                         Use Demo Credentials
                       </span>

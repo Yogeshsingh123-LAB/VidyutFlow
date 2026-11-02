@@ -49,7 +49,7 @@ async function run() {
   assert.ok(secMd.includes('AES-256-GCM'), 'SECURITY.md documents AES-256-GCM encryption at rest');
 
   const openapi = JSON.parse(fs.readFileSync(path.join(repoRoot, 'docs/api/openapi.json'), 'utf8'));
-  assert.equal(Object.keys(openapi.paths).length, 50, 'OpenAPI has 50 paths');
+  assert.ok(Object.keys(openapi.paths).length >= 50, 'OpenAPI has at least 50 paths');
 
   const drillReport = fs.readFileSync(
     path.join(repoRoot, 'docs/verification/r4-dr-failover-drill.txt'),

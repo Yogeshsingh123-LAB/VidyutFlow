@@ -10,7 +10,7 @@ import {
   Wrench,
   ShieldCheck,
   Bell,
-  Sparkles,
+  Cpu,
   ChevronRight,
   ChevronLeft
 } from 'lucide-react';
@@ -224,7 +224,7 @@ export const WorkflowVisualizerModal: React.FC = () => {
 
               <div className="p-3 rounded-lg bg-teal-50/60 dark:bg-teal-950/30 border border-teal-100 dark:border-teal-900/40">
                 <span className="text-[10px] uppercase font-bold text-teal-700 dark:text-teal-300 flex items-center gap-1 mb-1">
-                  <Sparkles className="w-3 h-3 text-teal-500" />
+                  <Cpu className="w-3 h-3 text-teal-500" />
                   AI & Automation Assist
                 </span>
                 <span className="text-teal-900 dark:text-teal-200">{currentStep.aiEnhancement}</span>

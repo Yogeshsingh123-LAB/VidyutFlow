@@ -13,8 +13,7 @@ import {
   Sliders,
   Check,
   Plus,
-  Minus,
-  Sparkles
+  Minus
 } from 'lucide-react';
 import {
   BillingCycle,

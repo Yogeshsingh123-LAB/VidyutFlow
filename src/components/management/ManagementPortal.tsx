@@ -17,7 +17,8 @@ import {
   TrendingDown,
   TrendingUp,
   AlertTriangle,
-  Sparkles,
+  Activity,
+  ShieldCheck,
   Download,
   Filter,
   Cpu,
@@ -592,14 +593,14 @@ export const ManagementPortal: React.FC = () => {
           <LiveAiGovernancePanel />
           <LivePredictiveDecisionPanel />
           <LiveSlaRiskWatchlist />
-          <div className="p-5 rounded-xl bg-gradient-to-r from-blue-900/20 to-teal-900/20 border border-teal-500/30 space-y-3">
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-teal-400" />
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">
+              <Activity className="w-4 h-4 text-slate-700 dark:text-slate-300" />
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
                 {tm.aiRadarBannerTitle}
               </h2>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
               {tm.aiRadarBannerSubtitle}
             </p>
           </div>
@@ -660,15 +661,15 @@ export const ManagementPortal: React.FC = () => {
           <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
             <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-purple-600" />
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   <span>{tm.aiQueueTitle}</span>
                 </h3>
                 <p className="text-xs text-slate-500">
                   {tm.aiQueueSubtitle}
                 </p>
               </div>
-              <span className="text-[10px] font-bold px-2.5 py-1 rounded bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 self-start sm:self-auto">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800 self-start sm:self-auto">
                 {recommendations.filter(r => r.requiredApprovingRole === 'management' && r.status === 'PENDING_APPROVAL').length} {tm.pendingConcurrenceBadge}
               </span>
             </div>

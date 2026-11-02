@@ -14,10 +14,9 @@ import {
   Home,
   Info,
   HelpCircle,
-  ChevronDown,
   ShieldCheck,
-  Sparkles,
-  Users
+  Users,
+  Cpu
 } from 'lucide-react';
 import { PresentationAboutModal } from '../common/PresentationAboutModal';
 import { LanguageSelector } from '../common/LanguageSelector';
@@ -470,7 +469,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
                   }}
                   className="sm:hidden w-full flex items-center gap-2.5 px-3 py-2 text-teal-700 hover:bg-teal-50 rounded-lg text-left font-medium cursor-pointer"
                 >
-                  <Sparkles className="w-4 h-4 text-teal-600 shrink-0" />
+                  <Cpu className="w-4 h-4 text-teal-600 shrink-0" />
                   <span>{t.erp.vidyutMitraAi}</span>
                 </button>
 
