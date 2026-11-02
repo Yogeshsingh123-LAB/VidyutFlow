@@ -23,6 +23,9 @@ const ManagementPortal = lazy(() =>
 const AdminPortal = lazy(() =>
   import('./components/admin/AdminPortal').then(m => ({ default: m.AdminPortal }))
 );
+const MeterReadingWorkspace = lazy(() =>
+  import('./components/common/MeterReadingWorkspace').then(m => ({ default: m.MeterReadingWorkspace }))
+);
 
 const WorkspaceRouteFallback: React.FC = () => (
   <div
@@ -73,6 +76,7 @@ const MainExperience: React.FC = () => {
       ) : (
         /* Full Workspace Platform Shell */
         <AppShell>
+          <MeterReadingWorkspace />
           <PortalRouter />
         </AppShell>
       )}

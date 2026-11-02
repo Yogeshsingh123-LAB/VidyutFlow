@@ -6,11 +6,11 @@
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "start": "tsx src/server/prodServer.ts",
-    "build": "vite build",
+    "build": "node scripts/copy-tesseract-assets.mjs && vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "tsx tests/auth-access.test.ts && tsx tests/demo-data-integrity.test.ts && tsx tests/ai-assistant-resilience.test.ts && tsx tests/server-auth-foundation.test.ts && tsx tests/server-auth-api.test.ts && tsx tests/navigation-views.test.ts && tsx tests/agentic-ai-tools.test.ts && tsx tests/critical-incidents.test.ts && tsx tests/incident-routing-escalation.test.ts && tsx tests/erp-workflows.test.ts && tsx tests/human-in-the-loop.test.ts && tsx tests/backend-readiness.test.ts && tsx tests/ui-ux-accessibility.test.ts && tsx tests/security-resilience-stress.test.ts && tsx tests/e2e-hackathon-readiness.test.ts && tsx tests/consumer-portal-security.test.ts && tsx tests/notification-application-queue.test.ts && tsx tests/multilingual-infrastructure.test.ts && tsx tests/multilingual-cards-repair.test.ts && tsx tests/erp-multilingual-navigation.test.ts && tsx tests/consumer-portal-multilingual.test.ts && tsx tests/live-api-wiring.test.ts && tsx tests/request-submission-status.test.ts && tsx tests/demo-load-policy.test.ts && tsx tests/backend-session-boundary.test.ts && tsx tests/document-upload.test.ts && tsx tests/ai-story-alignment.test.ts && tsx tests/offline-field-sync.test.ts && tsx tests/erp-adapter.test.ts && tsx tests/alert-engine.test.ts && tsx tests/workflow-templates.test.ts && tsx tests/performance-monitoring.test.ts && tsx tests/executive-analytics.test.ts && tsx tests/ai-governance.test.ts && tsx tests/infra-and-workload-evidence.test.ts && tsx tests/page-weight-and-five-portal-qa.test.ts && tsx tests/teammate-backlog-completion.test.ts && tsx tests/judge-gap-closure.test.ts && tsx tests/phase10-outage-map-and-timeline.test.ts",
+    "test": "tsx tests/auth-access.test.ts && tsx tests/demo-data-integrity.test.ts && tsx tests/ai-assistant-resilience.test.ts && tsx tests/server-auth-foundation.test.ts && tsx tests/server-auth-api.test.ts && tsx tests/navigation-views.test.ts && tsx tests/agentic-ai-tools.test.ts && tsx tests/critical-incidents.test.ts && tsx tests/incident-routing-escalation.test.ts && tsx tests/erp-workflows.test.ts && tsx tests/human-in-the-loop.test.ts && tsx tests/backend-readiness.test.ts && tsx tests/ui-ux-accessibility.test.ts && tsx tests/security-resilience-stress.test.ts && tsx tests/e2e-hackathon-readiness.test.ts && tsx tests/consumer-portal-security.test.ts && tsx tests/notification-application-queue.test.ts && tsx tests/multilingual-infrastructure.test.ts && tsx tests/multilingual-cards-repair.test.ts && tsx tests/erp-multilingual-navigation.test.ts && tsx tests/consumer-portal-multilingual.test.ts && tsx tests/live-api-wiring.test.ts && tsx tests/request-submission-status.test.ts && tsx tests/demo-load-policy.test.ts && tsx tests/backend-session-boundary.test.ts && tsx tests/document-upload.test.ts && tsx tests/ai-story-alignment.test.ts && tsx tests/offline-field-sync.test.ts && tsx tests/erp-adapter.test.ts && tsx tests/alert-engine.test.ts && tsx tests/workflow-templates.test.ts && tsx tests/performance-monitoring.test.ts && tsx tests/executive-analytics.test.ts && tsx tests/ai-governance.test.ts && tsx tests/infra-and-workload-evidence.test.ts && tsx tests/page-weight-and-five-portal-qa.test.ts && tsx tests/teammate-backlog-completion.test.ts && tsx tests/judge-gap-closure.test.ts && tsx tests/phase10-outage-map-and-timeline.test.ts && tsx tests/meter-reading.test.ts",
     "test:phase10": "tsx tests/phase10-outage-map-and-timeline.test.ts",
     "test:auth": "tsx tests/auth-access.test.ts",
     "test:server-auth": "tsx tests/server-auth-foundation.test.ts && tsx tests/server-auth-api.test.ts",
@@ -52,6 +52,7 @@
     "react-dom": "^19.0.1",
     "recharts": "^3.10.1",
     "sharp": "^0.35.5",
+    "tesseract.js": "^7.0.0",
     "vite": "^8.3.0"
   },
   "devDependencies": {

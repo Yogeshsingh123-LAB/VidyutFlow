@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createAuthApiHandler } from './authRoutes';
 import { createAiChatHandler, createHealthHandler } from './runtimeMiddleware';
+import { handleMeterReadingRoute } from './meterReadingRoutes';
 
 /**
  * Standalone Production HTTP Server for VidyutFlow (Item #7).
@@ -47,7 +48,7 @@ function applySecurityHeaders(res: ServerResponse) {
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; worker-src 'self'; connect-src 'self' https://tessdata.projectnaptha.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
   );
 }
 
@@ -130,6 +131,11 @@ export function createProductionRequestHandler(options?: {
 
     if (pathname === '/api/ai-chat' || pathname === '/api/ai-chat/') {
       void aiChatHandler(req, res);
+      return;
+    }
+
+    if (pathname === '/api/meter-readings' || pathname.startsWith('/api/meter-readings/')) {
+      void handleMeterReadingRoute(req, res);
       return;
     }
 
