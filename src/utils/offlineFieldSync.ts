@@ -15,10 +15,11 @@
 import { hasBackendSession } from './backendSession';
 import { FieldSyncResponse, syncLiveFieldUpdate } from './liveData';
 import type { MeterReadingSubmission } from '../services/meterReading';
+import type { WorkOrderCompletionReport } from '../types';
 
 export type FieldSyncTaskStatus = 'FIELD_VERIFIED' | 'COMPLETED' | 'BLOCKED';
 export type OfflineQueueSyncState = 'PENDING' | 'SYNCING' | 'SYNCED' | 'DUPLICATE' | 'CONFLICT';
-export type OfflineQueueTargetKind = 'backend_request' | 'demo_workorder' | 'meter_reading';
+export type OfflineQueueTargetKind = 'backend_request' | 'demo_workorder' | 'meter_reading' | 'workorder_completion';
 
 export interface OfflineInspectionDetails {
   readingKwh: number;
@@ -54,6 +55,7 @@ export interface OfflineFieldQueueItem {
   inspection_details?: OfflineInspectionDetails;
   meter_reading?: Omit<MeterReadingSubmission, 'clientUuid' | 'photoDataUrl'>;
   photo_blob_key?: string;
+  completion_report?: WorkOrderCompletionReport;
 }
 
 export interface EnqueueFieldInspectionInput {
@@ -69,6 +71,7 @@ export interface EnqueueFieldInspectionInput {
   inspection_details?: OfflineInspectionDetails;
   meter_reading?: Omit<MeterReadingSubmission, 'clientUuid' | 'photoDataUrl'>;
   photo?: Blob;
+  completion_report?: WorkOrderCompletionReport;
 }
 
 export interface FlushFieldQueueSummary {
@@ -178,13 +181,14 @@ function readQueueFromLocalStorage(): OfflineFieldQueueItem[] {
 function writeQueueToIndexedDb(items: OfflineFieldQueueItem[]): void {
   if (typeof indexedDB === 'undefined') return;
   try {
-    const openReq = indexedDB.open(IDB_NAME, 2);
+    const openReq = indexedDB.open(IDB_NAME, 3);
     openReq.onupgradeneeded = () => {
       const db = openReq.result;
       if (!db.objectStoreNames.contains(IDB_STORE)) {
         db.createObjectStore(IDB_STORE, { keyPath: 'client_uuid' });
       }
       if (!db.objectStoreNames.contains('meter_reading_photos')) db.createObjectStore('meter_reading_photos', { keyPath: 'client_uuid' });
+      if (!db.objectStoreNames.contains('field_evidence_photos')) db.createObjectStore('field_evidence_photos', { keyPath: 'id' });
     };
     openReq.onsuccess = () => {
       try {
@@ -315,6 +319,7 @@ export function enqueueFieldInspection(input: EnqueueFieldInspectionInput): Offl
     sync_state: 'PENDING',
     attempts: 0,
     inspection_details: input.inspection_details,
+    completion_report: input.completion_report,
     ...(input.meter_reading ? { meter_reading: input.meter_reading, photo_blob_key: input.photo ? input.client_uuid || undefined : undefined } : {}),
   };
   const next = [item, ...loadFieldQueue().filter(existing => existing.client_uuid !== item.client_uuid)];
@@ -369,6 +374,28 @@ export async function enqueueOfflineMeterReading(input: {
     persistQueue(loadFieldQueue().map(existing => existing.client_uuid === clientUuid ? item : existing));
   }
   return item;
+}
+
+export function enqueueWorkOrderCompletion(input: {
+  clientUuid?: string;
+  workOrderId: string;
+  title: string;
+  actorEmail: string;
+  completionReport: WorkOrderCompletionReport;
+  notes?: string;
+}): OfflineFieldQueueItem {
+  const clientUuid = input.clientUuid || generateClientUuid();
+  return enqueueFieldInspection({
+    client_uuid: clientUuid,
+    target_kind: 'workorder_completion',
+    request_id: input.workOrderId,
+    title: input.title,
+    task_status: 'COMPLETED',
+    notes: input.notes || input.completionReport.completionRemarks || 'Work order completed with evidence',
+    meter_serial: '',
+    actor_email: input.actorEmail,
+    completion_report: input.completionReport
+  });
 }
 
 export async function getQueuedMeterPhoto(clientUuid: string): Promise<Blob | undefined> {
@@ -479,7 +506,7 @@ export async function flushOfflineFieldQueue(
       const currentItem = snapshot[idx];
       const attemptTime = new Date().toISOString();
 
-      if (currentItem.target_kind === 'demo_workorder') {
+      if (currentItem.target_kind === 'demo_workorder' || currentItem.target_kind === 'workorder_completion') {
         attempted += 1;
         options.onApplyDemoWorkOrder?.(currentItem);
         const updated = loadFieldQueue().map(i =>
@@ -724,15 +751,20 @@ export function clearOfflineFieldQueue(): void {
   }
   if (typeof indexedDB !== 'undefined') {
     try {
-      const openReq = indexedDB.open(IDB_NAME, 2);
+      const openReq = indexedDB.open(IDB_NAME, 3);
       openReq.onsuccess = () => {
         try {
           const db = openReq.result;
           if (db.objectStoreNames.contains(IDB_STORE)) {
-            const stores = [IDB_STORE, ...(db.objectStoreNames.contains('meter_reading_photos') ? ['meter_reading_photos'] : [])];
+            const stores = [
+              IDB_STORE,
+              ...(db.objectStoreNames.contains('meter_reading_photos') ? ['meter_reading_photos'] : []),
+              ...(db.objectStoreNames.contains('field_evidence_photos') ? ['field_evidence_photos'] : [])
+            ];
             const tx = db.transaction(stores, 'readwrite');
             tx.objectStore(IDB_STORE).clear();
             if (stores.includes('meter_reading_photos')) tx.objectStore('meter_reading_photos').clear();
+            if (stores.includes('field_evidence_photos')) tx.objectStore('field_evidence_photos').clear();
             tx.oncomplete = () => db.close();
           } else {
             db.close();
