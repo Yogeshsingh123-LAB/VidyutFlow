@@ -26,6 +26,7 @@ from ..security import (
     get_totp_provisioning_uri,
     hash_password,
     hash_token,
+    sanitize_untrusted_text,
     validate_password_policy,
     verify_password,
     verify_recovery_code,
@@ -204,9 +205,12 @@ def register(body: Register, db: Session = Depends(get_db)):
     except ValueError as exc:
         raise HTTPException(422, str(exc))
 
+    clean_name = sanitize_untrusted_text(body.name)
+    if not clean_name:
+        raise HTTPException(422, "Valid applicant name is required")
     u = User(
         email=norm_email,
-        name=body.name.strip(),
+        name=clean_name,
         role=body.role,
         zone=canonical_zone,
         hashed_password=pw_hash,
@@ -741,14 +745,20 @@ def create_saved_premise(
         ):
             raise HTTPException(422, "Coordinates out of valid WGS84 range")
     canonical_zone = resolve_active_zone(db, body.zone)
+    clean_label = sanitize_untrusted_text(body.label)
+    clean_name = sanitize_untrusted_text(body.applicant_name)
+    clean_address = sanitize_untrusted_text(body.address)
+    pin = sanitize_untrusted_text(body.pin_code).strip()
+    if pin and (len(pin) != 6 or not pin.isascii() or not pin.isdigit() or pin.startswith("0")):
+        raise HTTPException(422, "Valid 6-digit Indian PIN code is required")
     row = SavedPremise(
         user_id=u.id,
-        label=body.label.strip(),
-        applicant_name=body.applicant_name.strip(),
+        label=clean_label,
+        applicant_name=clean_name,
         phone=digits,
-        address=body.address.strip(),
+        address=clean_address,
         zone=canonical_zone,
-        pin_code=body.pin_code.strip(),
+        pin_code=pin,
         latitude=round(float(body.latitude), 6) if body.latitude is not None else None,
         longitude=round(float(body.longitude), 6) if body.longitude is not None else None,
         tariff_category=body.tariff_category.strip(),

@@ -14,8 +14,12 @@ from jose import jwt, JWTError
 from .config import settings
 
 _FIELD_ENC_PREFIX = "AES256GCM:v1:"
-_SCRIPT_OR_TAG_RE = re.compile(r"<\s*/?\s*(script|iframe|object|embed|svg|img|style)\b[^>]*>", re.IGNORECASE)
-_EVENT_ATTR_RE = re.compile(r"\bon[a-z]+\s*=", re.IGNORECASE)
+_DANGEROUS_TAG_RE = re.compile(
+    r"<\s*/?\s*(script|iframe|object|embed|svg|img|style|link|meta|base|form|input|button|body|html|applet)\b[^>]*>",
+    re.IGNORECASE,
+)
+_EVENT_ATTR_RE = re.compile(r"\bon[a-z]+\s*=\s*([\"'][^\"']*[\"']|[^\s>]+)?", re.IGNORECASE)
+_JS_SCHEME_RE = re.compile(r"(javascript|vbscript|data):[^\s]*", re.IGNORECASE)
 
 
 def _derive_field_key() -> bytes:
@@ -57,12 +61,13 @@ def decrypt_field_aes256(token: str, aad: str = "vidyutflow-pii") -> str:
 
 
 def sanitize_untrusted_text(value: str) -> str:
-    """Strip executable HTML/script payloads and control chars for defense-in-depth XSS safety."""
+    """Strip executable HTML/script payloads, JS URI schemes, and control chars for defense-in-depth XSS safety."""
     if not value:
         return ""
-    cleaned = "".join(ch for ch in value if ch in ("\n", "\t") or ord(ch) >= 32)
-    cleaned = _SCRIPT_OR_TAG_RE.sub("", cleaned)
+    cleaned = "".join(ch for ch in value if ch in ("\n", "\t", "\r") or ord(ch) >= 32)
+    cleaned = _DANGEROUS_TAG_RE.sub("", cleaned)
     cleaned = _EVENT_ATTR_RE.sub("", cleaned)
+    cleaned = _JS_SCHEME_RE.sub("", cleaned)
     return cleaned.strip()
 
 
