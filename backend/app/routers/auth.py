@@ -1,19 +1,41 @@
+from datetime import datetime, timedelta, timezone
+import json
 import math
-from fastapi import APIRouter, Depends, Header, HTTPException, Response
+import uuid
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..audit import audit
 from ..config import settings
 from ..db import get_db
 from ..deps import AUTH_COOKIE_NAME, current_user, require
-from ..login_limit import enforce_login_limit
-from ..models import SavedPremise, User
-from ..security import create_token, hash_password, verify_password
+from ..login_limit import enforce_login_limit, enforce_account_limit, reset_account_limit
+from ..models import PasswordResetToken, SavedPremise, User, UserSession
+from ..security import (
+    create_token,
+    decode_token,
+    decrypt_totp_secret,
+    encrypt_totp_secret,
+    generate_password_reset_token,
+    generate_recovery_codes,
+    generate_refresh_token,
+    generate_totp_secret,
+    get_totp_provisioning_uri,
+    hash_password,
+    hash_token,
+    validate_password_policy,
+    verify_password,
+    verify_recovery_code,
+    verify_totp_code,
+)
 from .staff import resolve_active_zone
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+REFRESH_COOKIE_NAME = "vidyutflow_refresh_token"
 
 SSO_SIMULATION_DISCLOSURE = (
     "SIMULATED OIDC / MeriPehchaan Parichay Single Sign-On for hackathon demonstration only — "
@@ -48,6 +70,24 @@ def _set_auth_cookie(response: Response, token: str) -> None:
         max_age=int(settings.access_token_minutes) * 60,
         path="/",
     )
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
+    response.set_cookie(
+        key=REFRESH_COOKIE_NAME,
+        value=refresh_token,
+        httponly=True,
+        samesite="lax",
+        secure=(settings.app_env == "production"),
+        max_age=int(settings.refresh_token_days) * 24 * 3600,
+        path="/",
+    )
+
+
+def _clear_auth_cookies(response: Response) -> None:
+    response.delete_cookie(key=AUTH_COOKIE_NAME, path="/")
+    response.delete_cookie(key=REFRESH_COOKIE_NAME, path="/")
+    response.delete_cookie(key=REFRESH_COOKIE_NAME, path="/auth")
 
 
 def ensure_default_premises(db: Session, u: User) -> None:
@@ -101,8 +141,7 @@ class Register(BaseModel):
     @field_validator("password")
     @classmethod
     def password_fits_bcrypt(cls, password: str) -> str:
-        if len(password.encode("utf-8")) > 72:
-            raise ValueError("Password must be at most 72 bytes when encoded as UTF-8")
+        validate_password_policy(password)
         return password
 
 
@@ -110,6 +149,28 @@ class SimulatedSsoLoginBody(BaseModel):
     provider_id: str = Field(..., min_length=3, max_length=80)
     email: str = Field(..., min_length=3, max_length=160)
     state: str = Field(..., min_length=8, max_length=128)
+
+
+class RefreshTokenBody(BaseModel):
+    refresh_token: str | None = None
+
+
+class MfaVerifyBody(BaseModel):
+    mfa_token: str
+    code: str
+
+
+class MfaEnableBody(BaseModel):
+    code: str
+
+
+class ForgotPasswordBody(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordBody(BaseModel):
+    token: str
+    new_password: str
 
 
 class PremiseCreateBody(BaseModel):
@@ -131,14 +192,24 @@ def register(body: Register, db: Session = Depends(get_db)):
     if body.role != "consumer":
         raise HTTPException(403, "Public registration is restricted to consumers")
     canonical_zone = resolve_active_zone(db, body.zone)
-    if db.query(User).filter(User.email == body.email).first():
-        raise HTTPException(400, "Email already registered")
+    norm_email = body.email.strip().lower()
+    if db.query(User).filter(func.lower(User.email) == norm_email).first():
+        # Generic message avoids confirming whether the account exists
+        raise HTTPException(
+            400,
+            "Registration could not be completed with the provided details. Please verify your information or proceed to login.",
+        )
+    try:
+        pw_hash = hash_password(body.password)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+
     u = User(
-        email=body.email,
-        name=body.name,
+        email=norm_email,
+        name=body.name.strip(),
         role=body.role,
         zone=canonical_zone,
-        hashed_password=hash_password(body.password),
+        hashed_password=pw_hash,
     )
     db.add(u)
     db.commit()
@@ -148,22 +219,66 @@ def register(body: Register, db: Session = Depends(get_db)):
 
 @router.post("/login", dependencies=[Depends(enforce_login_limit)])
 def login(
+    request: Request,
     response: Response,
     use_cookie: bool = False,
     x_use_cookie_session: str | None = Header(default=None),
     form: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    u = db.query(User).filter(User.email == form.username).first()
+    enforce_account_limit(form.username)
+    u = db.query(User).filter(func.lower(User.email) == form.username.strip().lower()).first()
     if not u or not u.is_active or not verify_password(form.password, u.hashed_password):
         raise HTTPException(401, "Invalid email or password")
-    token = create_token(u.id, u.role)
+
+    reset_account_limit(form.username)
+
+    # Multi-factor authentication challenge for enabled accounts
+    if getattr(u, "mfa_enabled", False):
+        challenge_token = create_token(u.id, u.role, token_type="mfa_challenge", expires_minutes=5)
+        return {
+            "mfa_required": True,
+            "mfa_token": challenge_token,
+            "user_id": u.id,
+            "email": u.email,
+            "role": u.role,
+            "name": u.name,
+        }
+
+    # Issue access token + refresh token bound to server-side UserSession
+    jti = str(uuid.uuid4())
+    raw_refresh, refresh_hash = generate_refresh_token()
+    token_family = str(uuid.uuid4())
+    token = create_token(u.id, u.role, jti=jti)
+    now_utc = datetime.now(timezone.utc)
+    exp_refresh = now_utc + timedelta(days=settings.refresh_token_days)
+
+    client_ip = request.client.host if request.client else ""
+    user_agent = request.headers.get("user-agent", "")[:250]
+    session_row = UserSession(
+        user_id=u.id,
+        jti=jti,
+        refresh_token_hash=refresh_hash,
+        token_family=token_family,
+        is_revoked=False,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        created_at=now_utc,
+        expires_at=exp_refresh,
+    )
+    db.add(session_row)
+    db.commit()
+
     issue_cookie = bool(use_cookie or x_use_cookie_session in ("1", "true"))
     if issue_cookie:
         _set_auth_cookie(response, token)
+        _set_refresh_cookie(response, raw_refresh)
+
     return {
         "access_token": token,
+        "refresh_token": raw_refresh,
         "token_type": "bearer",
+        "expires_in": settings.access_token_minutes * 60,
         "cookie_auth": issue_cookie,
         "role": u.role,
         "name": u.name,
@@ -172,10 +287,299 @@ def login(
     }
 
 
+@router.post("/refresh")
+def refresh_session(
+    request: Request,
+    response: Response,
+    body: RefreshTokenBody = RefreshTokenBody(),
+    db: Session = Depends(get_db),
+):
+    raw_token = body.refresh_token or request.cookies.get(REFRESH_COOKIE_NAME)
+    if not raw_token:
+        raise HTTPException(401, "Refresh token is required")
+
+    h = hash_token(raw_token.strip())
+    sess = db.query(UserSession).filter(UserSession.refresh_token_hash == h).first()
+    if not sess:
+        raise HTTPException(401, "Invalid refresh token")
+
+    now_utc = datetime.now(timezone.utc)
+    # Token reuse detection: if a revoked refresh token is presented, revoke entire token family
+    if sess.is_revoked:
+        db.query(UserSession).filter(UserSession.token_family == sess.token_family).update(
+            {"is_revoked": True, "revoked_at": now_utc, "revoked_reason": "TOKEN_REUSE_DETECTED"}
+        )
+        db.commit()
+        audit(db, sess.user, "TOKEN_REUSE_DETECTED", "auth", sess.user_id, f"family={sess.token_family}")
+        _clear_auth_cookies(response)
+        raise HTTPException(401, "Token reuse detected. All sessions in this family have been revoked.")
+
+    sess_exp = sess.expires_at
+    if sess_exp.tzinfo is None:
+        sess_exp = sess_exp.replace(tzinfo=timezone.utc)
+    if sess_exp < now_utc:
+        sess.is_revoked = True
+        sess.revoked_at = now_utc
+        sess.revoked_reason = "EXPIRED"
+        db.commit()
+        raise HTTPException(401, "Refresh token has expired")
+
+    u = db.get(User, sess.user_id)
+    if not u or not u.is_active:
+        raise HTTPException(401, "User not found or inactive")
+
+    # Single-use rotation: consume old session record
+    sess.is_revoked = True
+    sess.revoked_at = now_utc
+    sess.revoked_reason = "ROTATED"
+
+    # Issue new access token + new refresh token in same family
+    new_jti = str(uuid.uuid4())
+    new_raw_refresh, new_refresh_hash = generate_refresh_token()
+    new_access_token = create_token(u.id, u.role, jti=new_jti)
+    new_exp_refresh = now_utc + timedelta(days=settings.refresh_token_days)
+
+    client_ip = request.client.host if request.client else ""
+    user_agent = request.headers.get("user-agent", "")[:250]
+    new_sess = UserSession(
+        user_id=u.id,
+        jti=new_jti,
+        refresh_token_hash=new_refresh_hash,
+        token_family=sess.token_family,
+        is_revoked=False,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        created_at=now_utc,
+        expires_at=new_exp_refresh,
+    )
+    db.add(new_sess)
+    db.commit()
+
+    if request.cookies.get(AUTH_COOKIE_NAME) or request.cookies.get(REFRESH_COOKIE_NAME):
+        _set_auth_cookie(response, new_access_token)
+        _set_refresh_cookie(response, new_raw_refresh)
+
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_raw_refresh,
+        "token_type": "bearer",
+        "expires_in": settings.access_token_minutes * 60,
+    }
+
+
 @router.post("/logout")
-def logout(response: Response):
-    response.delete_cookie(key=AUTH_COOKIE_NAME, path="/")
+def logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    # Server-side revocation: mark session record as revoked
+    raw_token = request.headers.get("authorization", "").replace("Bearer ", "").strip() or request.cookies.get(AUTH_COOKIE_NAME)
+    if raw_token:
+        p = decode_token(raw_token, expected_type="access")
+        if p and p.get("jti"):
+            jti = p["jti"]
+            now_utc = datetime.now(timezone.utc)
+            db.query(UserSession).filter(UserSession.jti == jti).update(
+                {"is_revoked": True, "revoked_at": now_utc, "revoked_reason": "LOGOUT"}
+            )
+            db.commit()
+
+    # If a refresh token cookie is present, revoke that session record too
+    refresh_cookie = request.cookies.get(REFRESH_COOKIE_NAME)
+    if refresh_cookie:
+        rh = hash_token(refresh_cookie.strip())
+        now_utc = datetime.now(timezone.utc)
+        db.query(UserSession).filter(UserSession.refresh_token_hash == rh).update(
+            {"is_revoked": True, "revoked_at": now_utc, "revoked_reason": "LOGOUT"}
+        )
+        db.commit()
+
+    _clear_auth_cookies(response)
     return {"logged_out": True}
+
+
+@router.post("/mfa/setup")
+def mfa_setup(
+    db: Session = Depends(get_db),
+    u: User = Depends(require("admin", "officer", "engineer")),
+):
+    secret = generate_totp_secret()
+    enc_secret = encrypt_totp_secret(secret)
+    plain_codes, hash_codes = generate_recovery_codes()
+    u.mfa_secret_encrypted = enc_secret
+    u.mfa_recovery_hashes_json = json.dumps(hash_codes)
+    db.commit()
+    return {
+        "secret": secret,
+        "provisioning_uri": get_totp_provisioning_uri(secret, u.email),
+        "recovery_codes": plain_codes,
+        "message": "Scan the QR provisioning URI with an authenticator app and store recovery codes securely.",
+    }
+
+
+@router.post("/mfa/enable")
+def mfa_enable(
+    body: MfaEnableBody,
+    db: Session = Depends(get_db),
+    u: User = Depends(require("admin", "officer", "engineer")),
+):
+    if not u.mfa_secret_encrypted:
+        raise HTTPException(400, "MFA setup has not been initiated. Call /auth/mfa/setup first.")
+    secret = decrypt_totp_secret(u.mfa_secret_encrypted)
+    if not verify_totp_code(secret, body.code):
+        raise HTTPException(400, "Invalid verification code")
+    u.mfa_enabled = True
+    audit(db, u, "MFA_ENABLED", "auth", u.id, "TOTP multi-factor enabled")
+    db.commit()
+    return {"mfa_enabled": True, "message": "Multi-factor authentication successfully enabled"}
+
+
+@router.post("/mfa/verify")
+def mfa_verify_login(
+    request: Request,
+    response: Response,
+    body: MfaVerifyBody,
+    use_cookie: bool = False,
+    x_use_cookie_session: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    payload = decode_token(body.mfa_token, expected_type="mfa_challenge")
+    if not payload:
+        raise HTTPException(401, "Invalid or expired MFA challenge token")
+    u = db.get(User, payload["sub"])
+    if not u or not u.is_active or not u.mfa_enabled or not u.mfa_secret_encrypted:
+        raise HTTPException(401, "Invalid MFA state")
+
+    secret = decrypt_totp_secret(u.mfa_secret_encrypted)
+    is_valid = verify_totp_code(secret, body.code)
+    used_recovery = False
+    if not is_valid and u.mfa_recovery_hashes_json:
+        stored_hashes = json.loads(u.mfa_recovery_hashes_json)
+        is_valid, updated_hashes = verify_recovery_code(body.code, stored_hashes)
+        if is_valid:
+            used_recovery = True
+            u.mfa_recovery_hashes_json = json.dumps(updated_hashes)
+
+    if not is_valid:
+        raise HTTPException(401, "Invalid verification code or recovery code")
+
+    jti = str(uuid.uuid4())
+    raw_refresh, refresh_hash = generate_refresh_token()
+    token_family = str(uuid.uuid4())
+    token = create_token(u.id, u.role, jti=jti)
+    now_utc = datetime.now(timezone.utc)
+    exp_refresh = now_utc + timedelta(days=settings.refresh_token_days)
+
+    client_ip = request.client.host if request.client else ""
+    user_agent = request.headers.get("user-agent", "")[:250]
+    session_row = UserSession(
+        user_id=u.id,
+        jti=jti,
+        refresh_token_hash=refresh_hash,
+        token_family=token_family,
+        is_revoked=False,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        created_at=now_utc,
+        expires_at=exp_refresh,
+    )
+    db.add(session_row)
+    audit(
+        db,
+        u,
+        "MFA_LOGIN_SUCCESS",
+        "auth",
+        u.id,
+        f"mode={'recovery_code' if used_recovery else 'totp'}",
+    )
+    db.commit()
+
+    issue_cookie = bool(use_cookie or x_use_cookie_session in ("1", "true"))
+    if issue_cookie:
+        _set_auth_cookie(response, token)
+        _set_refresh_cookie(response, raw_refresh)
+
+    return {
+        "access_token": token,
+        "refresh_token": raw_refresh,
+        "token_type": "bearer",
+        "expires_in": settings.access_token_minutes * 60,
+        "cookie_auth": issue_cookie,
+        "role": u.role,
+        "name": u.name,
+        "user_id": u.id,
+        "zone": u.zone,
+    }
+
+
+@router.post("/forgot-password", dependencies=[Depends(enforce_login_limit)])
+def forgot_password(
+    body: ForgotPasswordBody,
+    db: Session = Depends(get_db),
+):
+    enforce_account_limit(body.email)
+    norm_email = body.email.strip().lower()
+    u = db.query(User).filter(func.lower(User.email) == norm_email).first()
+    raw_reset = None
+    if u and u.is_active:
+        raw_reset, token_hash = generate_password_reset_token()
+        exp = datetime.now(timezone.utc) + timedelta(minutes=15)
+        reset_row = PasswordResetToken(user_id=u.id, token_hash=token_hash, expires_at=exp)
+        db.add(reset_row)
+        audit(db, u, "PASSWORD_RESET_REQUESTED", "auth", u.id, f"exp={exp.isoformat()}")
+        db.commit()
+
+    res = {
+        "message": "If this email address is registered, password reset instructions have been issued.",
+    }
+    if settings.app_env != "production" and raw_reset:
+        res["demo_reset_token"] = raw_reset
+    return res
+
+
+@router.post("/reset-password", dependencies=[Depends(enforce_login_limit)])
+def reset_password(
+    body: ResetPasswordBody,
+    db: Session = Depends(get_db),
+):
+    try:
+        validate_password_policy(body.new_password)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+
+    h = hash_token(body.token.strip())
+    now_utc = datetime.now(timezone.utc)
+    token_row = (
+        db.query(PasswordResetToken)
+        .filter(PasswordResetToken.token_hash == h, PasswordResetToken.is_used.is_(False))
+        .first()
+    )
+    if not token_row:
+        raise HTTPException(400, "Invalid or expired password reset token")
+
+    exp = token_row.expires_at
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=timezone.utc)
+    if exp < now_utc:
+        raise HTTPException(400, "Password reset token has expired")
+
+    token_row.is_used = True
+    token_row.used_at = now_utc
+
+    u = db.get(User, token_row.user_id)
+    if not u or not u.is_active:
+        raise HTTPException(400, "User account not found or inactive")
+
+    u.hashed_password = hash_password(body.new_password)
+
+    # Invalidate all active sessions for this user across all devices
+    db.query(UserSession).filter(UserSession.user_id == u.id, UserSession.is_revoked.is_(False)).update(
+        {"is_revoked": True, "revoked_at": now_utc, "revoked_reason": "PASSWORD_RESET"}
+    )
+    audit(db, u, "PASSWORD_RESET_COMPLETED", "auth", u.id, "All active sessions revoked")
+    db.commit()
+    return {"message": "Password successfully reset. Please sign in with your new password."}
 
 
 @router.get("/sso/providers")
@@ -191,6 +595,7 @@ def list_sso_providers():
 @router.post("/sso/login", dependencies=[Depends(enforce_login_limit)])
 def simulated_sso_login(
     body: SimulatedSsoLoginBody,
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
 ):
@@ -205,8 +610,31 @@ def simulated_sso_login(
     u = db.query(User).filter(User.email == str(body.email).lower()).first()
     if not u or not u.is_active:
         raise HTTPException(401, "SSO identity is not mapped to an active VidyutFlow account")
-    token = create_token(u.id, u.role)
+
+    jti = str(uuid.uuid4())
+    raw_refresh, refresh_hash = generate_refresh_token()
+    token_family = str(uuid.uuid4())
+    token = create_token(u.id, u.role, jti=jti)
+    now_utc = datetime.now(timezone.utc)
+    exp_refresh = now_utc + timedelta(days=settings.refresh_token_days)
+
+    client_ip = request.client.host if request.client else ""
+    user_agent = request.headers.get("user-agent", "")[:250]
+    session_row = UserSession(
+        user_id=u.id,
+        jti=jti,
+        refresh_token_hash=refresh_hash,
+        token_family=token_family,
+        is_revoked=False,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        created_at=now_utc,
+        expires_at=exp_refresh,
+    )
+    db.add(session_row)
+
     _set_auth_cookie(response, token)
+    _set_refresh_cookie(response, raw_refresh)
     audit(
         db,
         u,
@@ -218,7 +646,9 @@ def simulated_sso_login(
     db.commit()
     return {
         "access_token": token,
+        "refresh_token": raw_refresh,
         "token_type": "bearer",
+        "expires_in": settings.access_token_minutes * 60,
         "cookie_auth": True,
         "sso_simulated": True,
         "provider_id": body.provider_id,

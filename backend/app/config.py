@@ -10,7 +10,10 @@ class Settings(BaseSettings):
     app_env: Literal["development", "production"] = "development"
     secret_key: str = "dev-only-change-me-in-production-please-32-chars"
     algorithm: str = "HS256"
-    access_token_minutes: int = 60 * 24
+    access_token_minutes: int = 15
+    refresh_token_days: int = 7
+    jwt_issuer: str = "vidyutflow-api"
+    jwt_audience: str = "vidyutflow-client"
     # SQLite fallback makes the demo run anywhere; Docker Compose sets PostgreSQL.
     database_url: str = "sqlite:///./vidyutflow.db"
     redis_url: str = ""
@@ -18,6 +21,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     login_max_attempts: int = Field(default=20, ge=1, le=1000)
     login_window_seconds: int = Field(default=60, ge=1, le=3600)
+    login_account_max_attempts: int = Field(default=5, ge=1, le=100)
+    login_account_lockout_seconds: int = Field(default=300, ge=1, le=3600)
     # Demonstration review threshold only; not an official UGVCL limit.
     demo_load_review_threshold_kw: float = Field(default=100.0, gt=0, allow_inf_nan=False)
     # Maximum uploaded supporting document size in bytes (default 5 MiB).

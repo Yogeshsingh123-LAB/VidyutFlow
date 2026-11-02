@@ -22,7 +22,51 @@ class User(Base):
     zone: Mapped[str] = mapped_column(String, default="North")
     hashed_password: Mapped[str] = mapped_column(String)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    mfa_secret_encrypted: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    mfa_recovery_hashes_json: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class UserSession(Base):
+    """Server-side active sessions with hashed refresh tokens and rotation family tracking."""
+    __tablename__ = "user_sessions"
+    __table_args__ = (
+        Index("ix_user_sessions_user_active", "user_id", "is_revoked", "expires_at"),
+        Index("ix_user_sessions_refresh_hash", "refresh_token_hash"),
+        Index("ix_user_sessions_family", "token_family"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    jti: Mapped[str] = mapped_column(String, index=True)  # bound access token ID
+    refresh_token_hash: Mapped[str] = mapped_column(String, unique=True, index=True)  # sha256
+    token_family: Mapped[str] = mapped_column(String, index=True)  # uuid for rotation lineage
+    is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    revoked_reason: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    ip_address: Mapped[str] = mapped_column(String, default="")
+    user_agent: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    user = relationship("User")
+
+
+class PasswordResetToken(Base):
+    """Cryptographic single-use password reset token with 15-minute validity."""
+    __tablename__ = "password_reset_tokens"
+    __table_args__ = (
+        Index("ix_password_reset_user_used", "user_id", "is_used", "expires_at"),
+        Index("ix_password_reset_token_hash", "token_hash"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String, unique=True, index=True)  # sha256
+    is_used: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    user = relationship("User")
+
 
 class ConnectionRequest(Base):
     __tablename__ = "connection_requests"

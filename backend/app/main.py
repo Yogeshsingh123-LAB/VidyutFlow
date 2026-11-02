@@ -160,12 +160,35 @@ def migrate_validation_issues(db_engine):
         if db_engine.dialect.name != "sqlite" or "duplicate column name" not in str(exc).lower():
             raise
 
+def migrate_auth_session_security(db_engine):
+    """Add additive MFA columns to users table and create session/reset tables if upgrading an older DB."""
+    inspector = sa_inspect(db_engine)
+    if "users" not in inspector.get_table_names():
+        return
+    existing = {col["name"] for col in inspector.get_columns("users")}
+    clause = " IF NOT EXISTS" if db_engine.dialect.name == "postgresql" else ""
+    cols_to_add = [
+        ("mfa_enabled", "BOOLEAN DEFAULT FALSE"),
+        ("mfa_secret_encrypted", "VARCHAR"),
+        ("mfa_recovery_hashes_json", "TEXT"),
+    ]
+    with db_engine.begin() as conn:
+        for col_name, col_type in cols_to_add:
+            if col_name not in existing:
+                try:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN{clause} {col_name} {col_type}"))
+                except OperationalError as exc:
+                    if db_engine.dialect.name != "sqlite" or "duplicate column name" not in str(exc).lower():
+                        raise
+
+
 @asynccontextmanager
 async def lifespan(_app):
     Base.metadata.create_all(bind=engine)
     migrate_audit_chain()
     migrate_validation_issues(engine)
     migrate_geo_columns(engine)
+    migrate_auth_session_security(engine)
     ensure_performance_indexes(engine)
     bump_all_caches()
     try: ensure_models()
