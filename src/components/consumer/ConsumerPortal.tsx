@@ -17,6 +17,7 @@ import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { LocationPinPicker } from '../common/LocationPinPicker';
 import { SavedPremisesBar } from './SavedPremisesBar';
+import { ConsumerComplaintTimelineModal } from './ConsumerComplaintTimelineModal';
 import {
   localizeTariffCategory,
   localizeConnectionStatus,
@@ -85,7 +86,7 @@ import {
   Tooltip,
   CartesianGrid
 } from 'recharts';
-import { TariffCategory, ElectricityConnection, ElectricityBill, PaymentTransaction } from '../../types';
+import { TariffCategory, ElectricityConnection, ElectricityBill, PaymentTransaction, ComplaintRecord } from '../../types';
 import { LanguageCode } from '../../i18n/types';
 
 export const CONSUMER_WORKFLOW_INTAKE_TEXT: Record<
@@ -274,6 +275,12 @@ export const ConsumerPortal: React.FC = () => {
   const [selectedPaymentGateway, setSelectedPaymentGateway] = useState<PaymentTransaction['paymentMethod']>('UPI / BHIM');
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<ElectricityBill | null>(null);
+
+  // Verified Complaint Timeline Modal State (Phase 13D/13E)
+  const [selectedComplaintForTimeline, setSelectedComplaintForTimeline] = useState<ComplaintRecord | null>(null);
+  const activeTimelineComplaint = selectedComplaintForTimeline
+    ? (consumerComplaints.find(c => c.id === selectedComplaintForTimeline.id) || selectedComplaintForTimeline)
+    : null;
 
   // Link Existing Connection Modal State
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
@@ -2387,34 +2394,64 @@ export const ConsumerPortal: React.FC = () => {
                 {consumerComplaints.map(cmp => (
                   <div
                     key={cmp.id}
-                    onClick={() => openCaseDrawer('complaint', cmp.id)}
+                    onClick={() => setSelectedComplaintForTimeline(cmp)}
                     className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs hover:border-blue-400 cursor-pointer transition-all space-y-3"
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-mono text-xs font-bold text-slate-900 dark:text-white">
                             {cmp.id}
                           </span>
                           <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
                             {localizeComplaintCategory(cmp.category, language)}
                           </span>
+                          {cmp.reopenedFromComplaintId && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                              Reopened #{cmp.reopenedFromComplaintId}
+                            </span>
+                          )}
+                          {cmp.verificationStatus === 'approved' && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                              ✓ Verified &amp; Approved
+                            </span>
+                          )}
+                          {cmp.verificationStatus === 'pending_verification' && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                              Awaiting Verification
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">
                           {localizeComplaintDescription(cmp.id, cmp.description, language)}
                         </p>
                       </div>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                        {localizeComplaintStatus(cmp.status, language)}
-                      </span>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                          {localizeComplaintStatus(cmp.status, language)}
+                        </span>
+                        {cmp.feedback && (
+                          <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-0.5">
+                            ★ {cmp.feedback.rating}/5
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
                       <span>{tc.filedLabel} {cmp.filedAt}</span>
                       <span>{tc.slaLabel} {cmp.slaTargetHours} {tc.hoursSuffix}</span>
-                      <span className="text-blue-600 dark:text-blue-400 font-medium">
-                        {tc.expectedResolutionLabel} {cmp.slaDueTime}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedComplaintForTimeline(cmp);
+                        }}
+                        className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>View Verified Timeline</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -3169,6 +3206,17 @@ export const ConsumerPortal: React.FC = () => {
       )}
 
       {activeTab === 'outage-map' && <LazyOutageMapSection />}
+
+      {activeTimelineComplaint && (
+        <ConsumerComplaintTimelineModal
+          complaint={activeTimelineComplaint}
+          isOpen={!!activeTimelineComplaint}
+          onClose={() => setSelectedComplaintForTimeline(null)}
+          onReopened={(newCmp) => {
+            setSelectedComplaintForTimeline(newCmp);
+          }}
+        />
+      )}
     </div>
   );
 };

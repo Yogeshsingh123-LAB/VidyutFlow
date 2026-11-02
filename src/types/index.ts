@@ -98,6 +98,58 @@ export interface NewConnectionApplication {
   archiveReason?: string;
 }
 
+export type EvidenceType = 'before' | 'after' | 'inspection' | 'other';
+export type EvidenceVerificationStatus = 'pending' | 'accepted' | 'rejected';
+export type WorkOrderVerificationStatus = 'unsubmitted' | 'pending_verification' | 'approved' | 'rejected' | 'more_info_needed';
+
+export interface FieldEvidenceItem {
+  id: string;
+  workOrderId: string;
+  relatedComplaintId?: string;
+  relatedIncidentId?: string;
+  type: EvidenceType;
+  capturedAt?: string;
+  submittedAt: string;
+  submittedByRole: string;
+  submittedByUser: string;
+  storageRef: string;
+  mimeType: string;
+  fileSize: number;
+  verificationStatus: EvidenceVerificationStatus;
+  source: 'DEMO' | 'backend';
+  thumbnailUrl?: string;
+  caption?: string;
+}
+
+export interface WorkOrderCompletionReport {
+  technicalObservations: string;
+  repairAction: string;
+  materialsUsed?: string[];
+  checklist: Record<string, boolean>;
+  completionRemarks: string;
+  completedAt: string;
+  locationEvidencePermitted?: boolean;
+  gpsLocation?: string;
+  evidenceItems: FieldEvidenceItem[];
+  clientUuid?: string;
+  safetyPhotoExemptionReason?: string;
+}
+
+export interface WorkOrderVerificationReview {
+  reviewedBy: string;
+  reviewedByRole: string;
+  reviewedAt: string;
+  action: 'approve' | 'request_more_info' | 'reject' | 'reassign';
+  reason: string;
+}
+
+export interface ComplaintFeedback {
+  rating: number;
+  confirmedSatisfaction: boolean;
+  comments?: string;
+  submittedAt: string;
+}
+
 export interface ComplaintRecord {
   id: string;
   consumerNo: string;
@@ -119,6 +171,11 @@ export interface ComplaintRecord {
   resolvedAt?: string;
   timeline: { time: string; stage: string; actor: string; remark: string }[];
   accountId?: string;
+  verificationStatus?: WorkOrderVerificationStatus;
+  feedback?: ComplaintFeedback;
+  reopenedFromComplaintId?: string;
+  reopenReason?: string;
+  followUpComplaintId?: string;
 }
 
 export interface WorkOrder {
@@ -149,6 +206,9 @@ export interface WorkOrder {
     technicianRemarks: string;
     photoUploaded: boolean;
   };
+  verificationStatus?: WorkOrderVerificationStatus;
+  completionReport?: WorkOrderCompletionReport;
+  verificationReview?: WorkOrderVerificationReview;
 }
 
 export interface FeederHealth {

@@ -254,3 +254,34 @@ class SavedPremise(Base):
     premises_type: Mapped[str] = mapped_column(String, default="Owned")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
+
+class WorkOrderEvidence(Base):
+    """Field completion evidence items (photos, documents, checklists) with cryptographic client UUID and verification state.
+    Phase 13 additive model for field engineer completion verification.
+    """
+    __tablename__ = "work_order_evidence"
+    __table_args__ = (
+        UniqueConstraint("client_uuid", name="uq_work_order_evidence_client_uuid"),
+        Index("ix_work_order_evidence_wo_type", "work_order_id", "evidence_type"),
+        Index("ix_work_order_evidence_status", "verification_status"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    client_uuid: Mapped[str] = mapped_column(String, unique=True, index=True)
+    work_order_id: Mapped[str] = mapped_column(String, index=True)
+    complaint_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True, default=None)
+    evidence_type: Mapped[str] = mapped_column(String)  # photo_before | photo_after | checklist | technical_report | safety_exemption
+    storage_ref: Mapped[str] = mapped_column(String)  # IndexedDB key or S3/Blob URI
+    file_size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    mime_type: Mapped[str] = mapped_column(String, default="image/jpeg")
+    sha256_hash: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    submitted_by: Mapped[str] = mapped_column(String, index=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    verification_status: Mapped[str] = mapped_column(String, default="pending_verification", index=True)  # pending_verification | approved | rejected | more_info_needed
+    reviewed_by: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    review_remarks: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+

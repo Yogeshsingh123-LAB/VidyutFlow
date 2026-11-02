@@ -7,7 +7,7 @@ from sqlalchemy import inspect as sa_inspect, text
 from sqlalchemy.exc import OperationalError
 from .db import Base, engine, SessionLocal
 from . import models  # noqa
-from .routers import auth, requests, assistant, system, notifications, erp, workflows, staff
+from .routers import auth, requests, assistant, system, notifications, erp, workflows, staff, evidence
 from .routers.staff import ensure_subdivision_zones
 from .erp_adapter import record_erp_sync
 from .alerts import evaluate_and_dispatch_alerts
@@ -278,4 +278,4 @@ app.add_middleware(ApiVersionPrefixMiddleware)
 @app.get("/health")
 def health(): return {"status": "ok", "service": "VidyutFlow", "data_notice": "Demo uses synthetic data only."}
 
-app.include_router(auth.router); app.include_router(requests.router); app.include_router(assistant.router); app.include_router(system.router); app.include_router(notifications.router); app.include_router(erp.router); app.include_router(workflows.router); app.include_router(staff.router)
+app.include_router(auth.router); app.include_router(requests.router); app.include_router(assistant.router); app.include_router(system.router); app.include_router(notifications.router); app.include_router(erp.router); app.include_router(workflows.router); app.include_router(staff.router); app.include_router(evidence.router)

@@ -67,6 +67,7 @@ import {
   Flame,
   X,
 } from 'lucide-react';
+import { WorkOrderEvidenceModal } from './WorkOrderEvidenceModal';
 
 const DEFAULT_TECH_REMARKS_SET = new Set(
   Object.values(FIELD_UI_TRANSLATIONS).map((d) => d.defaultTechnicianRemarks)
@@ -159,6 +160,7 @@ export const FieldPortal: React.FC = () => {
   );
   const [selectedBackendRequestId, setSelectedBackendRequestId] = useState<string>('');
   const [taskOutcome, setTaskOutcome] = useState<FieldSyncTaskStatus>('COMPLETED');
+  const [evidenceModalWO, setEvidenceModalWO] = useState<WorkOrder | null>(null);
 
   const effectiveOffline = offlineSimulated || !browserOnline;
 
@@ -1060,23 +1062,95 @@ export const FieldPortal: React.FC = () => {
                     >
                       {tf.btnDetails}
                     </button>
+                    {wo.verificationStatus === 'pending_verification' && (
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" /> Pending Verification
+                      </span>
+                    )}
+                    {wo.verificationStatus === 'more_info_needed' && (
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 dark:bg-orange-950/50 dark:text-orange-400 border border-orange-200 dark:border-orange-800 flex items-center gap-1">
+                        <AlertTriangle className="w-3.5 h-3.5" /> More Evidence Needed
+                      </span>
+                    )}
+                    {wo.verificationStatus === 'rejected' && (
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800 flex items-center gap-1">
+                        <X className="w-3.5 h-3.5" /> Completion Rejected
+                      </span>
+                    )}
+                    {wo.verificationStatus === 'approved' && (
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Verified & Approved
+                      </span>
+                    )}
                     {wo.status !== 'Completed' ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setEvidenceModalWO(wo)}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                        >
+                          <Camera className="w-3.5 h-3.5" /> Complete with Evidence
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedWOId(wo.id);
+                            setActiveTab('inspections');
+                          }}
+                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold cursor-pointer"
+                          title={tf.btnEnterInspectionFindings}
+                        >
+                          {tf.btnEnterInspectionFindings}
+                        </button>
+                      </div>
+                    ) : wo.verificationStatus === 'more_info_needed' ? (
                       <button
-                        onClick={() => {
-                          setSelectedWOId(wo.id);
-                          setActiveTab('inspections');
-                        }}
-                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                        type="button"
+                        onClick={() => setEvidenceModalWO(wo)}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
                       >
-                        {tf.btnEnterInspectionFindings}
+                        <Camera className="w-3.5 h-3.5" /> Update Evidence
                       </button>
-                    ) : (
+                    ) : !wo.verificationStatus ? (
                       <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
                         {tf.badgeCompleted}
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
+                {wo.completionReport && (
+                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3.5 border border-slate-200/80 dark:border-slate-700/60 text-xs space-y-1.5">
+                    <div className="font-semibold text-blue-700 dark:text-blue-400 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4" /> Field Completion Evidence Recorded
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-normal">
+                        {new Date(wo.completionReport.completedAt).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-slate-600 dark:text-slate-300">
+                      <strong>Repair Action:</strong> {wo.completionReport.repairAction}
+                    </p>
+                    {wo.completionReport.materialsUsed && wo.completionReport.materialsUsed.length > 0 && (
+                      <p className="text-slate-500 dark:text-slate-400">
+                        <strong>Materials:</strong> {wo.completionReport.materialsUsed.join(', ')}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-slate-500">
+                      <span className="px-2 py-0.5 rounded bg-slate-200/70 dark:bg-slate-700 font-medium">
+                        {wo.completionReport.evidenceItems?.length || 0} Photo(s) Attached
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-slate-200/70 dark:bg-slate-700 font-medium">
+                        {Object.values(wo.completionReport.checklist || {}).filter(Boolean).length} Checklist Items Verified
+                      </span>
+                      {wo.completionReport.safetyPhotoExemptionReason && (
+                        <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-medium">
+                          Photo Exemption: {wo.completionReport.safetyPhotoExemptionReason}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {wo.inspectionReport && (
                   <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3.5 border border-slate-200/80 dark:border-slate-700/60 text-xs space-y-1">
                     <div className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
@@ -1905,6 +1979,14 @@ export const FieldPortal: React.FC = () => {
       )}
 
       {activeTab === 'outage-map' && <LazyOutageMapSection />}
+
+      {evidenceModalWO && (
+        <WorkOrderEvidenceModal
+          workOrder={evidenceModalWO}
+          isOpen={Boolean(evidenceModalWO)}
+          onClose={() => setEvidenceModalWO(null)}
+        />
+      )}
     </div>
   );
 };

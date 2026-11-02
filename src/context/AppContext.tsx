@@ -15,6 +15,9 @@ import {
   ElectricityBill,
   PaymentTransaction,
   WorkOrder,
+  WorkOrderCompletionReport,
+  WorkOrderVerificationReview,
+  ComplaintFeedback,
   AppNotification,
   ElectricityConnection,
   AuditLogItem,
@@ -835,6 +838,10 @@ interface AppContextType {
   restoreApplication: (id: string) => boolean;
   updateComplaintStatus: (id: string, status: ComplaintRecord['status'], remark?: string) => void;
   updateWorkOrderStatus: (id: string, status: WorkOrder['status'], report?: WorkOrder['inspectionReport']) => void;
+  submitWorkOrderCompletionEvidence: (woId: string, report: WorkOrderCompletionReport) => boolean;
+  reviewWorkOrderCompletion: (woId: string, review: WorkOrderVerificationReview) => boolean;
+  submitComplaintFeedback: (complaintId: string, feedback: ComplaintFeedback) => boolean;
+  reopenComplaint: (complaintId: string, reason: string) => ComplaintRecord | null;
   assignComplaintToField: (complaintId: string, engineerName: string, priority?: string, notes?: string) => boolean;
   reportFeederFault: (feederId: string, faultType: string, remarks: string, severity?: IncidentSeverity, emergencyClassification?: EmergencyHazardClassification) => void;
   markNotificationRead: (id: string) => void;
@@ -5652,6 +5659,471 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Work Order ${id} updated to "${status}"`, 'success');
   };
 
+  const submitWorkOrderCompletionEvidence = (woId: string, report: WorkOrderCompletionReport): boolean => {
+    if (effectiveRole === 'consumer') {
+      showToast(`Access Denied: Consumers cannot submit work order completion evidence.`, 'error');
+      addAuditEvent('ACCESS_DENIED', `WorkOrder:${woId}`, `Unauthorized attempt to submit completion evidence by ${effectiveRole}`, activeUser.name, 'WARNING');
+      return false;
+    }
+
+    const targetWo = workOrders.find(w => w.id === woId);
+    if (!targetWo) {
+      showToast(`Work Order #${woId} was not found.`, 'error');
+      return false;
+    }
+
+    const nowIso = new Date().toISOString();
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    setWorkOrders(prev =>
+      prev.map(wo => {
+        if (wo.id !== woId) return wo;
+        const newHistory = [
+          ...(wo.actionHistory || []),
+          {
+            timestamp: nowIso,
+            stage: 'Completed',
+            actor: `${activeUser.name} (Field JE)`,
+            notes: `Work completed with field evidence: ${report.completionRemarks || report.repairAction || 'Site restoration complete.'}`
+          }
+        ];
+        return {
+          ...wo,
+          status: 'Completed',
+          verificationStatus: 'pending_verification',
+          completionReport: report,
+          actionHistory: newHistory
+        };
+      })
+    );
+
+    // Linked complaint update: show 'Under Verification' in timeline
+    const targetCmpId = targetWo.complaintId || (woId === 'WO-4401' ? 'CMP-8821' : woId.startsWith('WO-CMP-') ? woId.replace('WO-CMP-', 'CMP-') : null);
+    if (targetCmpId) {
+      setComplaints(prev =>
+        prev.map(c => {
+          if (c.id !== targetCmpId) return c;
+          return {
+            ...c,
+            verificationStatus: 'pending_verification',
+            timeline: [
+              ...c.timeline,
+              {
+                time: `15-Oct ${timeStr}`,
+                stage: 'Under Verification',
+                actor: `${activeUser.name} (Field JE)`,
+                remark: `Restoration completed on site. Evidence and checklist submitted for authorized employee review.`
+              }
+            ]
+          };
+        })
+      );
+    }
+
+    // Notify employee operations desk
+    const employeeNotif: AppNotification = {
+      id: `NOTIF-${Date.now()}-EMP-EVIDENCE-SUBMITTED`,
+      title: `Completion Evidence Submitted: ${woId}`,
+      message: `Field Engineer ${activeUser.name} submitted completion evidence for ${targetWo.title}. Verification required before closure.`,
+      time: 'Just now',
+      targetRole: 'employee',
+      type: 'info',
+      read: false,
+      category: 'Outage',
+      complaintId: targetCmpId || undefined,
+      workOrderId: woId,
+      subdivision: targetWo.subdivision,
+      eventKey: `EVT-EMP-WO-${woId}-Evidence-Submitted`
+    };
+    setNotifications(prev => upsertNotificationList(prev, [employeeNotif]));
+
+    addAuditEvent(
+      'SUBMIT_COMPLETION_EVIDENCE',
+      `WorkOrder:${woId}`,
+      `Field completion evidence submitted with ${report.evidenceItems?.length || 0} photos by ${activeUser.name}`,
+      activeUser.name,
+      'SUCCESS'
+    );
+
+    showToast(`Work Order ${woId} completion submitted for employee verification`, 'success');
+    return true;
+  };
+
+  const reviewWorkOrderCompletion = (woId: string, review: WorkOrderVerificationReview): boolean => {
+    // Only employee and admin are authorized to review and verify field completions
+    if (effectiveRole !== 'employee' && effectiveRole !== 'admin') {
+      showToast(`Access Denied: Role "${effectiveRole.toUpperCase()}" is not authorized to verify field completion evidence.`, 'error');
+      addAuditEvent('ACCESS_DENIED', `WorkOrder:${woId}`, `Unauthorized verification attempt by ${effectiveRole} (${activeUser.name})`, activeUser.name, 'WARNING');
+      return false;
+    }
+
+    const targetWo = workOrders.find(w => w.id === woId);
+    if (!targetWo) {
+      showToast(`Work Order #${woId} was not found.`, 'error');
+      return false;
+    }
+
+    const nowIso = new Date().toISOString();
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const targetCmpId = targetWo.complaintId || (woId === 'WO-4401' ? 'CMP-8821' : woId.startsWith('WO-CMP-') ? woId.replace('WO-CMP-', 'CMP-') : null);
+
+    if (review.action === 'approve') {
+      setWorkOrders(prev =>
+        prev.map(wo => {
+          if (wo.id !== woId) return wo;
+          return {
+            ...wo,
+            verificationStatus: 'approved',
+            verificationReview: review,
+            actionHistory: [
+              ...(wo.actionHistory || []),
+              {
+                timestamp: nowIso,
+                stage: 'Verified & Approved',
+                actor: `${activeUser.name} (${currentRole.toUpperCase()})`,
+                notes: `Completion evidence approved: ${review.reason}`
+              }
+            ]
+          };
+        })
+      );
+
+      // Transition linked complaint to 'Resolved'
+      if (targetCmpId) {
+        setComplaints(prev =>
+          prev.map(c => {
+            if (c.id !== targetCmpId) return c;
+            return {
+              ...c,
+              status: 'Resolved',
+              resolvedAt: nowIso,
+              verificationStatus: 'approved',
+              resolutionRemarks: review.reason || targetWo.completionReport?.completionRemarks || 'Restoration verified and approved by operations desk.',
+              timeline: [
+                ...c.timeline,
+                {
+                  time: `15-Oct ${timeStr}`,
+                  stage: 'Resolved',
+                  actor: `${activeUser.name} (Operations Desk)`,
+                  remark: `Work completion verified and approved: ${review.reason}`
+                }
+              ]
+            };
+          })
+        );
+
+        // Notify consumer of verified resolution
+        const linkedCmp = complaints.find(c => c.id === targetCmpId);
+        const consumerNotif: AppNotification = {
+          id: `NOTIF-${Date.now()}-CNS-RESOLVED`,
+          title: `Grievance #${targetCmpId} Resolved`,
+          message: `Your power grievance has been verified and resolved. Please confirm satisfaction in the Consumer Portal.`,
+          time: 'Just now',
+          targetRole: 'consumer',
+          type: 'success',
+          read: false,
+          category: 'Outage',
+          complaintId: targetCmpId,
+          accountId: linkedCmp?.accountId,
+          subdivision: targetWo.subdivision,
+          eventKey: `EVT-CNS-CMP-${targetCmpId}-Verified-Resolved`
+        };
+        setNotifications(prev => upsertNotificationList(prev, [consumerNotif]));
+      }
+
+      addAuditEvent(
+        'VERIFY_COMPLETION_APPROVED',
+        `WorkOrder:${woId}`,
+        `Approved by ${activeUser.name}: ${review.reason}`,
+        activeUser.name,
+        'SUCCESS'
+      );
+      showToast(`Work Order ${woId} verified and approved.`, 'success');
+      return true;
+    }
+
+    if (review.action === 'request_more_info') {
+      setWorkOrders(prev =>
+        prev.map(wo => {
+          if (wo.id !== woId) return wo;
+          return {
+            ...wo,
+            verificationStatus: 'more_info_needed',
+            verificationReview: review,
+            actionHistory: [
+              ...(wo.actionHistory || []),
+              {
+                timestamp: nowIso,
+                stage: 'More Info Requested',
+                actor: `${activeUser.name} (${currentRole.toUpperCase()})`,
+                notes: `Additional evidence requested: ${review.reason}`
+              }
+            ]
+          };
+        })
+      );
+
+      if (targetCmpId) {
+        setComplaints(prev =>
+          prev.map(c => {
+            if (c.id !== targetCmpId) return c;
+            return {
+              ...c,
+              verificationStatus: 'more_info_needed',
+              timeline: [
+                ...c.timeline,
+                {
+                  time: `15-Oct ${timeStr}`,
+                  stage: 'Further Action Requested',
+                  actor: `${activeUser.name} (Reviewer)`,
+                  remark: `Reviewer requested additional field evidence: ${review.reason}`
+                }
+              ]
+            };
+          })
+        );
+      }
+
+      // Notify field engineer
+      const engineerNotif: AppNotification = {
+        id: `NOTIF-${Date.now()}-FIELD-MORE-INFO`,
+        title: `More Evidence Requested: ${woId}`,
+        message: `Reviewer requested additional info: ${review.reason}`,
+        time: 'Just now',
+        targetRole: 'field',
+        type: 'warning',
+        read: false,
+        category: 'Outage',
+        workOrderId: woId,
+        subdivision: targetWo.subdivision,
+        eventKey: `EVT-FIELD-WO-${woId}-More-Info`
+      };
+      setNotifications(prev => upsertNotificationList(prev, [engineerNotif]));
+
+      addAuditEvent(
+        'VERIFY_COMPLETION_MORE_INFO',
+        `WorkOrder:${woId}`,
+        `Requested more info: ${review.reason}`,
+        activeUser.name,
+        'WARNING'
+      );
+      showToast(`Returned Work Order ${woId} to field engineer for more info.`, 'info');
+      return true;
+    }
+
+    if (review.action === 'reject') {
+      setWorkOrders(prev =>
+        prev.map(wo => {
+          if (wo.id !== woId) return wo;
+          return {
+            ...wo,
+            verificationStatus: 'rejected',
+            verificationReview: review,
+            actionHistory: [
+              ...(wo.actionHistory || []),
+              {
+                timestamp: nowIso,
+                stage: 'Completion Rejected',
+                actor: `${activeUser.name} (${currentRole.toUpperCase()})`,
+                notes: `Evidence rejected: ${review.reason}`
+              }
+            ]
+          };
+        })
+      );
+
+      if (targetCmpId) {
+        setComplaints(prev =>
+          prev.map(c => {
+            if (c.id !== targetCmpId) return c;
+            return {
+              ...c,
+              verificationStatus: 'rejected',
+              timeline: [
+                ...c.timeline,
+                {
+                  time: `15-Oct ${timeStr}`,
+                  stage: 'Under Review',
+                  actor: `${activeUser.name} (Reviewer)`,
+                  remark: `Field completion rejected: ${review.reason}`
+                }
+              ]
+            };
+          })
+        );
+      }
+
+      // Notify field engineer
+      const engineerNotif: AppNotification = {
+        id: `NOTIF-${Date.now()}-FIELD-REJECTED`,
+        title: `Completion Rejected: ${woId}`,
+        message: `Field completion was rejected: ${review.reason}`,
+        time: 'Just now',
+        targetRole: 'field',
+        type: 'alert',
+        read: false,
+        category: 'Outage',
+        workOrderId: woId,
+        subdivision: targetWo.subdivision,
+        eventKey: `EVT-FIELD-WO-${woId}-Rejected`
+      };
+      setNotifications(prev => upsertNotificationList(prev, [engineerNotif]));
+
+      addAuditEvent(
+        'VERIFY_COMPLETION_REJECTED',
+        `WorkOrder:${woId}`,
+        `Rejected by ${activeUser.name}: ${review.reason}`,
+        activeUser.name,
+        'WARNING'
+      );
+      showToast(`Work Order ${woId} completion rejected.`, 'error');
+      return true;
+    }
+
+    return false;
+  };
+
+  const submitComplaintFeedback = (complaintId: string, feedback: ComplaintFeedback): boolean => {
+    const target = complaints.find(c => c.id === complaintId);
+    if (!target) {
+      showToast(`Complaint #${complaintId} was not found.`, 'error');
+      return false;
+    }
+
+    setComplaints(prev =>
+      prev.map(c => {
+        if (c.id !== complaintId) return c;
+        const newStatus = feedback.confirmedSatisfaction ? 'Closed' : c.status;
+        return {
+          ...c,
+          status: newStatus,
+          feedback,
+          timeline: [
+            ...c.timeline,
+            {
+              time: 'Just now',
+              stage: feedback.confirmedSatisfaction ? 'Closed' : 'Feedback Received',
+              actor: `${activeUser.name} (Consumer)`,
+              remark: `Rating: ${feedback.rating}/5 stars. ${feedback.confirmedSatisfaction ? 'Consumer confirmed satisfaction. Case closed.' : 'Consumer reported unresolved aspects.'}`
+            }
+          ]
+        };
+      })
+    );
+
+    // Notify employee desk
+    const employeeNotif: AppNotification = {
+      id: `NOTIF-${Date.now()}-EMP-FEEDBACK`,
+      title: `Consumer Feedback Received: ${complaintId}`,
+      message: `Consumer rated complaint #${complaintId} ${feedback.rating}/5 stars. ${feedback.confirmedSatisfaction ? 'Satisfied.' : 'Not satisfied.'}`,
+      time: 'Just now',
+      targetRole: 'employee',
+      type: feedback.confirmedSatisfaction ? 'success' : 'warning',
+      read: false,
+      category: 'Outage',
+      complaintId,
+      subdivision: target.subdivision,
+      eventKey: `EVT-EMP-CMP-${complaintId}-Feedback`
+    };
+    setNotifications(prev => upsertNotificationList(prev, [employeeNotif]));
+
+    addAuditEvent(
+      'SUBMIT_COMPLAINT_FEEDBACK',
+      `Complaint:${complaintId}`,
+      `Rating: ${feedback.rating} stars, Satisfied: ${feedback.confirmedSatisfaction}`,
+      activeUser.name,
+      'SUCCESS'
+    );
+    showToast(`Feedback submitted successfully. Thank you!`, 'success');
+    return true;
+  };
+
+  const reopenComplaint = (complaintId: string, reason: string): ComplaintRecord | null => {
+    const original = complaints.find(c => c.id === complaintId);
+    if (!original) {
+      showToast(`Complaint #${complaintId} was not found.`, 'error');
+      return null;
+    }
+
+    // Check if duplicate reopen already exists
+    if (original.followUpComplaintId) {
+      showToast(`A follow-up complaint (${original.followUpComplaintId}) is already open for #${complaintId}.`, 'info');
+      const existingFollowUp = complaints.find(c => c.id === original.followUpComplaintId);
+      return existingFollowUp || null;
+    }
+
+    const cleanReason = (reason || '').trim();
+    if (!cleanReason) {
+      showToast(`Please provide a reason to reopen this complaint.`, 'error');
+      return null;
+    }
+
+    const newComplaintId = `CMP-REOPEN-${Date.now().toString().slice(-4)}`;
+    const nowIso = new Date().toISOString();
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const newComplaint: ComplaintRecord = {
+      id: newComplaintId,
+      consumerNo: original.consumerNo,
+      consumerName: original.consumerName,
+      phone: original.phone,
+      category: original.category,
+      description: `[Reopened from ${original.id}] ${cleanReason}`,
+      priority: original.priority === 'Low' ? 'Medium' : original.priority,
+      status: 'Registered',
+      subdivision: original.subdivision,
+      feederName: original.feederName,
+      filedAt: nowIso,
+      slaTargetHours: original.slaTargetHours,
+      slaDueTime: new Date(Date.now() + original.slaTargetHours * 3600 * 1000).toISOString(),
+      slaBreached: false,
+      accountId: original.accountId,
+      reopenedFromComplaintId: original.id,
+      reopenReason: cleanReason,
+      timeline: [
+        {
+          time: `15-Oct ${timeStr}`,
+          stage: 'Reopened',
+          actor: `${activeUser.name} (Consumer)`,
+          remark: `Reopened follow-up referencing #${original.id}: ${cleanReason}`
+        }
+      ]
+    };
+
+    // Update original closed complaint with followUpComplaintId without altering its terminal closed status or history
+    setComplaints(prev => [
+      newComplaint,
+      ...prev.map(c => (c.id === complaintId ? { ...c, followUpComplaintId: newComplaintId } : c))
+    ]);
+
+    // Notify employee operations desk
+    const employeeNotif: AppNotification = {
+      id: `NOTIF-${Date.now()}-EMP-REOPENED`,
+      title: `Complaint Reopened: ${newComplaintId}`,
+      message: `Consumer reopened grievance #${complaintId} as #${newComplaintId}. Reason: ${cleanReason}`,
+      time: 'Just now',
+      targetRole: 'employee',
+      type: 'warning',
+      read: false,
+      category: 'Outage',
+      complaintId: newComplaintId,
+      subdivision: original.subdivision,
+      eventKey: `EVT-EMP-CMP-${newComplaintId}-Reopened`
+    };
+    setNotifications(prev => upsertNotificationList(prev, [employeeNotif]));
+
+    addAuditEvent(
+      'REOPEN_COMPLAINT',
+      `Complaint:${newComplaintId}`,
+      `Created follow-up from ${complaintId}. Reason: ${cleanReason}`,
+      activeUser.name,
+      'WARNING'
+    );
+
+    showToast(`Complaint reopened as #${newComplaintId}. Our operations desk has been alerted.`, 'success');
+    return newComplaint;
+  };
+
   const reportFeederFault = (
     feederId: string,
     faultType: string,
@@ -6086,6 +6558,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         restoreApplication,
         updateComplaintStatus,
         updateWorkOrderStatus,
+        submitWorkOrderCompletionEvidence,
+        reviewWorkOrderCompletion,
+        submitComplaintFeedback,
+        reopenComplaint,
         assignComplaintToField,
         reportFeederFault,
         markNotificationRead,

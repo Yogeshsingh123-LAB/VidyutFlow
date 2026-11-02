@@ -34,6 +34,8 @@ import {
 import {
   SUBDIVISION_PERFORMANCE
 } from '../../data/mockData';
+import { WorkOrder } from '../../types';
+import { WorkOrderVerificationReviewModal } from './WorkOrderVerificationReviewModal';
 import {
   getApplicationStatusDisplayMeta,
   canArchiveApplication
@@ -90,6 +92,7 @@ export const EmployeePortal: React.FC = () => {
     connections,
     applications,
     complaints,
+    workOrders,
     recommendations,
     roleIncidents,
     fieldEngineers,
@@ -113,6 +116,8 @@ export const EmployeePortal: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [subdivisionFilter, setSubdivisionFilter] = useState<string>('All');
   const [approvalFilter, setApprovalFilter] = useState<string>('All');
+  const [approvalSubView, setApprovalSubView] = useState<'field_verification' | 'recommendations'>('field_verification');
+  const [reviewingWorkOrder, setReviewingWorkOrder] = useState<WorkOrder | null>(null);
   const [confirmArchiveAppId, setConfirmArchiveAppId] = useState<string | null>(null);
   const [archiveReasonInput, setArchiveReasonInput] = useState<string>('');
 
@@ -867,15 +872,39 @@ export const EmployeePortal: React.FC = () => {
                               {cmp.assignedWorkOrderId}
                             </span>
                           )}
+                          {cmp.verificationStatus === 'pending_verification' && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                              VERIFICATION PENDING
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="p-3.5 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => openCaseDrawer('complaint', cmp.id)}
-                          className="px-2.5 py-1 text-xs font-semibold rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-blue-600 hover:text-white whitespace-nowrap"
-                        >
-                          {te.actionTicketBtn}
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          {cmp.verificationStatus === 'pending_verification' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const linkedWo = workOrders.find(
+                                  w => w.complaintId === cmp.id || w.id === cmp.assignedWorkOrderId
+                                );
+                                if (linkedWo) setReviewingWorkOrder(linkedWo);
+                                else openCaseDrawer('complaint', cmp.id);
+                              }}
+                              className="px-2.5 py-1 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1 whitespace-nowrap cursor-pointer"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>Verify</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => openCaseDrawer('complaint', cmp.id)}
+                            className="px-2.5 py-1 text-xs font-semibold rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-blue-600 hover:text-white whitespace-nowrap"
+                          >
+                            {te.actionTicketBtn}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -904,6 +933,227 @@ export const EmployeePortal: React.FC = () => {
             </span>
           </div>
 
+          {/* Sub-view switcher: Field Completion Verification vs AI Proposals */}
+          <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+            <button
+              type="button"
+              onClick={() => setApprovalSubView('field_verification')}
+              className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer transition-colors ${
+                approvalSubView === 'field_verification'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Field Completion Verification</span>
+              {workOrders.filter(w => w.verificationStatus === 'pending_verification' || (w.status === 'Completed' && !w.verificationStatus)).length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-400 text-slate-900 font-extrabold">
+                  {workOrders.filter(w => w.verificationStatus === 'pending_verification' || (w.status === 'Completed' && !w.verificationStatus)).length}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setApprovalSubView('recommendations')}
+              className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer transition-colors ${
+                approvalSubView === 'recommendations'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              <CheckSquare className="w-4 h-4" />
+              <span>Sanctions & AI Proposals</span>
+            </button>
+          </div>
+
+          {approvalSubView === 'field_verification' ? (
+            /* Field Completion Verification Panel */
+            <div className="space-y-4">
+              {(() => {
+                const verificationWOs = workOrders.filter(
+                  wo => wo.verificationStatus || wo.status === 'Completed' || wo.completionReport
+                );
+                const pendingCount = verificationWOs.filter(
+                  wo => wo.verificationStatus === 'pending_verification' || (wo.status === 'Completed' && !wo.verificationStatus)
+                ).length;
+                const approvedCount = verificationWOs.filter(wo => wo.verificationStatus === 'approved').length;
+                const returnedCount = verificationWOs.filter(
+                  wo => wo.verificationStatus === 'more_info_needed' || wo.verificationStatus === 'rejected'
+                ).length;
+
+                return (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                      <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                          Total Completed Jobs
+                        </span>
+                        <div className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
+                          {verificationWOs.length}
+                        </div>
+                        <span className="text-xs text-slate-500">Field work orders</span>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 block mb-1">
+                          Awaiting Verification
+                        </span>
+                        <div className="text-2xl font-extrabold text-amber-600 tabular-nums">
+                          {pendingCount}
+                        </div>
+                        <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                          Evidence under review
+                        </span>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500 block mb-1">
+                          Verified & Approved
+                        </span>
+                        <div className="text-2xl font-extrabold text-emerald-600 tabular-nums">
+                          {approvedCount}
+                        </div>
+                        <span className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">
+                          Resolution verified
+                        </span>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-orange-500 block mb-1">
+                          Returned / Rejected
+                        </span>
+                        <div className="text-2xl font-extrabold text-orange-600 tabular-nums">
+                          {returnedCount}
+                        </div>
+                        <span className="text-xs text-slate-500">Rework requested</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[880px] text-left text-xs">
+                          <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+                            <tr>
+                              <th className="p-3.5 font-semibold whitespace-nowrap">Work Order & Type</th>
+                              <th className="p-3.5 font-semibold whitespace-nowrap">Engineer & Location</th>
+                              <th className="p-3.5 font-semibold whitespace-nowrap">Linked Case</th>
+                              <th className="p-3.5 font-semibold whitespace-nowrap">Evidence Attached</th>
+                              <th className="p-3.5 font-semibold whitespace-nowrap">Repair Action</th>
+                              <th className="p-3.5 font-semibold whitespace-nowrap">Verification State</th>
+                              <th className="p-3.5 font-semibold text-right whitespace-nowrap">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                            {verificationWOs.map(wo => {
+                              const vStatus = wo.verificationStatus || 'pending_verification';
+                              const report = wo.completionReport;
+                              const photoCount = report?.evidenceItems?.length || (wo.inspectionReport?.photoUploaded ? 1 : 0);
+                              const checklistCount = report?.checklist
+                                ? Object.values(report.checklist).filter(Boolean).length
+                                : 4;
+
+                              return (
+                                <tr key={wo.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                                  <td className="p-3.5 whitespace-nowrap">
+                                    <span className="font-mono font-bold text-blue-600 dark:text-blue-400 block">
+                                      {wo.id}
+                                    </span>
+                                    <span className="text-[11px] text-slate-700 dark:text-slate-300 font-semibold">
+                                      {wo.type}
+                                    </span>
+                                  </td>
+                                  <td className="p-3.5 whitespace-nowrap">
+                                    <div className="font-semibold text-slate-900 dark:text-white">
+                                      {wo.assignedTo}
+                                    </div>
+                                    <div className="text-[11px] text-slate-400 truncate max-w-xs">
+                                      {wo.location}
+                                    </div>
+                                  </td>
+                                  <td className="p-3.5 whitespace-nowrap">
+                                    {wo.complaintId ? (
+                                      <span className="font-mono font-bold text-amber-600 dark:text-amber-400 block">
+                                        {wo.complaintId}
+                                      </span>
+                                    ) : wo.applicationId ? (
+                                      <span className="font-mono font-bold text-teal-600 dark:text-teal-400 block">
+                                        {wo.applicationId}
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-400 font-mono">—</span>
+                                    )}
+                                  </td>
+                                  <td className="p-3.5 whitespace-nowrap">
+                                    <div className="space-y-0.5">
+                                      <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold text-slate-700 dark:text-slate-300 inline-block mr-1">
+                                        📷 {photoCount} Photo(s)
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold text-slate-700 dark:text-slate-300 inline-block">
+                                        ✓ {checklistCount} Checked
+                                      </span>
+                                      {report?.safetyPhotoExemptionReason && (
+                                        <div className="text-[10px] text-amber-600 truncate max-w-[180px]">
+                                          Exempt: {report.safetyPhotoExemptionReason}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="p-3.5 max-w-xs">
+                                    <div className="text-[11px] text-slate-800 dark:text-slate-200 line-clamp-2">
+                                      {report?.repairAction || wo.inspectionReport?.technicianRemarks || 'On-site rectification completed.'}
+                                    </div>
+                                    {report?.materialsUsed && report.materialsUsed.length > 0 && (
+                                      <div className="text-[10px] text-slate-400 truncate">
+                                        Mat: {report.materialsUsed.join(', ')}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="p-3.5 whitespace-nowrap">
+                                    {vStatus === 'pending_verification' && (
+                                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+                                        <Clock className="w-3 h-3" /> PENDING VERIFICATION
+                                      </span>
+                                    )}
+                                    {vStatus === 'approved' && (
+                                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                                        <CheckCircle2 className="w-3 h-3" /> VERIFIED & APPROVED
+                                      </span>
+                                    )}
+                                    {vStatus === 'more_info_needed' && (
+                                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300 border border-orange-200 dark:border-orange-800 flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3" /> MORE INFO REQUESTED
+                                      </span>
+                                    )}
+                                    {vStatus === 'rejected' && (
+                                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border border-rose-200 dark:border-rose-800 flex items-center gap-1">
+                                        <XCircle className="w-3 h-3" /> COMPLETION REJECTED
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="p-3.5 text-right whitespace-nowrap">
+                                    <button
+                                      type="button"
+                                      onClick={() => setReviewingWorkOrder(wo)}
+                                      className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-1 cursor-pointer ml-auto"
+                                    >
+                                      <ShieldCheck className="w-3.5 h-3.5" />
+                                      <span>{vStatus === 'pending_verification' ? 'Review Evidence' : 'View Decision'}</span>
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          ) : (
+            /* Recommendations Sub-view */
+            <>
           {/* Quick Metrics */}
           {(() => {
             const employeeRecs = recommendations.filter(
@@ -1084,6 +1334,8 @@ export const EmployeePortal: React.FC = () => {
               </>
             );
           })()}
+            </>
+          )}
         </div>
       )}
 
@@ -1891,6 +2143,14 @@ export const EmployeePortal: React.FC = () => {
       )}
 
       {activeTab === 'outage-map' && <LazyOutageMapSection />}
+
+      {reviewingWorkOrder && (
+        <WorkOrderVerificationReviewModal
+          workOrder={reviewingWorkOrder}
+          isOpen={Boolean(reviewingWorkOrder)}
+          onClose={() => setReviewingWorkOrder(null)}
+        />
+      )}
     </div>
   );
 };
