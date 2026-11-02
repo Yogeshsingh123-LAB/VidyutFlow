@@ -121,9 +121,9 @@ def submit_evidence(
 def get_work_order_evidence(
     work_order_id: str,
     db: Session = Depends(get_db),
-    u: User = Depends(current_user),
+    u: User = Depends(require("engineer", "officer", "admin")),
 ):
-    """Retrieve all evidence records associated with a work order."""
+    """Retrieve all evidence records associated with a work order (staff/admin only)."""
     clean_wo_id = sanitize_untrusted_text(work_order_id)
     items = db.query(WorkOrderEvidence).filter(WorkOrderEvidence.work_order_id == clean_wo_id).order_by(WorkOrderEvidence.created_at.asc()).all()
     return [_out(item) for item in items]

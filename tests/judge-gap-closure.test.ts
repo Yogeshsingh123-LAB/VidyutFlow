@@ -49,7 +49,7 @@ async function run() {
   assert.ok(secMd.includes('AES-256-GCM'), 'SECURITY.md documents AES-256-GCM encryption at rest');
 
   const openapi = JSON.parse(fs.readFileSync(path.join(repoRoot, 'docs/api/openapi.json'), 'utf8'));
-  assert.equal(Object.keys(openapi.paths).length, 50, 'OpenAPI has 50 paths');
+  assert.equal(Object.keys(openapi.paths).length, 61, 'OpenAPI has 61 paths');
 
   const drillReport = fs.readFileSync(
     path.join(repoRoot, 'docs/verification/r4-dr-failover-drill.txt'),
@@ -58,13 +58,13 @@ async function run() {
   assert.ok(drillReport.includes('Status                         : PASS'), 'DR failover drill report PASSED');
   assert.ok(drillReport.includes('Records lost (replicated RPO)  : 0'), 'DR failover drill proved 0 records lost');
 
-  // 5. Verify OOD GERC/CGRF real-domain text eval, 100% (55/55) API coverage, Cold-Start DR proof & BOM sources
+  // 5. Verify OOD GERC/CGRF real-domain text eval, 100% (66/66) API coverage, Cold-Start DR proof & BOM sources
   const oodEval = fs.readFileSync(path.join(repoRoot, 'docs/verification/r3-realworld-text-eval.txt'), 'utf8');
   assert.ok(oodEval.includes('Synthetic Template Overlap: 0'), 'Zero overlap on OOD field benchmark');
   assert.ok(oodEval.includes('Category Accuracy         : 0.9074'), 'OOD field benchmark >= 0.75 (0.9074)');
 
   const apiCov = fs.readFileSync(path.join(repoRoot, 'docs/verification/r4-api-endpoint-coverage.txt'), 'utf8');
-  assert.ok(apiCov.includes('Operations Tested in Pytest: 55 / 55 (100.0%)'), '100% (55/55) OpenAPI operation coverage');
+  assert.ok(apiCov.includes('Operations Tested in Pytest: 66 / 66 (100.0%)'), '100% (66/66) OpenAPI operation coverage');
 
   const coldDr = fs.readFileSync(path.join(repoRoot, 'docs/verification/r4-cold-start-dr-proof.txt'), 'utf8');
   assert.ok(coldDr.includes('Data loss (records)             : 0'), 'Cold-start DR proof 0 data loss');

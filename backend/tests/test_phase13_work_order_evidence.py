@@ -53,7 +53,11 @@ def test_evidence_submission_idempotency_and_review_workflow():
         assert res_replay.status_code == 201 or res_replay.status_code == 200
         assert res_replay.json()["id"] == evidence_id
 
-        # 4. Query evidence for work order
+        # 4. Consumer cannot read raw internal work-order evidence/GPS/remarks (BOLA & privacy 403)
+        res_consumer_list = client.get(f"/v1/evidence/work-order/{wo_id}", headers=consumer)
+        assert res_consumer_list.status_code == 403
+
+        # 4b. Authorized staff query evidence for work order
         res_list = client.get(f"/v1/evidence/work-order/{wo_id}", headers=engineer)
         assert res_list.status_code == 200
         items = res_list.json()

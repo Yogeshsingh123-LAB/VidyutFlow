@@ -96,7 +96,7 @@ VidyutFlow 2.0 maintains a strictly separated two-layer architecture:
 
 ### 4.2 Query Work Order Evidence
 - **Endpoint:** `GET /v1/evidence/work-order/{work_order_id}`
-- **Authorization:** `current_user`
+- **Authorization:** `require("engineer", "officer", "admin")` (consumers receive `403 Forbidden` to prevent raw technician/GPS/internal-remark leakage)
 - **Response:** `200 OK` array of evidence objects.
 
 ### 4.3 Review and Verify Evidence
