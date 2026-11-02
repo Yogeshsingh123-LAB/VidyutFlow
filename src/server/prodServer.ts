@@ -35,6 +35,7 @@ const FASTAPI_PREFIXES = [
   '/api/backend',
   '/api/v1',
   '/api/requests',
+  '/api/evidence',
   '/api/notifications',
   '/api/system',
   '/api/erp',
@@ -47,6 +48,7 @@ function applySecurityHeaders(res: ServerResponse) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self)');
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://*.tile.openstreetmap.org; worker-src 'self' blob:; connect-src 'self' data: blob: https://tessdata.projectnaptha.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
@@ -145,10 +147,11 @@ export function createProductionRequestHandler(options?: {
       return;
     }
 
-    // Serve built SPA static files from dist/ with traversal protection
+    // Serve built SPA static files from dist/ with strict path-separator traversal protection
+    const normalizedDist = path.resolve(distDir);
     const decodedPath = decodeURIComponent(pathname === '/' ? '/index.html' : pathname);
-    const resolvedFile = path.resolve(distDir, '.' + decodedPath);
-    if (!resolvedFile.startsWith(distDir)) {
+    const resolvedFile = path.resolve(normalizedDist, '.' + decodedPath);
+    if (resolvedFile !== normalizedDist && !resolvedFile.startsWith(normalizedDist + path.sep)) {
       res.statusCode = 403;
       res.end('Forbidden');
       return;
@@ -156,7 +159,7 @@ export function createProductionRequestHandler(options?: {
 
     let fileToServe = resolvedFile;
     if (!fs.existsSync(fileToServe) || fs.statSync(fileToServe).isDirectory()) {
-      fileToServe = path.join(distDir, 'index.html');
+      fileToServe = path.join(normalizedDist, 'index.html');
     }
 
     if (!fs.existsSync(fileToServe)) {

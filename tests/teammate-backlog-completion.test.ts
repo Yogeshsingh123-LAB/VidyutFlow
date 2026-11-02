@@ -176,6 +176,35 @@ async function run() {
       else process.env.NODE_ENV = prevNodeEnv;
     }
     console.log('  ✅ PASS: Simulated OIDC / Gujarat Parichay SSO issues HttpOnly session & blocks in production (#18)');
+
+    // 5b. Cross-origin CSRF protection & bounded payload size on /api/ai-chat + Permissions-Policy header
+    resetAiMiddlewareStateForTests();
+    const crossOriginAi = await fetch(`${baseUrl}/api/ai-chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookiePair,
+        Origin: 'https://evil-attacker.example',
+      },
+      body: JSON.stringify({ message: 'Explain my latest bill' }),
+    });
+    assert.equal(crossOriginAi.status, 403, 'Cross-origin Origin header on /api/ai-chat must be rejected with 403');
+    assert.equal(
+      crossOriginAi.headers.get('permissions-policy'),
+      'camera=(self), microphone=(), geolocation=(self)',
+      'Production server must emit Permissions-Policy header'
+    );
+
+    const oversizedAi = await fetch(`${baseUrl}/api/ai-chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookiePair,
+      },
+      body: JSON.stringify({ message: 'x'.repeat(65_000) }),
+    });
+    assert.equal(oversizedAi.status, 413, 'Oversized /api/ai-chat body must return 413 without OOM');
+    console.log('  ✅ PASS: /api/ai-chat blocks cross-origin CSRF (403), caps body size (413), & emits Permissions-Policy');
   } finally {
     setCustomGeminiGeneratorForTests(null);
     resetAiMiddlewareStateForTests();
@@ -210,8 +239,16 @@ async function run() {
   );
   assert.ok(
     backendSessionSrc.includes('X-Use-Cookie-Session') &&
-      backendSessionSrc.includes('/api/backend/auth/logout')
+      backendSessionSrc.includes('/api/backend/auth/logout') &&
+      backendSessionSrc.includes('/api/backend/auth/refresh')
   );
+
+  const prodServerSrc = fs.readFileSync(path.join(FRONTEND_ROOT, 'src/server/prodServer.ts'), 'utf8');
+  assert.ok(prodServerSrc.includes("'/api/evidence'"), 'prodServer.ts must proxy /api/evidence');
+  const viteConfigSrc = fs.readFileSync(path.join(FRONTEND_ROOT, 'vite.config.ts'), 'utf8');
+  assert.ok(viteConfigSrc.includes("'/api/evidence'"), 'vite.config.ts must proxy /api/evidence');
+  const runBatSrc = fs.readFileSync(path.join(FRONTEND_ROOT, 'run.bat'), 'utf8');
+  assert.ok(!runBatSrc.includes('%~dp0frontend'), 'run.bat must not reference deleted frontend\\ directory');
 
   for (const rel of [
     'src/components/common/LocationPinPicker.tsx',

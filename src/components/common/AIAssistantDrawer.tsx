@@ -336,8 +336,10 @@ export const AIAssistantDrawer: React.FC = () => {
     try {
       const response = await fetch('/api/ai-chat', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-VidyutFlow-CSRF': '1'
         },
         signal: abortController.signal,
         body: JSON.stringify({

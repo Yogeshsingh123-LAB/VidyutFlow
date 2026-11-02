@@ -61,6 +61,11 @@ export default defineConfig(() => {
           changeOrigin: true,
           rewrite: path => path.replace(/^\/api/, '')
         },
+        '/api/evidence': {
+          target: FASTAPI_TARGET,
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api/, '')
+        },
         '/api/system': {
           target: FASTAPI_TARGET,
           changeOrigin: true,

@@ -38,6 +38,7 @@ export interface BackendSyncOptions {
 
 type ActiveSession = {
   token: string;
+  refreshToken?: string;
   email: string;
   portalRole: string;
   expiresAt: number;
@@ -46,6 +47,7 @@ type ActiveSession = {
 
 let active: ActiveSession | null = null;
 let pending: { email: string; portalRole: string } | null = null;
+let activeRefreshPromise: Promise<string | null> | null = null;
 let generation = 0;
 const listeners = new Set<() => void>();
 
@@ -153,19 +155,23 @@ export const subscribeBackendSession = (listener: () => void): (() => void) => {
 export const getBackendToken = (): string | null => {
   if (!active) return null;
   if (Date.now() >= active.expiresAt) {
-    clearBackendSession();
+    if (!active.refreshToken) {
+      clearBackendSession();
+    }
     return null;
   }
   return active.token;
 };
 
-export const hasBackendSession = (): boolean => getBackendToken() !== null;
+export const hasBackendSession = (): boolean =>
+  getBackendToken() !== null || Boolean(active?.refreshToken);
 
 export function clearBackendSession(): void {
   const hadState = active !== null || pending !== null;
   generation += 1;
   active = null;
   pending = null;
+  activeRefreshPromise = null;
   if (hadState) {
     emit();
   }
@@ -191,14 +197,71 @@ export function notifyPortalIdentityChanged(email: string | null, portalRole: st
 }
 
 /**
+ * Rotate the short-lived (15m) FastAPI access token using the in-memory refresh token
+ * (or HttpOnly refresh cookie). Concurrent callers share a single rotation request so
+ * single-use refresh tokens never trigger false-positive reuse revocation.
+ */
+export async function refreshBackendAccessToken(): Promise<string | null> {
+  if (!active?.refreshToken) return null;
+  if (activeRefreshPromise) return activeRefreshPromise;
+
+  const snapshot = active;
+  const attempt = generation;
+
+  activeRefreshPromise = (async (): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/backend/auth/refresh', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: snapshot.refreshToken }),
+      });
+      if (!res.ok || attempt !== generation) {
+        if (attempt === generation) clearBackendSession();
+        return null;
+      }
+      const payload = (await res.json()) as { access_token?: unknown; refresh_token?: unknown };
+      if (typeof payload.access_token !== 'string' || !payload.access_token || attempt !== generation) {
+        if (attempt === generation) clearBackendSession();
+        return null;
+      }
+      const nextExpiresAt = resolveTokenExpiryMs(payload.access_token);
+      if (nextExpiresAt === null || attempt !== generation) {
+        if (attempt === generation) clearBackendSession();
+        return null;
+      }
+      active = {
+        ...snapshot,
+        token: payload.access_token,
+        refreshToken:
+          typeof payload.refresh_token === 'string' && payload.refresh_token
+            ? payload.refresh_token
+            : undefined,
+        expiresAt: nextExpiresAt,
+      };
+      emit();
+      return payload.access_token;
+    } catch {
+      if (attempt === generation) clearBackendSession();
+      return null;
+    } finally {
+      activeRefreshPromise = null;
+    }
+  })();
+
+  return activeRefreshPromise;
+}
+
+/**
  * Re-verify that the current portal session still belongs to the same user/role before
- * attaching a FastAPI Bearer token. Fails closed on logout, expiry, or account switch.
+ * attaching a FastAPI Bearer token. Fails closed on logout, expiry, or account switch,
+ * and transparently rotates expired 15-minute access tokens when a refresh token is held.
  */
 export async function getVerifiedBackendToken(): Promise<string | null> {
   const token = getBackendToken();
   const expected = active;
   const attempt = generation;
-  if (!token || !expected) return null;
+  if (!expected || (!token && !expected.refreshToken)) return null;
 
   try {
     const res = await fetch('/api/auth/me', { credentials: 'same-origin', cache: 'no-store' });
@@ -220,7 +283,9 @@ export async function getVerifiedBackendToken(): Promise<string | null> {
         clearBackendSession();
         return null;
       }
-      return getBackendToken();
+      const validToken = getBackendToken();
+      if (validToken) return validToken;
+      return await refreshBackendAccessToken();
     }
 
     if (!expected.portalCookieVerified && res.status === 401) {
@@ -233,7 +298,9 @@ export async function getVerifiedBackendToken(): Promise<string | null> {
       }
       if (attempt !== generation) return null;
       if (code && code !== 'SESSION_EXPIRED') {
-        return getBackendToken();
+        const validToken = getBackendToken();
+        if (validToken) return validToken;
+        return await refreshBackendAccessToken();
       }
     }
 
@@ -265,7 +332,7 @@ async function authenticateExactBackendUser(
   });
   if (!response.ok || attempt !== generation) return false;
 
-  const auth = (await response.json()) as { access_token?: unknown };
+  const auth = (await response.json()) as { access_token?: unknown; refresh_token?: unknown };
   if (typeof auth.access_token !== 'string' || !auth.access_token || attempt !== generation) {
     return false;
   }
@@ -291,6 +358,9 @@ async function authenticateExactBackendUser(
 
   active = {
     token: auth.access_token,
+    ...(typeof auth.refresh_token === 'string' && auth.refresh_token
+      ? { refreshToken: auth.refresh_token }
+      : {}),
     email: expectedEmail,
     portalRole,
     expiresAt,
@@ -423,7 +493,7 @@ export async function syncBackendSsoSession(
       });
       if (!res.ok) continue;
       if (attempt !== generation) return false;
-      const auth = (await res.json()) as { access_token?: unknown };
+      const auth = (await res.json()) as { access_token?: unknown; refresh_token?: unknown };
       if (typeof auth.access_token !== 'string' || !auth.access_token) continue;
       const expiresAt = resolveTokenExpiryMs(auth.access_token);
       if (expiresAt === null) continue;
@@ -436,6 +506,9 @@ export async function syncBackendSsoSession(
       if (identity.role !== expectedRole) return false;
       active = {
         token: auth.access_token,
+        ...(typeof auth.refresh_token === 'string' && auth.refresh_token
+          ? { refreshToken: auth.refresh_token }
+          : {}),
         email: expectedEmail,
         portalRole,
         expiresAt,
@@ -457,11 +530,13 @@ export async function syncBackendSsoSession(
  * Revoke the FastAPI HttpOnly session cookie alongside the Node portal cookie on logout.
  */
 export async function logoutBackendCookieSession(): Promise<void> {
+  const tokenToRevoke = active?.token;
   clearBackendSession();
   try {
     await fetch('/api/backend/auth/logout', {
       method: 'POST',
       credentials: 'same-origin',
+      ...(tokenToRevoke ? { headers: { Authorization: `Bearer ${tokenToRevoke}` } } : {}),
     });
   } catch {
     // Ignore when FastAPI is offline in static preview mode

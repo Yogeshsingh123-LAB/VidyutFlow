@@ -4,6 +4,7 @@ import {
   getBackendToken,
   getVerifiedBackendToken,
   hasBackendSession,
+  logoutBackendCookieSession,
   notifyPortalIdentityChanged,
   reconcileBackendIdentity,
   registerBackendConsumerSession,
@@ -234,6 +235,51 @@ try {
   assert.equal(getBackendToken(), null, 'portal account switch clears backend session');
   assert.ok(events > eventsAfterLogin);
   unsub();
+
+  // 11. 15-minute access token transparent refresh rotation (single-flight) + logout JTI header
+  const t0 = 1_710_000_000_000;
+  Date.now = () => t0;
+  const accessV1 = makeJwtWithExp(Math.floor(t0 / 1000) + 900); // 15m
+  const accessV2 = makeJwtWithExp(Math.floor(t0 / 1000) + 1800); // +30m
+  let refreshHits = 0;
+  globalThis.fetch = async url => {
+    const u = String(url);
+    if (u.endsWith('/login')) return jsonRes({ access_token: accessV1, refresh_token: 'rt-1' });
+    if (u.endsWith('/backend/auth/me')) return jsonRes({ email: 'alice@example.com', role: 'consumer' });
+    if (u === '/api/auth/me') return jsonRes({ authenticated: true, user: { email: 'alice@example.com' }, role: 'consumer' });
+    if (u.endsWith('/auth/refresh')) {
+      refreshHits += 1;
+      return jsonRes({ access_token: accessV2, refresh_token: 'rt-2' });
+    }
+    return jsonRes([{ id: 'req-1' }]);
+  };
+  assert.equal(await syncBackendSession('alice@example.com', 'pass123', 'consumer'), true);
+  assert.equal(getBackendToken(), accessV1);
+
+  // Advance past 15-minute access token expiry while 8-hour portal cookie remains valid
+  Date.now = () => t0 + 901_000;
+  assert.equal(getBackendToken(), null, 'expired access token is never synchronously returned');
+  assert.equal(hasBackendSession(), true, 'session remains rotatable while refresh token is held');
+
+  // Fire 3 concurrent fastApi requests — must share ONE single-use refresh call
+  const [r1, r2, r3] = await Promise.all([fastApi('/requests'), fastApi('/requests'), fastApi('/requests')]);
+  assert.equal(refreshHits, 1, 'concurrent callers must deduplicate refresh rotation to prevent reuse revocation');
+  assert.equal(getBackendToken(), accessV2);
+  assert.equal(r1.length, 1);
+  assert.equal(r2.length, 1);
+  assert.equal(r3.length, 1);
+
+  // Logout passes Authorization Bearer header to revoke active UserSession JTI on server
+  let logoutAuthHeader: string | undefined;
+  globalThis.fetch = async (_url, init) => {
+    logoutAuthHeader = (init?.headers as Record<string, string> | undefined)?.Authorization;
+    return jsonRes({ logged_out: true });
+  };
+  await logoutBackendCookieSession();
+  assert.equal(logoutAuthHeader, `Bearer ${accessV2}`);
+  assert.equal(getBackendToken(), null);
+  assert.equal(hasBackendSession(), false);
+  Date.now = originalDateNow;
 } finally {
   Date.now = originalDateNow;
   clearBackendSession();

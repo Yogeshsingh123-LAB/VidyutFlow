@@ -5,7 +5,7 @@
 ## Role / area
 
 - [ ] Role 1 · Backend & Workflow (`backend/app/`)
-- [ ] Role 2 · Frontend & PWA (`frontend/src/`)
+- [ ] Role 2 · Frontend & PWA (`src/`)
 - [ ] Role 3 · ML & AI (`backend/app/ml/`, `assistant/`)
 - [ ] Role 4 · DevOps / Security / QA (Compose, Makefile, tests)
 - [ ] Role 5 · Docs / Demo / Product (`README.md`, `docs/`)

@@ -187,12 +187,11 @@ if "%PYTHON_CMD%"=="" (
     exit /b 1
 )
 
-REM Verify frontend dependencies exist
-if not exist "%~dp0frontend\node_modules" (
-    echo [INFO] Frontend node_modules missing. Installing dependencies...
-    cd /d "%~dp0frontend"
-    call npm install
+REM Verify frontend dependencies exist at repo root
+if not exist "%~dp0node_modules" (
+    echo [INFO] Root node_modules missing. Installing dependencies...
     cd /d "%~dp0"
+    call npm install
 )
 
 REM Prepare environment variables for local execution
@@ -204,7 +203,7 @@ echo [INFO] Starting FastAPI backend on http://127.0.0.1:!BACKEND_PORT!...
 start "VidyutFlow Backend (:!BACKEND_PORT!)" /D "%~dp0backend" cmd /k "set DATABASE_URL=sqlite:///./vidyutflow.db&& set CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000&& %PYTHON_CMD% -m uvicorn app.main:app --reload --host 127.0.0.1 --port !BACKEND_PORT!"
 
 echo [INFO] Starting Vite frontend on http://localhost:3000...
-start "VidyutFlow Frontend (:3000)" /D "%~dp0frontend" cmd /k "set VITE_PROXY_TARGET=http://127.0.0.1:!BACKEND_PORT!&& npm run dev"
+start "VidyutFlow Frontend (:3000)" /D "%~dp0" cmd /k "set VITE_PROXY_TARGET=http://127.0.0.1:!BACKEND_PORT!&& npm run dev"
 
 echo.
 echo ======================================================================
@@ -231,7 +230,7 @@ goto :end
 
 :cmd_frontend
 echo [INFO] Starting Vite frontend in current window...
-cd /d "%~dp0frontend"
+cd /d "%~dp0"
 set "VITE_PROXY_TARGET=http://127.0.0.1:!BACKEND_PORT!"
 call npm run dev
 goto :end
@@ -246,9 +245,8 @@ cd /d "%~dp0backend"
 "%PYTHON_CMD%" -m pip install -r requirements.txt -r requirements-dev.txt
 echo.
 echo [INFO] Installing frontend dependencies...
-cd /d "%~dp0frontend"
-call npm install
 cd /d "%~dp0"
+call npm install
 echo.
 echo [SUCCESS] All dependencies installed successfully.
 goto :end
@@ -267,10 +265,9 @@ goto :end
 
 :cmd_build
 echo [INFO] Building production frontend bundle...
-cd /d "%~dp0frontend"
-call npm run build
 cd /d "%~dp0"
-echo [SUCCESS] Frontend production build created in frontend/dist.
+call npm run build
+echo [SUCCESS] Frontend production build created in dist.
 goto :end
 
 :cmd_test
@@ -295,7 +292,7 @@ if errorlevel 1 (
 
 echo.
 echo [INFO] 2/2 Running frontend test suite...
-cd /d "%~dp0frontend"
+cd /d "%~dp0"
 call npm test
 if errorlevel 1 (
     echo [WARNING] Frontend tests reported failures.
@@ -303,7 +300,6 @@ if errorlevel 1 (
 ) else (
     echo [SUCCESS] Frontend test suite passed.
 )
-cd /d "%~dp0"
 
 if "%TEST_FAILED%"=="1" (
     echo.
@@ -317,6 +313,8 @@ goto :end
 
 :cmd_reset
 echo [INFO] Resetting local SQLite demo databases...
+if exist "backend\vidyutflow.db" del /f /q "backend\vidyutflow.db" 2>nul
+if exist "vidyutflow.db" del /f /q "vidyutflow.db" 2>nul
 if exist "backend\vidyutos.db" del /f /q "backend\vidyutos.db" 2>nul
 if exist "vidyutos.db" del /f /q "vidyutos.db" 2>nul
 if exist "backend\test_vidyutos.db" del /f /q "backend\test_vidyutos.db" 2>nul
@@ -328,7 +326,8 @@ goto :end
 :cmd_clean
 call :cmd_reset
 echo [INFO] Cleaning build artifacts and cache directories...
-if exist "frontend\dist" rmdir /s /q "frontend\dist" 2>nul
+if exist "dist" rmdir /s /q "dist" 2>nul
+if exist "public\vendor\tesseract" rmdir /s /q "public\vendor\tesseract" 2>nul
 if exist "backend\.pytest_cache" rmdir /s /q "backend\.pytest_cache" 2>nul
 if exist ".pytest_cache" rmdir /s /q ".pytest_cache" 2>nul
 echo [SUCCESS] Clean completed.
