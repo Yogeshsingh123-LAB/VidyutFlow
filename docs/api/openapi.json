@@ -2851,6 +2851,51 @@
         ]
       }
     },
+    "/requests/{request_id}/document": {
+      "get": {
+        "operationId": "get_document_requests__request_id__document_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Get Document",
+        "tags": [
+          "requests"
+        ]
+      }
+    },
     "/requests/{request_id}/status": {
       "patch": {
         "operationId": "update_status_requests__request_id__status_patch",

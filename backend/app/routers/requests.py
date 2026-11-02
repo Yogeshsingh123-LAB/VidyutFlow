@@ -12,9 +12,15 @@ from ..workflow import run_workflow
 from ..audit import audit, verify_chain
 from ..notify import notify, notify_request_parties, notify_zone_officers
 from ..access import visible_requests, require_request_access
+from pathlib import PurePosixPath
 from ..config import settings
 from ..transitions import apply_transition
-from ..uploads import sanitize_document_reference, validate_and_encrypt_upload, validate_and_read_upload
+from ..uploads import (
+    sanitize_document_reference,
+    validate_and_encrypt_upload,
+    validate_and_read_upload,
+    retrieve_decrypted_document,
+)
 from ..erp_adapter import record_erp_sync
 from ..alerts import evaluate_and_dispatch_alerts
 from ..workflow_templates import resolve_active_template
@@ -121,6 +127,65 @@ def get_one(request_id: str, db: Session = Depends(get_db), u: User = Depends(cu
     if u.role == "engineer" and r.assigned_engineer_id != u.id:
         raise HTTPException(403, "Request is not assigned to you")
     return out(r)
+
+@router.get("/{request_id}/document")
+def get_document(request_id: str, db: Session = Depends(get_db), u: User = Depends(current_user)):
+    r = db.get(ConnectionRequest, request_id)
+    if not r:
+        raise HTTPException(404, "Request not found")
+    require_request_access(db, u, r)
+    if u.role == "consumer" and r.consumer_id != u.id:
+        raise HTTPException(403, "Not your request")
+    if u.role == "engineer" and r.assigned_engineer_id != u.id:
+        raise HTTPException(403, "Request is not assigned to you")
+    if not r.document_name:
+        raise HTTPException(404, "No document attached to this request")
+
+    clean_name = r.document_name
+    prefix = None
+    audit_row = (
+        db.query(AuditLog)
+        .filter(AuditLog.entity_id == r.id, AuditLog.action == "REQUEST_CREATED_WITH_DOC")
+        .order_by(AuditLog.created_at.desc())
+        .first()
+    )
+    if audit_row and "enc=AES256GCM:" in (audit_row.detail or ""):
+        try:
+            prefix = audit_row.detail.split("enc=AES256GCM:")[1].split()[0].strip()
+        except Exception:
+            prefix = None
+
+    try:
+        content = retrieve_decrypted_document(
+            clean_name=clean_name,
+            master_secret=settings.secret_key,
+            vault_dir=settings.upload_vault_dir,
+            prefix=prefix,
+        )
+    except FileNotFoundError:
+        raise HTTPException(404, "Document file not found in storage vault")
+    except Exception:
+        raise HTTPException(500, "Document decryption or integrity check failed")
+
+    ext = PurePosixPath(clean_name).suffix.lower()
+    media_types = {
+        ".pdf": "application/pdf",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".txt": "text/plain; charset=utf-8",
+    }
+    media_type = media_types.get(ext, "application/octet-stream")
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{clean_name}"',
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store, private",
+        },
+    )
 
 ENGINEER_STATUSES = {"IN_PROGRESS", "FIELD_VERIFIED", "COMPLETED"}
 

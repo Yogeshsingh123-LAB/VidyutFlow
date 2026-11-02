@@ -25,6 +25,15 @@ _BINARY_DISGUISE_HEADERS = (
 )
 
 
+_HTML_XML_DISGUISE_HEADERS = (
+    b"<!doctype html",
+    b"<html",
+    b"<svg",
+    b"<?xml",
+    b"<script",
+)
+
+
 def validate_magic_bytes(clean_name: str, data: bytes) -> None:
     """Enforce magic-byte file signature checks matching `clean_name`'s extension."""
     ext = PurePosixPath(clean_name).suffix.lower()
@@ -51,6 +60,12 @@ def validate_magic_bytes(clean_name: str, data: bytes) -> None:
             raise HTTPException(
                 400,
                 "Invalid text document: binary or executable signature detected in .txt upload",
+            )
+        data_stripped = data.strip().lower()
+        if any(data_stripped.startswith(tag) for tag in _HTML_XML_DISGUISE_HEADERS):
+            raise HTTPException(
+                400,
+                "Invalid text document: HTML/XML/SVG script tags detected in .txt upload",
             )
         try:
             data.decode("utf-8")
@@ -252,5 +267,51 @@ async def validate_and_encrypt_upload(
         return clean_name, cipher_sha256
     finally:
         await document.close()
+
+
+def retrieve_decrypted_document(
+    clean_name: str,
+    master_secret: str,
+    vault_dir: str | None = None,
+    prefix: str | None = None,
+) -> bytes:
+    """Locate encrypted document in vault, authenticate, and decrypt with AES-256-GCM."""
+    import glob
+    import os as _os
+    from .config import settings
+
+    # Ensure no path traversal in clean_name
+    sanitized = PurePosixPath(clean_name.replace("\\", "/")).name
+    if not sanitized or sanitized != clean_name:
+        raise ValueError("Invalid document name path structure")
+
+    effective_vault = (
+        vault_dir
+        or _os.environ.get("UPLOAD_VAULT_DIR", "").strip()
+        or settings.upload_vault_dir
+    )
+    if not _os.path.isdir(effective_vault):
+        raise FileNotFoundError(f"Storage vault directory does not exist: {effective_vault}")
+
+    matches: list[str] = []
+    if prefix:
+        pattern = _os.path.join(effective_vault, f"{prefix}*_{clean_name}.enc")
+        matches = glob.glob(pattern)
+
+    if not matches:
+        pattern = _os.path.join(effective_vault, f"*_{clean_name}.enc")
+        matches = glob.glob(pattern)
+
+    if not matches:
+        raise FileNotFoundError(f"Document {clean_name} not found in storage vault")
+
+    matches.sort(key=lambda p: _os.path.getmtime(p), reverse=True)
+    target_path = matches[0]
+
+    with open(target_path, "rb") as fh:
+        encrypted_blob = fh.read()
+
+    key_material = master_secret if len(master_secret) >= 16 else (master_secret * 4)[:32]
+    return decrypt_upload_at_rest(encrypted_blob, key_material, aad=clean_name.encode("utf-8"))
 
 
