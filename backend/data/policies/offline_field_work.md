@@ -1,0 +1,2 @@
+# Offline Field Work (demo policy extract — synthetic/sample)
+Field engineers may complete tasks with no network (airplane mode). Each entry is saved on the device with a unique UUID. On reconnect the app syncs the queue; the server accepts a UUID once only, so re-syncing never creates duplicates. Conflicts: latest field status wins for work status; billing/financial fields need manual review (roadmap).

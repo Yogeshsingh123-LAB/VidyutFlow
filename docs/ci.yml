@@ -34,15 +34,15 @@ jobs:
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: package-lock.json
       - name: Install frontend dependencies
-        run: cd frontend && npm ci
+        run: npm ci
       - name: Run frontend test suites
-        run: cd frontend && npm test
+        run: npm test
       - name: Type check
-        run: cd frontend && npm run lint
+        run: npm run lint
       - name: Production build
-        run: cd frontend && npm run build
+        run: npm run build
 
   playwright-e2e-a11y:
     name: Playwright browser E2E & WCAG axe-core suite
@@ -57,15 +57,15 @@ jobs:
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: package-lock.json
       - name: Install backend & frontend dependencies
         run: |
           pip install -r backend/requirements.txt
-          cd frontend && npm ci
+          npm ci
           npx playwright install --with-deps chromium --only-shell
       - name: Start FastAPI backend & run Playwright Chromium E2E + a11y suite
         run: |
           cd backend && uvicorn app.main:app --host 127.0.0.1 --port 8008 &
           for i in $(seq 1 30); do curl -sf http://127.0.0.1:8008/health && break; sleep 1; done
-          cd ../frontend && npm run test:playwright
+          cd .. && npm run test:playwright
 

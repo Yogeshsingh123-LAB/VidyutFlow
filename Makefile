@@ -7,7 +7,7 @@ help: ## Show available targets
 
 setup: ## Install backend + frontend dependencies
 	cd backend && pip install -r requirements.txt -r requirements-dev.txt
-	cd frontend && npm install
+	npm install
 
 train: ## Train all 5 sklearn models + evaluate 54-item GERC/CGRF real-domain benchmark
 	cd backend && python scripts/train_models.py && python scripts/evaluate_realworld_benchmark.py
@@ -21,17 +21,17 @@ dr-proof: ## Run cold-start Primary Kill -> Hot-Standby DR failover proof (0 dat
 backend: ## Run API locally (SQLite fallback) on :8000
 	cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000
 
-frontend: ## Run web app locally on :5173 (proxies /api to :8000)
-	cd frontend && npm run dev
+frontend: ## Run web app locally on :3000 (proxies /api to :8000)
+	npm run dev
 
 test: ## Backend test suite (end-to-end flow, RBAC, offline de-dup, ML)
 	cd backend && python -m pytest -q
 
 test-frontend: ## Frontend test suite (auth, session, AI resilience, data integrity)
-	cd frontend && npm test
+	npm test
 
 build: ## Production frontend build
-	cd frontend && npm run build
+	npm run build
 
 up: ## Full stack with PostgreSQL via Docker Compose
 	docker compose up --build
@@ -43,5 +43,5 @@ demo-reset: ## Remove local SQLite demo databases (re-seeded on next start)
 	./scripts/demo_reset.sh
 
 clean: demo-reset ## Remove demo DBs and build artefacts
-	rm -rf frontend/dist backend/.pytest_cache
+	rm -rf dist backend/.pytest_cache
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +

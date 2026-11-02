@@ -1,0 +1,2 @@
+# SLA and Escalation (demo policy extract — synthetic/sample)
+Requests likely to breach SLA are flagged by the SLA-risk model with reasons such as incomplete documents, high zone workload, or high requested load. Officers should act first on P1/P2 and on risk above 0.7. If the SLA due time passes without completion, the request is escalated to the admin dashboard and an audit-log entry is created. Consumers can track status live on the portal and never need to visit the office for status.
