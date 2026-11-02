@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, AlertTriangle, Camera, Check, ChevronDown, FileCheck2, Gauge, RotateCw, Upload, X } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -42,6 +42,8 @@ export const MeterReadingWorkspace: React.FC = () => {
   const [readingAt, setReadingAt] = useState(new Date().toISOString().slice(0, 10));
   const [meterEvent, setMeterEvent] = useState<'ordinary' | 'replacement' | 'rollover'>('ordinary');
   const [file, setFile] = useState<File | null>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const cameraVideo = useRef<HTMLVideoElement>(null);
   const [preview, setPreview] = useState('');
   const [photoPayload, setPhotoPayload] = useState('');
   const [rotation, setRotation] = useState(0);
@@ -58,6 +60,40 @@ export const MeterReadingWorkspace: React.FC = () => {
   const selectedConnection = candidates.find(conn => conn.consumerNo === connectionNo) || candidates[0];
   const visibleBills = currentRole === 'consumer' ? userBills : bills;
   const visiblePayments = currentRole === 'consumer' ? userPayments : payments;
+
+  useEffect(() => {
+    if (cameraVideo.current && cameraStream) cameraVideo.current.srcObject = cameraStream;
+    return () => cameraStream?.getTracks().forEach(track => track.stop());
+  }, [cameraStream]);
+
+  const startCamera = async () => {
+    setError('');
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera access requires HTTPS or localhost and a browser that supports camera access.');
+      setCameraStream(await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to open the camera. Check browser camera permission and try again.');
+    }
+  };
+
+  const closeCamera = () => {
+    cameraStream?.getTracks().forEach(track => track.stop());
+    setCameraStream(null);
+  };
+
+  const captureCameraPhoto = () => {
+    const video = cameraVideo.current;
+    if (!video || !video.videoWidth || !video.videoHeight) { setError('Camera is still starting. Try again in a moment.'); return; }
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0);
+    canvas.toBlob(blob => {
+      if (!blob) { setError('The camera photo could not be captured.'); return; }
+      chooseFile(new File([blob], `meter-${Date.now()}.jpg`, { type: 'image/jpeg' }));
+      closeCamera();
+    }, 'image/jpeg', 0.92);
+  };
 
   const refresh = async () => {
     try {
@@ -219,7 +255,8 @@ export const MeterReadingWorkspace: React.FC = () => {
           </div>
           <div className="space-y-3 rounded-xl border border-dashed border-slate-300 p-3 dark:border-slate-700">
             <p className="text-xs text-slate-600 dark:text-slate-300">{text.photoHelp}</p>
-            <div className="flex flex-wrap gap-2"><label className="cursor-pointer rounded-lg border px-3 py-2 text-xs font-semibold"><Camera className="mr-1 inline" size={15} />{text.takePhoto}<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="sr-only" onChange={event => chooseFile(event.target.files?.[0] || null)} /></label><label className="cursor-pointer rounded-lg border px-3 py-2 text-xs font-semibold"><Upload className="mr-1 inline" size={15} />{text.gallery}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={event => chooseFile(event.target.files?.[0] || null)} /></label>{file && <button type="button" onClick={() => setRotation(value => (value + 90) % 360)} className="rounded-lg border px-3 py-2 text-xs"><RotateCw className="mr-1 inline" size={14} />{text.rotate}</button>}</div>
+            <div className="flex flex-wrap gap-2"><button type="button" onClick={() => cameraStream ? closeCamera() : void startCamera()} className="rounded-lg border px-3 py-2 text-xs font-semibold"><Camera className="mr-1 inline" size={15} />{text.takePhoto}</button><label className="cursor-pointer rounded-lg border px-3 py-2 text-xs font-semibold"><Upload className="mr-1 inline" size={15} />{text.gallery}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={event => chooseFile(event.target.files?.[0] || null)} /></label>{file && <button type="button" onClick={() => setRotation(value => (value + 90) % 360)} className="rounded-lg border px-3 py-2 text-xs"><RotateCw className="mr-1 inline" size={14} />{text.rotate}</button>}</div>
+            {cameraStream && <div className="space-y-2"><video ref={cameraVideo} autoPlay playsInline muted className="max-h-80 w-full rounded-lg bg-black object-contain" /><div className="flex gap-2"><button type="button" onClick={captureCameraPhoto} className="rounded-lg bg-cyan-700 px-3 py-2 text-xs font-semibold text-white">Capture photo</button><button type="button" onClick={closeCamera} className="rounded-lg border px-3 py-2 text-xs">Close camera</button></div></div>}
             {preview && <img src={preview} alt="Meter photo preview" className="max-h-64 w-full rounded-lg bg-slate-100 object-contain" style={{ transform: `rotate(${rotation}deg)` }} />}
             {file && <button type="button" disabled={busy} onClick={() => void runOcr()} className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? `${text.loading} ${progress}%` : text.runOcr}</button>}
             {ocr && <div className="rounded-lg bg-cyan-50 p-3 text-xs text-cyan-950 dark:bg-cyan-950/40 dark:text-cyan-100"><strong>{text.readingCheck}</strong><p className="mt-1">{ocr.candidateReading || '—'} · {text.confidence}: {ocr.confidence === undefined ? 'not provided' : `${ocr.confidence}%`}</p><p className="mt-1 break-all text-slate-500">{ocr.rawText}</p></div>}
