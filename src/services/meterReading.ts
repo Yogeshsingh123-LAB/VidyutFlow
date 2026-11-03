@@ -1,6 +1,179 @@
 import type { TariffCategory } from '../types';
 
 export type MeterReadingStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'REREAD_REQUESTED';
+
+export type AnomalyReviewStatus =
+  | 'DETECTED'
+  | 'PENDING_REVIEW'
+  | 'UNDER_INVESTIGATION'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'CORRECTED_THROUGH_ADJUSTMENT'
+  | 'CLOSED';
+
+export const VALID_ANOMALY_STATUS_TRANSITIONS: Readonly<Record<AnomalyReviewStatus, readonly AnomalyReviewStatus[]>> = {
+  DETECTED: ['PENDING_REVIEW', 'UNDER_INVESTIGATION', 'CLOSED'],
+  PENDING_REVIEW: ['UNDER_INVESTIGATION', 'APPROVED', 'REJECTED', 'CORRECTED_THROUGH_ADJUSTMENT'],
+  UNDER_INVESTIGATION: ['PENDING_REVIEW', 'APPROVED', 'REJECTED', 'CORRECTED_THROUGH_ADJUSTMENT', 'CLOSED'],
+  APPROVED: ['CLOSED'],
+  REJECTED: ['CLOSED'],
+  CORRECTED_THROUGH_ADJUSTMENT: ['CLOSED'],
+  CLOSED: [] // Terminal status
+};
+
+export function canTransitionAnomalyStatus(current: AnomalyReviewStatus, next: AnomalyReviewStatus): boolean {
+  if (current === next) return true;
+  const allowed = VALID_ANOMALY_STATUS_TRANSITIONS[current] || [];
+  return allowed.includes(next);
+}
+
+export function validateStatusTransition(
+  current: AnomalyReviewStatus,
+  next: AnomalyReviewStatus,
+  note?: string
+): void {
+  if (current === next) return;
+  if (!canTransitionAnomalyStatus(current, next)) {
+    throw new MeterReadingError(
+      `Cannot transition status from ${current} to ${next}. Valid transitions: ${(VALID_ANOMALY_STATUS_TRANSITIONS[current] || []).join(', ') || 'none (terminal)'}.`,
+      'INVALID_STATUS_TRANSITION'
+    );
+  }
+  const requiresNote: AnomalyReviewStatus[] = [
+    'UNDER_INVESTIGATION',
+    'REJECTED',
+    'CORRECTED_THROUGH_ADJUSTMENT',
+    'CLOSED'
+  ];
+  if (requiresNote.includes(next) && (!note || !note.trim())) {
+    throw new MeterReadingError(
+      `A meaningful audit note is required when transitioning to ${next}.`,
+      'AUDIT_NOTE_REQUIRED'
+    );
+  }
+}
+
+export interface AnomalyStatusHistoryItem {
+  id: string;
+  fromStatus: AnomalyReviewStatus;
+  toStatus: AnomalyReviewStatus;
+  actorId: string;
+  actorName: string;
+  actorRole: string;
+  timestamp: string;
+  action: string;
+  reason: string;
+  referenceId?: string;
+}
+
+export interface StructuredAnomalyCase {
+  id: string;
+  readingId?: string;
+  consumerNo: string;
+  connectionId: string;
+  meterNo: string;
+  category: MeterAnomalyCategory;
+  severity: 'INFO' | 'REVIEW' | 'HIGH';
+  detectedAt: string;
+  observedValue?: string;
+  expectedValue?: string;
+  explanation: string;
+  status: AnomalyReviewStatus;
+  assignedReviewer?: string;
+  assignedRole?: string;
+  investigationNotes?: string[];
+  evidenceLinks?: string[];
+  statusHistory: AnomalyStatusHistoryItem[];
+  resolution?: {
+    resolvedAt: string;
+    resolvedBy: string;
+    resolutionType: 'APPROVED' | 'REJECTED' | 'ADJUSTED' | 'CLOSED';
+    note: string;
+    adjustmentId?: string;
+  };
+  demo: true;
+}
+
+export type BillingReviewCategory =
+  | 'CONSUMPTION_DISPUTE'
+  | 'TARIFF_MISMATCH'
+  | 'METER_FAULT_SUSPECTED'
+  | 'PAYMENT_NOT_REFLECTED'
+  | 'DUPLICATE_BILL'
+  | 'OTHER';
+
+export interface ConsumerBillingReviewRequest {
+  id: string;
+  consumerNo: string;
+  connectionId: string;
+  billNo: string;
+  readingId?: string;
+  category: BillingReviewCategory;
+  description: string;
+  evidencePhotoId?: string;
+  status: AnomalyReviewStatus;
+  submittedBy: string;
+  submittedAt: string;
+  clientUuid: string;
+  assignedTo?: string;
+  consumerVisibleNote?: string;
+  internalStaffNotes?: string[];
+  statusHistory: AnomalyStatusHistoryItem[];
+  resolution?: {
+    resolvedAt: string;
+    resolvedBy: string;
+    resolutionType: 'APPROVED' | 'REJECTED' | 'ADJUSTED' | 'CLOSED';
+    publicNote: string;
+    internalNote?: string;
+    adjustmentId?: string;
+  };
+  demo: true;
+}
+
+export type FinancialAdjustmentStatus =
+  | 'PROPOSED'
+  | 'PENDING_APPROVAL'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'APPLIED_TO_LEDGER'
+  | 'CANCELLED';
+
+export interface FinancialAdjustmentProposal {
+  id: string;
+  billNo: string;
+  consumerNo: string;
+  connectionId: string;
+  readingId?: string;
+  anomalyId?: string;
+  reviewRequestId?: string;
+  originalBilledAmount: number;
+  originalUnits: number;
+  revisedUnits?: number;
+  proposedAdjustmentAmount: number;
+  adjustmentType: 'CREDIT_CONCESSION' | 'SLAB_CORRECTION' | 'METER_ERROR_REBATE' | 'SUPPLEMENTARY_CHARGE';
+  proposedRevisedAmount: number;
+  calculationBasis: string;
+  reason: string;
+  supportingEvidence?: string[];
+  proposedBy: string;
+  proposedByRole: string;
+  proposedAt: string;
+  status: FinancialAdjustmentStatus;
+  approvedBy?: string;
+  approvedByRole?: string;
+  approvedAt?: string;
+  approvalNote?: string;
+  rejectionReason?: string;
+  statusHistory: Array<{
+    status: FinancialAdjustmentStatus;
+    actor: string;
+    role: string;
+    timestamp: string;
+    note: string;
+  }>;
+  demo: true;
+}
+
 export type MeterAnomalyCategory =
   | 'FIRST_READING'
   | 'IDENTITY_MISMATCH'
@@ -9,12 +182,24 @@ export type MeterAnomalyCategory =
   | 'METER_ROLLOVER'
   | 'METER_REPLACEMENT'
   | 'DUPLICATE_READING'
+  | 'DUPLICATE_SUBMISSION'
   | 'OUT_OF_ORDER'
   | 'HIGH_CONSUMPTION'
   | 'LOW_CONSUMPTION'
   | 'ZERO_CONSUMPTION'
   | 'BILL_DISCREPANCY'
+  | 'BILL_CALCULATION_MISMATCH'
+  | 'PAYMENT_LINKAGE_MISMATCH'
+  | 'INCORRECT_READING_LINKAGE'
   | 'OCR_LOW_CONFIDENCE';
+
+export interface AmbiguousDigitNotice {
+  position: number;
+  rawChar: string;
+  proposedDigit: string;
+  alternatives: string[];
+  reason: string;
+}
 
 export interface MeterOCRResult {
   meterId: string;
@@ -26,6 +211,8 @@ export interface MeterOCRResult {
   engineVersion: string;
   extractedAt: string;
   engine: 'tesseract.js';
+  ambiguousDigits?: AmbiguousDigitNotice[];
+  isCropped?: boolean;
 }
 
 export interface MeterReadingRecord {
@@ -84,6 +271,36 @@ export interface MeterReadingSubmission {
   photoDataUrl?: string;
 }
 
+export type BillFindingCategory =
+  | 'TARIFF_SLAB_MISMATCH'
+  | 'FIXED_CHARGE_MISMATCH'
+  | 'FPPPA_MISMATCH'
+  | 'ELECTRICITY_DUTY_MISMATCH'
+  | 'PAYMENT_LINKAGE_MISMATCH'
+  | 'DUPLICATE_BILL'
+  | 'INCORRECT_READING_LINKAGE'
+  | 'INCONSISTENT_INPUTS';
+
+export interface BillValidationFinding {
+  findingId: string;
+  category: BillFindingCategory;
+  severity: 'INFO' | 'REVIEW' | 'HIGH';
+  expectedValue?: string;
+  actualValue: string;
+  explanation: string;
+  relatedBillNo: string;
+  relatedReadingId?: string;
+  suggestedAction: string;
+}
+
+export interface BillLineComparisonItem {
+  lineItem: string;
+  expected: number;
+  recorded: number;
+  difference: number;
+  status: 'MATCH' | 'DISCREPANCY';
+}
+
 export interface BillCheckResult {
   status: 'CLEAR' | 'REVIEW';
   expectedAmount: number;
@@ -91,6 +308,8 @@ export interface BillCheckResult {
   difference: number;
   evidence: string[];
   billNo?: string;
+  findings?: BillValidationFinding[];
+  comparison?: BillLineComparisonItem[];
 }
 
 export interface MeterThresholds {

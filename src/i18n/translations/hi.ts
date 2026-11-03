@@ -3,6 +3,7 @@ import { EMPLOYEE_UI_TRANSLATIONS } from '../employeeContentTranslations';
 import { FIELD_UI_TRANSLATIONS } from '../fieldContentTranslations';
 import { MANAGEMENT_UI_TRANSLATIONS } from '../managementContentTranslations';
 import { ADMIN_UI_TRANSLATIONS } from '../adminContentTranslations';
+import { METER_PHASE11_TRANSLATIONS } from '../meterPhase11Translations';
 
 export const hi: TranslationDictionary = {
   common: {
@@ -1181,5 +1182,6 @@ export const hi: TranslationDictionary = {
   employee: EMPLOYEE_UI_TRANSLATIONS.hi,
   field: FIELD_UI_TRANSLATIONS.hi,
   management: MANAGEMENT_UI_TRANSLATIONS.hi,
-  admin: ADMIN_UI_TRANSLATIONS.hi
+  admin: ADMIN_UI_TRANSLATIONS.hi,
+  meterPhase11: METER_PHASE11_TRANSLATIONS.hi
 };

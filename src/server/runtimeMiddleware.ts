@@ -6,7 +6,7 @@ import { defaultServerDataStore } from './dataStore';
 import { AGENTIC_PERSONAS } from './agenticPersonas';
 import { getRoleToolDeclarations, executeAgenticTool } from './agenticTools';
 import { defaultAiCacheManager } from './aiCache';
-import { handleMeterReadingRoute } from './meterReadingRoutes';
+import { handleMeterReadingRoute, METER_READING_ROUTE_PREFIXES } from './meterReadingRoutes';
 import { detectPromptInjection, redactSensitiveData } from '../utils/securityHardening';
 import { UserRole } from '../types';
 
@@ -666,7 +666,9 @@ export function attachVidyutServerMiddlewares(middlewares: {
   middlewares.use('/api/health', createHealthHandler());
   middlewares.use('/api/auth', createAuthApiHandler());
   middlewares.use('/api/ai-chat', createAiChatHandler());
-  middlewares.use('/api/meter-readings', (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => {
-    void handleMeterReadingRoute(req, res).then(handled => { if (!handled) next(); }).catch(next);
-  });
+  for (const prefix of METER_READING_ROUTE_PREFIXES) {
+    middlewares.use(prefix, (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => {
+      void handleMeterReadingRoute(req, res).then(handled => { if (!handled) next(); }).catch(next);
+    });
+  }
 }

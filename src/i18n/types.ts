@@ -2,6 +2,7 @@ import type { EmployeeUiDictionary } from './employeeContentTranslations';
 import type { FieldUiDictionary } from './fieldContentTranslations';
 import type { ManagementUiDictionary } from './managementContentTranslations';
 import type { AdminUiDictionary } from './adminContentTranslations';
+import type { MeterPhase11Dictionary } from './meterPhase11Translations';
 
 export type LanguageCode = 'en' | 'gu' | 'hi' | 'mr';
 export type Language = LanguageCode;
@@ -1197,6 +1198,7 @@ export interface TranslationDictionary {
   field: FieldUiDictionary;
   management: ManagementUiDictionary;
   admin: AdminUiDictionary;
+  meterPhase11: MeterPhase11Dictionary;
 }
 
 export type TranslationKey = string;

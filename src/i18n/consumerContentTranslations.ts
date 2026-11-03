@@ -14,6 +14,7 @@
  */
 
 import { LanguageCode } from './types';
+import { localizeMeterNotification } from './meterPhase11Translations';
 
 export function localizeTariffCategory(category: string, lang: LanguageCode): string {
   if (lang === 'en' || !category) return category;
@@ -3273,7 +3274,9 @@ export function localizeConsumerNotification(
     };
   }
 
-  const { title, message } = localizeNotificationTitleAndMessage(notif, lang);
+  const { title, message } = notif.id.startsWith('NOT-MR-')
+    ? localizeMeterNotification(notif.title, notif.message, lang)
+    : localizeNotificationTitleAndMessage(notif, lang);
 
   return {
     title,
