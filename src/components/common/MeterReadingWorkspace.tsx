@@ -50,7 +50,6 @@ export const MeterReadingWorkspace: React.FC = () => {
   const requestedPhotoIds = useRef<Set<string>>(new Set());
   const [preview, setPreview] = useState('');
   const [photoPayload, setPhotoPayload] = useState('');
-  const [rotation, setRotation] = useState(0);
   const [ocr, setOcr] = useState<MeterReadingSubmission['ocr']>();
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -170,15 +169,35 @@ export const MeterReadingWorkspace: React.FC = () => {
     setPreview(URL.createObjectURL(next));
     setPhotoPayload('');
     setOcr(undefined);
-    setRotation(0);
     setError('');
+  };
+
+  const rotatePhoto = async () => {
+    if (!file || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      const rotatedBlob = await prepareMeterPhoto(file, 90);
+      const rotatedFile = new File([rotatedBlob], `${file.name.replace(/\.[^.]+$/, '')}-rotated.jpg`, {
+        type: 'image/jpeg',
+        lastModified: Date.now()
+      });
+      setFile(rotatedFile);
+      setPreview(URL.createObjectURL(rotatedFile));
+      setPhotoPayload('');
+      setOcr(undefined);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : text.error);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const runOcr = async () => {
     if (!file) return;
     setBusy(true); setError('');
     try {
-      const prepared = await prepareMeterPhoto(file, rotation);
+      const prepared = await prepareMeterPhoto(file);
       const preparedDataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Photo could not be prepared.')); reader.readAsDataURL(prepared); });
       setPhotoPayload(preparedDataUrl);
       const result = await extractMeterReading(prepared, (value) => setProgress(Math.round(value * 100)));
@@ -202,7 +221,7 @@ export const MeterReadingWorkspace: React.FC = () => {
       closeCamera();
       if (currentRole === 'field' && isFieldEffectivelyOffline(isOfflineSimulated)) {
         let offlinePhoto: Blob | undefined;
-        if (file) offlinePhoto = await prepareMeterPhoto(file, rotation);
+        if (file) offlinePhoto = await prepareMeterPhoto(file);
         await enqueueOfflineMeterReading({
           requestId: selectedConnection.consumerNo, title: `Meter reading · ${selectedConnection.consumerNo}`,
           actorEmail: demoSession?.user.email || activeUser.email || '',
@@ -215,7 +234,7 @@ export const MeterReadingWorkspace: React.FC = () => {
       }
       let submittedPhotoPayload = photoPayload;
       if (file && !submittedPhotoPayload) {
-        const prepared = await prepareMeterPhoto(file, rotation);
+        const prepared = await prepareMeterPhoto(file);
         submittedPhotoPayload = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Photo could not be prepared.')); reader.readAsDataURL(prepared); });
         setPhotoPayload(submittedPhotoPayload);
       }
@@ -291,9 +310,8 @@ export const MeterReadingWorkspace: React.FC = () => {
           </div>
           <div className="space-y-3 rounded-xl border border-dashed border-slate-300 p-3 dark:border-slate-700">
             <p className="text-xs text-slate-600 dark:text-slate-300">{text.photoHelp}</p>
-            <div className="flex flex-wrap gap-2"><button type="button" onClick={() => cameraStream ? closeCamera() : void startCamera()} className="rounded-lg border px-3 py-2 text-xs font-semibold"><Camera className="mr-1 inline" size={15} />{text.takePhoto}</button><label className="cursor-pointer rounded-lg border px-3 py-2 text-xs font-semibold"><Upload className="mr-1 inline" size={15} />{text.gallery}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={event => chooseFile(event.target.files?.[0] || null)} /></label>{file && <button type="button" onClick={() => setRotation(value => (value + 90) % 360)} className="rounded-lg border px-3 py-2 text-xs"><RotateCw className="mr-1 inline" size={14} />{text.rotate}</button>}</div>
-            {cameraStream && <div className="space-y-2"><video ref={cameraVideo} autoPlay playsInline muted className="max-h-80 w-full rounded-lg bg-black object-contain" /><div className="flex gap-2"><button type="button" onClick={captureCameraPhoto} className="rounded-lg bg-cyan-700 px-3 py-2 text-xs font-semibold text-white">{text.capturePhoto}</button><button type="button" onClick={closeCamera} className="rounded-lg border px-3 py-2 text-xs">{text.closeCamera}</button></div></div>}
-            {preview && <img src={preview} alt="Meter photo preview" className="max-h-64 w-full rounded-lg bg-slate-100 object-contain" style={{ transform: `rotate(${rotation}deg)` }} />}
+            <div className="flex flex-wrap gap-2"><button type="button" onClick={() => cameraStream ? closeCamera() : void startCamera()} className="rounded-lg border px-3 py-2 text-xs font-semibold"><Camera className="mr-1 inline" size={15} />{text.takePhoto}</button><label className="cursor-pointer rounded-lg border px-3 py-2 text-xs font-semibold"><Upload className="mr-1 inline" size={15} />{text.gallery}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={event => chooseFile(event.target.files?.[0] || null)} /></label>{file && <button type="button" disabled={busy} onClick={() => void rotatePhoto()} className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50"><RotateCw className="mr-1 inline" size={14} />{text.rotate}</button>}</div>
+            {preview && <img src={preview} alt="Meter photo preview" className="max-h-64 w-full rounded-lg bg-slate-100 object-contain" />}
             {file && <button type="button" disabled={busy} onClick={() => void runOcr()} className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">{busy ? `${text.loading} ${progress}%` : text.runOcr}</button>}
             {ocr && <div className="rounded-lg bg-cyan-50 p-3 text-xs text-cyan-950 dark:bg-cyan-950/40 dark:text-cyan-100"><strong>{text.readingCheck}</strong><p className="mt-1">{ocr.candidateReading || '—'} · {text.confidence}: {ocr.confidence === undefined ? 'not provided' : `${ocr.confidence}%`}</p><p className="mt-1 break-all text-slate-500">{ocr.rawText}</p></div>}
             <p className="text-[11px] text-slate-500">{text.localOcr}</p>
