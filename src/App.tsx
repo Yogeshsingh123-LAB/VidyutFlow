@@ -25,6 +25,9 @@ const ManagementPortal = lazy(() =>
 const AdminPortal = lazy(() =>
   import('./components/admin/AdminPortal').then(m => ({ default: m.AdminPortal }))
 );
+const MeterReadingWorkspace = lazy(() =>
+  import('./components/common/MeterReadingWorkspace').then(m => ({ default: m.MeterReadingWorkspace }))
+);
 
 const PortalRouter: React.FC = () => {
   const { currentRole, demoSession } = useApp();
@@ -99,6 +102,7 @@ const MainExperience: React.FC = () => {
     <ErrorBoundary scope="app">
       <Suspense fallback={<PortalLoadingFallback role={currentRole} />}>
         <AppShell>
+          <MeterReadingWorkspace />
           <PortalRouter />
         </AppShell>
       </Suspense>

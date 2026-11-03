@@ -1,9 +1,9 @@
 ========================================================================
 VIDYUTFLOW OPENAPI HTTP ENDPOINT TEST COVERAGE AUDIT
 ========================================================================
-OpenAPI Paths              : 50
-Total HTTP Operations      : 55
-Operations Tested in Pytest: 55 / 55 (100.0%)
+OpenAPI Paths              : 61
+Total HTTP Operations      : 66
+Operations Tested in Pytest: 66 / 66 (100.0%)
 Untested Operations        : 0
 
 Verified Operations:
@@ -20,6 +20,8 @@ Verified Operations:
   [COVERED] GET    /erp/reconcile
   [COVERED] GET    /erp/sap-odata/ServiceOrders
   [COVERED] GET    /erp/sap-odata/metadata
+  [COVERED] GET    /evidence/kpis/summary
+  [COVERED] GET    /evidence/work-order/{work_order_id}
   [COVERED] GET    /health
   [COVERED] GET    /notifications
   [COVERED] GET    /notifications/alerts/dispatches
@@ -29,6 +31,7 @@ Verified Operations:
   [COVERED] GET    /requests/kpis/executive-analytics
   [COVERED] GET    /requests/kpis/summary
   [COVERED] GET    /requests/{request_id}
+  [COVERED] GET    /requests/{request_id}/document
   [COVERED] GET    /staff/members
   [COVERED] GET    /staff/zones
   [COVERED] GET    /system/demo-load-policy
@@ -42,16 +45,24 @@ Verified Operations:
   [COVERED] PATCH  /workflows/templates/{template_code}
   [COVERED] POST   /assistant/billing-anomaly
   [COVERED] POST   /assistant/chat
+  [COVERED] POST   /auth/forgot-password
   [COVERED] POST   /auth/login
   [COVERED] POST   /auth/logout
+  [COVERED] POST   /auth/mfa/enable
+  [COVERED] POST   /auth/mfa/setup
+  [COVERED] POST   /auth/mfa/verify
   [COVERED] POST   /auth/premises
+  [COVERED] POST   /auth/refresh
   [COVERED] POST   /auth/register
+  [COVERED] POST   /auth/reset-password
   [COVERED] POST   /auth/sso/login
   [COVERED] POST   /erp/gateway/propagate/{request_id}
   [COVERED] POST   /erp/logs/{log_id}/retry
   [COVERED] POST   /erp/reconcile/{request_id}
   [COVERED] POST   /erp/sap-odata/ServiceOrders/inbound-ack
   [COVERED] POST   /erp/sync/{request_id}
+  [COVERED] POST   /evidence
+  [COVERED] POST   /evidence/{evidence_id}/verify
   [COVERED] POST   /notifications/alerts/evaluate
   [COVERED] POST   /notifications/read-all
   [COVERED] POST   /notifications/{notification_id}/read

@@ -8,17 +8,22 @@ VidyutFlow is architected as a **non-invasive orchestration, AI decision-support
 
 ```text
 Consumer / Subdivision Officer / Field JE / Executive / Admin (React 19 + TS · en/gu/hi/mr)
+        │  ├─ Phase 10 Smart Outage Map (Leaflet + offline schematic fallback + citizen GPS redaction)
+        │  └─ Phase 11 Local Tesseract.js WASM OCR (Web Worker) + IndexedDB v3 offline sync queue
         │
-        ├── /api/ai-chat (Node runtime middleware)
-        │     └─ Vidyut Mitra role co-pilots: optional server-side Gemini (3,500ms deadline,
-        │        read-only grounded tools) → automatic deterministic Grounded Engine fallback
+        ├── Node / Vite Runtime Gateway (:3000 dev / :5173 prod — prodServer.ts & runtimeMiddleware.ts)
+        │     ├─ /api/auth/* (HttpOnly SameSite=Lax vidyutflow_sid cookie + scrypt + CSRF)
+        │     ├─ /api/ai-chat (Vidyut Mitra role co-pilots: optional server-side Gemini 3,500ms deadline
+        │     │                + read-only grounded tools → deterministic Grounded Engine fallback)
+        │     └─ /api/meter-readings/* (Phase 11 maker-checker meter review & read-only bill check)
         │
-        └── /api/* & /api/v1/* (Same-origin proxy · HttpOnly SameSite=Lax cookie + verified Bearer)
+        └── /api/* & /api/v1/* (Same-origin proxy · verified Bearer + 15m rotating refresh session)
               ▼
-FastAPI Control Plane & Non-Invasive Enterprise API Gateway (50 Paths / 55 HTTP Operations)
- ├─ Auth, RBAC & Zone Isolation · HKDF-SHA256 + AES-256-GCM field & document vault encryption
+FastAPI Control Plane & Non-Invasive Enterprise API Gateway (61 Paths / 66 HTTP Operations)
+ ├─ Auth, RBAC, Staff TOTP MFA & Zone Isolation · HKDF-SHA256 + AES-256-GCM field & document vault encryption
+ ├─ Phase 13 Verified Field Completion (/v1/evidence/* — client_uuid idempotent, staff-only BOLA, officer review)
  ├─ Fork-proof SHA-256 AuditLog hash chain + ArcSight/Wazuh CEF:0 SIEM export (/v1/system/siem-events)
- ├─ Configurable 7-Workflow Engine: validate → ML triage → calibrated SLA risk → zone auto-assign
+ ├─ Configurable Workflow Engine: validate → ML triage → calibrated SLA risk → zone auto-assign
  ├─ 5 Trained scikit-learn Models (unseen-template synthetic holdout):
  │    1. Category Classifier (0.8824 acc)       2. Severity + Safety Guardrail (100% CRITICAL recall)
  │    3. SLA Breach Risk RF (0.8913 recall)     4. Billing Anomaly IsolationForest (0.9511 acc / 1.00 recall)
@@ -28,7 +33,7 @@ FastAPI Control Plane & Non-Invasive Enterprise API Gateway (50 Paths / 55 HTTP 
  │    ├─ 3-System fan-out mock (simulated) (/v1/erp/gateway/propagate/{id} → mock SAP + e-Urja Billing + 1912 CRM)
  │    └─ Simulated Master Data Reconciliation (/v1/erp/reconcile — in-repo drift check & 1-click sync)
  └─ Edge Offline Sync & Live Hot-Standby DR:
-      ├─ Idempotent Field Sync (POST /v1/requests/field-sync — client_uuid UNIQUE)
+      ├─ Idempotent Field Sync (POST /v1/requests/field-sync & POST /v1/evidence — client_uuid UNIQUE)
       └─ Automated Primary → Hot-Standby Failover Drill (POST /v1/system/dr-failover-drill — <1s RTO, 0 loss)
               ▼
 PostgreSQL 16 Primary + Hot Standby (Docker/Prod) / SQLite Local · Offsite SHA-256 Backup Vault

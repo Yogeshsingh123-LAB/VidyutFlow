@@ -1160,7 +1160,107 @@ export function localizeComplaintResolution(
 }
 
 export function localizeConsumerTimelineStage(stage: string, lang: LanguageCode): string {
-  return localizeComplaintStatus(stage, lang);
+  if (lang === 'en' || !stage) return stage;
+  const normalized = stage.trim().toLowerCase();
+  const map: Record<string, Record<LanguageCode, string>> = {
+    submitted: {
+      en: 'Submitted',
+      gu: 'નોંધાયેલ',
+      hi: 'दर्ज किया गया',
+      mr: 'नोंदवले'
+    },
+    acknowledged: {
+      en: 'Acknowledged',
+      gu: 'સ્વીકારેલ',
+      hi: 'स्वीकृत',
+      mr: 'स्वीकारले'
+    },
+    'under review': {
+      en: 'Under Review',
+      gu: 'સમીક્ષા હેઠળ',
+      hi: 'समीक्षाधीन',
+      mr: 'पुनरावलोकनाधीन'
+    },
+    'in review': {
+      en: 'In Review',
+      gu: 'સમીક્ષા હેઠળ',
+      hi: 'सમીક્ષા હેઠળ',
+      mr: 'पुનરાવલોકનાધીન'
+    },
+    assigned: {
+      en: 'Assigned',
+      gu: 'સોંપાયેલ',
+      hi: 'आवंटित',
+      mr: 'नेमून दिले'
+    },
+    dispatched: {
+      en: 'Dispatched',
+      gu: 'ટીમ રવાના (Dispatched)',
+      hi: 'टीम रवाना (Dispatched)',
+      mr: 'पथक रवाना (Dispatched)'
+    },
+    scheduled: {
+      en: 'Scheduled',
+      gu: 'શેડ્યૂલ કરેલ',
+      hi: 'निर्धारित',
+      mr: 'नियोजित'
+    },
+    'work started': {
+      en: 'Work Started',
+      gu: 'કામ શરૂ થયું',
+      hi: 'कार्य प्रारंभ',
+      mr: 'काम सुरू झाले'
+    },
+    'in progress': {
+      en: 'In Progress',
+      gu: 'કામગીરી ચાલુ',
+      hi: 'प्रगति पर',
+      mr: 'काम सुरू'
+    },
+    'restoration reported': {
+      en: 'Restoration Reported',
+      gu: 'પુનઃસ્થાપન અહેવાલ',
+      hi: 'बहाली दर्ज',
+      mr: 'पुनर्स्थापना नोंदवली'
+    },
+    'under verification': {
+      en: 'Under Verification',
+      gu: 'ચકાસણી હેઠળ',
+      hi: 'सत्यापनाधीन',
+      mr: 'पडताळणी अंतर्गत'
+    },
+    resolved: {
+      en: 'Resolved',
+      gu: 'ઉકેલાયેલ (Resolved)',
+      hi: 'समाधान हो गया (Resolved)',
+      mr: 'निवारण झाले (Resolved)'
+    },
+    closed: {
+      en: 'Closed',
+      gu: 'બંધ (Closed)',
+      hi: 'बंद (Closed)',
+      mr: 'बंद (Closed)'
+    },
+    reopened: {
+      en: 'Reopened',
+      gu: 'ફરી ખોલાયેલ',
+      hi: 'पुनः खोला गया',
+      mr: 'पुन्हा उघडले'
+    },
+    'further action requested': {
+      en: 'Further Action Requested',
+      gu: 'વધુ પગલાં વિનંતી',
+      hi: 'अतिरिक्त कार्रवाई अनुरोध',
+      mr: 'पुढील कारवाईची विनंती'
+    },
+    'feedback received': {
+      en: 'Feedback Received',
+      gu: 'પ્રતિસાદ મળ્યો',
+      hi: 'प्रतिक्रिया प्राप्त',
+      mr: 'अभिप्राय प्राप्त'
+    }
+  };
+  return map[normalized]?.[lang] || localizeComplaintStatus(stage, lang);
 }
 
 export function localizeConsumerTimelineActor(actorLabel: string, lang: LanguageCode): string {
