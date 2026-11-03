@@ -36,6 +36,7 @@ import {
 } from '../../data/mockData';
 import { WorkOrder } from '../../types';
 import { WorkOrderVerificationReviewModal } from './WorkOrderVerificationReviewModal';
+import { EmployeeMeterReviewWorkspace } from './EmployeeMeterReviewWorkspace';
 import {
   getApplicationStatusDisplayMeta,
   canArchiveApplication
@@ -69,7 +70,8 @@ import {
   Check,
   Flame,
   Zap,
-  Activity
+  Activity,
+  Gauge
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -116,7 +118,7 @@ export const EmployeePortal: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [subdivisionFilter, setSubdivisionFilter] = useState<string>('All');
   const [approvalFilter, setApprovalFilter] = useState<string>('All');
-  const [approvalSubView, setApprovalSubView] = useState<'field_verification' | 'recommendations'>('field_verification');
+  const [approvalSubView, setApprovalSubView] = useState<'field_verification' | 'recommendations' | 'meter_anomaly_review'>('field_verification');
   const [reviewingWorkOrder, setReviewingWorkOrder] = useState<WorkOrder | null>(null);
   const [confirmArchiveAppId, setConfirmArchiveAppId] = useState<string | null>(null);
   const [archiveReasonInput, setArchiveReasonInput] = useState<string>('');
@@ -964,9 +966,23 @@ export const EmployeePortal: React.FC = () => {
               <CheckSquare className="w-4 h-4" />
               <span>Sanctions & AI Proposals</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setApprovalSubView('meter_anomaly_review')}
+              className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer transition-colors ${
+                approvalSubView === 'meter_anomaly_review'
+                  ? 'bg-cyan-600 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              <Gauge className="w-4 h-4" />
+              <span>{t.meterPhase11.empTabTitle}</span>
+            </button>
           </div>
 
-          {approvalSubView === 'field_verification' ? (
+          {approvalSubView === 'meter_anomaly_review' ? (
+            <EmployeeMeterReviewWorkspace />
+          ) : approvalSubView === 'field_verification' ? (
             /* Field Completion Verification Panel */
             <div className="space-y-4">
               {(() => {

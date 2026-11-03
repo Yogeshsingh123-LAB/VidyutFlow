@@ -104,12 +104,22 @@ export default defineConfig(() => {
       allowedHosts: true
     },
     build: {
+      minify: true,
       chunkSizeWarningLimit: 500,
       rollupOptions: {
         output: {
           manualChunks(id) {
+            if (id.includes('node_modules/recharts/es6/cartesian') || id.includes('node_modules/recharts/es6/polar')) {
+              return 'vendor-recharts-series';
+            }
             if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) {
               return 'vendor-recharts';
+            }
+            if (id.includes('node_modules/victory-vendor')) {
+              return 'vendor-victory';
+            }
+            if (id.includes('node_modules/leaflet')) {
+              return 'vendor-leaflet';
             }
             if (id.includes('node_modules/lucide-react')) {
               return 'vendor-icons';
@@ -133,8 +143,24 @@ export default defineConfig(() => {
             if (id.includes('managementContentTranslations.ts')) return 'i18n-management';
             if (id.includes('fieldContentTranslations.ts')) return 'i18n-field';
             if (id.includes('adminContentTranslations.ts')) return 'i18n-admin';
+            if (id.includes('meterPhase11Translations.ts')) return 'i18n-meter-phase11';
             if (id.includes('/src/data/')) {
               return 'app-datasets';
+            }
+            if (id.includes('node_modules/tesseract.js')) {
+              return 'vendor-tesseract';
+            }
+            if (id.includes('node_modules/')) {
+              return 'vendor-core';
+            }
+            if (id.includes('meterOcr')) {
+              return 'meter-ocr-engine';
+            }
+            if (id.includes('/src/services/') || id.includes('/src/utils/')) {
+              return 'app-services';
+            }
+            if (id.includes('MeterReadingWorkspace')) {
+              return 'meter-reading-workspace';
             }
           }
         }

@@ -11,6 +11,7 @@ import { subscribeBackendSession } from '../../utils/backendSession';
 import { LiveConsumerRequests } from './LiveConsumerRequests';
 import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 import { policyText, validLoad, formatValidationIssue, requiresDemoReview } from '../../utils/demoLoadPolicy';
+import { ConsumerMeterBillingSection } from './ConsumerMeterBillingSection';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { submissionNoticeFromResponse, submissionNoticeText, type SubmissionNotice } from '../../utils/requestSubmissionStatus';
 import { useApp } from '../../context/AppContext';
@@ -2242,6 +2243,15 @@ export const ConsumerPortal: React.FC = () => {
                 )}
               </div>
             )}
+
+            {/* Phase 11D: Native Meter Reading & Billing Review Section */}
+            <ConsumerMeterBillingSection
+              selectedConnection={selectedConnection}
+              consumerBills={consumerBills}
+              onRequestSelfReading={() => {
+                showToast('Open the top-bar Meter Reading & Bill Review workspace to perform optical scan.', 'info');
+              }}
+            />
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ import { LiveAiGovernancePanel } from '../common/LiveAiGovernancePanel';
 import { LivePredictiveDecisionPanel } from '../common/LivePredictiveDecisionPanel';
 import { LiveExecutiveAnalyticsSection } from './LiveExecutiveAnalyticsSection';
 import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
+import { ManagementMeterIntegritySection } from './ManagementMeterIntegritySection';
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
@@ -598,6 +599,7 @@ export const ManagementPortal: React.FC = () => {
       {activeTab === 'analytics' && (
         <div className="space-y-6">
           <AIEnergyForecasting />
+          <ManagementMeterIntegritySection />
         </div>
       )}
 

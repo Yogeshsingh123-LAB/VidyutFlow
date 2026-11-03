@@ -68,6 +68,7 @@ import {
   X,
 } from 'lucide-react';
 import { WorkOrderEvidenceModal } from './WorkOrderEvidenceModal';
+import { FieldMeterReadingModal } from './FieldMeterReadingModal';
 
 const DEFAULT_TECH_REMARKS_SET = new Set(
   Object.values(FIELD_UI_TRANSLATIONS).map((d) => d.defaultTechnicianRemarks)
@@ -161,6 +162,7 @@ export const FieldPortal: React.FC = () => {
   const [selectedBackendRequestId, setSelectedBackendRequestId] = useState<string>('');
   const [taskOutcome, setTaskOutcome] = useState<FieldSyncTaskStatus>('COMPLETED');
   const [evidenceModalWO, setEvidenceModalWO] = useState<WorkOrder | null>(null);
+  const [meterReadingWorkOrder, setMeterReadingWorkOrder] = useState<WorkOrder | null>(null);
 
   const effectiveOffline = offlineSimulated || !browserOnline;
 
@@ -975,15 +977,26 @@ export const FieldPortal: React.FC = () => {
                       </option>
                     </select>
                     {wo.status !== 'Completed' && (
-                      <button
-                        onClick={() => {
-                          setSelectedWOId(wo.id);
-                          setActiveTab('inspections');
-                        }}
-                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer"
-                      >
-                        {tf.btnPerformInspection}
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setMeterReadingWorkOrder(wo)}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/60 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 border border-cyan-200 dark:border-cyan-800 transition-colors flex items-center gap-1 cursor-pointer"
+                          title={t.meterPhase11.fldModalTitle}
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>{t.meterPhase11.fldLaunchButton}</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedWOId(wo.id);
+                            setActiveTab('inspections');
+                          }}
+                          className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                        >
+                          {tf.btnPerformInspection}
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1084,6 +1097,15 @@ export const FieldPortal: React.FC = () => {
                     )}
                     {wo.status !== 'Completed' ? (
                       <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setMeterReadingWorkOrder(wo)}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/60 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 border border-cyan-200 dark:border-cyan-800 transition-colors flex items-center gap-1 cursor-pointer"
+                          title="Capture OCR Meter Reading"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>Meter Reading</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => setEvidenceModalWO(wo)}
@@ -1985,6 +2007,14 @@ export const FieldPortal: React.FC = () => {
           workOrder={evidenceModalWO}
           isOpen={Boolean(evidenceModalWO)}
           onClose={() => setEvidenceModalWO(null)}
+        />
+      )}
+
+      {meterReadingWorkOrder && (
+        <FieldMeterReadingModal
+          workOrder={meterReadingWorkOrder}
+          isOpen={Boolean(meterReadingWorkOrder)}
+          onClose={() => setMeterReadingWorkOrder(null)}
         />
       )}
     </div>

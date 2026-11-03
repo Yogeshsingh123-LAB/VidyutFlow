@@ -6,6 +6,7 @@ import { LiveWorkflowTemplatesPanel } from './LiveWorkflowTemplatesPanel';
 import { LiveStaffAssignmentPanel } from './LiveStaffAssignmentPanel';
 import { LivePerformanceTelemetryPanel } from './LivePerformanceTelemetryPanel';
 import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
+import { AdminMeterOcrHealthSection } from './AdminMeterOcrHealthSection';
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -192,7 +193,12 @@ export const AdminPortal: React.FC = () => {
       {/* VIEW 1: SYSTEM OVERVIEW & INTEGRATIONS */}
       {(activeTab === 'overview' || activeTab === 'integrations') && (
         <div className="space-y-4 sm:space-y-6">
-          {activeTab === 'integrations' && <LiveErpAdapterPanel />}
+          {activeTab === 'integrations' && (
+            <>
+              <LiveErpAdapterPanel />
+              <AdminMeterOcrHealthSection />
+            </>
+          )}
           {/* Live Workflow KPIs — wired to VidyutFlow FastAPI backend */}
           <LiveWorkflowKpis />
           {/* Bento Health Strip */}
