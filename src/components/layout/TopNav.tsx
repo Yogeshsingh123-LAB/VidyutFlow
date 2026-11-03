@@ -1,25 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { isDevAuthModeSwitchEnabled } from '../../utils/authClient';
 import { ROLE_PROFILES } from '../../data/mockData';
-import { getCanonicalDemoAccountsByRole } from '../../data/demoAuthData';
 import {
   Search,
   Bell,
   Menu,
-  LogOut,
   RotateCcw,
   RefreshCw,
   Home,
   Info,
   HelpCircle,
-  ShieldCheck,
-  Users,
-  Cpu
+  ChevronDown,
+  AlertTriangle
 } from 'lucide-react';
 import { PresentationAboutModal } from '../common/PresentationAboutModal';
 import { LanguageSelector } from '../common/LanguageSelector';
+import { EnterpriseAccountMenu, getAccountMenuLabels } from '../common/EnterpriseAccountMenu';
 
 interface TopNavProps {
   onToggleMobileNav: () => void;
@@ -32,32 +29,26 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
     scopedNotifications,
     setIsNotificationDrawerOpen,
     setIsCommandPaletteOpen,
-    setIsAIAssistantOpen,
     replayIntro,
     exitToWelcomeScreen,
     resetDemoData,
-    logoutDemoSession,
-    switchDemoUserAccount,
-    authMode,
-    setAuthMode,
-    dataMode,
-    setDataMode,
     activeUser,
     unreadIncidentsCount,
     criticalIncidentsCount
   } = useApp();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const accountLabels = getAccountMenuLabels(language);
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
+  const [isConfirmingHelpReset, setIsConfirmingHelpReset] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
 
-  const userMenuRef = useRef<HTMLDivElement>(null);
   const helpMenuRef = useRef<HTMLDivElement>(null);
+  const helpButtonRef = useRef<HTMLButtonElement>(null);
 
   const profile = ROLE_PROFILES[currentRole];
   const unreadNotifications = scopedNotifications.filter(n => !n.read).length;
-  const roleDemoAccounts = getCanonicalDemoAccountsByRole(currentRole);
 
   const roleLabelMap: Record<string, string> = {
     consumer: t.erp.roleConsumer,
@@ -108,7 +99,9 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
       'audit': t.erp.navAuditTrail,
       'integrations': t.erp.navApiIntegrations,
       'infra': t.erp.navInfraDb,
-      'settings': t.erp.navSystemSettings
+      'settings': t.erp.navSystemSettings,
+      'directory': (t.erp as any).navUgvclDirectory || 'UGVCL Directory',
+      'outage-map': (t.erp as any).navOutageMap || 'Live Outage Map'
     };
     if (labelMap[tab]) return labelMap[tab];
     return tab
@@ -118,17 +111,29 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
   };
 
   useEffect(() => {
+    if (!isHelpMenuOpen) {
+      setIsConfirmingHelpReset(false);
+      return;
+    }
     const handleClickOutside = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setIsUserMenuOpen(false);
-      }
       if (helpMenuRef.current && !helpMenuRef.current.contains(e.target as Node)) {
         setIsHelpMenuOpen(false);
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setIsHelpMenuOpen(false);
+        helpButtonRef.current?.focus();
+      }
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isHelpMenuOpen]);
 
   return (
     <header className="h-12 sm:h-16 bg-white border-b border-slate-200 px-3 min-[375px]:px-4 md:px-6 flex items-center justify-between gap-2 sticky top-0 z-30 select-none">
@@ -201,7 +206,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
 
         {/* Non-interactive Role Indicator — Visible on md+ to prevent mobile header crowding */}
         <div
-          className="hidden md:flex h-9 items-center gap-2 px-3 rounded-lg border border-blue-200/80 bg-blue-50/70 text-xs text-slate-800 shadow-2xs select-none"
+          className="hidden lg:flex h-9 items-center gap-2 px-3 rounded-lg border border-blue-200/80 bg-blue-50/70 text-xs text-slate-800 shadow-2xs select-none"
           title={`${t.erp.authenticatedSession}: ${localizedRoleLabel} (${activeUser.name} · ${activeUser.id})`}
           aria-label={`Current Role: ${localizedRoleLabel}`}
         >
@@ -218,6 +223,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
         {/* Compact Help / Information Menu — Visible on sm+ in header, available inside Profile Menu & MobileNav on xs */}
         <div className="relative hidden sm:block" ref={helpMenuRef}>
           <button
+            ref={helpButtonRef}
             type="button"
             onClick={() => {
               setIsHelpMenuOpen(prev => !prev);
@@ -293,20 +299,46 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
 
                 <div className="my-1 border-t border-slate-100" />
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsHelpMenuOpen(false);
-                    resetDemoData();
-                  }}
-                  className="w-full flex items-start gap-2.5 px-3 py-2 text-amber-700 hover:bg-amber-50 rounded-lg text-left transition-colors cursor-pointer"
-                >
-                  <RefreshCw className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                  <div>
-                    <div className="font-semibold">{t.erp.resetDemoData}</div>
-                    <div className="text-[11px] text-amber-600">{t.erp.resetDemoDataSub}</div>
+                {!isConfirmingHelpReset ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmingHelpReset(true)}
+                    className="w-full flex items-start gap-2.5 px-3 py-2 text-amber-700 hover:bg-amber-50 rounded-lg text-left transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="font-semibold">{t.erp.resetDemoData}</div>
+                      <div className="text-[11px] text-amber-600">{t.erp.resetDemoDataSub}</div>
+                    </div>
+                  </button>
+                ) : (
+                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 space-y-2">
+                    <div className="flex items-start gap-2 text-[11px] text-amber-900 font-medium leading-snug">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <span>{accountLabels.resetConfirmPrompt}</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsConfirmingHelpReset(false)}
+                        className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
+                      >
+                        {accountLabels.resetCancelAction}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsConfirmingHelpReset(false);
+                          setIsHelpMenuOpen(false);
+                          resetDemoData();
+                        }}
+                        className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-amber-600 text-white hover:bg-amber-700 transition-colors cursor-pointer"
+                      >
+                        {accountLabels.resetConfirmAction}
+                      </button>
+                    </div>
                   </div>
-                </button>
+                )}
               </div>
             </div>
           )}
@@ -340,237 +372,16 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
           ) : null}
         </button>
 
-        {/* User Profile Avatar & Dropdown */}
-        <div className="relative shrink-0" ref={userMenuRef}>
-          <button
-            type="button"
-            onClick={() => {
-              setIsUserMenuOpen(prev => !prev);
-              setIsHelpMenuOpen(false);
-            }}
-            className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
-            title={`Active Session: ${activeUser.name} (${activeUser.id} · ${activeUser.initials})`}
-            aria-label="User Profile Menu"
-            aria-expanded={isUserMenuOpen}
-            aria-haspopup="true"
-          >
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
-              {activeUser.initials}
-            </div>
-          </button>
-
-          {isUserMenuOpen && (
-            <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] bg-white rounded-xl border border-slate-200 shadow-xl py-2 z-50 animate-in fade-in">
-              <div className="px-4 py-3 border-b border-slate-100">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 font-mono">
-                    {activeUser.isCustomUser ? t.erp.registeredAccount : t.erp.authenticatedSession}
-                  </span>
-                  <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-mono">
-                    {currentRole} · {activeUser.id}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-xs shrink-0">
-                    {activeUser.initials}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold text-slate-900 break-words">
-                      {activeUser.name}
-                    </div>
-                    <div className="text-[11px] text-slate-500 font-mono truncate">
-                      {activeUser.email}
-                    </div>
-                  </div>
-                </div>
-                <div className="text-[10px] text-blue-600 mt-2 font-medium flex items-start gap-1 leading-snug">
-                  <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
-                  <span className="break-words">
-                    {activeUser.designation}
-                    {activeUser.subdivision ? ` · ${activeUser.subdivision}` : ''}
-                  </span>
-                </div>
-              </div>
-
-              {/* Explicit DEMO Account Switcher within the current role */}
-              {dataMode === 'DEMO' && roleDemoAccounts.length > 1 && (
-                <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/70 space-y-1.5">
-                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    <span className="flex items-center gap-1">
-                      <Users className="w-3 h-3 text-blue-600" />
-                      <span>
-                        {currentRole === 'field'
-                          ? (t.erp.switchDemoEngineer || 'Switch Demo Engineer')
-                          : (t.erp.switchDemoAccount || 'Switch Demo Account')}
-                      </span>
-                    </span>
-                    <span className="font-mono text-[9px] text-blue-600">{t.erp.simulated}</span>
-                  </div>
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
-                    {roleDemoAccounts.map(acc => {
-                      const isCurrentAcc = acc.id === activeUser.id;
-                      return (
-                        <button
-                          key={acc.id}
-                          type="button"
-                          onClick={() => {
-                            setIsUserMenuOpen(false);
-                            if (!isCurrentAcc) {
-                              switchDemoUserAccount(acc.id);
-                            }
-                          }}
-                          className={`w-full px-2.5 py-1.5 rounded-lg text-left text-[11px] flex items-center justify-between gap-2 transition-colors cursor-pointer ${
-                            isCurrentAcc
-                              ? 'bg-blue-600 text-white font-semibold'
-                              : 'bg-white hover:bg-blue-50 text-slate-700 border border-slate-200/80'
-                          }`}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate font-semibold">{acc.name}</div>
-                            <div
-                              className={`text-[10px] truncate ${
-                                isCurrentAcc ? 'text-blue-100' : 'text-slate-500'
-                              }`}
-                            >
-                              {acc.id} · {acc.subdivision}
-                            </div>
-                          </div>
-                          {isCurrentAcc && (
-                            <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-blue-700 text-white shrink-0">
-                              {t.erp.active}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className="p-1.5 space-y-0.5 text-xs">
-                {/* Mobile-accessible tools moved out of the <640px header */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    setIsCommandPaletteOpen(true);
-                  }}
-                  className="sm:hidden w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 hover:bg-slate-100 rounded-lg text-left cursor-pointer"
-                >
-                  <Search className="w-4 h-4 text-blue-600 shrink-0" />
-                  <span>{t.erp.searchRecordsShort}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    setIsAIAssistantOpen(true);
-                  }}
-                  className="sm:hidden w-full flex items-center gap-2.5 px-3 py-2 text-teal-700 hover:bg-teal-50 rounded-lg text-left font-medium cursor-pointer"
-                >
-                  <Cpu className="w-4 h-4 text-teal-600 shrink-0" />
-                  <span>{t.erp.vidyutMitraAi}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsUserMenuOpen(false);
-                    setIsAboutModalOpen(true);
-                  }}
-                  className="sm:hidden w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 hover:bg-slate-100 rounded-lg text-left cursor-pointer"
-                >
-                  <Info className="w-4 h-4 text-blue-600 shrink-0" />
-                  <span>{t.erp.platformBriefAndInfo}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    exitToWelcomeScreen();
-                    setIsUserMenuOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-slate-700 hover:bg-slate-100 rounded-lg text-left cursor-pointer"
-                >
-                  <Home className="w-4 h-4 text-blue-500 shrink-0" />
-                  <span>{t.erp.welcomePortalHomepage}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    resetDemoData();
-                    setIsUserMenuOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-amber-700 hover:bg-amber-50 rounded-lg text-left font-medium cursor-pointer"
-                >
-                  <RefreshCw className="w-4 h-4 text-amber-500 shrink-0" />
-                  <span>{t.erp.resetDemoRecords}</span>
-                </button>
-
-                {/* Secure Sign Out - Required to switch role or account */}
-                <div className="pt-1 mt-1 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsUserMenuOpen(false);
-                      logoutDemoSession();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-lg text-left font-semibold cursor-pointer"
-                  >
-                    <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
-                    <span>{t.erp.signOutSwitchRole}</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="pt-2 px-3 border-t border-slate-100 space-y-1.5">
-                {isDevAuthModeSwitchEnabled() && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="font-mono uppercase text-slate-400">Dev Auth Mode:</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsUserMenuOpen(false);
-                          setAuthMode(authMode === 'server' ? 'demo' : 'server');
-                        }}
-                        className={`font-semibold px-2 py-0.5 rounded border cursor-pointer ${
-                          authMode === 'server'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}
-                      >
-                        {authMode === 'server' ? 'Server (/api/auth)' : 'Client Demo'}
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="font-mono uppercase text-slate-400">ERP Data Mode:</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsUserMenuOpen(false);
-                          setDataMode(dataMode === 'DEMO' ? 'LIVE' : 'DEMO');
-                        }}
-                        className={`font-semibold px-2 py-0.5 rounded border cursor-pointer ${
-                          dataMode === 'LIVE'
-                            ? 'bg-purple-50 text-purple-700 border-purple-200'
-                            : 'bg-blue-50 text-blue-700 border-blue-200'
-                        }`}
-                      >
-                        {dataMode === 'LIVE' ? 'LIVE (/api/v1 DB)' : 'DEMO (Simulated)'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-                <div className="py-0.5 text-[10px] text-slate-400 text-center leading-tight">
-                  VidyutFlow · Independent UGVCL-Inspired ERP Prototype
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Enterprise Account & Session Menu */}
+        <EnterpriseAccountMenu
+          isOpen={isUserMenuOpen}
+          onToggle={() => {
+            setIsUserMenuOpen(prev => !prev);
+            setIsHelpMenuOpen(false);
+          }}
+          onClose={() => setIsUserMenuOpen(false)}
+          onOpenAboutModal={() => setIsAboutModalOpen(true)}
+        />
       </div>
     </header>
   );

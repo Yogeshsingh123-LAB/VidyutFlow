@@ -1,27 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { UGVCL_LOGO_PATH, FEEDER_METRICS } from '../../data/mockData';
 import { WorkOrder, FeederHealth } from '../../types';
+import { WORK_ORDER_TRANSITIONS } from '../../services/erpAdapter';
 import { fetchLiveRequests, useLivePoll } from '../../utils/liveData';
-import { subscribeBackendSession } from '../../utils/backendSession';
-import { getServiceWorkerState } from '../../utils/serviceWorkerRegistration';
+import { ExportMenu } from '../common/ExportMenu';
+import { OfficialDocumentModal } from '../common/OfficialDocumentModal';
 import {
-  FieldSyncTaskStatus,
-  OfflineFieldQueueItem,
-  dismissFieldQueueConflict,
-  enqueueFieldInspection,
-  flushOfflineFieldQueue,
-  getManualOfflineOverride,
-  getVisibleFieldQueue,
-  hydrateFieldQueueFromIndexedDb,
-  isBrowserOnline,
-  requeueSameUuidForIdempotencyCheck,
-  resolveConflictWithUpdatedOutcome,
-  setManualOfflineOverride,
-  subscribeFieldQueue,
-} from '../../utils/offlineFieldSync';
+  GeneratedOfficialDocument,
+  getDocumentUiTranslations,
+  generateInspectionSummaryDocument,
+} from '../../utils/documentEngine';
 import {
   FIELD_UI_TRANSLATIONS,
   localizeFeederName,
@@ -29,7 +20,23 @@ import {
   localizeTerminalCondition,
   localizeSealStatus,
   localizeFieldTechnicianRemarks,
+  localizeOfflineQueueFailureReason,
+  resolveOfflineQueueSafeAction,
 } from '../../i18n/fieldContentTranslations';
+import { formatErpDateTime } from '../../utils/dateUtils';
+import {
+  resolveFieldConnectivityStatus,
+  FieldConnectivityStatus,
+} from '../../utils/fieldOfflineQueue';
+import {
+  getAnalyticsTransparencyDictionary,
+  resolveAnalyticsDataSourceClassification
+} from '../../utils/analyticsTransparency';
+import {
+  selectWorkOrderAndFieldMetrics,
+  selectOfflineQueueCanonicalMetrics,
+  getCanonicalAnalyticsTranslations
+} from '../../utils/canonicalAnalytics';
 import {
   localizeSubdivision,
   localizeConsumerAddress,
@@ -85,10 +92,43 @@ export const FieldPortal: React.FC = () => {
     showToast,
     openCaseDrawer,
     activeUser,
+    incidents,
+    fieldEngineers,
     roleIncidents,
     acknowledgeIncident,
     openIncidentModal,
+    isOfflineSimulated,
+    setIsOfflineSimulated,
+    isBrowserOffline,
+    isFieldOfflineActive,
+    isFieldSyncing,
+    fieldOfflineQueue,
+    syncFieldOfflineQueue,
+    refreshFieldOfflineQueueFromStorage,
+    dataMode,
+    backendStatus,
   } = useApp();
+
+  const { language: currentLang } = useLanguage();
+  const docUi = getDocumentUiTranslations(currentLang);
+  const at = getAnalyticsTransparencyDictionary(currentLang);
+  const liveRequests = useLivePoll(fetchLiveRequests);
+  const [fieldOfficialDoc, setFieldOfficialDoc] = useState<GeneratedOfficialDocument | null>(null);
+
+  const fieldDocumentActor = {
+    id: activeUser.name || 'FLD-UG-201',
+    name: activeUser.name,
+    role: 'field' as const,
+    email: activeUser.email,
+    subdivision: activeUser.subdivision,
+  };
+  const fieldFeederSource = resolveAnalyticsDataSourceClassification({
+    dataMode,
+    backendStatusState: backendStatus.state,
+    isBrowserOffline,
+    isOfflineSimulated,
+    language: currentLang
+  });
 
   const feeders: FeederHealth[] = FEEDER_METRICS;
   const criticalIncidents = roleIncidents;
@@ -131,11 +171,13 @@ export const FieldPortal: React.FC = () => {
 
   const { language, t } = useLanguage();
   const tf = t.field;
+  const caTranslations = getCanonicalAnalyticsTranslations(language);
 
-  // Critical incidents specifically assigned to this Field Engineer
+  // Critical incidents specifically assigned to this Field Engineer (excluding RESOLVED and CLOSED)
   const assignedIncidents = criticalIncidents.filter(
     (inc) =>
       inc.status !== 'RESOLVED' &&
+      inc.status !== 'CLOSED' &&
       (inc.assignedToUserId === activeUser.id ||
         inc.assignedEngineerName === activeUser.name ||
         (!inc.assignedToUserId &&
@@ -143,24 +185,66 @@ export const FieldPortal: React.FC = () => {
             (inc as unknown as { targetRoles?: string[] }).targetRoles?.includes('field'))))
   );
 
-  const [offlineSimulated, setOfflineSimulated] = useState<boolean>(() => getManualOfflineOverride());
-  const [browserOnline, setBrowserOnline] = useState<boolean>(() => isBrowserOnline());
-  const [isSyncingQueue, setIsSyncingQueue] = useState(false);
-  const [queueItems, setQueueItems] = useState<OfflineFieldQueueItem[]>(() =>
-    getVisibleFieldQueue(activeUser.email || '')
+  const fieldCanonicalMetrics = React.useMemo(
+    () =>
+      selectWorkOrderAndFieldMetrics({
+        workOrders,
+        fieldEngineers,
+        incidents,
+        engineerId: activeUser.id,
+        engineerName: activeUser.name
+      }),
+    [workOrders, fieldEngineers, incidents, activeUser.id, activeUser.name]
   );
-  const liveRequests = useLivePoll(fetchLiveRequests);
-  const liveAssignedRequests = (liveRequests.data || []).filter(
-    (r) => r.status !== 'COMPLETED' && r.status !== 'REJECTED'
+
+  const offlineQueueCanonicalMetrics = React.useMemo(
+    () => selectOfflineQueueCanonicalMetrics(fieldOfflineQueue, isFieldSyncing),
+    [fieldOfflineQueue, isFieldSyncing]
   );
+
+  const offlineSimulated = isFieldOfflineActive;
+  const [recentlySynced, setRecentlySynced] = useState(false);
+  const recentlySyncedTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevSyncingRef = React.useRef(isFieldSyncing);
+
+  useEffect(() => {
+    if (prevSyncingRef.current && !isFieldSyncing) {
+      setRecentlySynced(true);
+      if (recentlySyncedTimeoutRef.current) clearTimeout(recentlySyncedTimeoutRef.current);
+      recentlySyncedTimeoutRef.current = setTimeout(() => {
+        setRecentlySynced(false);
+      }, 4000);
+    }
+    prevSyncingRef.current = isFieldSyncing;
+  }, [isFieldSyncing]);
+
+  const connectivityStatus: FieldConnectivityStatus = resolveFieldConnectivityStatus({
+    isBrowserOffline,
+    isOfflineSimulated,
+    isSyncing: isFieldSyncing,
+    queue: fieldOfflineQueue,
+    recentlySynced,
+    prioritizeNetworkHealth: true,
+  });
+
+  // Load saved offline queue items when Field Engineer Portal initializes
+  useEffect(() => {
+    refreshFieldOfflineQueueFromStorage();
+  }, []);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      syncFieldOfflineQueue({ restoreOnline: true });
+    };
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [syncFieldOfflineQueue]);
 
   const [selectedWOId, setSelectedWOId] = useState<string>(
     workOrders.find((w) => w.status !== 'Completed')?.id || workOrders[0]?.id || 'WO-4401'
   );
-  const [selectedBackendRequestId, setSelectedBackendRequestId] = useState<string>('');
-  const [taskOutcome, setTaskOutcome] = useState<FieldSyncTaskStatus>('COMPLETED');
-
-  const effectiveOffline = offlineSimulated || !browserOnline;
 
   // Inspection Form State
   const [meterSerial, setMeterSerial] = useState('UGVCL-SM-2026-99412');
@@ -171,7 +255,7 @@ export const FieldPortal: React.FC = () => {
   const [voltageY, setVoltageY] = useState('232');
   const [voltageB, setVoltageB] = useState('235');
   const [technicianRemarks, setTechnicianRemarks] = useState(tf.defaultTechnicianRemarks);
-  const [gpsLocation, setGpsLocation] = useState('23.5880° N, 72.3693° E (Mehsana North)');
+  const [gpsLocation] = useState('23.5880° N, 72.3693° E (Mehsana North)');
 
   // Emergency Hazard Reporting Modal
   const [showHazardModal, setShowHazardModal] = useState(false);
@@ -204,200 +288,139 @@ export const FieldPortal: React.FC = () => {
     );
   };
 
-  const applyQueuedDemoWorkOrder = useCallback(
-    (item: OfflineFieldQueueItem) => {
-      if (item.target_kind !== 'demo_workorder') return;
-      const details = item.inspection_details;
-      submitSiteInspection(item.request_id, {
-        meterSerial: item.meter_serial,
-        readingKwh: details?.readingKwh ?? 0,
-        sealIntact: details?.sealIntact ?? true,
-        terminalCondition: details?.terminalCondition ?? 'Normal',
-        voltageR: details?.voltageR ?? 230,
-        voltageY: details?.voltageY ?? 230,
-        voltageB: details?.voltageB ?? 230,
-        gpsLocation: details?.gpsLocation ?? gpsLocation,
-        photoAttached: details?.photoAttached ?? true,
-        technicianRemarks: item.notes,
-        submittedBy: details?.submittedBy ?? `${activeUser.name} (${activeUser.id})`,
-      });
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeUser.id, activeUser.name, gpsLocation]
-  );
-
-  const runQueueFlush = useCallback(
-    async (manualOfflineFlag: boolean, showFeedback: boolean) => {
-      setIsSyncingQueue(true);
-      try {
-        const summary = await flushOfflineFieldQueue({
-          actorEmail: activeUser.email || '',
-          manualOffline: manualOfflineFlag,
-          onApplyDemoWorkOrder: applyQueuedDemoWorkOrder,
-        });
-        if (!summary.skippedOffline && (summary.syncedCount > 0 || summary.duplicateCount > 0)) {
-          liveRequests.refresh();
-        }
-        if (showFeedback) {
-          if (summary.conflictCount > 0) {
-            showToast(
-              `Sync completed with ${summary.conflictCount} server conflict(s) requiring review.`,
-              'warning'
-            );
-          } else if (summary.duplicateCount > 0 && summary.syncedCount === 0) {
-            showToast(
-              `UUID de-duplication verified: ${summary.duplicateCount} duplicate update(s) ignored safely.`,
-              'info'
-            );
-          } else if (summary.syncedCount > 0 || summary.duplicateCount > 0) {
-            showToast(
-              `Simulated Online Mode restored — local queue synchronized`,
-              'success'
-            );
-          } else if (!summary.skippedOffline) {
-            showToast(
-              `Simulated Online Mode restored — local queue synchronized`,
-              'success'
-            );
-          }
-        }
-        return summary;
-      } finally {
-        setIsSyncingQueue(false);
-      }
-    },
-    [activeUser.email, applyQueuedDemoWorkOrder, liveRequests, showToast]
-  );
-
-  // Hydrate persistent IndexedDB/localStorage queue & subscribe to queue/session updates
-  useEffect(() => {
-    const syncLocalView = () => {
-      setQueueItems(getVisibleFieldQueue(activeUser.email || ''));
-    };
-    syncLocalView();
-    void hydrateFieldQueueFromIndexedDb().then(() => syncLocalView());
-    const unsubQueue = subscribeFieldQueue(syncLocalView);
-    const unsubSession = subscribeBackendSession(() => {
-      syncLocalView();
-      if (!getManualOfflineOverride() && isBrowserOnline()) {
-        void runQueueFlush(false, false);
-      }
-    });
-    return () => {
-      unsubQueue();
-      unsubSession();
-    };
-  }, [activeUser.email, runQueueFlush]);
-
-  // Listen to browser online/offline transitions for automatic reconnect replay
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handleOnline = () => {
-      setBrowserOnline(true);
-      if (!getManualOfflineOverride()) {
-        void runQueueFlush(false, true);
-      }
-    };
-    const handleOffline = () => {
-      setBrowserOnline(false);
-    };
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [runQueueFlush]);
-
   const toggleOfflineMode = () => {
-    const next = !offlineSimulated;
-    setOfflineSimulated(next);
-    setManualOfflineOverride(next);
-    if (next) {
-      showToast(
-        'Simulated Offline Mode enabled — inspections will queue locally',
-        'warning'
-      );
-    } else {
-      void runQueueFlush(false, true);
-    }
+    const next = !isOfflineSimulated;
+    setIsOfflineSimulated(next);
+    showToast(
+      next
+        ? 'Simulated Offline Mode enabled (DEMO) — inspections and status updates will queue locally.'
+        : 'Online mode restored. Pending offline actions will automatically replay into local ERP state.',
+      next ? 'warning' : 'info'
+    );
   };
 
-  const handleInspectionSubmit = async (e: React.FormEvent) => {
+  const handleSimulateSyncNow = (targetClientUuid?: string) => {
+    if (isFieldSyncing) return;
+    syncFieldOfflineQueue({ restoreOnline: true, targetClientUuid });
+  };
+
+  const handleInspectionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const canonicalRemarks = DEFAULT_TECH_REMARKS_SET.has(technicianRemarks)
       ? FIELD_UI_TRANSLATIONS.en.defaultTechnicianRemarks
       : technicianRemarks;
-
-    const liveTarget = selectedBackendRequestId
-      ? (liveRequests.data || []).find((r) => r.id === selectedBackendRequestId)
-      : undefined;
-
-    const queued = enqueueFieldInspection({
-      target_kind: liveTarget ? 'backend_request' : 'demo_workorder',
-      request_id: liveTarget ? liveTarget.id : selectedWOId,
-      title: liveTarget
-        ? `${liveTarget.applicant_name} (${liveTarget.zone} · ${liveTarget.requested_load_kw} kW)`
-        : selectedWO
-          ? `${selectedWO.id} — ${selectedWO.title}`
-          : selectedWOId,
-      task_status: taskOutcome,
-      notes: canonicalRemarks,
-      meter_serial: meterSerial,
-      actor_email: activeUser.email || '',
-      inspection_details: {
-        readingKwh: Number(readingKwh) || 0,
-        sealIntact,
-        terminalCondition,
-        voltageR: Number(voltageR) || 230,
-        voltageY: Number(voltageY) || 230,
-        voltageB: Number(voltageB) || 230,
-        gpsLocation,
-        photoAttached: true,
-        submittedBy: `${activeUser.name} (${activeUser.id})`,
-      },
+    const wasOffline = isFieldOfflineActive;
+    submitSiteInspection(selectedWOId, {
+      meterSerial,
+      readingKwh: Number(readingKwh) || 0,
+      sealIntact,
+      terminalCondition,
+      voltageR: Number(voltageR) || 230,
+      voltageY: Number(voltageY) || 230,
+      voltageB: Number(voltageB) || 230,
+      gpsLocation,
+      photoAttached: true,
+      technicianRemarks: canonicalRemarks,
+      submittedBy: `${activeUser.name} (${activeUser.id})`,
     });
-
-    if (effectiveOffline) {
-      showToast(
-        `Queued offline (UUID ${queued.client_uuid.slice(0, 8)}) — will auto-sync on reconnect`,
-        'warning'
-      );
+    if (wasOffline) {
       setActiveTab('offline');
-      return;
-    }
-
-    const summary = await runQueueFlush(false, false);
-    if (summary.conflictCount > 0) {
+    } else {
       showToast(
-        `Sync conflict on ${queued.request_id.slice(0, 8)} — review server status in Offline Queue`,
-        'warning'
+        `Inspection report submitted for ${selectedWOId} — Status updated to Completed`,
+        'success'
       );
-      setActiveTab('offline');
-      return;
+      setActiveTab('workorders');
     }
-
-    showToast(
-      liveTarget
-        ? `Synced ${taskOutcome} for ${liveTarget.applicant_name} (UUID ${queued.client_uuid.slice(0, 8)})`
-        : `Inspection report submitted for ${selectedWOId} — Status updated to Completed`,
-      'success'
-    );
-    setActiveTab(liveTarget ? 'offline' : 'workorders');
   };
 
-  const pendingQueueCount = queueItems.filter((i) => i.sync_state === 'PENDING' || i.sync_state === 'SYNCING').length;
-  const conflictItems = queueItems.filter((i) => i.sync_state === 'CONFLICT');
-
+  const pendingOfflineCount = offlineQueueCanonicalMetrics.pendingCount;
+  const processingOfflineCount = offlineQueueCanonicalMetrics.processingCount;
+  const failedOfflineCount = offlineQueueCanonicalMetrics.failedCount;
+  const conflictCount = offlineQueueCanonicalMetrics.conflictCount;
+  const completedOfflineCount = offlineQueueCanonicalMetrics.completedCount;
   const pendingWorkOrders = workOrders.filter((w) => w.status !== 'Completed');
   const completedWorkOrders = workOrders.filter((w) => w.status === 'Completed');
 
   const selectedWO = workOrders.find((w) => w.id === selectedWOId);
 
+  const getStatusBadgeConfig = (status: FieldConnectivityStatus) => {
+    switch (status) {
+      case 'SYNCING':
+        return {
+          label: tf.statusSyncingLabel,
+          icon: <RefreshCw className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 animate-spin shrink-0" aria-hidden="true" />,
+          bg: 'bg-blue-50 dark:bg-blue-950/60',
+          text: 'text-blue-800 dark:text-blue-200',
+          border: 'border-blue-300 dark:border-blue-700',
+        };
+      case 'OFFLINE':
+        return {
+          label: tf.statusRealOfflineLabel,
+          icon: <WifiOff className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" aria-hidden="true" />,
+          bg: 'bg-amber-100 dark:bg-amber-950/80',
+          text: 'text-amber-900 dark:text-amber-200 font-bold',
+          border: 'border-amber-400 dark:border-amber-700',
+        };
+      case 'SIMULATED_OFFLINE':
+        return {
+          label: tf.statusSimOfflineLabel,
+          demoBadge: tf.badgeDemoIndicator,
+          icon: <Sliders className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" aria-hidden="true" />,
+          bg: 'bg-amber-50 dark:bg-amber-950/60',
+          text: 'text-amber-900 dark:text-amber-200 font-semibold',
+          border: 'border-amber-300 dark:border-amber-700',
+        };
+      case 'PENDING_SYNC':
+        return {
+          label: `${tf.statusPendingSyncLabel} (${pendingOfflineCount})`,
+          icon: <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />,
+          bg: 'bg-amber-50 dark:bg-amber-950/60',
+          text: 'text-amber-800 dark:text-amber-200 font-semibold',
+          border: 'border-amber-300 dark:border-amber-700',
+        };
+      case 'SYNCHRONIZED_DEMO':
+        return {
+          label: tf.statusSyncedDemoLabel,
+          icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" aria-hidden="true" />,
+          bg: 'bg-emerald-50 dark:bg-emerald-950/60',
+          text: 'text-emerald-800 dark:text-emerald-200 font-semibold',
+          border: 'border-emerald-300 dark:border-emerald-700',
+        };
+      case 'CONFLICT_DETECTED':
+        return {
+          label: `${tf.statusConflictDetectedLabel} (${conflictCount})`,
+          icon: <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" aria-hidden="true" />,
+          bg: 'bg-rose-50 dark:bg-rose-950/60',
+          text: 'text-rose-800 dark:text-rose-200 font-semibold',
+          border: 'border-rose-300 dark:border-rose-700',
+        };
+      case 'SYNC_FAILED':
+        return {
+          label: `${tf.statusSyncFailedLabel} (${failedOfflineCount})`,
+          icon: <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" aria-hidden="true" />,
+          bg: 'bg-rose-50 dark:bg-rose-950/60',
+          text: 'text-rose-800 dark:text-rose-200 font-semibold',
+          border: 'border-rose-300 dark:border-rose-700',
+        };
+      case 'ONLINE':
+      default:
+        return {
+          label: tf.statusOnlineLabel,
+          icon: <Wifi className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" aria-hidden="true" />,
+          bg: 'bg-emerald-50 dark:bg-emerald-950/60',
+          text: 'text-emerald-800 dark:text-emerald-200 font-semibold',
+          border: 'border-emerald-300 dark:border-emerald-700',
+        };
+    }
+  };
+
+  const statusBadge = getStatusBadgeConfig(connectivityStatus);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Field Engineer Top Status Bar */}
-      <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t-4 border-t-emerald-600">
+      <div className="bg-white dark:bg-[#111827] rounded-xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-t-4 border-t-emerald-600">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3.5 min-w-0">
           <div className="w-11 h-11 rounded-lg bg-white p-1.5 border border-slate-200 shadow-xs shrink-0 flex items-center justify-center">
             <img
@@ -433,109 +456,186 @@ export const FieldPortal: React.FC = () => {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2.5 flex-wrap">
+
+        {/* Connectivity Status & Actions Cluster */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Status Badge */}
+          <div
+            data-testid="field-connectivity-indicator"
+            role="status"
+            aria-live="polite"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold ${statusBadge.bg} ${statusBadge.text} ${statusBadge.border}`}
+          >
+            {statusBadge.icon}
+            <span>{statusBadge.label}</span>
+            {statusBadge.demoBadge && (
+              <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-200 dark:bg-amber-800/80 text-amber-950 dark:text-amber-100">
+                {statusBadge.demoBadge}
+              </span>
+            )}
+          </div>
+
+          {/* Quick Review Conflict Action near indicator */}
+          {(conflictCount > 0 || failedOfflineCount > 0) && (
+            <button
+              type="button"
+              data-testid="review-conflict-btn"
+              onClick={() => setActiveTab('offline')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 shadow-2xs transition-colors cursor-pointer"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" aria-hidden="true" />
+              <span>{tf.btnReviewConflict} ({conflictCount || failedOfflineCount})</span>
+            </button>
+          )}
+
+          {/* Emergency Hazard Button */}
           <button
             type="button"
             onClick={() => setShowHazardModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-all cursor-pointer"
           >
             <Flame className="w-3.5 h-3.5" aria-hidden="true" />
             {tf.btnReportHazard}
           </button>
 
+          {/* Simulated Offline Toggle (DEMO Testing Tool) */}
           <button
             type="button"
             onClick={toggleOfflineMode}
-            aria-label={effectiveOffline ? tf.ariaDisableOffline : tf.ariaEnableOffline}
-            aria-pressed={effectiveOffline}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-              effectiveOffline
-                ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300'
-                : 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+            aria-label={isOfflineSimulated ? tf.ariaDisableOffline : tf.ariaEnableOffline}
+            aria-pressed={isOfflineSimulated}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+              isOfflineSimulated
+                ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-400 dark:border-amber-700 text-amber-900 dark:text-amber-200'
+                : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
-            {effectiveOffline ? (
-              <>
-                <WifiOff className="w-3.5 h-3.5 text-amber-600" aria-hidden="true" />
-                {tf.badgeOfflineModeActive}
-                {pendingQueueCount > 0 && (
-                  <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-amber-600 text-white text-[10px] font-bold">
-                    {pendingQueueCount}
-                  </span>
-                )}
-              </>
-            ) : (
-              <>
-                <Wifi className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" />
-                {tf.btnOnlineAmr}
-                {pendingQueueCount > 0 && (
-                  <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-bold">
-                    {pendingQueueCount}
-                  </span>
-                )}
-              </>
-            )}
+            <Sliders className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>{isOfflineSimulated ? tf.btnToggleSimOfflineDisable : tf.btnToggleSimOfflineEnable}</span>
+          </button>
+
+          {/* Manual Sync Button (Accessible Fallback) */}
+          <button
+            type="button"
+            disabled={isFieldSyncing || isBrowserOffline || isOfflineSimulated || (pendingOfflineCount === 0 && failedOfflineCount === 0)}
+            onClick={() => handleSimulateSyncNow()}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold cursor-pointer shadow-xs transition-all"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isFieldSyncing ? 'animate-spin' : ''}`} aria-hidden="true" />
+            <span>{tf.btnManualSyncNow}</span>
           </button>
         </div>
       </div>
 
-      {/* Offline Queue Indicator Banner */}
-      {effectiveOffline && (
+      {/* Dynamic Connectivity & Queue Notification Strip (Refined & Compact) */}
+      {connectivityStatus === 'OFFLINE' && (
         <div
           role="status"
           aria-live="polite"
-          className="bg-amber-950 border border-amber-700/80 text-white px-4 py-3 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md"
+          data-testid="real-offline-banner"
+          className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 px-4 py-2.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
-              <WifiOff className="w-4 h-4 text-amber-400" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-amber-300">
-                {tf.offlineBufferActivePrefix}{' '}
-                <span className="font-normal text-amber-100/90 normal-case">
-                  {tf.offlineBufferActiveDesc}
-                </span>
-              </p>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <WifiOff className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />
+            <p>
+              <strong className="font-semibold">{tf.bannerRealOfflineTitle}:</strong>{' '}
+              <span className="text-amber-800 dark:text-amber-300">{tf.bannerRealOfflineDesc}</span>
+            </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap shrink-0">
-            {getServiceWorkerState() === 'registered' && (
-              <span className="px-2.5 py-1 rounded bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
-                {tf.badgeSwOfflineShellReady}
-              </span>
-            )}
-            <span className="px-2.5 py-1 rounded bg-amber-500/20 border border-amber-500/40 text-[10px] font-bold uppercase tracking-wider text-amber-300">
-              {tf.badgeLocalQueueReady} ({pendingQueueCount})
-            </span>
-          </div>
+          <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 border border-amber-300 dark:border-amber-700 text-[10px] font-bold uppercase tracking-wider text-amber-900 dark:text-amber-200 shrink-0">
+            {tf.badgeAutoSyncReady}
+          </span>
         </div>
       )}
 
-      {/* Top-Level Sync Conflict Alert Banner */}
-      {conflictItems.length > 0 && (
+      {connectivityStatus === 'SYNCING' && (
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="syncing-queue-banner"
+          className="bg-blue-50 dark:bg-blue-950/40 border border-blue-300 dark:border-blue-800/60 text-blue-900 dark:text-blue-200 px-4 py-2.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+        >
+          <div className="flex items-center gap-2.5">
+            <RefreshCw className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin shrink-0" aria-hidden="true" />
+            <p>
+              <strong className="font-semibold">{tf.bannerSyncingTitle}:</strong>{' '}
+              <span className="text-blue-800 dark:text-blue-300">{tf.bannerSyncingDesc}</span>
+            </p>
+          </div>
+          <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 border border-blue-300 dark:border-blue-700 text-[10px] font-bold uppercase tracking-wider text-blue-900 dark:text-blue-200 shrink-0">
+            {tf.badgeAutoSyncActive}
+          </span>
+        </div>
+      )}
+
+      {connectivityStatus === 'SYNCHRONIZED_DEMO' && (
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="synced-demo-banner"
+          className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200 px-4 py-2.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+        >
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" aria-hidden="true" />
+            <p>
+              <strong className="font-semibold">{tf.bannerSyncSuccessTitle}:</strong>{' '}
+              <span className="text-emerald-800 dark:text-emerald-300">{tf.bannerSyncSuccessDesc}</span>
+            </p>
+          </div>
+          <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-700 text-[10px] font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-200 shrink-0">
+            {tf.statusSyncedDemoLabel}
+          </span>
+        </div>
+      )}
+
+      {connectivityStatus === 'PENDING_SYNC' && (
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="pending-sync-banner"
+          className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/60 text-amber-900 dark:text-amber-200 px-4 py-2.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+        >
+          <div className="flex items-center gap-2.5">
+            <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />
+            <p>
+              <strong className="font-semibold">{tf.bannerPendingSyncTitle} ({pendingOfflineCount}):</strong>{' '}
+              <span className="text-amber-800 dark:text-amber-300">{tf.bannerPendingSyncDesc}</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleSimulateSyncNow()}
+            className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-700 text-xs font-semibold text-white shrink-0 self-start sm:self-auto cursor-pointer"
+          >
+            {tf.btnManualSyncNow}
+          </button>
+        </div>
+      )}
+
+      {(connectivityStatus === 'SYNC_FAILED' || connectivityStatus === 'CONFLICT_DETECTED') && (
         <div
           role="alert"
-          className="bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+          aria-live="polite"
+          data-testid="sync-conflict-banner"
+          className="bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800/60 text-rose-900 dark:text-rose-200 px-4 py-2.5 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
         >
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs font-bold text-rose-800 dark:text-rose-200">
-                {tf.conflictAlertTitle} ({conflictItems.length})
-              </p>
-              <p className="text-xs text-rose-700 dark:text-rose-300 mt-0.5">
-                {conflictItems[0].title} — HTTP {conflictItems[0].conflict_code ?? 409}:{' '}
-                {conflictItems[0].conflict_reason}
-              </p>
-            </div>
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" aria-hidden="true" />
+            <p>
+              <strong className="font-semibold">
+                {connectivityStatus === 'CONFLICT_DETECTED' ? tf.statusConflictDetectedLabel : tf.statusSyncFailedLabel} ({failedOfflineCount}):
+              </strong>{' '}
+              <span className="text-rose-800 dark:text-rose-300">
+                {connectivityStatus === 'CONFLICT_DETECTED' ? tf.statusConflictDetectedDesc : tf.statusSyncFailedDesc}
+              </span>
+            </p>
           </div>
           <button
             type="button"
             onClick={() => setActiveTab('offline')}
-            className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shrink-0 cursor-pointer"
+            className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-700 text-xs font-semibold text-white shrink-0 self-start sm:self-auto cursor-pointer"
           >
-            {tf.badgeSyncConflict}
+            {tf.btnReviewConflict} →
           </button>
         </div>
       )}
@@ -649,68 +749,6 @@ export const FieldPortal: React.FC = () => {
       {/* TAB 1: FIELD DASHBOARD */}
       {activeTab === 'dashboard' && (
         <div className="space-y-6">
-          {/* Live Assigned Backend Requests (FastAPI) */}
-          {liveAssignedRequests.length > 0 && (
-            <div className="bg-white dark:bg-[#111827] rounded-xl border border-emerald-200 dark:border-emerald-900/60 overflow-hidden shadow-xs">
-              <div className="px-6 py-3.5 bg-emerald-50/70 dark:bg-emerald-950/30 border-b border-emerald-200 dark:border-emerald-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h2 className="font-bold text-slate-900 dark:text-white text-sm">
-                    {tf.sectionLiveAssignedRequests} ({liveAssignedRequests.length})
-                  </h2>
-                  <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                    {tf.subtitleLiveAssignedRequests}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => liveRequests.refresh()}
-                  className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  {tf.btnRefreshLiveQueue}
-                </button>
-              </div>
-              <div className="divide-y divide-slate-200 dark:divide-slate-800">
-                {liveAssignedRequests.map((req) => (
-                  <div
-                    key={req.id}
-                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                          {req.id.slice(0, 8)}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
-                          {req.status}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                          {req.category} · {req.requested_load_kw} kW
-                        </span>
-                      </div>
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                        {req.applicant_name}
-                      </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 shrink-0" />
-                        {req.address || req.zone}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedBackendRequestId(req.id);
-                        setActiveTab('inspections');
-                      }}
-                      className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shrink-0 cursor-pointer"
-                    >
-                      {tf.btnInspectLiveRequest}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs">
               <div className="flex items-center justify-between mb-2">
@@ -734,8 +772,11 @@ export const FieldPortal: React.FC = () => {
                 </span>
                 <AlertTriangle className="w-4 h-4 text-rose-600" />
               </div>
-              <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">
-                1 {tf.kpiEmergencyActiveSuffix}
+              <p
+                data-testid="field-kpi-emergency-callouts"
+                className="text-2xl font-bold text-rose-600 dark:text-rose-400 tabular-nums"
+              >
+                {fieldCanonicalMetrics.totalActiveEmergencyCallouts} {tf.kpiEmergencyActiveSuffix}
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 {tf.kpiEmergencySub}
@@ -952,26 +993,33 @@ export const FieldPortal: React.FC = () => {
                     <select
                       aria-label={`${tf.labelStatusPrefix} ${wo.id}`}
                       value={wo.status}
+                      disabled={wo.status === 'Completed'}
                       onChange={(e) => {
                         const nextStatus = e.target.value as typeof wo.status;
-                        updateWorkOrderStatus(wo.id, nextStatus);
-                        showToast(`Work Order ${wo.id} updated to "${nextStatus}"`, 'info');
+                        if (nextStatus !== wo.status) {
+                          updateWorkOrderStatus(wo.id, nextStatus);
+                        }
                       }}
-                      className="text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-200 font-medium"
+                      className="text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-200 font-medium disabled:opacity-60"
                     >
-                      <option value="Pending">
-                        {localizeWorkOrderStatus('Pending', language)}
+                      <option value={wo.status}>
+                        {localizeWorkOrderStatus(wo.status, language)}
                       </option>
-                      <option value="En Route">
-                        {localizeWorkOrderStatus('En Route', language)}
-                      </option>
-                      <option value="On Site">
-                        {localizeWorkOrderStatus('On Site', language)}
-                      </option>
-                      <option value="Completed">
-                        {localizeWorkOrderStatus('Completed', language)}
-                      </option>
+                      {(WORK_ORDER_TRANSITIONS[wo.status] || [])
+                        .filter((trans) => trans !== wo.status)
+                        .map((trans) => (
+                          <option key={trans} value={trans}>
+                            {localizeWorkOrderStatus(trans, language)}
+                          </option>
+                        ))}
                     </select>
+                    {fieldOfflineQueue.some(
+                      (q) => q.targetRecordId === wo.id && q.status === 'PENDING'
+                    ) && (
+                      <span className="px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-[10px] font-bold text-amber-800 dark:text-amber-300">
+                        {tf.badgeOfflineQueuedOnWo}
+                      </span>
+                    )}
                     {wo.status !== 'Completed' && (
                       <button
                         onClick={() => {
@@ -995,13 +1043,20 @@ export const FieldPortal: React.FC = () => {
       {/* TAB 2: ASSIGNED WORK ORDERS */}
       {activeTab === 'workorders' && (
         <div className="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
-          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-            <h2 className="font-semibold text-slate-900 dark:text-white text-base">
-              {tf.headingAssignedWorkOrders}
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {tf.subtitleAssignedWorkOrders}
-            </p>
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-slate-900 dark:text-white text-base">
+                {tf.headingAssignedWorkOrders}
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {tf.subtitleAssignedWorkOrders}
+              </p>
+            </div>
+            <ExportMenu
+              datasetKey="assigned_work_orders"
+              filteredRecords={workOrders}
+              variant="compact"
+            />
           </div>
           <div className="divide-y divide-slate-200 dark:divide-slate-800">
             {workOrders.map((wo) => {
@@ -1079,8 +1134,29 @@ export const FieldPortal: React.FC = () => {
                 </div>
                 {wo.inspectionReport && (
                   <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3.5 border border-slate-200/80 dark:border-slate-700/60 text-xs space-y-1">
-                    <div className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4" /> {tf.labelInspectionFindingsRecorded}
+                    <div className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center justify-between gap-2 flex-wrap">
+                      <span className="flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4" /> {tf.labelInspectionFindingsRecorded}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFieldOfficialDoc(
+                            generateInspectionSummaryDocument({
+                              role: 'field',
+                              actor: fieldDocumentActor,
+                              workOrder: wo,
+                              language: currentLang,
+                              dataSource: dataMode,
+                            })
+                          );
+                        }}
+                        className="px-2.5 py-1 rounded-md border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <FileCheck className="w-3 h-3" />
+                        <span>{docUi.viewInspectionSummary}</span>
+                      </button>
                     </div>
                     <p className="text-slate-600 dark:text-slate-300">
                       {tf.labelMeterSerialPrefix}{' '}
@@ -1121,67 +1197,14 @@ export const FieldPortal: React.FC = () => {
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   {tf.labelTaskPrefix}{' '}
-                  {selectedBackendRequestId
-                    ? (() => {
-                        const r = (liveRequests.data || []).find((x) => x.id === selectedBackendRequestId);
-                        return r
-                          ? `[FastAPI ${r.id.slice(0, 8)}] ${r.applicant_name} (${r.zone} · ${r.requested_load_kw} kW)`
-                          : selectedBackendRequestId;
-                      })()
-                    : selectedWO
-                      ? `${selectedWO.id} — ${localizeWorkOrderTitle(selectedWO.title, language)}`
-                      : tf.defaultInspectionTaskFallback}
+                  {selectedWO
+                    ? `${selectedWO.id} — ${localizeWorkOrderTitle(selectedWO.title, language)}`
+                    : tf.defaultInspectionTaskFallback}
                 </p>
               </div>
             </div>
 
             <form onSubmit={handleInspectionSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    {tf.labelInspectionTarget}
-                  </label>
-                  <select
-                    value={selectedBackendRequestId ? `backend:${selectedBackendRequestId}` : `wo:${selectedWOId}`}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val.startsWith('backend:')) {
-                        setSelectedBackendRequestId(val.slice('backend:'.length));
-                      } else {
-                        setSelectedBackendRequestId('');
-                        setSelectedWOId(val.replace(/^wo:/, ''));
-                      }
-                    }}
-                    className="w-full px-3.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-sm text-slate-900 dark:text-white"
-                  >
-                    {liveAssignedRequests.map((req) => (
-                      <option key={`backend:${req.id}`} value={`backend:${req.id}`}>
-                        [FastAPI {req.id.slice(0, 8)}] {req.applicant_name} ({req.status} · {req.requested_load_kw} kW)
-                      </option>
-                    ))}
-                    {workOrders.map((wo) => (
-                      <option key={`wo:${wo.id}`} value={`wo:${wo.id}`}>
-                        {wo.id} — {localizeWorkOrderTitle(wo.title, language)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                    {tf.labelFieldSyncOutcome}
-                  </label>
-                  <select
-                    value={taskOutcome}
-                    onChange={(e) => setTaskOutcome(e.target.value as FieldSyncTaskStatus)}
-                    className="w-full px-3.5 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-sm text-slate-900 dark:text-white"
-                  >
-                    <option value="COMPLETED">{tf.optionOutcomeCompleted}</option>
-                    <option value="FIELD_VERIFIED">{tf.optionOutcomeFieldVerified}</option>
-                    <option value="BLOCKED">{tf.optionOutcomeBlocked}</option>
-                  </select>
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -1282,7 +1305,7 @@ export const FieldPortal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5 border border-slate-200 dark:border-slate-700/60 flex flex-wrap items-center justify-between gap-2">
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <Camera className="w-4 h-4 text-blue-600" />
                   <div>
@@ -1294,41 +1317,9 @@ export const FieldPortal: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (typeof navigator !== 'undefined' && navigator.geolocation) {
-                        navigator.geolocation.getCurrentPosition(
-                          pos => {
-                            const coords = `${pos.coords.latitude.toFixed(4)}° N, ${pos.coords.longitude.toFixed(4)}° E`;
-                            setGpsLocation(coords);
-                            showToast(`GPS Geotag updated: ${coords}`, 'success');
-                          },
-                          () => {
-                            showToast('Browser GPS permission declined; retaining last verified feeder geotag.', 'info');
-                          },
-                          { enableHighAccuracy: true, timeout: 5000 }
-                        );
-                      }
-                    }}
-                    className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
-                  >
-                    <MapPin className="w-3 h-3" />
-                    <span>
-                      {language === 'gu'
-                        ? 'લાઇવ GPS લો'
-                        : language === 'hi'
-                        ? 'लाइव GPS लें'
-                        : language === 'mr'
-                        ? 'लाइव्ह GPS घ्या'
-                        : 'Capture Live GPS'}
-                    </span>
-                  </button>
-                  <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 text-[11px] font-semibold">
-                    {tf.badgeGeotagVerified}
-                  </span>
-                </div>
+                <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 text-[11px] font-semibold">
+                  {tf.badgeGeotagVerified}
+                </span>
               </div>
 
               <div>
@@ -1357,145 +1348,353 @@ export const FieldPortal: React.FC = () => {
 
       {/* TAB 4: OFFLINE QUEUE */}
       {activeTab === 'offline' && (
-        <div className="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                {tf.headingLivePersistentQueue}
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {tf.subtitleLivePersistentQueue}
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  {tf.headingOfflineQueue}
+                </h2>
+                <span
+                  data-testid="offline-queue-pending-badge"
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                    pendingOfflineCount > 0
+                      ? 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                      : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800'
+                  }`}
+                >
+                  {pendingOfflineCount} {tf.offlineQueuePendingCountBadge}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  {tf.offlineQueueTotalItemsLabel}{' '}
+                  <strong className="text-slate-800 dark:text-slate-200">
+                    {fieldOfflineQueue.length}
+                  </strong>
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {tf.subtitleOfflineQueue}
               </p>
             </div>
             <button
               type="button"
-              disabled={isSyncingQueue}
-              onClick={() => {
-                setOfflineSimulated(false);
-                setManualOfflineOverride(false);
-                void runQueueFlush(false, true);
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg text-xs font-semibold cursor-pointer self-start sm:self-auto"
+              data-testid="offline-queue-manual-sync-btn"
+              disabled={isFieldSyncing || isBrowserOffline || isOfflineSimulated || (pendingOfflineCount === 0 && failedOfflineCount === 0)}
+              onClick={() => handleSimulateSyncNow()}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold cursor-pointer shrink-0 transition-colors shadow-xs"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncingQueue ? 'animate-spin' : ''}`} />
-              {isSyncingQueue ? tf.btnSyncingQueue : tf.btnSyncQueueNow}
+              <RefreshCw className={`w-3.5 h-3.5 ${isFieldSyncing ? 'animate-spin' : ''}`} />{' '}
+              {isFieldSyncing ? tf.statusSyncingLabel : tf.btnSimulateSyncNow}
             </button>
           </div>
 
-          {queueItems.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 p-5 text-xs text-slate-500 dark:text-slate-400">
-              {tf.emptyPersistentQueue}
+          {/* Compact 4-Card Status Summary */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/40">
+              <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                {tf.offlineQueueTotalItemsLabel}
+              </div>
+              <div className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
+                {fieldOfflineQueue.length}
+              </div>
+            </div>
+            <div className="p-3 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/60 dark:bg-amber-950/30">
+              <div className="text-[11px] font-medium text-amber-800 dark:text-amber-400 flex items-center justify-between gap-1">
+                <span>{tf.queueStatusPending}</span>
+                {processingOfflineCount > 0 && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200">
+                    {processingOfflineCount} {caTranslations.processingQueueLabel}
+                  </span>
+                )}
+              </div>
+              <div className="text-xl font-bold text-amber-900 dark:text-amber-300 mt-0.5 tabular-nums">
+                {pendingOfflineCount}
+              </div>
+            </div>
+            <div className="p-3 rounded-lg border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/60 dark:bg-emerald-950/30">
+              <div className="text-[11px] font-medium text-emerald-800 dark:text-emerald-400">
+                {tf.queueStatusCompleted}
+              </div>
+              <div className="text-xl font-bold text-emerald-900 dark:text-emerald-300 mt-0.5">
+                {completedOfflineCount}
+              </div>
+            </div>
+            <div
+              className={`p-3 rounded-lg border ${
+                conflictCount > 0 || failedOfflineCount > 0
+                  ? 'border-rose-300 dark:border-rose-800/80 bg-rose-50/70 dark:bg-rose-950/30'
+                  : 'border-slate-200 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-800/40'
+              }`}
+            >
+              <div
+                className={`text-[11px] font-medium ${
+                  conflictCount > 0 || failedOfflineCount > 0
+                    ? 'text-rose-800 dark:text-rose-400'
+                    : 'text-slate-500 dark:text-slate-400'
+                }`}
+              >
+                {tf.statusConflictDetectedLabel}
+              </div>
+              <div
+                className={`text-xl font-bold mt-0.5 ${
+                  conflictCount > 0 || failedOfflineCount > 0
+                    ? 'text-rose-900 dark:text-rose-300'
+                    : 'text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                {conflictCount || failedOfflineCount}
+              </div>
+            </div>
+          </div>
+
+          {/* Real-time Storage & Auto-Sync Engine Telemetry */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 text-xs">
+            <div>
+              <div className="text-[10px] uppercase font-semibold tracking-wider text-slate-500 dark:text-slate-400">
+                Network Physical
+              </div>
+              <div className="font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mt-0.5">
+                <span className={`w-2 h-2 rounded-full ${isBrowserOffline ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                {isBrowserOffline ? tf.statusRealOfflineLabel : tf.statusOnlineLabel}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-semibold tracking-wider text-slate-500 dark:text-slate-400">
+                Demo Simulation
+              </div>
+              <div className="font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mt-0.5">
+                <span className={`w-2 h-2 rounded-full ${isOfflineSimulated ? 'bg-amber-500' : 'bg-slate-400'}`} />
+                {isOfflineSimulated ? tf.statusSimOfflineLabel : 'Disabled'}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-semibold tracking-wider text-slate-500 dark:text-slate-400">
+                Sync Engine
+              </div>
+              <div className="font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mt-0.5">
+                <span className={`w-2 h-2 rounded-full ${isFieldSyncing ? 'bg-blue-500 animate-ping' : 'bg-emerald-500'}`} />
+                {isFieldSyncing ? tf.statusSyncingLabel : tf.badgeAutoSyncReady}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-semibold tracking-wider text-slate-500 dark:text-slate-400">
+                Local Persistence
+              </div>
+              <div className="font-mono text-[11px] text-slate-800 dark:text-slate-200 truncate mt-0.5" title="vidyutflow_field_offline_queue (localStorage)">
+                localStorage
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/70 rounded-lg px-3.5 py-2.5 text-[11px] text-slate-600 dark:text-slate-300">
+            {tf.offlineDemoDisclaimer}
+          </div>
+
+          {fieldOfflineQueue.length === 0 ? (
+            <div
+              data-testid="offline-queue-empty-state"
+              className="border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-8 text-center space-y-2"
+            >
+              <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center mx-auto">
+                <Wifi className="w-5 h-5" aria-hidden="true" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                {tf.emptyOfflineQueueTitle}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                {tf.emptyOfflineQueueDesc}
+              </p>
             </div>
           ) : (
             <div className="divide-y divide-slate-200 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg">
-              {queueItems.map((item) => (
-                <div key={item.client_uuid} className="p-4 space-y-2.5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="space-y-1">
+              {fieldOfflineQueue.map((item) => {
+                const statusBadgeConfig =
+                  item.status === 'COMPLETED'
+                    ? {
+                        label: tf.queueStatusCompleted,
+                        cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800',
+                      }
+                    : item.status === 'PROCESSING'
+                    ? {
+                        label: tf.queueStatusProcessing,
+                        cls: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-800',
+                      }
+                    : item.status === 'FAILED'
+                    ? {
+                        label: tf.queueStatusFailed,
+                        cls: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-800',
+                      }
+                    : {
+                        label: tf.queueStatusPending,
+                        cls: 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800',
+                      };
+
+                const actionLabel =
+                  item.actionType === 'SITE_INSPECTION_SUBMIT'
+                    ? tf.offlineQueueActionInspection
+                    : tf.offlineQueueActionStatusUpdate;
+
+                const report = item.payload.inspectionReport;
+
+                return (
+                  <div
+                    key={item.client_uuid}
+                    data-testid={`offline-queue-item-${item.targetRecordId}`}
+                    className="p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3"
+                  >
+                    <div className="space-y-1.5 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-semibold text-slate-900 dark:text-white">
-                          {item.title}
+                        <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
+                          {item.targetRecordId}
                         </span>
-                        <span className="px-2 py-0.5 rounded font-mono text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                          UUID: {item.client_uuid.slice(0, 8)}
+                        <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-semibold">
+                          {actionLabel}
                         </span>
-                        <span className="px-2 py-0.5 rounded font-mono text-[10px] bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300">
-                          {item.task_status}
-                        </span>
+                        {item.relatedRefId && (
+                          <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                            {tf.labelRefPrefix} {item.relatedRefId}
+                          </span>
+                        )}
                       </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        {item.meter_serial ? `${item.meter_serial} · ` : ''}
-                        {item.notes} · <Clock className="w-3 h-3 inline -mt-0.5" />{' '}
-                        {new Date(item.created_offline_at).toLocaleString()}
-                      </p>
-                      {item.last_network_error && item.sync_state === 'PENDING' && (
-                        <p className="text-[11px] text-amber-700 dark:text-amber-400">
-                          {item.last_network_error}
+
+                      {item.payload.workOrderTitle && (
+                        <p className="text-xs font-semibold text-slate-900 dark:text-white">
+                          {localizeWorkOrderTitle(item.payload.workOrderTitle, language)}
                         </p>
                       )}
+
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                        {tf.labelTransitionPrefix}{' '}
+                        <strong>
+                          {item.payload.expectedPreviousStatus
+                            ? localizeWorkOrderStatus(item.payload.expectedPreviousStatus, language)
+                            : '—'}
+                        </strong>{' '}
+                        →{' '}
+                        <strong>
+                          {localizeWorkOrderStatus(item.payload.targetStatus, language)}
+                        </strong>
+                        {report ? (
+                          <>
+                            {' '}
+                            · {tf.labelMeterSerialPrefix}{' '}
+                            <span className="font-mono">{report.meterSerialScanned}</span> ·{' '}
+                            {tf.labelReadingPrefix} {report.readingKwh} kWh ·{' '}
+                            {tf.labelVoltagePrefix} {report.testedPhaseVoltage?.r ?? 234}V/
+                            {report.testedPhaseVoltage?.y ?? 232}V/
+                            {report.testedPhaseVoltage?.b ?? 235}V
+                          </>
+                        ) : null}
+                      </p>
+
+                      {report?.technicianRemarks && (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          {tf.labelRemarksPrefix}{' '}
+                          {localizeFieldTechnicianRemarks(report.technicianRemarks, language)}
+                        </p>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400 pt-0.5">
+                        <span>
+                          {tf.labelQueuedAtPrefix} {formatErpDateTime(item.timestamp)}
+                        </span>
+                        {item.syncedAt && (
+                          <span>
+                            {tf.labelReplayedAtPrefix} {formatErpDateTime(item.syncedAt)}
+                          </span>
+                        )}
+                        <span className="font-mono">
+                          {tf.labelClientUuidPrefix} {item.client_uuid}
+                        </span>
+                      </div>
+
+                      {item.status === 'FAILED' && item.failureReason && (() => {
+                        const canonicalWo = workOrders.find((w) => w.id === item.targetRecordId);
+                        const isAlreadyApplied =
+                          canonicalWo &&
+                          (canonicalWo.status === item.payload.targetStatus ||
+                            (item.payload.targetStatus === 'Completed' && canonicalWo.status === 'Completed'));
+
+                        return (
+                          <div className="mt-2.5 p-3.5 rounded-lg bg-rose-50/90 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/70 text-xs text-rose-900 dark:text-rose-200 space-y-2.5">
+                            <div className="flex items-start justify-between gap-2 flex-wrap">
+                              <div className="flex items-start gap-2">
+                                <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                                <div>
+                                  <strong className="font-semibold block text-rose-950 dark:text-rose-100">
+                                    {item.conflictDetected ? tf.statusConflictDetectedLabel : tf.statusSyncFailedLabel} — {item.targetRecordId}
+                                  </strong>
+                                  <p className="text-[11px] text-rose-800 dark:text-rose-300 mt-0.5">
+                                    {localizeOfflineQueueFailureReason(item.failureReason, language)}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[11px] bg-white/80 dark:bg-slate-900/80 px-2.5 py-1 rounded border border-rose-200/80 dark:border-rose-800/60">
+                                <span className="text-slate-600 dark:text-slate-400 font-medium">
+                                  {tf.labelCanonicalStatePrefix}
+                                </span>
+                                <span className="font-semibold text-slate-900 dark:text-slate-100">
+                                  {canonicalWo ? localizeWorkOrderStatus(canonicalWo.status, language) : '—'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {isAlreadyApplied && (
+                              <div className="p-2 rounded bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-200 text-[11px] flex items-center gap-1.5">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                <span>{tf.noticeActionAlreadyApplied}</span>
+                              </div>
+                            )}
+
+                            <div className="text-[11px] pt-1.5 border-t border-rose-200/70 dark:border-rose-800/50 text-slate-700 dark:text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <span className="font-semibold text-slate-900 dark:text-slate-100">{tf.labelSafeActionPrefix}</span>{' '}
+                                {resolveOfflineQueueSafeAction(item, language)}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => openDetailDrawer({ type: 'workorder', id: item.targetRecordId })}
+                                  className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-600 cursor-pointer shadow-2xs transition-colors flex items-center gap-1"
+                                >
+                                  <FileCheck className="w-3 h-3 text-slate-500" />
+                                  <span>{tf.btnViewRecordInDrawer}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isFieldSyncing}
+                                  onClick={() => handleSimulateSyncNow(item.client_uuid)}
+                                  className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white cursor-pointer shadow-2xs transition-colors"
+                                >
+                                  {tf.btnRetryQueueItem}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
-                    <div className="flex items-center gap-2 flex-wrap shrink-0">
-                      {item.sync_state === 'SYNCED' && (
-                        <>
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
-                            {tf.badgeSyncedToServer}
-                          </span>
-                          {item.target_kind === 'backend_request' && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                requeueSameUuidForIdempotencyCheck(item.client_uuid);
-                                if (!effectiveOffline) {
-                                  void runQueueFlush(false, true);
-                                }
-                              }}
-                              className="px-2.5 py-1 rounded text-[11px] font-semibold border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                            >
-                              {tf.btnTestUuidDeduplication}
-                            </button>
-                          )}
-                        </>
-                      )}
-                      {item.sync_state === 'DUPLICATE' && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
-                          {tf.badgeUuidDeduplicated}
-                        </span>
-                      )}
-                      {item.sync_state === 'SYNCING' && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
-                          {tf.badgeSyncingNow}
-                        </span>
-                      )}
-                      {item.sync_state === 'PENDING' && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
-                          {tf.badgePendingSync}
-                        </span>
-                      )}
-                      {item.sync_state === 'CONFLICT' && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
-                          {tf.badgeSyncConflict}
-                        </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${statusBadgeConfig.cls}`}
+                      >
+                        {statusBadgeConfig.label}
+                      </span>
+                      {item.status === 'FAILED' && (
+                        <button
+                          type="button"
+                          disabled={isFieldSyncing}
+                          onClick={() => handleSimulateSyncNow(item.client_uuid)}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white cursor-pointer"
+                        >
+                          {tf.btnRetryQueueItem}
+                        </button>
                       )}
                     </div>
                   </div>
-
-                  {item.sync_state === 'CONFLICT' && (
-                    <div className="rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                      <p className="text-xs text-rose-800 dark:text-rose-200">
-                        <strong>HTTP {item.conflict_code ?? 409}:</strong>{' '}
-                        {item.conflict_reason || tf.conflictAlertTitle}
-                      </p>
-                      <div className="flex items-center gap-2 flex-wrap shrink-0">
-                        {item.conflict_code === 409 && item.task_status !== 'FIELD_VERIFIED' && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              resolveConflictWithUpdatedOutcome(item.client_uuid, 'FIELD_VERIFIED');
-                              if (!effectiveOffline) {
-                                void runQueueFlush(false, true);
-                              }
-                            }}
-                            className="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-semibold cursor-pointer"
-                          >
-                            {tf.btnRetryFieldVerified}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            dismissFieldQueueConflict(item.client_uuid);
-                            liveRequests.refresh();
-                          }}
-                          className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-[11px] font-semibold cursor-pointer"
-                        >
-                          {tf.btnDismissConflict}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -1511,20 +1710,39 @@ export const FieldPortal: React.FC = () => {
                   <Zap className="w-5 h-5" aria-hidden="true" />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    {tf.headingFeederPatrol}
-                  </h2>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                      {tf.headingFeederPatrol}
+                    </h2>
+                    <span
+                      data-testid="field-feeder-source-badge"
+                      className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                    >
+                      {fieldFeederSource.badgeLabel}
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                      {at.simulatedVsRatedLabel}
+                    </span>
+                  </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {tf.subtitleFeederPatrol}
+                    {tf.subtitleFeederPatrol} · {at.fieldFeederPatrolDisclosure}
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setActiveTab('workorders')}
-                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer self-start sm:self-auto"
-              >
-                {tf.btnViewAssignedWorkOrdersArrow}
-              </button>
+              <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                <ExportMenu
+                  datasetKey="feeder_patrol"
+                  filteredRecords={feeders}
+                  dataSource={fieldFeederSource.code}
+                  variant="compact"
+                />
+                <button
+                  onClick={() => setActiveTab('workorders')}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  {tf.btnViewAssignedWorkOrdersArrow}
+                </button>
+              </div>
             </div>
 
             {/* Feeder Health Summary Strip */}
@@ -1727,10 +1945,15 @@ export const FieldPortal: React.FC = () => {
                 {tf.subtitleCompletedJobs}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
                 {completedWorkOrders.length} {tf.badgeCompletedJobsCountSuffix}
               </span>
+              <ExportMenu
+                datasetKey="completed_jobs"
+                filteredRecords={completedWorkOrders}
+                variant="compact"
+              />
               <button
                 onClick={() => setActiveTab('workorders')}
                 className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
@@ -1799,9 +2022,29 @@ export const FieldPortal: React.FC = () => {
                       </div>
                     </div>
                     <div
-                      className="flex items-center gap-2 self-start sm:self-center"
+                      className="flex items-center gap-2 self-start sm:self-center flex-wrap"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      {wo.inspectionReport && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFieldOfficialDoc(
+                              generateInspectionSummaryDocument({
+                                role: 'field',
+                                actor: fieldDocumentActor,
+                                workOrder: wo,
+                                language: currentLang,
+                                dataSource: dataMode,
+                              })
+                            )
+                          }
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <FileCheck className="w-3.5 h-3.5" />
+                          <span>{docUi.viewInspectionSummary}</span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => openDetailDrawer({ type: 'workorder', id: wo.id })}
@@ -1903,7 +2146,11 @@ export const FieldPortal: React.FC = () => {
           )}
         </div>
       )}
-
+      <OfficialDocumentModal
+        document={fieldOfficialDoc}
+        isOpen={Boolean(fieldOfficialDoc)}
+        onClose={() => setFieldOfficialDoc(null)}
+      />
       {activeTab === 'outage-map' && <LazyOutageMapSection />}
     </div>
   );

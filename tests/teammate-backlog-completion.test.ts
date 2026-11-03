@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -26,14 +27,85 @@ async function run() {
   resetAiMiddlewareStateForTests();
   resetAuthRateLimitForTests();
 
-  const server = http.createServer(createProductionRequestHandler());
-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
-  const addr = server.address() as { port: number };
-  const baseUrl = `http://127.0.0.1:${addr.port}`;
+  const handler = createProductionRequestHandler();
+  const baseUrl = 'http://127.0.0.1:3000';
+
+  const inMemoryFetch = async (urlStr: string, init?: RequestInit): Promise<Response> => {
+    const urlObj = new URL(urlStr);
+    const req = new EventEmitter() as any;
+    req.method = (init?.method || 'GET').toUpperCase();
+    req.url = urlObj.pathname + urlObj.search;
+    req.headers = {};
+    if (init?.headers) {
+      if (init.headers instanceof Headers) {
+        init.headers.forEach((v, k) => { req.headers[k.toLowerCase()] = v; });
+      } else if (Array.isArray(init.headers)) {
+        for (const [k, v] of init.headers) { req.headers[k.toLowerCase()] = v; }
+      } else {
+        for (const [k, v] of Object.entries(init.headers)) { req.headers[k.toLowerCase()] = String(v); }
+      }
+    }
+    if (!req.headers['host']) req.headers['host'] = urlObj.host || '127.0.0.1:3000';
+    req.socket = { remoteAddress: '127.0.0.1' };
+
+    return new Promise<Response>((resolve, reject) => {
+      const resHeaders: Record<string, string | string[]> = {};
+      let statusCode = 200;
+      const chunks: Buffer[] = [];
+      const res = new EventEmitter() as any;
+      res.statusCode = 200;
+      res.setHeader = (name: string, value: any) => {
+        resHeaders[name.toLowerCase()] = value;
+        return res;
+      };
+      res.getHeader = (name: string) => resHeaders[name.toLowerCase()];
+      res.writeHead = (code: number, headers?: any) => {
+        statusCode = code;
+        if (headers) {
+          for (const [k, v] of Object.entries(headers)) {
+            resHeaders[k.toLowerCase()] = v as any;
+          }
+        }
+        return res;
+      };
+      res.write = (chunk: any) => {
+        if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        return true;
+      };
+      res.end = (chunk?: any) => {
+        if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        statusCode = res.statusCode || statusCode;
+        const bodyBuffer = Buffer.concat(chunks);
+        const respHeaders = new Headers();
+        for (const [k, v] of Object.entries(resHeaders)) {
+          if (Array.isArray(v)) {
+            for (const item of v) respHeaders.append(k, item);
+          } else if (v !== undefined) {
+            respHeaders.set(k, String(v));
+          }
+        }
+        resolve(new Response(bodyBuffer, { status: statusCode, headers: respHeaders }));
+      };
+
+      try {
+        handler(req, res);
+        if (init?.body) {
+          if (typeof init.body === 'string') {
+            req.emit('data', Buffer.from(init.body));
+          } else if (Buffer.isBuffer(init.body)) {
+            req.emit('data', init.body);
+          }
+        }
+        req.emit('end');
+      } catch (err) {
+        reject(err);
+      }
+    });
+  };
 
   try {
     // 1. Item #7: Standalone production server serves /api/health outside vite dev
-    const healthRes = await fetch(`${baseUrl}/api/health`);
+    const healthRes = await inMemoryFetch(`${baseUrl}/api/health`);
     assert.equal(healthRes.status, 200);
     const healthJson = (await healthRes.json()) as Record<string, unknown>;
     assert.equal(healthJson.status, 'ok');
@@ -42,13 +114,13 @@ async function run() {
     console.log('  ✅ PASS: Standalone production server mounts /api/health, /api/auth, and /api/ai-chat outside vite dev (#7)');
 
     // 2. Item #6: Unauthenticated /api/ai-chat requests are rejected with 401
-    const unauthAi = await fetch(`${baseUrl}/api/ai-chat`, {
+    const unauthAi = await inMemoryFetch(`${baseUrl}/api/ai-chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'What is my latest bill?', role: 'admin' }),
     });
     assert.equal(unauthAi.status, 401, 'Unauthenticated /api/ai-chat must return 401');
-    const forgedAi = await fetch(`${baseUrl}/api/ai-chat`, {
+    const forgedAi = await inMemoryFetch(`${baseUrl}/api/ai-chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -60,7 +132,7 @@ async function run() {
     console.log('  ✅ PASS: /api/ai-chat enforces HttpOnly session authentication (401 on missing/forged cookies) (#6)');
 
     // 3. Item #6: Role spoofing & poisoned client accountContext are ignored by /api/ai-chat
-    const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
+    const loginRes = await inMemoryFetch(`${baseUrl}/api/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -83,7 +155,7 @@ async function run() {
       return 'Server-verified consumer reply ₹2,185.00';
     });
 
-    const spoofAiRes = await fetch(`${baseUrl}/api/ai-chat`, {
+    const spoofAiRes = await inMemoryFetch(`${baseUrl}/api/ai-chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -113,7 +185,7 @@ async function run() {
     resetAiMiddlewareStateForTests();
     let throttledCount = 0;
     for (let i = 0; i < 33; i++) {
-      const r = await fetch(`${baseUrl}/api/ai-chat`, {
+      const r = await inMemoryFetch(`${baseUrl}/api/ai-chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -129,13 +201,13 @@ async function run() {
 
     // 5. Item #18: Simulated OIDC / Gujarat Parichay SSO flow + production guard
     resetAuthRateLimitForTests();
-    const ssoProvRes = await fetch(`${baseUrl}/api/auth/sso/providers`);
+    const ssoProvRes = await inMemoryFetch(`${baseUrl}/api/auth/sso/providers`);
     assert.equal(ssoProvRes.status, 200);
     const ssoProvJson = (await ssoProvRes.json()) as { isSimulated: boolean; providers: unknown[] };
     assert.equal(ssoProvJson.isSimulated, true);
     assert.ok(ssoProvJson.providers.length >= 2);
 
-    const ssoLoginRes = await fetch(`${baseUrl}/api/auth/sso`, {
+    const ssoLoginRes = await inMemoryFetch(`${baseUrl}/api/auth/sso`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -157,7 +229,7 @@ async function run() {
     const prevNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';
     try {
-      const prodSsoRes = await fetch(`${baseUrl}/api/auth/sso`, {
+      const prodSsoRes = await inMemoryFetch(`${baseUrl}/api/auth/sso`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -176,10 +248,38 @@ async function run() {
       else process.env.NODE_ENV = prevNodeEnv;
     }
     console.log('  ✅ PASS: Simulated OIDC / Gujarat Parichay SSO issues HttpOnly session & blocks in production (#18)');
+
+    // 5b. Cross-origin CSRF protection & bounded payload size on /api/ai-chat + Permissions-Policy header
+    resetAiMiddlewareStateForTests();
+    const crossOriginAi = await inMemoryFetch(`${baseUrl}/api/ai-chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookiePair,
+        Origin: 'https://evil-attacker.example',
+      },
+      body: JSON.stringify({ message: 'Explain my latest bill' }),
+    });
+    assert.equal(crossOriginAi.status, 403, 'Cross-origin Origin header on /api/ai-chat must be rejected with 403');
+    assert.equal(
+      crossOriginAi.headers.get('permissions-policy'),
+      'camera=(self), microphone=(), geolocation=(self)',
+      'Production server must emit Permissions-Policy header'
+    );
+
+    const oversizedAi = await inMemoryFetch(`${baseUrl}/api/ai-chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookiePair,
+      },
+      body: JSON.stringify({ message: 'x'.repeat(65_000) }),
+    });
+    assert.equal(oversizedAi.status, 413, 'Oversized /api/ai-chat body must return 413 without OOM');
+    console.log('  ✅ PASS: /api/ai-chat blocks cross-origin CSRF (403), caps body size (413), & emits Permissions-Policy');
   } finally {
     setCustomGeminiGeneratorForTests(null);
     resetAiMiddlewareStateForTests();
-    await new Promise<void>(resolve => server.close(() => resolve()));
   }
 
   // 6. Item #7: Production Dockerfile & Vercel serverless configuration checks
@@ -210,8 +310,16 @@ async function run() {
   );
   assert.ok(
     backendSessionSrc.includes('X-Use-Cookie-Session') &&
-      backendSessionSrc.includes('/api/backend/auth/logout')
+      backendSessionSrc.includes('/api/backend/auth/logout') &&
+      backendSessionSrc.includes('/api/backend/auth/refresh')
   );
+
+  const prodServerSrc = fs.readFileSync(path.join(FRONTEND_ROOT, 'src/server/prodServer.ts'), 'utf8');
+  assert.ok(prodServerSrc.includes("'/api/evidence'"), 'prodServer.ts must proxy /api/evidence');
+  const viteConfigSrc = fs.readFileSync(path.join(FRONTEND_ROOT, 'vite.config.ts'), 'utf8');
+  assert.ok(viteConfigSrc.includes("'/api/evidence'"), 'vite.config.ts must proxy /api/evidence');
+  const runBatSrc = fs.readFileSync(path.join(FRONTEND_ROOT, 'run.bat'), 'utf8');
+  assert.ok(!runBatSrc.includes('%~dp0frontend'), 'run.bat must not reference deleted frontend\\ directory');
 
   for (const rel of [
     'src/components/common/LocationPinPicker.tsx',

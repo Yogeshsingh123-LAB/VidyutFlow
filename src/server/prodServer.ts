@@ -5,6 +5,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createAuthApiHandler } from './authRoutes';
 import { createAiChatHandler, createHealthHandler } from './runtimeMiddleware';
+import { handleMeterReadingRoute } from './meterReadingRoutes';
+import { handleDirectoryRoute } from './directoryRoutes';
 
 /**
  * Standalone Production HTTP Server for VidyutFlow (Item #7).
@@ -26,13 +28,15 @@ const MIME_BY_EXT: Record<string, string> = {
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
   '.ico': 'image/x-icon',
-  '.woff2': 'font/woff2'
+  '.woff2': 'font/woff2',
+  '.wasm': 'application/wasm'
 };
 
 const FASTAPI_PREFIXES = [
   '/api/backend',
   '/api/v1',
   '/api/requests',
+  '/api/evidence',
   '/api/notifications',
   '/api/system',
   '/api/erp',
@@ -45,9 +49,10 @@ function applySecurityHeaders(res: ServerResponse) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self)');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://*.tile.openstreetmap.org; worker-src 'self' blob:; connect-src 'self' data: blob: https://tessdata.projectnaptha.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
   );
 }
 
@@ -133,15 +138,26 @@ export function createProductionRequestHandler(options?: {
       return;
     }
 
+    if (pathname === '/api/meter-readings' || pathname.startsWith('/api/meter-readings/')) {
+      void handleMeterReadingRoute(req, res);
+      return;
+    }
+
+    if (pathname === '/api/directory' || pathname.startsWith('/api/directory/')) {
+      void handleDirectoryRoute(req, res);
+      return;
+    }
+
     if (FASTAPI_PREFIXES.some(p => pathname === p || pathname.startsWith(`${p}/`))) {
       proxyToFastApi(req, res, fastApiTarget);
       return;
     }
 
-    // Serve built SPA static files from dist/ with traversal protection
+    // Serve built SPA static files from dist/ with strict path-separator traversal protection
+    const normalizedDist = path.resolve(distDir);
     const decodedPath = decodeURIComponent(pathname === '/' ? '/index.html' : pathname);
-    const resolvedFile = path.resolve(distDir, '.' + decodedPath);
-    if (!resolvedFile.startsWith(distDir)) {
+    const resolvedFile = path.resolve(normalizedDist, '.' + decodedPath);
+    if (resolvedFile !== normalizedDist && !resolvedFile.startsWith(normalizedDist + path.sep)) {
       res.statusCode = 403;
       res.end('Forbidden');
       return;
@@ -149,7 +165,7 @@ export function createProductionRequestHandler(options?: {
 
     let fileToServe = resolvedFile;
     if (!fs.existsSync(fileToServe) || fs.statSync(fileToServe).isDirectory()) {
-      fileToServe = path.join(distDir, 'index.html');
+      fileToServe = path.join(normalizedDist, 'index.html');
     }
 
     if (!fs.existsSync(fileToServe)) {

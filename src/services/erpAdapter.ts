@@ -4,7 +4,8 @@ import {
   ComplaintRecord,
   WorkOrder,
   CriticalIncident,
-  IncidentSeverity
+  IncidentSeverity,
+  IncidentStatus
 } from '../types';
 import {
   ApiResponse,
@@ -46,12 +47,37 @@ export const COMPLAINT_TRANSITIONS: Record<ComplaintRecord['status'], ComplaintR
  * Valid lifecycle transitions for Field Work Orders.
  */
 export const WORK_ORDER_TRANSITIONS: Record<WorkOrder['status'], WorkOrder['status'][]> = {
-  'Pending': ['En Route', 'Deferred'],
+  'Pending': ['Assigned', 'En Route', 'Deferred'],
+  'Assigned': ['En Route', 'In Progress', 'Deferred'],
   'En Route': ['On Site', 'Deferred'],
-  'On Site': ['Completed', 'Deferred'],
-  'Deferred': ['Pending', 'En Route'],
+  'On Site': ['In Progress', 'Completed', 'Deferred'],
+  'In Progress': ['Completed', 'Deferred'],
+  'Deferred': ['Pending', 'Assigned', 'En Route'],
   'Completed': [] // Final
 };
+
+/**
+ * Valid lifecycle transitions for Critical Incidents (VidyutFlow Canonical ERP Model).
+ * Reopening resolved or closed incidents is NOT supported in the canonical model.
+ */
+export const INCIDENT_TRANSITIONS: Record<IncidentStatus, IncidentStatus[]> = {
+  'DETECTED': ['ACKNOWLEDGED', 'ASSIGNED', 'ESCALATED', 'RESOLVED'],
+  'ACKNOWLEDGED': ['ASSIGNED', 'ESCALATED', 'RESOLVED'],
+  'ASSIGNED': ['IN_PROGRESS', 'ACKNOWLEDGED', 'ESCALATED', 'RESOLVED'],
+  'IN_PROGRESS': ['RESOLVED', 'ESCALATED', 'ACKNOWLEDGED'],
+  'ESCALATED': ['RESOLVED', 'ASSIGNED', 'IN_PROGRESS', 'ACKNOWLEDGED'],
+  'RESOLVED': ['CLOSED'],
+  'CLOSED': [] // Reopening is strictly unsupported in canonical model
+};
+
+export function isValidIncidentTransition(
+  current: IncidentStatus,
+  target: IncidentStatus
+): boolean {
+  if (current === target) return true;
+  const allowed = INCIDENT_TRANSITIONS[current] || [];
+  return allowed.includes(target);
+}
 
 /**
  * Check if the active role is authorized to perform a given endpoint or operation.
@@ -218,8 +244,220 @@ export function getApplicationStatusDisplayMeta(
   }
 }
 
+const SUBDIVISION_DEFAULT_FEEDER_MAP: Record<string, string> = {
+  'Mehsana Sub-Division 1': '11kV Visnagar Road Feeder',
+  'Patan Sub-Division': '11kV Patan GIDC Express Feeder',
+  'Patan Sub-Division 1': '11kV Patan GIDC Express Feeder',
+  'Palanpur Sub-Division': '11kV Palanpur Dairy Road Feeder',
+  'Gandhinagar Sub-Division 2': '11kV Kalol Industrial Feeder',
+  'Kalol Sub-Division': '11kV Kalol Industrial Feeder',
+  'Himmatnagar Sub-Division': '11kV Himmatnagar Civil Feeder',
+  'Visnagar Sub-Division': '11kV Visnagar Road Feeder'
+};
+
 /**
- * UGVCL ERP Integration (Simulated) Adapter Layer
+ * Discovers an existing site-inspection work order linked to an application
+ * using deterministic priority rules so existing links are reused rather than duplicated.
+ */
+export function findExistingSiteInspectionWorkOrder(
+  app: NewConnectionApplication,
+  workOrders: WorkOrder[]
+): WorkOrder | undefined {
+  if (!app || !Array.isArray(workOrders)) return undefined;
+
+  // 1. Explicit assignedWorkOrderId on the application
+  if (app.assignedWorkOrderId) {
+    const byAssignedId = workOrders.find(w => w.id === app.assignedWorkOrderId);
+    if (byAssignedId) return byAssignedId;
+  }
+
+  // 2. Explicit applicationId back-reference on a work order
+  const byApplicationId = workOrders.find(w => w.applicationId === app.id);
+  if (byApplicationId) return byApplicationId;
+
+  // 3. Canonical generated inspection work-order ID convention
+  const canonicalWoId = `WO-INS-${app.id.replace('APP-', '')}`;
+  const byCanonicalId = workOrders.find(w => w.id === canonicalWoId);
+  if (byCanonicalId) return byCanonicalId;
+
+  // 4. Existing New Connection Verification work order referencing the application ID in its title (e.g. WO-4402)
+  const byTitleRef = workOrders.find(
+    w => w.type === 'New Connection Verification' && w.title.includes(app.id)
+  );
+  if (byTitleRef) return byTitleRef;
+
+  return undefined;
+}
+
+/**
+ * Resolves the field engineer assignee for a site-inspection work order
+ * strictly from existing record fields without fabricating staff assignments.
+ */
+export function resolveSiteInspectionAssignee(
+  app: NewConnectionApplication,
+  existingWo?: WorkOrder
+): string {
+  const existingWoAssignee = existingWo?.assignedTo?.trim();
+  if (existingWoAssignee && existingWoAssignee !== 'Unassigned') {
+    return existingWoAssignee;
+  }
+  const appEngineer = app.assignedEngineer?.trim();
+  if (appEngineer && appEngineer !== 'Unassigned') {
+    return appEngineer;
+  }
+  return 'Unassigned';
+}
+
+export interface SiteInspectionWorkOrderResolution {
+  workOrder: WorkOrder;
+  created: boolean;
+  updatedWorkOrders: WorkOrder[];
+  assignedWorkOrderId: string;
+  assignedEngineer?: string;
+}
+
+/**
+ * Ensures a linked site-inspection work order exists when an application enters
+ * the Site Inspection stage. Reuses any existing linked work order or creates
+ * a canonical pending New Connection Verification work order.
+ */
+export function ensureSiteInspectionWorkOrderForApplication(params: {
+  app: NewConnectionApplication;
+  workOrders: WorkOrder[];
+  actorLabel: string;
+  timestamp?: string;
+}): SiteInspectionWorkOrderResolution {
+  const {
+    app,
+    workOrders,
+    actorLabel,
+    timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ')
+  } = params;
+  const existingWo = findExistingSiteInspectionWorkOrder(app, workOrders);
+
+  if (existingWo) {
+    const resolvedAssignee = resolveSiteInspectionAssignee(app, existingWo);
+    const needsBacklinkUpdate =
+      existingWo.applicationId !== app.id ||
+      (existingWo.assignedTo === 'Unassigned' && resolvedAssignee !== 'Unassigned');
+
+    const normalizedWo: WorkOrder = needsBacklinkUpdate
+      ? {
+          ...existingWo,
+          applicationId: app.id,
+          assignedTo: resolvedAssignee
+        }
+      : existingWo;
+
+    const updatedWorkOrders = needsBacklinkUpdate
+      ? workOrders.map(w => (w.id === existingWo.id ? normalizedWo : w))
+      : workOrders;
+
+    return {
+      workOrder: normalizedWo,
+      created: false,
+      updatedWorkOrders,
+      assignedWorkOrderId: normalizedWo.id,
+      assignedEngineer: resolvedAssignee !== 'Unassigned' ? resolvedAssignee : app.assignedEngineer
+    };
+  }
+
+  const preferredWoId = `WO-INS-${app.id.replace('APP-', '')}`;
+  const existingIds = new Set(workOrders.map(w => w.id));
+  let woId = preferredWoId;
+  if (existingIds.has(woId)) {
+    let suffix = 2;
+    while (existingIds.has(`${preferredWoId}-${suffix}`)) {
+      suffix += 1;
+    }
+    woId = `${preferredWoId}-${suffix}`;
+  }
+
+  const assignedTo = resolveSiteInspectionAssignee(app);
+  const existingSubdivisionFeeder = workOrders.find(
+    w => w.subdivision === app.subdivision && w.feederName
+  )?.feederName;
+  const feederName =
+    existingSubdivisionFeeder ||
+    SUBDIVISION_DEFAULT_FEEDER_MAP[app.subdivision] ||
+    '11kV Visnagar Road Feeder';
+
+  const newWo: WorkOrder = {
+    id: woId,
+    title: `Site Feasibility & Meter Load Inspection (${app.id})`,
+    type: 'New Connection Verification',
+    subdivision: app.subdivision,
+    feederName,
+    location: `${app.applicantName}, ${app.address}`,
+    gpsCoordinates: { lat: 23.6042, lng: 72.3995 },
+    consumerName: app.applicantName,
+    priority: 'High',
+    scheduledDate: '15-Oct-2026',
+    status: 'Pending',
+    assignedTo,
+    materialsNeeded: ['Earthing Resistance Meter', 'GPS Geotag Camera', 'Digital Clamp Meter'],
+    applicationId: app.id,
+    actionHistory: [
+      {
+        timestamp,
+        stage: 'Pending',
+        actor: actorLabel,
+        notes:
+          assignedTo !== 'Unassigned'
+            ? `Auto-dispatched site inspection work order for ${app.id} (${app.requestedLoadKw} kW ${app.category}) to ${assignedTo}.`
+            : `Auto-created site inspection work order for ${app.id} (${app.requestedLoadKw} kW ${app.category}) pending field engineer assignment.`
+      }
+    ]
+  };
+
+  return {
+    workOrder: newWo,
+    created: true,
+    updatedWorkOrders: [newWo, ...workOrders],
+    assignedWorkOrderId: newWo.id,
+    assignedEngineer: assignedTo !== 'Unassigned' ? assignedTo : app.assignedEngineer
+  };
+}
+
+/**
+ * Reconciles bidirectional links between applications and existing New Connection Verification
+ * work orders without creating new records or mutating input arrays.
+ */
+export function reconcileApplicationWorkOrderLinks(
+  applications: NewConnectionApplication[],
+  workOrders: WorkOrder[]
+): { applications: NewConnectionApplication[]; workOrders: WorkOrder[] } {
+  let nextWorkOrders = [...workOrders];
+  let woChanged = false;
+
+  const nextApplications = applications.map(app => {
+    const existingWo = findExistingSiteInspectionWorkOrder(app, nextWorkOrders);
+    if (!existingWo) return app;
+
+    if (existingWo.applicationId !== app.id) {
+      nextWorkOrders = nextWorkOrders.map(w =>
+        w.id === existingWo.id ? { ...w, applicationId: app.id } : w
+      );
+      woChanged = true;
+    }
+
+    if (app.assignedWorkOrderId !== existingWo.id) {
+      return {
+        ...app,
+        assignedWorkOrderId: existingWo.id
+      };
+    }
+    return app;
+  });
+
+  return {
+    applications: nextApplications,
+    workOrders: woChanged ? nextWorkOrders : workOrders
+  };
+}
+
+/**
+ * UGVCL ERP Integration Adapter Layer
  *
  * Provides a clean abstraction between UI portal components and backend microservices.
  * In development / demo environments without a live microservice cluster, it coordinates
@@ -277,14 +515,23 @@ export class ErpAdapterService {
   }
 
   /**
-   * Update an application's lifecycle status with role checking & transition validation
+   * Update an application's lifecycle status with role checking & transition validation.
+   * When targetStatus is 'Site Inspection', ensures a linked site-inspection work order
+   * is reused or automatically created.
    */
   async updateApplicationStatus(
     callerRole: UserRole,
     application: NewConnectionApplication,
     targetStatus: NewConnectionApplication['status'],
-    note?: string
-  ): Promise<ApiResponse<NewConnectionApplication>> {
+    note?: string,
+    workOrders: WorkOrder[] = []
+  ): Promise<
+    ApiResponse<NewConnectionApplication> & {
+      workOrder?: WorkOrder;
+      workOrderCreated?: boolean;
+      workOrders?: WorkOrder[];
+    }
+  > {
     if (!isActionAuthorized(callerRole, 'PATCH /api/v1/applications/:id/status')) {
       return {
         success: false,
@@ -316,23 +563,49 @@ export class ErpAdapterService {
       'Rejected': 0
     };
 
+    const timestampStr = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const actorLabel = `Authorized Officer (${callerRole.toUpperCase()})`;
+
+    let woResolution: SiteInspectionWorkOrderResolution | undefined;
+    if (targetStatus === 'Site Inspection') {
+      woResolution = ensureSiteInspectionWorkOrderForApplication({
+        app: application,
+        workOrders,
+        actorLabel,
+        timestamp: timestampStr
+      });
+    }
+
+    const updatedApp: NewConnectionApplication = {
+      ...application,
+      status: targetStatus,
+      workflowStep: stepMap[targetStatus],
+      ...(woResolution
+        ? {
+            assignedWorkOrderId: woResolution.assignedWorkOrderId,
+            ...(woResolution.assignedEngineer
+              ? { assignedEngineer: woResolution.assignedEngineer }
+              : {})
+          }
+        : {}),
+      notesHistory: note
+        ? [
+            ...application.notesHistory,
+            {
+              timestamp: timestampStr,
+              author: actorLabel,
+              note
+            }
+          ]
+        : application.notesHistory
+    };
+
     return {
       success: true,
-      data: {
-        ...application,
-        status: targetStatus,
-        workflowStep: stepMap[targetStatus],
-        notesHistory: note
-          ? [
-              ...application.notesHistory,
-              {
-                timestamp: new Date().toISOString().slice(0, 16).replace('T', ' '),
-                author: `Authorized Officer (${callerRole.toUpperCase()})`,
-                note
-              }
-            ]
-          : application.notesHistory
-      },
+      data: updatedApp,
+      workOrder: woResolution?.workOrder,
+      workOrderCreated: woResolution?.created,
+      workOrders: woResolution?.updatedWorkOrders,
       timestamp: new Date().toISOString(),
       requestId: `REQ-${Date.now()}`,
       meta: { source: 'demo-adapter-simulated' }

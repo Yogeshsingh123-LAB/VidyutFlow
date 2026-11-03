@@ -50,3 +50,6 @@ def require(*roles):
         return u
 
     return dep
+
+
+get_current_user = current_user

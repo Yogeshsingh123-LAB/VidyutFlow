@@ -1,10 +1,3 @@
-import { LiveWorkflowKpis } from '../common/LiveWorkflowKpis';
-import { LiveSlaRiskWatchlist } from '../common/LiveSlaRiskWatchlist';
-import { LiveAlertEnginePanel } from '../common/LiveAlertEnginePanel';
-import { LiveAiGovernancePanel } from '../common/LiveAiGovernancePanel';
-import { LivePredictiveDecisionPanel } from '../common/LivePredictiveDecisionPanel';
-import { LiveExecutiveAnalyticsSection } from './LiveExecutiveAnalyticsSection';
-import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
@@ -17,8 +10,7 @@ import {
   TrendingDown,
   TrendingUp,
   AlertTriangle,
-  Activity,
-  ShieldCheck,
+  Sparkles,
   Download,
   Filter,
   Cpu,
@@ -45,6 +37,14 @@ import {
 } from 'recharts';
 import { SmartGridDigitalTwin } from '../intro/SmartGridDigitalTwin';
 import { AIEnergyForecasting } from '../intro/AIEnergyForecasting';
+import { ExportMenu } from '../common/ExportMenu';
+import { LiveWorkflowKpis } from '../common/LiveWorkflowKpis';
+import { LiveSlaRiskWatchlist } from '../common/LiveSlaRiskWatchlist';
+import { LiveAlertEnginePanel } from '../common/LiveAlertEnginePanel';
+import { LiveAiGovernancePanel } from '../common/LiveAiGovernancePanel';
+import { LivePredictiveDecisionPanel } from '../common/LivePredictiveDecisionPanel';
+import { LiveExecutiveAnalyticsSection } from './LiveExecutiveAnalyticsSection';
+import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 import { formatErpDateTime } from '../../utils/dateUtils';
 import { useLanguage } from '../../i18n/LanguageContext';
 import {
@@ -66,7 +66,25 @@ import {
   localizeConsumerAddress,
   localizeSubdivision
 } from '../../i18n/consumerContentTranslations';
-import { localizeAssignedActorName as localizeActorName } from '../../i18n/employeeContentTranslations';
+import { localizeAssignedActorName as localizeActorName, localizeSlaDuration } from '../../i18n/employeeContentTranslations';
+import {
+  evaluateApplicationSla,
+  evaluateComplaintSla,
+  formatLocalizedSlaRemainingTime,
+  getSlaDashboardUiStrings,
+  localizeSlaRiskStateBadge
+} from '../../utils/slaEngine';
+import {
+  getAnalyticsTransparencyDictionary,
+  resolveAnalyticsDataSourceClassification,
+  resolveAnalyticsTimestampLabel,
+  resolveForecastUncertaintyDisclosure,
+  getAnomalyClassificationLabel
+} from '../../utils/analyticsTransparency';
+import {
+  selectManagementCanonicalMetrics,
+  getCanonicalAnalyticsTranslations
+} from '../../utils/canonicalAnalytics';
 
 export const ManagementPortal: React.FC = () => {
   const { language } = useLanguage();
@@ -76,6 +94,9 @@ export const ManagementPortal: React.FC = () => {
     applications,
     complaints,
     workOrders,
+    bills,
+    payments,
+    incidents,
     roleIncidents,
     recommendations,
     resolveIncident,
@@ -85,31 +106,85 @@ export const ManagementPortal: React.FC = () => {
     openCaseDrawer,
     setIsAIAssistantOpen,
     showToast,
-    activeUser
+    activeUser,
+    dataMode,
+    backendStatus,
+    isBrowserOffline,
+    isOfflineSimulated
   } = useApp();
   const tm = getManagementUiDictionary(language);
+  const at = getAnalyticsTransparencyDictionary(language);
+  const caTranslations = getCanonicalAnalyticsTranslations(language);
   const [timePeriod, setTimePeriod] = useState<'Q2-2026' | 'FY26-YTD'>('FY26-YTD');
   const [selectedEscalatedIncident, setSelectedEscalatedIncident] = useState<any | null>(null);
 
-  // Derived Real-Time ERP Metrics from Canonical Records (Scoped by Role/Session)
-  const pendingApplications = applications.filter(a => a.status !== 'Meter Installed' && a.status !== 'Rejected');
-  const openComplaints = complaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed');
-  const activeWorkOrders = workOrders.filter(w => w.status !== 'Completed');
-  const activeIncidents = roleIncidents.filter(i => i.status !== 'RESOLVED');
-  const criticalIncidents = activeIncidents.filter(i => i.severity === 'CRITICAL');
+  const mgmtDataSource = resolveAnalyticsDataSourceClassification({
+    dataMode,
+    backendStatusState: backendStatus.state,
+    isBrowserOffline,
+    isOfflineSimulated,
+    language
+  });
+  const mgmtForecastSource = resolveAnalyticsDataSourceClassification({
+    dataMode,
+    backendStatusState: backendStatus.state,
+    isBrowserOffline,
+    isOfflineSimulated,
+    isForecastView: true,
+    language
+  });
+  const datasetPeriodMeta = resolveAnalyticsTimestampLabel({
+    timestamp: 'May 2026 – Oct 2026',
+    type: 'dataset_period',
+    language
+  });
+  const forecastUncertaintyMeta = resolveForecastUncertaintyDisclosure({
+    hasValidatedStatisticalInterval: false,
+    language
+  });
+  const forecastRiskBadge = getAnomalyClassificationLabel('forecast_risk', language);
+  const detectedAnomalyBadge = getAnomalyClassificationLabel('detected_anomaly', language);
 
-  // Applications requiring managerial sanction review (high load >= 10 kW or commercial/industrial)
-  const highRiskApplications = applications.filter(
-    a => (a.requestedLoadKw >= 10 || a.category.includes('Commercial') || a.category.includes('Industrial')) && a.status === 'Sanction Approval'
+  const mgmtCanonicalMetrics = useMemo(
+    () =>
+      selectManagementCanonicalMetrics({
+        applications,
+        complaints,
+        workOrders,
+        incidents,
+        bills,
+        payments,
+        feeders: FEEDER_METRICS,
+        timePeriod,
+        activeUser
+      }),
+    [applications, complaints, workOrders, incidents, bills, payments, timePeriod, activeUser]
   );
 
-  // Localized chart data
+  // Derived Real-Time ERP Metrics from Canonical Records (Scoped by Role/Session)
+  const pendingApplications = applications.filter(
+    a => !a.isArchived && a.status !== 'Meter Installed' && a.status !== 'Rejected'
+  );
+  const openComplaints = complaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed');
+  const activeWorkOrders = workOrders.filter(w => w.status !== 'Completed');
+  const activeIncidents = roleIncidents.filter(i => i.status !== 'RESOLVED' && i.status !== 'CLOSED');
+  const criticalIncidents = activeIncidents.filter(i => i.severity === 'CRITICAL');
+
+  // Applications requiring managerial sanction review (high load >= 10 kW or commercial/industrial, excluding archived)
+  const highRiskApplications = applications.filter(
+    a =>
+      !a.isArchived &&
+      (a.requestedLoadKw >= 10 || a.category.includes('Commercial') || a.category.includes('Industrial')) &&
+      a.status === 'Sanction Approval'
+  );
+
+  // Localized chart data filtered by timePeriod ('Q2-2026' vs 'FY26-YTD')
   const localizedMonthlyMetrics = useMemo(() => {
-    return EXECUTIVE_MONTHLY_METRICS.map(row => ({
+    return mgmtCanonicalMetrics.monthlyTrajectorySeries.map(row => ({
       ...row,
       month: localizeBillingMonth(row.month, language)
     }));
-  }, [language]);
+  }, [mgmtCanonicalMetrics.monthlyTrajectorySeries, language]);
 
   return (
     <div className="space-y-4 sm:space-y-6 min-w-0">
@@ -139,7 +214,6 @@ export const ManagementPortal: React.FC = () => {
         <div className="flex flex-col min-[420px]:flex-row sm:flex-nowrap items-stretch min-[420px]:items-center gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800/80 shrink-0">
           <select
             value={timePeriod}
-            aria-label="Select reporting period"
             onChange={e => setTimePeriod(e.target.value as any)}
             className="flex-1 sm:flex-initial min-h-11 sm:min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 dark:bg-[#131D31] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
           >
@@ -147,24 +221,38 @@ export const ManagementPortal: React.FC = () => {
             <option value="FY26-YTD">{tm.optYtd}</option>
           </select>
 
-          <button
-            onClick={() => showToast(tm.flashReportToast, 'success')}
-            className="flex-1 sm:flex-initial min-h-11 sm:min-h-[38px] px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs whitespace-nowrap cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5 shrink-0" />
-            <span>{tm.exportReportBtn}</span>
-          </button>
+          <ExportMenu
+            datasetKey="monthly_performance"
+            filteredRecords={EXECUTIVE_MONTHLY_METRICS}
+            dataSource={mgmtDataSource.code}
+            labelOverride={tm.exportReportBtn}
+          />
         </div>
       </div>
 
       {/* Cross-Portal ERP Workflow Operations Pulse */}
       <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white border border-slate-800 shadow-md">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3.5">
-          <div className="flex items-center gap-2.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-            <h2 className="text-sm font-bold tracking-wide">
-              {tm.telemetryTitle}
-            </h2>
+          <div>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <h2 className="text-sm font-bold tracking-wide">
+                {tm.telemetryTitle}
+              </h2>
+              <span
+                data-testid="mgmt-pulse-source-badge"
+                className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border ${
+                  mgmtDataSource.isTrulyLive
+                    ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/40'
+                    : 'bg-amber-500/20 text-amber-200 border-amber-400/40'
+                }`}
+              >
+                {mgmtDataSource.badgeLabel}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-300 mt-1">
+              {mgmtDataSource.isTrulyLive ? at.mgmtErpPulseLiveNote : at.mgmtErpPulseDemoNote}
+            </p>
           </div>
           <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-white/10 text-slate-200 self-start sm:self-auto border border-white/10">
             {tm.canonicalStateSyncActive}
@@ -203,8 +291,9 @@ export const ManagementPortal: React.FC = () => {
       {/* VIEW 1: EXECUTIVE DASHBOARD */}
       {activeTab === 'dashboard' && (
         <div className="space-y-4 sm:space-y-6">
-          {/* Live Workflow KPIs — wired to VidyutFlow FastAPI backend */}
           <LiveWorkflowKpis />
+          {/* Live Database-Backed Executive Analytics & Recharts */}
+          <LiveExecutiveAnalyticsSection mode="dashboard" />
           {/* Executive Escalation Inbox (Only Escalated Incidents or Emergency Safety Overrides Appear Here) */}
           {activeIncidents.length > 0 && (
             <div className="p-5 rounded-xl bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/60 shadow-2xs space-y-3">
@@ -341,19 +430,43 @@ export const ManagementPortal: React.FC = () => {
             </div>
           )}
 
-          {/* Live Database-Backed Executive Analytics & Recharts */}
-          <LiveExecutiveAnalyticsSection mode="dashboard" />
+          {/* Executive KPI Bento Transparency Header */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700">
+                {mgmtDataSource.badgeLabel}
+              </span>
+              <span className="font-mono text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+                {at.calculated}
+              </span>
+              <span>{at.mgmtKpiDatasetNote}</span>
+            </div>
+            <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">
+              {timePeriod === 'Q2-2026'
+                ? caTranslations.periodSummaryBadgeQ2
+                : caTranslations.periodSummaryBadgeYtd}{' '}
+              · {datasetPeriodMeta.formattedText}
+            </span>
+          </div>
 
           {/* Executive KPI Bento */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* AT&C Loss */}
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                {tm.kpiAtcLossTitle}
-              </span>
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  {tm.kpiAtcLossTitle}
+                </span>
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
+                  {at.calculated}
+                </span>
+              </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
-                  12.4%
+                <span
+                  data-testid="mgmt-kpi-atc-loss"
+                  className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums"
+                >
+                  {mgmtCanonicalMetrics.executiveKpis.weightedAtcLossPct}%
                 </span>
                 <span className="text-xs font-semibold text-emerald-600 flex items-center">
                   <TrendingDown className="w-3 h-3 mr-0.5" /> {tm.yoyReductionSuffix}
@@ -366,12 +479,20 @@ export const ManagementPortal: React.FC = () => {
 
             {/* Billing Efficiency */}
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                {tm.kpiBillingEffTitle}
-              </span>
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  {tm.kpiBillingEffTitle}
+                </span>
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
+                  {at.calculated}
+                </span>
+              </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
-                  88.6%
+                <span
+                  data-testid="mgmt-kpi-billing-eff"
+                  className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums"
+                >
+                  {mgmtCanonicalMetrics.executiveKpis.billingEfficiencyPct}%
                 </span>
                 <span className="text-xs font-semibold text-emerald-600 flex items-center">
                   <TrendingUp className="w-3 h-3 mr-0.5" /> {tm.trendUpSuffix}
@@ -384,27 +505,40 @@ export const ManagementPortal: React.FC = () => {
 
             {/* Collection Efficiency */}
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                {tm.kpiCollectionEffTitle}
-              </span>
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  {tm.kpiCollectionEffTitle}
+                </span>
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
+                  {at.calculated}
+                </span>
+              </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
-                  98.4%
+                <span
+                  data-testid="mgmt-kpi-collection-eff"
+                  className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums"
+                >
+                  {mgmtCanonicalMetrics.executiveKpis.collectionEfficiencyPct}%
                 </span>
                 <span className="text-xs font-semibold text-blue-600">
                   {tm.kpiCollectionEffVal}
                 </span>
               </div>
               <span className="text-[11px] text-slate-500 mt-1 block">
-                {tm.kpiCollectionEffSub}
+                {tm.kpiCollectionEffSub} · {caTranslations.liveErpCollectionEfficiencyLabel}: {mgmtCanonicalMetrics.executiveKpis.liveErpCollectionRatePct}%
               </span>
             </div>
 
             {/* Reliability Index (SAIDI) */}
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                {tm.kpiReliabilityTitle}
-              </span>
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  {tm.kpiReliabilityTitle}
+                </span>
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
+                  {at.calculated}
+                </span>
+              </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
                   18.2 min
@@ -422,7 +556,7 @@ export const ManagementPortal: React.FC = () => {
           {/* AT&C Loss Trajectory & Revenue Trajectory */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-start justify-between gap-2 mb-4">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     {tm.chartAtcCurveTitle}
@@ -430,6 +564,17 @@ export const ManagementPortal: React.FC = () => {
                   <p className="text-xs text-slate-500">
                     {tm.chartAtcCurveSubtitle}
                   </p>
+                  <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
+                    {at.mgmtChartAtcHorizon}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    {mgmtDataSource.badgeLabel}
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300">
+                    {at.historicalData}
+                  </span>
                 </div>
               </div>
 
@@ -438,7 +583,7 @@ export const ManagementPortal: React.FC = () => {
                   <LineChart data={localizedMonthlyMetrics} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.15} />
                     <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
-                    <YAxis domain={[11, 15]} stroke="#94a3b8" fontSize={11} tickLine={false} />
+                    <YAxis domain={[11, 15]} stroke="#94a3b8" fontSize={11} tickLine={false} unit="%" />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: '#101C35',
@@ -462,7 +607,7 @@ export const ManagementPortal: React.FC = () => {
             </div>
 
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-start justify-between gap-2 mb-4">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     {tm.chartEnergyVsRevTitle}
@@ -470,6 +615,17 @@ export const ManagementPortal: React.FC = () => {
                   <p className="text-xs text-slate-500">
                     {tm.chartEnergyVsRevSubtitle}
                   </p>
+                  <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
+                    {at.mgmtChartRevenueHorizon}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    {mgmtDataSource.badgeLabel}
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+                    {at.historicalData}
+                  </span>
                 </div>
               </div>
 
@@ -510,15 +666,29 @@ export const ManagementPortal: React.FC = () => {
         <div className="space-y-6">
           <SmartGridDigitalTwin />
 
-          <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-4 border-t border-slate-200 dark:border-slate-800">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                {tm.feederRadarTitle}
-              </h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {tm.feederRadarTitle}
+                </h2>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                  {mgmtDataSource.badgeLabel}
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                  {at.simulatedVsRatedLabel}
+                </span>
+              </div>
               <p className="text-xs text-slate-500">
-                {tm.feederRadarSubtitle}
+                {tm.feederRadarSubtitle} · {at.mgmtFeederRadarDisclosure}
               </p>
             </div>
+            <ExportMenu
+              datasetKey="feeder_analytics"
+              filteredRecords={FEEDER_METRICS}
+              dataSource={mgmtDataSource.code}
+              variant="compact"
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -589,71 +759,120 @@ export const ManagementPortal: React.FC = () => {
       {/* VIEW 3: AI EXECUTIVE INSIGHTS */}
       {activeTab === 'ai-insights' && (
         <div className="space-y-6">
-          {/* Live ML SLA Risk Watchlist, Predictive Services & AI Governance */}
           <LiveAiGovernancePanel />
           <LivePredictiveDecisionPanel />
           <LiveSlaRiskWatchlist />
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-slate-700 dark:text-slate-300" />
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
-                {tm.aiRadarBannerTitle}
-              </h2>
+          <div className="p-5 rounded-xl bg-gradient-to-r from-blue-900/20 to-teal-900/20 border border-teal-500/30 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Sparkles className="w-5 h-5 text-teal-400" />
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  {tm.aiRadarBannerTitle}
+                </h2>
+                <span
+                  data-testid="mgmt-ai-insights-source-badge"
+                  className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800"
+                >
+                  {mgmtForecastSource.badgeLabel}
+                </span>
+              </div>
+              <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                {at.readOnlyAdvisoryNote}
+              </span>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              {tm.aiRadarBannerSubtitle}
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              {tm.aiRadarBannerSubtitle} ({at.mgmtAiRadarDisclosure})
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500 block">
-                {tm.alert1Badge}
-              </span>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                {tm.alert1Title}
-              </h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                {tm.alert1Desc}
-              </p>
-              <button
-                onClick={() => setIsAIAssistantOpen(true)}
-                className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1"
-              >
-                <span>{tm.askCopilotBtn}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3 flex flex-col justify-between">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500 block">
+                    {tm.alert1Badge}
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                    {forecastRiskBadge.label}
+                  </span>
+                </div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {tm.alert1Title}
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  {tm.alert1Desc}
+                </p>
+              </div>
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                  <span>{at.predicted} · 14d Horizon</span>
+                  <span>{forecastUncertaintyMeta.badgeText}</span>
+                </div>
+                <button
+                  onClick={() => setIsAIAssistantOpen(true)}
+                  className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>{tm.askCopilotBtn}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 block">
-                {tm.alert2Badge}
-              </span>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                {tm.alert2Title}
-              </h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                {tm.alert2Desc}
-              </p>
-              <button
-                onClick={() => showToast(tm.dispatchVigilanceToast, 'info')}
-                className="text-xs text-amber-600 font-semibold hover:underline"
-              >
-                {tm.dispatchAuditBtn}
-              </button>
+            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3 flex flex-col justify-between">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 block">
+                    {tm.alert2Badge}
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                    {detectedAnomalyBadge.label}
+                  </span>
+                </div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {tm.alert2Title}
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  {tm.alert2Desc}
+                </p>
+              </div>
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                  <span>{at.calculated} · PF 0.72</span>
+                  <span>{mgmtDataSource.badgeLabel}</span>
+                </div>
+                <button
+                  onClick={() => showToast(tm.dispatchVigilanceToast, 'info')}
+                  className="text-xs text-amber-600 font-semibold hover:underline cursor-pointer"
+                >
+                  {tm.dispatchAuditBtn}
+                </button>
+              </div>
             </div>
 
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-teal-500 block">
-                {tm.alert3Badge}
-              </span>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                {tm.alert3Title}
-              </h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                {tm.alert3Desc}
-              </p>
-              <span className="text-xs text-slate-400">{tm.alert3Policy}</span>
+            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3 flex flex-col justify-between">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-teal-500 block">
+                    {tm.alert3Badge}
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                    {at.forecast}
+                  </span>
+                </div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {tm.alert3Title}
+                </h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  {tm.alert3Desc}
+                </p>
+              </div>
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                  <span>{at.projectedData} · Nov 2026</span>
+                  <span>{forecastUncertaintyMeta.badgeText}</span>
+                </div>
+                <span className="text-xs text-slate-400 block">{tm.alert3Policy}</span>
+              </div>
             </div>
           </div>
 
@@ -661,15 +880,15 @@ export const ManagementPortal: React.FC = () => {
           <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
             <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-purple-600" />
                   <span>{tm.aiQueueTitle}</span>
                 </h3>
                 <p className="text-xs text-slate-500">
                   {tm.aiQueueSubtitle}
                 </p>
               </div>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800 self-start sm:self-auto">
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 self-start sm:self-auto">
                 {recommendations.filter(r => r.requiredApprovingRole === 'management' && r.status === 'PENDING_APPROVAL').length} {tm.pendingConcurrenceBadge}
               </span>
             </div>
@@ -712,6 +931,7 @@ export const ManagementPortal: React.FC = () => {
                           }`}>
                             {localizeAiProposalRisk(rec.riskLevel, language)}
                           </span>
+                          <div className="text-[9px] text-slate-400 mt-0.5">{at.qualitativeRiskScoreLabel}</div>
                         </td>
                         <td className="p-3.5 whitespace-nowrap">
                           <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded ${
@@ -753,14 +973,20 @@ export const ManagementPortal: React.FC = () => {
         <div className="space-y-4 min-w-0">
           <LiveAlertEnginePanel />
           <LiveExecutiveAnalyticsSection mode="sla" />
-
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              {tm.slaMatrixTitle}
-            </h2>
-            <p className="text-xs text-slate-500">
-              {tm.slaMatrixSubtitle}
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                {tm.slaMatrixTitle}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {tm.slaMatrixSubtitle}
+              </p>
+            </div>
+            <ExportMenu
+              datasetKey="subdivision_sla"
+              filteredRecords={mgmtCanonicalMetrics.subdivisionPerformanceSeries}
+              dataSource={mgmtDataSource.code}
+            />
           </div>
 
           <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
@@ -777,10 +1003,10 @@ export const ManagementPortal: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                  {SUBDIVISION_PERFORMANCE.map(s => (
+                  {mgmtCanonicalMetrics.subdivisionPerformanceSeries.map(s => (
                     <tr key={s.name} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                       <td className="p-3.5 font-bold text-slate-900 dark:text-white whitespace-nowrap">{localizeSubdivision(s.name, language)}</td>
-                      <td className="p-3.5 font-mono tabular-nums whitespace-nowrap">{s.complaints}</td>
+                      <td className="p-3.5 font-mono tabular-nums whitespace-nowrap">{s.totalComplaintsCombined}</td>
                       <td className="p-3.5 font-mono font-semibold text-emerald-600 tabular-nums whitespace-nowrap">{s.resolvedPct}%</td>
                       <td className="p-3.5 font-mono tabular-nums whitespace-nowrap">{s.avgTatHours}{tm.hoursSuffix}</td>
                       <td className="p-3.5 font-mono tabular-nums whitespace-nowrap">{s.atcLossPct}%</td>
@@ -795,12 +1021,127 @@ export const ManagementPortal: React.FC = () => {
               </table>
             </div>
           </div>
+
+          {/* Deterministic Case-Level SLA Deadline & Risk Monitor (DEMO) */}
+          {(() => {
+            const slaStrings = getSlaDashboardUiStrings(language);
+            return (
+              <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
+                <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-blue-600" />
+                      <span>{slaStrings.liveSlaMonitorTitle}</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {slaStrings.liveSlaMonitorSubtitle}
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800 self-start sm:self-auto">
+                    {slaStrings.demoDerivedSlaBadge}
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+                      <tr>
+                        <th className="p-3.5 font-semibold whitespace-nowrap">{slaStrings.colCaseRef}</th>
+                        <th className="p-3.5 font-semibold whitespace-nowrap">{slaStrings.colRecordType}</th>
+                        <th className="p-3.5 font-semibold whitespace-nowrap">{slaStrings.colSubdivision}</th>
+                        <th className="p-3.5 font-semibold whitespace-nowrap">{slaStrings.colConfiguredSla}</th>
+                        <th className="p-3.5 font-semibold whitespace-nowrap">{slaStrings.colDueTimestamp}</th>
+                        <th className="p-3.5 font-semibold whitespace-nowrap">{slaStrings.colRiskStatus}</th>
+                        <th className="p-3.5 font-semibold whitespace-nowrap">{slaStrings.colRemainingWindow}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                      {complaints.map(cmp => {
+                        const evalResult = evaluateComplaintSla(cmp);
+                        const badge = localizeSlaRiskStateBadge(evalResult.state, language, 'complaint');
+                        return (
+                          <tr
+                            key={cmp.id}
+                            onClick={() => openCaseDrawer('complaint', cmp.id)}
+                            className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 cursor-pointer"
+                          >
+                            <td className="p-3.5 font-mono font-bold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                              {cmp.id}
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className="font-medium text-slate-800 dark:text-slate-200">
+                                {slaStrings.typeComplaint}
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                              {localizeSubdivision(cmp.subdivision, language)}
+                            </td>
+                            <td className="p-3.5 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                              {localizeSlaDuration(cmp.slaTargetHours, language)}
+                            </td>
+                            <td className="p-3.5 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                              {cmp.slaDueTime}
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded border ${badge.badgeClasses}`}>
+                                {badge.label}
+                              </span>
+                            </td>
+                            <td className="p-3.5 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                              {formatLocalizedSlaRemainingTime(evalResult, language)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {applications.filter(a => !a.isArchived).map(app => {
+                        const evalResult = evaluateApplicationSla(app);
+                        const badge = localizeSlaRiskStateBadge(evalResult.state, language, 'application');
+                        return (
+                          <tr
+                            key={app.id}
+                            onClick={() => openCaseDrawer('application', app.id)}
+                            className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 cursor-pointer"
+                          >
+                            <td className="p-3.5 font-mono font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                              {app.id}
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className="font-medium text-slate-800 dark:text-slate-200">
+                                {slaStrings.typeApplication}
+                              </span>
+                            </td>
+                            <td className="p-3.5 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                              {localizeSubdivision(app.subdivision, language)}
+                            </td>
+                            <td className="p-3.5 font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                              15d (DEMO)
+                            </td>
+                            <td className="p-3.5 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                              {app.targetCompletionDate}
+                            </td>
+                            <td className="p-3.5 whitespace-nowrap">
+                              <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded border ${badge.badgeClasses}`}>
+                                {badge.label}
+                              </span>
+                            </td>
+                            <td className="p-3.5 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                              {formatLocalizedSlaRemainingTime(evalResult, language)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
       {/* VIEW 5: EXECUTIVE EXPORT & BOARD REPORTING */}
       {activeTab === 'reports' && (
         <div className="space-y-6 min-w-0">
+          <LiveExecutiveAnalyticsSection mode="reports" />
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -814,8 +1155,6 @@ export const ManagementPortal: React.FC = () => {
               {tm.clientSideDemoBadge}
             </span>
           </div>
-
-          <LiveExecutiveAnalyticsSection mode="reports" />
 
           {/* Exportable Report Packages */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -919,7 +1258,7 @@ export const ManagementPortal: React.FC = () => {
 
           {/* Monthly Performance Ledger Preview Table */}
           <div className="space-y-3 min-w-0">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
                   {tm.previewLedgerTitle}
@@ -928,6 +1267,12 @@ export const ManagementPortal: React.FC = () => {
                   {tm.previewLedgerSubtitle}
                 </p>
               </div>
+              <ExportMenu
+                datasetKey="monthly_performance"
+                filteredRecords={EXECUTIVE_MONTHLY_METRICS}
+                dataSource={mgmtDataSource.code}
+                variant="compact"
+              />
             </div>
 
             <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
@@ -963,7 +1308,6 @@ export const ManagementPortal: React.FC = () => {
           </div>
         </div>
       )}
-
       {activeTab === 'outage-map' && <LazyOutageMapSection />}
     </div>
   );

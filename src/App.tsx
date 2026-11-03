@@ -1,6 +1,8 @@
 import React, { Suspense, lazy } from 'react';
 import { AppProvider, useApp, isValidDemoSession } from './context/AppContext';
 import { LanguageProvider } from './i18n/LanguageContext';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { PortalLoadingFallback } from './components/common/PortalLoadingFallback';
 
 const AppShell = lazy(() =>
   import('./components/layout/AppShell').then(m => ({ default: m.AppShell }))
@@ -24,16 +26,6 @@ const AdminPortal = lazy(() =>
   import('./components/admin/AdminPortal').then(m => ({ default: m.AdminPortal }))
 );
 
-const WorkspaceRouteFallback: React.FC = () => (
-  <div
-    role="status"
-    aria-live="polite"
-    className="min-h-[45vh] flex items-center justify-center p-6 text-xs font-semibold text-slate-500"
-  >
-    Loading VidyutFlow workspace…
-  </div>
-);
-
 const PortalRouter: React.FC = () => {
   const { currentRole, demoSession } = useApp();
 
@@ -43,14 +35,29 @@ const PortalRouter: React.FC = () => {
     return null;
   }
 
+  const renderActivePortal = () => {
+    switch (currentRole) {
+      case 'consumer':
+        return <ConsumerPortal />;
+      case 'employee':
+        return <EmployeePortal />;
+      case 'field':
+        return <FieldPortal />;
+      case 'management':
+        return <ManagementPortal />;
+      case 'admin':
+        return <AdminPortal />;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <Suspense fallback={<WorkspaceRouteFallback />}>
-      {currentRole === 'consumer' && <ConsumerPortal />}
-      {currentRole === 'employee' && <EmployeePortal />}
-      {currentRole === 'field' && <FieldPortal />}
-      {currentRole === 'management' && <ManagementPortal />}
-      {currentRole === 'admin' && <AdminPortal />}
-    </Suspense>
+    <ErrorBoundary scope="portal">
+      <Suspense fallback={<PortalLoadingFallback role={currentRole} />}>
+        {renderActivePortal()}
+      </Suspense>
+    </ErrorBoundary>
   );
 };
 
@@ -66,26 +73,47 @@ const MainExperience: React.FC = () => {
     demoSession.role === currentRole
   );
 
-  return (
-    <Suspense fallback={<WorkspaceRouteFallback />}>
-      {!isAuthorized ? (
+  return !isAuthorized ? (
+    <ErrorBoundary scope="app">
+      <Suspense
+        fallback={
+          <div
+            role="status"
+            aria-live="polite"
+            className="min-h-screen flex items-center justify-center bg-slate-900 text-white"
+          >
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs text-slate-300 font-medium">
+                Initializing UGVCL VidyutFlow 2.0...
+              </span>
+            </div>
+          </div>
+        }
+      >
         <WelcomePortalPage />
-      ) : (
-        /* Full Workspace Platform Shell */
+      </Suspense>
+    </ErrorBoundary>
+  ) : (
+    /* Full Workspace Platform Shell */
+    <ErrorBoundary scope="app">
+      <Suspense fallback={<PortalLoadingFallback role={currentRole} />}>
         <AppShell>
           <PortalRouter />
         </AppShell>
-      )}
-    </Suspense>
+      </Suspense>
+    </ErrorBoundary>
   );
 };
 
 export default function App() {
   return (
-    <AppProvider>
-      <LanguageProvider>
-        <MainExperience />
-      </LanguageProvider>
-    </AppProvider>
+    <ErrorBoundary scope="app">
+      <AppProvider>
+        <LanguageProvider>
+          <MainExperience />
+        </LanguageProvider>
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

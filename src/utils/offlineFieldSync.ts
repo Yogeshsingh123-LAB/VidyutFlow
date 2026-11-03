@@ -14,10 +14,12 @@
 
 import { hasBackendSession } from './backendSession';
 import { FieldSyncResponse, syncLiveFieldUpdate } from './liveData';
+import type { MeterReadingSubmission } from '../services/meterReading';
+import type { WorkOrderCompletionReport } from '../types';
 
 export type FieldSyncTaskStatus = 'FIELD_VERIFIED' | 'COMPLETED' | 'BLOCKED';
 export type OfflineQueueSyncState = 'PENDING' | 'SYNCING' | 'SYNCED' | 'DUPLICATE' | 'CONFLICT';
-export type OfflineQueueTargetKind = 'backend_request' | 'demo_workorder';
+export type OfflineQueueTargetKind = 'backend_request' | 'demo_workorder' | 'meter_reading' | 'workorder_completion';
 
 export interface OfflineInspectionDetails {
   readingKwh: number;
@@ -51,6 +53,9 @@ export interface OfflineFieldQueueItem {
   conflict_reason?: string;
   last_network_error?: string;
   inspection_details?: OfflineInspectionDetails;
+  meter_reading?: Omit<MeterReadingSubmission, 'clientUuid' | 'photoDataUrl'>;
+  photo_blob_key?: string;
+  completion_report?: WorkOrderCompletionReport;
 }
 
 export interface EnqueueFieldInspectionInput {
@@ -64,6 +69,9 @@ export interface EnqueueFieldInspectionInput {
   created_offline_at?: string;
   actor_email: string;
   inspection_details?: OfflineInspectionDetails;
+  meter_reading?: Omit<MeterReadingSubmission, 'clientUuid' | 'photoDataUrl'>;
+  photo?: Blob;
+  completion_report?: WorkOrderCompletionReport;
 }
 
 export interface FlushFieldQueueSummary {
@@ -78,7 +86,20 @@ export interface FlushFieldQueueSummary {
 export const OFFLINE_FIELD_QUEUE_KEY = 'vidyutflow_field_offline_queue';
 export const OFFLINE_MANUAL_OVERRIDE_KEY = 'vidyutflow_field_offline_override';
 const IDB_NAME = 'vidyutflow_offline_db';
+const IDB_VERSION = 3;
 const IDB_STORE = 'field_sync_queue';
+
+function upgradeOfflineDb(db: IDBDatabase): void {
+  if (!db.objectStoreNames.contains(IDB_STORE)) {
+    db.createObjectStore(IDB_STORE, { keyPath: 'client_uuid' });
+  }
+  if (!db.objectStoreNames.contains('meter_reading_photos')) {
+    db.createObjectStore('meter_reading_photos', { keyPath: 'client_uuid' });
+  }
+  if (!db.objectStoreNames.contains('field_evidence_photos')) {
+    db.createObjectStore('field_evidence_photos', { keyPath: 'id' });
+  }
+}
 
 let memoryQueue: OfflineFieldQueueItem[] | null = null;
 let activeFlushPromise: Promise<FlushFieldQueueSummary> | null = null;
@@ -173,13 +194,8 @@ function readQueueFromLocalStorage(): OfflineFieldQueueItem[] {
 function writeQueueToIndexedDb(items: OfflineFieldQueueItem[]): void {
   if (typeof indexedDB === 'undefined') return;
   try {
-    const openReq = indexedDB.open(IDB_NAME, 1);
-    openReq.onupgradeneeded = () => {
-      const db = openReq.result;
-      if (!db.objectStoreNames.contains(IDB_STORE)) {
-        db.createObjectStore(IDB_STORE, { keyPath: 'client_uuid' });
-      }
-    };
+    const openReq = indexedDB.open(IDB_NAME, IDB_VERSION);
+    openReq.onupgradeneeded = () => upgradeOfflineDb(openReq.result);
     openReq.onsuccess = () => {
       try {
         const db = openReq.result;
@@ -233,13 +249,8 @@ export async function hydrateFieldQueueFromIndexedDb(): Promise<OfflineFieldQueu
 
   return new Promise(resolve => {
     try {
-      const openReq = indexedDB.open(IDB_NAME, 1);
-      openReq.onupgradeneeded = () => {
-        const db = openReq.result;
-        if (!db.objectStoreNames.contains(IDB_STORE)) {
-          db.createObjectStore(IDB_STORE, { keyPath: 'client_uuid' });
-        }
-      };
+      const openReq = indexedDB.open(IDB_NAME, IDB_VERSION);
+      openReq.onupgradeneeded = () => upgradeOfflineDb(openReq.result);
       openReq.onerror = () => resolve(current);
       openReq.onsuccess = () => {
         try {
@@ -308,10 +319,121 @@ export function enqueueFieldInspection(input: EnqueueFieldInspectionInput): Offl
     sync_state: 'PENDING',
     attempts: 0,
     inspection_details: input.inspection_details,
+    completion_report: input.completion_report,
+    ...(input.meter_reading ? { meter_reading: input.meter_reading, photo_blob_key: input.photo ? input.client_uuid || undefined : undefined } : {}),
   };
   const next = [item, ...loadFieldQueue().filter(existing => existing.client_uuid !== item.client_uuid)];
   persistQueue(next);
+  if (input.meter_reading && input.photo) void storeQueuedMeterPhoto(item.client_uuid, input.photo);
   return item;
+}
+
+export async function storeQueuedMeterPhoto(clientUuid: string, photo: Blob): Promise<void> {
+  if (typeof indexedDB === 'undefined') throw new Error('Offline photo storage is not available in this browser.');
+  await new Promise<void>((resolve, reject) => {
+    const open = indexedDB.open(IDB_NAME, IDB_VERSION);
+    open.onupgradeneeded = () => upgradeOfflineDb(open.result);
+    open.onerror = () => reject(new Error('Could not open offline photo storage.'));
+    open.onsuccess = () => {
+      const db = open.result;
+      const tx = db.transaction('meter_reading_photos', 'readwrite');
+      tx.objectStore('meter_reading_photos').put({ client_uuid: clientUuid, photo });
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(new Error('Offline photo storage is full or unavailable.')); };
+    };
+  });
+}
+
+export async function enqueueOfflineMeterReading(input: {
+  clientUuid?: string;
+  requestId: string;
+  title: string;
+  actorEmail: string;
+  meterReading: Omit<MeterReadingSubmission, 'clientUuid' | 'photoDataUrl'>;
+  photo?: Blob;
+}): Promise<OfflineFieldQueueItem> {
+  const clientUuid = input.clientUuid || generateClientUuid();
+  if (input.photo) await storeQueuedMeterPhoto(clientUuid, input.photo);
+  const item = enqueueFieldInspection({
+    client_uuid: clientUuid,
+    target_kind: 'meter_reading',
+    request_id: input.requestId,
+    title: input.title,
+    task_status: 'FIELD_VERIFIED',
+    notes: 'Offline meter-reading submission',
+    meter_serial: input.meterReading.meterNo,
+    actor_email: input.actorEmail,
+    meter_reading: input.meterReading
+  });
+  if (input.photo) {
+    item.photo_blob_key = clientUuid;
+    persistQueue(loadFieldQueue().map(existing => existing.client_uuid === clientUuid ? item : existing));
+  }
+  return item;
+}
+
+export function enqueueWorkOrderCompletion(input: {
+  clientUuid?: string;
+  workOrderId: string;
+  title: string;
+  actorEmail: string;
+  completionReport: WorkOrderCompletionReport;
+  notes?: string;
+}): OfflineFieldQueueItem {
+  const clientUuid = input.clientUuid || generateClientUuid();
+  return enqueueFieldInspection({
+    client_uuid: clientUuid,
+    target_kind: 'workorder_completion',
+    request_id: input.workOrderId,
+    title: input.title,
+    task_status: 'COMPLETED',
+    notes: input.notes || input.completionReport.completionRemarks || 'Work order completed with evidence',
+    meter_serial: '',
+    actor_email: input.actorEmail,
+    completion_report: input.completionReport
+  });
+}
+
+export async function getQueuedMeterPhoto(clientUuid: string): Promise<Blob | undefined> {
+  if (typeof indexedDB === 'undefined') return undefined;
+  return new Promise(resolve => {
+    const open = indexedDB.open(IDB_NAME, IDB_VERSION);
+    open.onupgradeneeded = () => upgradeOfflineDb(open.result);
+    open.onerror = () => resolve(undefined);
+    open.onsuccess = () => {
+      const db = open.result;
+      if (!db.objectStoreNames.contains('meter_reading_photos')) { db.close(); resolve(undefined); return; }
+      const req = db.transaction('meter_reading_photos', 'readonly').objectStore('meter_reading_photos').get(clientUuid);
+      req.onsuccess = () => { db.close(); resolve(req.result?.photo as Blob | undefined); };
+      req.onerror = () => { db.close(); resolve(undefined); };
+    };
+  });
+}
+
+export async function deleteQueuedMeterPhoto(clientUuid: string): Promise<void> {
+  if (typeof indexedDB === 'undefined') return;
+  await new Promise<void>(resolve => {
+    const open = indexedDB.open(IDB_NAME, IDB_VERSION);
+    open.onupgradeneeded = () => upgradeOfflineDb(open.result);
+    open.onsuccess = () => {
+      const db = open.result;
+      if (!db.objectStoreNames.contains('meter_reading_photos')) { db.close(); resolve(); return; }
+      const tx = db.transaction('meter_reading_photos', 'readwrite');
+      tx.objectStore('meter_reading_photos').delete(clientUuid);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); resolve(); };
+    };
+    open.onerror = () => resolve();
+  });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('Queued meter photo could not be read.'));
+    reader.readAsDataURL(blob);
+  });
 }
 
 export interface FlushFieldQueueOptions {
@@ -377,7 +499,7 @@ export async function flushOfflineFieldQueue(
       const currentItem = snapshot[idx];
       const attemptTime = new Date().toISOString();
 
-      if (currentItem.target_kind === 'demo_workorder') {
+      if (currentItem.target_kind === 'demo_workorder' || currentItem.target_kind === 'workorder_completion') {
         attempted += 1;
         options.onApplyDemoWorkOrder?.(currentItem);
         const updated = loadFieldQueue().map(i =>
@@ -394,6 +516,39 @@ export async function flushOfflineFieldQueue(
         );
         persistQueue(updated);
         syncedCount += 1;
+        continue;
+      }
+
+      if (currentItem.target_kind === 'meter_reading') {
+        attempted += 1;
+        const payload = currentItem.meter_reading;
+        const photo = await getQueuedMeterPhoto(currentItem.client_uuid);
+        if (!payload || (currentItem.photo_blob_key && !photo)) {
+          persistQueue(loadFieldQueue().map(i => i.client_uuid === uuid ? { ...i, sync_state: 'CONFLICT' as const, conflict_code: 400, conflict_reason: 'Offline reading details or photo are missing. The item was retained for review.' } : i));
+          conflictCount += 1;
+          continue;
+        }
+        persistQueue(loadFieldQueue().map(i => i.client_uuid === uuid ? { ...i, sync_state: 'SYNCING' as const, attempts: i.attempts + 1, last_attempt_at: attemptTime } : i));
+        try {
+          const response = await fetch('/api/meter-readings', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-VidyutFlow-CSRF': '1' },
+            body: JSON.stringify({ ...payload, clientUuid: currentItem.client_uuid, ...(photo ? { photoDataUrl: await blobToDataUrl(photo) } : {}) })
+          });
+          const result = await response.json().catch(() => ({}));
+          if (response.ok) {
+            persistQueue(loadFieldQueue().map(i => i.client_uuid === uuid ? { ...i, sync_state: 'SYNCED' as const, synced_at: new Date().toISOString(), server_request_status: result.reading?.status || 'PENDING_REVIEW', last_network_error: undefined } : i));
+            await deleteQueuedMeterPhoto(uuid);
+            syncedCount += 1;
+          } else if ([400, 403, 404, 409].includes(response.status)) {
+            persistQueue(loadFieldQueue().map(i => i.client_uuid === uuid ? { ...i, sync_state: 'CONFLICT' as const, conflict_code: response.status, conflict_reason: result.error || 'Server rejected the offline meter reading.' } : i));
+            conflictCount += 1;
+          } else {
+            persistQueue(loadFieldQueue().map(i => i.client_uuid === uuid ? { ...i, sync_state: 'PENDING' as const, last_network_error: result.error || `HTTP ${response.status}` } : i));
+          }
+        } catch (error) {
+          persistQueue(loadFieldQueue().map(i => i.client_uuid === uuid ? { ...i, sync_state: 'PENDING' as const, last_network_error: error instanceof Error ? error.message : 'Network error' } : i));
+        }
         continue;
       }
 
@@ -529,6 +684,7 @@ export async function flushOfflineFieldQueue(
 export function dismissFieldQueueConflict(clientUuid: string): void {
   const next = loadFieldQueue().filter(item => item.client_uuid !== clientUuid);
   persistQueue(next);
+  void deleteQueuedMeterPhoto(clientUuid);
 }
 
 /**
@@ -588,13 +744,21 @@ export function clearOfflineFieldQueue(): void {
   }
   if (typeof indexedDB !== 'undefined') {
     try {
-      const openReq = indexedDB.open(IDB_NAME, 1);
+      const openReq = indexedDB.open(IDB_NAME, IDB_VERSION);
+      openReq.onupgradeneeded = () => upgradeOfflineDb(openReq.result);
       openReq.onsuccess = () => {
         try {
           const db = openReq.result;
           if (db.objectStoreNames.contains(IDB_STORE)) {
-            const tx = db.transaction(IDB_STORE, 'readwrite');
+            const stores = [
+              IDB_STORE,
+              ...(db.objectStoreNames.contains('meter_reading_photos') ? ['meter_reading_photos'] : []),
+              ...(db.objectStoreNames.contains('field_evidence_photos') ? ['field_evidence_photos'] : [])
+            ];
+            const tx = db.transaction(stores, 'readwrite');
             tx.objectStore(IDB_STORE).clear();
+            if (stores.includes('meter_reading_photos')) tx.objectStore('meter_reading_photos').clear();
+            if (stores.includes('field_evidence_photos')) tx.objectStore('field_evidence_photos').clear();
             tx.oncomplete = () => db.close();
           } else {
             db.close();

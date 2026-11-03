@@ -1,11 +1,3 @@
-import { LiveWorkflowKpis } from '../common/LiveWorkflowKpis';
-import { LiveAlertEnginePanel } from '../common/LiveAlertEnginePanel';
-import { LiveAiGovernancePanel } from '../common/LiveAiGovernancePanel';
-import { LiveErpAdapterPanel } from './LiveErpAdapterPanel';
-import { LiveWorkflowTemplatesPanel } from './LiveWorkflowTemplatesPanel';
-import { LiveStaffAssignmentPanel } from './LiveStaffAssignmentPanel';
-import { LivePerformanceTelemetryPanel } from './LivePerformanceTelemetryPanel';
-import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -28,6 +20,27 @@ import { localizeNotificationTimestamp } from '../../i18n/consumerContentTransla
 import {
   SYSTEM_SERVICES
 } from '../../data/mockData';
+import { ExportMenu } from '../common/ExportMenu';
+import { LiveWorkflowKpis } from '../common/LiveWorkflowKpis';
+import { LiveAlertEnginePanel } from '../common/LiveAlertEnginePanel';
+import { LiveAiGovernancePanel } from '../common/LiveAiGovernancePanel';
+import { LiveErpAdapterPanel } from './LiveErpAdapterPanel';
+import { LiveWorkflowTemplatesPanel } from './LiveWorkflowTemplatesPanel';
+import { LiveStaffAssignmentPanel } from './LiveStaffAssignmentPanel';
+import { LivePerformanceTelemetryPanel } from './LivePerformanceTelemetryPanel';
+import { safeLoadStorage } from '../../utils/securityHardening';
+import {
+  ADMIN_STAFF_USERS_STORAGE_KEY,
+  ADMIN_RBAC_PERMISSIONS_STORAGE_KEY,
+  getDemoBackupUiDictionary
+} from '../../utils/demoBackupEngine';
+import {
+  selectAdminCanonicalMetrics,
+  getCanonicalAnalyticsTranslations
+} from '../../utils/canonicalAnalytics';
+import { AdminDemoBackupCenter } from './AdminDemoBackupCenter';
+import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
+import { OrganizationalDirectoryWorkspace } from './OrganizationalDirectoryWorkspace';
 import {
   Activity,
   Users,
@@ -88,11 +101,74 @@ const INITIAL_PERMISSIONS: PermissionRow[] = [
 ];
 
 export const AdminPortal: React.FC = () => {
-  const { activeTab, auditLogs, resetDemoData, showToast, activeUser, recommendations, openApprovalModal } = useApp();
+  const {
+    activeTab,
+    setActiveTab,
+    consumers,
+    connections,
+    applications,
+    complaints,
+    workOrders,
+    bills,
+    payments,
+    incidents,
+    notifications,
+    auditLogs,
+    fieldOfflineQueue,
+    employees,
+    fieldEngineers,
+    showToast,
+    activeUser,
+    recommendations,
+    openApprovalModal
+  } = useApp();
   const { language, t } = useLanguage();
   const ad = getAdminUiDictionary(language);
-  const [users, setUsers] = useState<MockUser[]>(INITIAL_USERS);
-  const [permissions, setPermissions] = useState<PermissionRow[]>(INITIAL_PERMISSIONS);
+  const bkpDict = getDemoBackupUiDictionary(language);
+  const caTranslations = getCanonicalAnalyticsTranslations(language);
+  const [users, setUsers] = useState<MockUser[]>(() =>
+    safeLoadStorage(ADMIN_STAFF_USERS_STORAGE_KEY, INITIAL_USERS)
+  );
+  const [permissions, setPermissions] = useState<PermissionRow[]>(() =>
+    safeLoadStorage(ADMIN_RBAC_PERMISSIONS_STORAGE_KEY, INITIAL_PERMISSIONS)
+  );
+
+  const adminCanonicalMetrics = useMemo(
+    () =>
+      selectAdminCanonicalMetrics({
+        consumers,
+        connections,
+        applications,
+        complaints,
+        workOrders,
+        bills,
+        payments,
+        incidents,
+        notifications,
+        auditLogs,
+        fieldOfflineQueue,
+        employees,
+        fieldEngineers,
+        systemServices: SYSTEM_SERVICES,
+        staffUsers: users
+      }),
+    [
+      consumers,
+      connections,
+      applications,
+      complaints,
+      workOrders,
+      bills,
+      payments,
+      incidents,
+      notifications,
+      auditLogs,
+      fieldOfflineQueue,
+      employees,
+      fieldEngineers,
+      users
+    ]
+  );
   const [isBackupRunning, setIsBackupRunning] = useState(false);
   const [auditFilter, setAuditFilter] = useState<'ALL' | 'SUCCESS' | 'WARNING' | 'FAILED'>('ALL');
   const [auditSearch, setAuditSearch] = useState('');
@@ -130,9 +206,13 @@ export const AdminPortal: React.FC = () => {
   );
 
   const toggleUserStatus = (id: string) => {
-    setUsers(prev =>
-      prev.map(u => (u.id === id ? { ...u, status: u.status === 'Active' ? 'Locked' : 'Active' } : u))
-    );
+    setUsers(prev => {
+      const next = prev.map(u => (u.id === id ? { ...u, status: u.status === 'Active' ? 'Locked' : 'Active' } : u)) as MockUser[];
+      try {
+        localStorage.setItem(ADMIN_STAFF_USERS_STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
     showToast(`User ${id} access state toggled (Demo)`, 'info');
   };
 
@@ -140,6 +220,9 @@ export const AdminPortal: React.FC = () => {
     setPermissions(prev => {
       const copy = [...prev];
       copy[rowIndex] = { ...copy[rowIndex], [role]: !copy[rowIndex][role] };
+      try {
+        localStorage.setItem(ADMIN_RBAC_PERMISSIONS_STORAGE_KEY, JSON.stringify(copy));
+      } catch {}
       return copy;
     });
     showToast('Permission matrix updated in volatile session', 'info');
@@ -179,7 +262,16 @@ export const AdminPortal: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800/80 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800/80 shrink-0">
+          <button
+            type="button"
+            data-testid="admin-open-backup-center-btn"
+            onClick={() => setActiveTab('infra')}
+            className="w-full sm:w-auto min-h-11 sm:min-h-[38px] px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>{bkpDict.demoScopeBadge}</span>
+          </button>
           <button
             onClick={() => showToast('Simulated zero-downtime certificate renewal', 'success')}
             className="w-full sm:w-auto min-h-11 sm:min-h-[38px] px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
@@ -193,7 +285,6 @@ export const AdminPortal: React.FC = () => {
       {(activeTab === 'overview' || activeTab === 'integrations') && (
         <div className="space-y-4 sm:space-y-6">
           {activeTab === 'integrations' && <LiveErpAdapterPanel />}
-          {/* Live Workflow KPIs — wired to VidyutFlow FastAPI backend */}
           <LiveWorkflowKpis />
           {/* Bento Health Strip */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -238,11 +329,92 @@ export const AdminPortal: React.FC = () => {
             </div>
           </div>
 
+          {/* Live Canonical DEMO Repository State Strip */}
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Database className="w-4 h-4 text-blue-600" />
+                  <span>{caTranslations.adminLiveDemoRepoTitle}</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {caTranslations.adminLiveDemoRepoSub}
+                </p>
+              </div>
+              <span
+                data-testid="admin-total-canonical-records"
+                className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 self-start sm:self-auto"
+              >
+                {caTranslations.adminTotalCanonicalRecordsLabel}: {adminCanonicalMetrics.demoRepositoryStats.totalCanonicalRecords}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-0.5">
+                  {caTranslations.adminActiveConnectionsLabel}
+                </span>
+                <div className="text-base font-extrabold font-mono text-slate-900 dark:text-white tabular-nums">
+                  {adminCanonicalMetrics.demoRepositoryStats.totalConnections} Conn · {adminCanonicalMetrics.demoRepositoryStats.totalBills} Bills
+                </div>
+                <span className="text-[11px] text-slate-500">
+                  {adminCanonicalMetrics.demoRepositoryStats.paidBills} Paid / {adminCanonicalMetrics.demoRepositoryStats.unpaidBills} Unpaid
+                </span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-0.5">
+                  {caTranslations.adminReconciledCollectionLabel}
+                </span>
+                <div
+                  data-testid="admin-reconciled-collected-inr"
+                  className="text-base font-extrabold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums"
+                >
+                  ₹{adminCanonicalMetrics.demoRepositoryStats.totalCollectedInr.toLocaleString('en-IN')}
+                </div>
+                <span className="text-[11px] text-slate-500">
+                  {adminCanonicalMetrics.demoRepositoryStats.totalPayments} Txns · Due ₹{adminCanonicalMetrics.demoRepositoryStats.totalOutstandingInr.toLocaleString('en-IN')}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-0.5">
+                  {caTranslations.adminOpenWorkflowsLabel}
+                </span>
+                <div className="text-base font-extrabold font-mono text-blue-600 dark:text-blue-400 tabular-nums">
+                  {adminCanonicalMetrics.demoRepositoryStats.activeApplications} Apps · {adminCanonicalMetrics.demoRepositoryStats.openComplaints} Cmp · {adminCanonicalMetrics.demoRepositoryStats.activeWorkOrders} WO
+                </div>
+                <span className="text-[11px] text-slate-500">
+                  Queue: {adminCanonicalMetrics.demoRepositoryStats.offlineQueuePending} Pending / {adminCanonicalMetrics.demoRepositoryStats.offlineQueueTotal} Total
+                </span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block mb-0.5">
+                  Audit & Staff Governance
+                </span>
+                <div className="text-base font-extrabold font-mono text-slate-900 dark:text-white tabular-nums">
+                  {adminCanonicalMetrics.auditSummary.totalLogs} Logs ({adminCanonicalMetrics.auditSummary.warningCount + adminCanonicalMetrics.auditSummary.failedCount} Alerts)
+                </div>
+                <span className="text-[11px] text-slate-500">
+                  Staff: {adminCanonicalMetrics.staffDirectory.activeStaffCount} Active / {adminCanonicalMetrics.staffDirectory.lockedStaffCount} Locked
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* Microservices Status Table */}
           <div className="space-y-3 min-w-0">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              {ad.servicesTableTitle}
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                {ad.servicesTableTitle}
+              </h3>
+              <ExportMenu
+                datasetKey="system_services"
+                filteredRecords={SYSTEM_SERVICES}
+                variant="compact"
+              />
+            </div>
 
             <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
               <div className="overflow-x-auto">
@@ -280,7 +452,6 @@ export const AdminPortal: React.FC = () => {
               </div>
             </div>
           </div>
-
           {activeTab === 'overview' && <LiveErpAdapterPanel />}
         </div>
       )}
@@ -297,15 +468,18 @@ export const AdminPortal: React.FC = () => {
                 {ad.userMgmtSubtitle}
               </p>
             </div>
-            <button
-              onClick={() => {
-                const el = document.getElementById('live-staff-assignment-panel');
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }}
-              className="w-full sm:w-auto min-h-11 sm:min-h-9 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shrink-0 whitespace-nowrap cursor-pointer"
-            >
-              {ad.addStaffUserBtn}
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <ExportMenu
+                datasetKey="user_accounts"
+                filteredRecords={users}
+              />
+              <button
+                onClick={() => showToast('New enterprise user onboarding dialog (Demo)', 'info')}
+                className="w-full sm:w-auto min-h-11 sm:min-h-9 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shrink-0 whitespace-nowrap cursor-pointer"
+              >
+                {ad.addStaffUserBtn}
+              </button>
+            </div>
           </div>
 
           <LiveStaffAssignmentPanel
@@ -372,13 +546,19 @@ export const AdminPortal: React.FC = () => {
       {/* VIEW 3: ACCESS CONTROL MATRIX */}
       {activeTab === 'access' && (
         <div className="space-y-4 min-w-0">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              {ad.rbacTitle}
-            </h2>
-            <p className="text-xs text-slate-500">
-              {ad.rbacSubtitle}
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                {ad.rbacTitle}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {ad.rbacSubtitle}
+              </p>
+            </div>
+            <ExportMenu
+              datasetKey="rbac_matrix"
+              filteredRecords={permissions}
+            />
           </div>
 
           <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
@@ -430,7 +610,6 @@ export const AdminPortal: React.FC = () => {
         <div className="space-y-5 min-w-0">
           <LiveAiGovernancePanel />
           <LiveAlertEnginePanel />
-
           {/* Security & Governance Human-in-the-Loop Approvals Queue */}
           <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
             <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -563,8 +742,18 @@ export const AdminPortal: React.FC = () => {
                   {localizeAuditStatusFilter(statusOption, language)}
                 </button>
               ))}
+              <ExportMenu
+                datasetKey="audit_logs"
+                filteredRecords={filteredAuditLogs}
+                allAuthorizedRecords={auditLogs}
+                variant="compact"
+              />
             </div>
           </div>
+
+          <LiveStaffAssignmentPanel
+            onToast={(msg, kind) => showToast(msg, kind || 'info')}
+          />
 
           <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
             <div className="overflow-x-auto">
@@ -659,68 +848,78 @@ export const AdminPortal: React.FC = () => {
         </div>
       )}
 
-      {/* VIEW 5: INFRASTRUCTURE & BACKUP */}
-      {activeTab === 'infra' && (
-        <div className="space-y-5 min-w-0">
+      {/* VIEW 5: INFRASTRUCTURE & DEMO BACKUP / RECOVERY */}
+      {(activeTab === 'infra' || activeTab === 'backup') && (
+        <div className="space-y-6">
           <LivePerformanceTelemetryPanel />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Database className="w-5 h-5 text-blue-600 shrink-0" />
-              <span>{ad.backupCardTitle}</span>
-            </h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              {ad.backupCardDescription}
-            </p>
-            <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 text-xs space-y-1.5">
-              <div className="flex flex-col min-[380px]:flex-row min-[380px]:justify-between gap-0.5">
-                <span className="text-slate-400">{ad.lastSnapshotLabel}</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">{ad.lastSnapshotValue}</span>
-              </div>
-              <div className="flex flex-col min-[380px]:flex-row min-[380px]:justify-between gap-0.5">
-                <span className="text-slate-400">{ad.rpoRtoLabel}</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">{ad.rpoRtoValue}</span>
-              </div>
-            </div>
-            <button
-              onClick={handleTriggerBackup}
-              disabled={isBackupRunning}
-              className="w-full min-h-11 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-2 shadow-xs cursor-pointer"
-            >
-              <RotateCw className={`w-3.5 h-3.5 ${isBackupRunning ? 'animate-spin' : ''}`} />
-              <span>{isBackupRunning ? ad.executingBackupBtn : ad.triggerBackupBtn}</span>
-            </button>
-          </div>
+          <AdminDemoBackupCenter
+            adminRbacState={{ users, permissions }}
+            onRestoreAdminRbacState={nextRbac => {
+              setUsers(nextRbac.users);
+              setPermissions(nextRbac.permissions);
+            }}
+          />
 
-          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-              <span>{ad.cyberResilienceTitle}</span>
-            </h3>
-            <div className="space-y-2 text-xs">
-              <div className="p-3 rounded-lg border border-slate-100 dark:border-slate-800 flex justify-between items-center gap-2">
-                <span>{ad.tlsCipherLabel}</span>
-                <span className="text-emerald-600 font-bold shrink-0">{ad.tlsCipherStatus}</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Database className="w-5 h-5 text-blue-600 shrink-0" />
+                <span>{ad.backupCardTitle}</span>
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                {ad.backupCardDescription}
+              </p>
+              <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 text-xs space-y-1.5">
+                <div className="flex flex-col min-[380px]:flex-row min-[380px]:justify-between gap-0.5">
+                  <span className="text-slate-400">{ad.lastSnapshotLabel}</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{ad.lastSnapshotValue}</span>
+                </div>
+                <div className="flex flex-col min-[380px]:flex-row min-[380px]:justify-between gap-0.5">
+                  <span className="text-slate-400">{ad.rpoRtoLabel}</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{ad.rpoRtoValue}</span>
+                </div>
               </div>
-              <div className="p-3 rounded-lg border border-slate-100 dark:border-slate-800 flex justify-between items-center gap-2">
-                <span>{ad.aadhaarMaskingLabel}</span>
-                <span className="text-emerald-600 font-bold shrink-0">{ad.aadhaarMaskingStatus}</span>
-              </div>
-              <div className="p-3 rounded-lg border border-slate-100 dark:border-slate-800 flex justify-between items-center gap-2">
-                <span>{ad.scadaFirewallLabel}</span>
-                <span className="text-emerald-600 font-bold shrink-0">{ad.scadaFirewallStatus}</span>
+              <button
+                onClick={handleTriggerBackup}
+                disabled={isBackupRunning}
+                className="w-full min-h-11 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+              >
+                <RotateCw className={`w-3.5 h-3.5 ${isBackupRunning ? 'animate-spin' : ''}`} />
+                <span>{isBackupRunning ? ad.executingBackupBtn : ad.triggerBackupBtn}</span>
+              </button>
+            </div>
+
+            <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span>{ad.cyberResilienceTitle}</span>
+              </h3>
+              <div className="space-y-2 text-xs">
+                <div className="p-3 rounded-lg border border-slate-100 dark:border-slate-800 flex justify-between items-center gap-2">
+                  <span>{ad.tlsCipherLabel}</span>
+                  <span className="text-emerald-600 font-bold shrink-0">{ad.tlsCipherStatus}</span>
+                </div>
+                <div className="p-3 rounded-lg border border-slate-100 dark:border-slate-800 flex justify-between items-center gap-2">
+                  <span>{ad.aadhaarMaskingLabel}</span>
+                  <span className="text-emerald-600 font-bold shrink-0">{ad.aadhaarMaskingStatus}</span>
+                </div>
+                <div className="p-3 rounded-lg border border-slate-100 dark:border-slate-800 flex justify-between items-center gap-2">
+                  <span>{ad.scadaFirewallLabel}</span>
+                  <span className="text-emerald-600 font-bold shrink-0">{ad.scadaFirewallStatus}</span>
+                </div>
               </div>
             </div>
-          </div>
           </div>
         </div>
       )}
 
       {/* VIEW 6: SYSTEM SETTINGS */}
-      {activeTab === 'settings' && (
-        <div className="space-y-5 min-w-0">
-          <LiveWorkflowTemplatesPanel />
+      {activeTab === 'outage-map' && <LazyOutageMapSection />}
+      {activeTab === 'directory' && <OrganizationalDirectoryWorkspace />}
 
+      {activeTab === 'settings' && (
+        <div className="space-y-6">
+          <LiveWorkflowTemplatesPanel />
           <div className="max-w-2xl mx-auto p-4 sm:p-6 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
           <h2 className="text-base font-bold text-slate-900 dark:text-white">
             {ad.settingsTitle}
@@ -758,8 +957,6 @@ export const AdminPortal: React.FC = () => {
         </div>
         </div>
       )}
-
-      {activeTab === 'outage-map' && <LazyOutageMapSection />}
     </div>
   );
 };

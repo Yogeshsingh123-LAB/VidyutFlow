@@ -446,29 +446,164 @@ export function localizeConsumerAddress(address: string, lang: LanguageCode): st
   return map[address]?.[lang] || address;
 }
 
+const MONTH_NAME_TRANSLATIONS: Record<string, Record<LanguageCode, string>> = {
+  January: { en: 'January', gu: 'જાન્યુઆરી', hi: 'जनवरी', mr: 'जानेवारी' },
+  Jan: { en: 'Jan', gu: 'જાન્યુ', hi: 'जन', mr: 'जाने' },
+  February: { en: 'February', gu: 'ફેબ્રુઆરી', hi: 'फ़रवरी', mr: 'फेब्रुवारी' },
+  Feb: { en: 'Feb', gu: 'ફેબ્રુ', hi: 'फ़र', mr: 'फेब्रु' },
+  March: { en: 'March', gu: 'માર્ચ', hi: 'मार्च', mr: 'मार्च' },
+  Mar: { en: 'Mar', gu: 'માર્ચ', hi: 'मार्च', mr: 'मार्च' },
+  April: { en: 'April', gu: 'એપ્રિલ', hi: 'अप्रैल', mr: 'एप्रिल' },
+  Apr: { en: 'Apr', gu: 'એપ્રિલ', hi: 'अप्रैल', mr: 'एप्रिल' },
+  May: { en: 'May', gu: 'મે', hi: 'मई', mr: 'मे' },
+  June: { en: 'June', gu: 'જૂન', hi: 'जून', mr: 'जून' },
+  Jun: { en: 'Jun', gu: 'જૂન', hi: 'जून', mr: 'जून' },
+  July: { en: 'July', gu: 'જુલાઈ', hi: 'जुलाई', mr: 'जुलै' },
+  Jul: { en: 'Jul', gu: 'જુલાઈ', hi: 'जुलाई', mr: 'जुलै' },
+  August: { en: 'August', gu: 'ઓગસ્ટ', hi: 'अगस्त', mr: 'ऑगस्ट' },
+  Aug: { en: 'Aug', gu: 'ઓગસ્ટ', hi: 'अगस्त', mr: 'ऑगस्ट' },
+  September: { en: 'September', gu: 'સપ્ટેમ્બર', hi: 'सितंबर', mr: 'सप्टेंबर' },
+  Sep: { en: 'Sep', gu: 'સપ્ટે', hi: 'सितं', mr: 'सप्टें' },
+  October: { en: 'October', gu: 'ઓક્ટોબર', hi: 'अक्टूबर', mr: 'ऑक्टोबर' },
+  Oct: { en: 'Oct', gu: 'ઓક્ટો', hi: 'अक्टू', mr: 'ऑक्टो' },
+  November: { en: 'November', gu: 'નવેમ્બર', hi: 'नवंबर', mr: 'नोव्हेंबर' },
+  Nov: { en: 'Nov', gu: 'નવે', hi: 'नवं', mr: 'नोव्हें' },
+  December: { en: 'December', gu: 'ડિસેમ્બર', hi: 'दिसंबर', mr: 'डिसेंबर' },
+  Dec: { en: 'Dec', gu: 'ડિસે', hi: 'दिसं', mr: 'डिसें' }
+};
+
 export function localizeBillMonth(month: string, lang: LanguageCode): string {
   if (lang === 'en' || !month) return month;
-  const map: Record<string, Record<LanguageCode, string>> = {
-    'September 2026': {
-      en: 'September 2026',
-      gu: 'સપ્ટેમ્બર 2026',
-      hi: 'सितंबर 2026',
-      mr: 'सप्टेंबर 2026'
+  const trimmed = month.trim();
+
+  // Direct single-month match: "September 2026"
+  const singleMatch = trimmed.match(/^([A-Za-z]+)\s+(\d{4})$/);
+  if (singleMatch) {
+    const [, mName, yr] = singleMatch;
+    const translatedMonth = MONTH_NAME_TRANSLATIONS[mName]?.[lang];
+    if (translatedMonth) return `${translatedMonth} ${yr}`;
+  }
+
+  // Same-year bi-monthly match: "September–October 2026" or "Sep-Oct 2026"
+  const biMonthlySameYearMatch = trimmed.match(/^([A-Za-z]+)\s*[–-]\s*([A-Za-z]+)\s+(\d{4})$/);
+  if (biMonthlySameYearMatch) {
+    const [, m1, m2, yr] = biMonthlySameYearMatch;
+    const t1 = MONTH_NAME_TRANSLATIONS[m1]?.[lang] || m1;
+    const t2 = MONTH_NAME_TRANSLATIONS[m2]?.[lang] || m2;
+    return `${t1}–${t2} ${yr}`;
+  }
+
+  // Cross-year bi-monthly match: "December 2026–January 2027"
+  const biMonthlyCrossYearMatch = trimmed.match(
+    /^([A-Za-z]+)\s+(\d{4})\s*[–-]\s*([A-Za-z]+)\s+(\d{4})$/
+  );
+  if (biMonthlyCrossYearMatch) {
+    const [, m1, y1, m2, y2] = biMonthlyCrossYearMatch;
+    const t1 = MONTH_NAME_TRANSLATIONS[m1]?.[lang] || m1;
+    const t2 = MONTH_NAME_TRANSLATIONS[m2]?.[lang] || m2;
+    return `${t1} ${y1}–${t2} ${y2}`;
+  }
+
+  // Short bi-monthly label without year: "Sep–Oct"
+  const shortBiMonthlyMatch = trimmed.match(/^([A-Za-z]+)\s*[–-]\s*([A-Za-z]+)$/);
+  if (shortBiMonthlyMatch) {
+    const [, m1, m2] = shortBiMonthlyMatch;
+    const t1 = MONTH_NAME_TRANSLATIONS[m1]?.[lang] || m1;
+    const t2 = MONTH_NAME_TRANSLATIONS[m2]?.[lang] || m2;
+    return `${t1}–${t2}`;
+  }
+
+  return month;
+}
+
+export function localizeBillingCycleType(
+  cycleType: 'MONTHLY' | 'BI_MONTHLY' | string | undefined,
+  lang: LanguageCode
+): string {
+  const normalized = cycleType === 'BI_MONTHLY' ? 'BI_MONTHLY' : 'MONTHLY';
+  const map: Record<'MONTHLY' | 'BI_MONTHLY', Record<LanguageCode, string>> = {
+    MONTHLY: {
+      en: 'Monthly Cycle (1-Month)',
+      gu: 'માસિક બિલિંગ ચક્ર (૧-મહિનો)',
+      hi: 'मासिक बिलिंग चक्र (१-माह)',
+      mr: 'मासिक बिलिंग चक्र (१-महिना)'
     },
-    'August 2026': {
-      en: 'August 2026',
-      gu: 'ઓગસ્ટ 2026',
-      hi: 'अगस्त 2026',
-      mr: 'ऑगस्ट 2026'
-    },
-    'July 2026': {
-      en: 'July 2026',
-      gu: 'જુલાઈ 2026',
-      hi: 'जुलाई 2026',
-      mr: 'जुलै 2026'
+    BI_MONTHLY: {
+      en: 'Bi-Monthly Cycle (2-Month)',
+      gu: 'દ્વિ-માસિક બિલિંગ ચક્ર (૨-મહિના)',
+      hi: 'द्वैमासिक बिलिंग चक्र (२-माह)',
+      mr: 'द्वैमासिक बिलिंग चक्र (२-महिने)'
     }
   };
-  return map[month]?.[lang] || month;
+  return map[normalized][lang] || map[normalized].en;
+}
+
+export function localizeBillingCycleShortBadge(
+  cycleType: 'MONTHLY' | 'BI_MONTHLY' | string | undefined,
+  lang: LanguageCode
+): string {
+  const normalized = cycleType === 'BI_MONTHLY' ? 'BI_MONTHLY' : 'MONTHLY';
+  const map: Record<'MONTHLY' | 'BI_MONTHLY', Record<LanguageCode, string>> = {
+    MONTHLY: {
+      en: 'Monthly',
+      gu: 'માસિક',
+      hi: 'मासिक',
+      mr: 'मासिक'
+    },
+    BI_MONTHLY: {
+      en: 'Bi-Monthly',
+      gu: 'દ્વિ-માસિક',
+      hi: 'द्वैमासिक',
+      mr: 'द्वैमासिक'
+    }
+  };
+  return map[normalized][lang] || map[normalized].en;
+}
+
+export function localizeMeterReadingProvenance(
+  provenance: string | undefined,
+  lang: LanguageCode
+): string {
+  const key = provenance || 'RECORDED';
+  const map: Record<string, Record<LanguageCode, string>> = {
+    RECORDED: {
+      en: 'Recorded Meter Reading',
+      gu: 'નોંધાયેલ મીટર રીડિંગ',
+      hi: 'दर्ज मीटर रीडिंग',
+      mr: 'नोंदवलेले मीटर रीडिंग'
+    },
+    AMR_SMART_METER: {
+      en: 'AMR Smart Meter Reading',
+      gu: 'AMR સ્માર્ટ મીટર રીડિંગ',
+      hi: 'AMR स्मार्ट मीटर रीडिंग',
+      mr: 'AMR स्मार्ट मीटर रीडिंग'
+    },
+    FIELD_VERIFIED: {
+      en: 'Field Engineer Verified Reading',
+      gu: 'ફીલ્ડ એન્જિનિયર પ્રમાણિત રીડિંગ',
+      hi: 'फ़ील्ड अभियंता सत्यापित रीडिंग',
+      mr: 'फील्ड अभियंता प्रमाणित रीडिंग'
+    },
+    ESTIMATED_AVERAGE: {
+      en: 'Provisional Estimated Average',
+      gu: 'કામચલાઉ અંદાજિત સરેરાશ',
+      hi: 'अनंतिम अनुमानित औसत',
+      mr: 'तात्पुरती अंदाजित सरासरी'
+    },
+    SIMULATED_DEMO: {
+      en: 'Simulated DEMO Cycle Reading',
+      gu: 'સિમ્યુલેટેડ DEMO ચક્ર રીડિંગ',
+      hi: 'सिम्युलेटेड DEMO चक्र रीडिंग',
+      mr: 'सिम्युलेटेड DEMO चक्र रीडिंग'
+    },
+    METER_RESET_OR_REPLACED: {
+      en: 'Meter Replacement / Reset Adjusted',
+      gu: 'મીટર બદલી / રીસેટ સમાયોજિત',
+      hi: 'मीटर प्रतिस्थापन / रीसेट समायोजित',
+      mr: 'मीटर बदल / रीसेट समायोजित'
+    }
+  };
+  return map[key]?.[lang] || map.RECORDED[lang] || key;
 }
 
 export function localizeBillStatus(status: string, lang: LanguageCode): string {
@@ -491,6 +626,12 @@ export function localizeBillStatus(status: string, lang: LanguageCode): string {
       gu: 'મુદતવીતી',
       hi: 'अतिदेय',
       mr: 'मुदतबाह्य'
+    },
+    'Partially Paid': {
+      en: 'Partially Paid',
+      gu: 'આંશિક ચૂકવાયેલ',
+      hi: 'आंशिक भुगतान',
+      mr: 'अंशतः भरलेले'
     }
   };
   return map[status]?.[lang] || status;
@@ -687,6 +828,18 @@ export function localizeDocumentName(doc: string, lang: LanguageCode): string {
       gu: 'સોસાયટીનું ના-વાંધા પ્રમાણપત્ર (NOC)',
       hi: 'सोसायटी से अनापत्ति प्रमाणपत्र (NOC)',
       mr: 'सोसायटीचे ना-हरकत प्रमाणपत्र (NOC)'
+    },
+    'Solar PV Net-Metering Feasibility & Grid Connectivity Form (PDF, 640 KB)': {
+      en: 'Solar PV Net-Metering Feasibility & Grid Connectivity Form (PDF, 640 KB)',
+      gu: 'સોલાર PV નેટ-મીટરિંગ શક્યતા અને ગ્રિડ કનેક્ટિવિટી ફોર્મ (PDF, 640 KB)',
+      hi: 'सोलर PV नेट-मीटरिंग व्यवहार्यता एवं ग्रिड संयोजन फॉर्म (PDF, 640 KB)',
+      mr: 'सोलर PV नेट-मीटरिंग शक्यता आणि ग्रिड जोडणी फॉर्म (PDF, 640 KB)'
+    },
+    'Latest Electricity Bill Receipt (PDF, 310 KB)': {
+      en: 'Latest Electricity Bill Receipt (PDF, 310 KB)',
+      gu: 'તાજેતરના વીજ બિલની પાવતી (PDF, 310 KB)',
+      hi: 'नवीनतम बिजली बिल रसीद (PDF, 310 KB)',
+      mr: 'अलीकडील वीज बिल पावती (PDF, 310 KB)'
     }
   };
   return map[doc]?.[lang] || doc;
@@ -804,6 +957,66 @@ export function localizeApplicationNote(note: string, lang: LanguageCode): strin
       : lang === 'hi'
       ? `${m[1]} द्वारा आवेदन सक्रिय कतार में पुनर्स्थापित किया गया`
       : `${m[1]} द्वारे अर्ज सक्रिय रांगेत पुनर्संचयित केला`;
+  }
+
+  m = trimmed.match(
+    /^Rooftop Solar Net-Metering \(Surya Gujarat\) request registered for existing connection #(\S+) \(([\d.]+) kW (.+?)\) at (.+)\.$/
+  );
+  if (m) {
+    const connNo = m[1];
+    const kw = m[2];
+    const cat = localizeTariffCategory(m[3] as any, lang);
+    const sub = localizeSubdivision(m[4], lang);
+    return lang === 'gu'
+      ? `${sub} ખાતે હયાત વીજ જોડાણ #${connNo} (${kw} kW ${cat}) માટે રૂફટોપ સોલાર નેટ-મીટરિંગ (સૂર્ય ગુજરાત) વિનંતી નોંધવામાં આવી.`
+      : lang === 'hi'
+      ? `${sub} में मौजूदा कनेक्शन #${connNo} (${kw} kW ${cat}) हेतु रूफटॉप सोलर नेट-मीटरिंग (सूर्य गुजरात) अनुरोध पंजीकृत किया गया।`
+      : `${sub} येथे विद्यमान जोडणी #${connNo} (${kw} kW ${cat}) साठी रूफटॉप सोलर नेट-मीटरिंग (सूर्य गुजरात) विनंती नोंदवली.`;
+  }
+
+  m = trimmed.match(
+    /^Rooftop Solar Net-Metering \(Surya Gujarat\) application registered for ([\d.]+) kW (.+?) supply at (.+)\.$/
+  );
+  if (m) {
+    const kw = m[1];
+    const cat = localizeTariffCategory(m[2] as any, lang);
+    const sub = localizeSubdivision(m[3], lang);
+    return lang === 'gu'
+      ? `${sub} ખાતે ${kw} kW ${cat} વીજ પુરવઠા માટે રૂફટોપ સોલાર નેટ-મીટરિંગ (સૂર્ય ગુજરાત) અરજી નોંધવામાં આવી.`
+      : lang === 'hi'
+      ? `${sub} में ${kw} kW ${cat} आपूर्ति हेतु रूफटॉप सोलर नेट-मीटरिंग (सूर्य गुजरात) आवेदन पंजीकृत किया गया।`
+      : `${sub} येथे ${kw} kW ${cat} पुरवठ्यासाठी रूफटॉप सोलर नेट-मीटरिंग (सूर्य गुजरात) अर्ज नोंदवला.`;
+  }
+
+  m = trimmed.match(
+    /^(Load Extension|Load Reduction) request registered for connection #(\S+): current sanctioned load ([\d.]+) kW to requested load ([\d.]+) kW \((.+?)\) at (.+)\.$/
+  );
+  if (m) {
+    const isReduction = m[1] === 'Load Reduction';
+    const connNo = m[2];
+    const curKw = m[3];
+    const reqKw = m[4];
+    const cat = localizeTariffCategory(m[5] as any, lang);
+    const sub = localizeSubdivision(m[6], lang);
+    return lang === 'gu'
+      ? `${sub} ખાતે વીજ જોડાણ #${connNo} (${cat}) માટે ${isReduction ? 'લોડ ઘટાડો' : 'લોડ વધારો'} વિનંતી નોંધવામાં આવી: હાલનો મંજૂર લોડ ${curKw} kW થી માંગેલ લોડ ${reqKw} kW.`
+      : lang === 'hi'
+      ? `${sub} में कनेक्शन #${connNo} (${cat}) हेतु ${isReduction ? 'लोड कमी' : 'लोड विस्तार'} अनुरोध पंजीकृत: वर्तमान स्वीकृत भार ${curKw} kW से अनुरोधित भार ${reqKw} kW।`
+      : `${sub} येथे जोडणी #${connNo} (${cat}) साठी ${isReduction ? 'लोड कपात' : 'लोड वाढ'} विनंती नोंदवली: सध्याचा मंजूर भार ${curKw} kW वरून मागितलेला भार ${reqKw} kW.`;
+  }
+
+  m = trimmed.match(
+    /^New LT connection application registered for ([\d.]+) kW (.+?) supply at (.+)\.$/
+  );
+  if (m) {
+    const kw = m[1];
+    const cat = localizeTariffCategory(m[2] as any, lang);
+    const sub = localizeSubdivision(m[3], lang);
+    return lang === 'gu'
+      ? `${sub} ખાતે ${kw} kW ${cat} વીજ પુરવઠા માટે નવી LT જોડાણ અરજી નોંધવામાં આવી.`
+      : lang === 'hi'
+      ? `${sub} में ${kw} kW ${cat} आपूर्ति हेतु नया LT कनेक्शन आवेदन पंजीकृत किया गया।`
+      : `${sub} येथे ${kw} kW ${cat} पुरवठ्यासाठी नवीन LT जोडणी अर्ज नोंदवला.`;
   }
 
   return note;
@@ -1161,6 +1374,36 @@ export function localizeNotificationStatusBadge(label: string, lang: LanguageCod
       hi: 'फील्ड असाइनमेंट',
       mr: 'फील्ड नेमणूक'
     },
+    'Work Order Reassigned': {
+      en: 'Work Order Reassigned',
+      gu: 'વર્ક ઓર્ડર પુનઃસોંપાયો',
+      hi: 'कार्य आदेश पुनः आवंटित',
+      mr: 'वर्क ऑर्डर पुन्हा नेमले'
+    },
+    'Emergency Dispatch': {
+      en: 'Emergency Dispatch',
+      gu: 'કટોકટી ડિસ્પેચ',
+      hi: 'आपातकालीन डिस्पैच',
+      mr: 'तातडीचे डिस्पॅच'
+    },
+    'Work Order Updated': {
+      en: 'Work Order Updated',
+      gu: 'વર્ક ઓર્ડર અપડેટ',
+      hi: 'कार्य आदेश अपडेट',
+      mr: 'वर्क ऑर्डर अपडेट'
+    },
+    'Sync Completed': {
+      en: 'Sync Completed',
+      gu: 'સિંક પૂર્ણ',
+      hi: 'सिंक पूर्ण',
+      mr: 'सिंक पूर्ण'
+    },
+    'Sync Conflict': {
+      en: 'Sync Conflict',
+      gu: 'સિંક સંઘર્ષ',
+      hi: 'सिंक टकराव',
+      mr: 'सिंक संघर्ष'
+    },
     'Executive Escalation': {
       en: 'Executive Escalation',
       gu: 'એક્ઝિક્યુટિવ એસ્કેલેશન',
@@ -1238,6 +1481,48 @@ export function localizeNotificationStatusBadge(label: string, lang: LanguageCod
       gu: 'સુરક્ષા',
       hi: 'सुरक्षा',
       mr: 'सुरक्षा'
+    },
+    'Approaching Deadline': {
+      en: 'Approaching Deadline',
+      gu: 'સમયમર્યાદા નજીક',
+      hi: 'समय-सीमा निकट',
+      mr: 'मुदत जवळ आली'
+    },
+    'SLA Breached': {
+      en: 'SLA Breached',
+      gu: 'SLA સમયમર્યાદા ભંગ',
+      hi: 'SLA समय-सीमा उल्लंघन',
+      mr: 'SLA मुदत भंग'
+    },
+    'On Track': {
+      en: 'On Track',
+      gu: 'સમયસર (On Track)',
+      hi: 'समय पर (On Track)',
+      mr: 'वेळेवर (On Track)'
+    },
+    'Acknowledged': {
+      en: 'Acknowledged',
+      gu: 'સ્વીકૃત',
+      hi: 'स्वीकृत',
+      mr: 'स्वीकारले'
+    },
+    'Resolved': {
+      en: 'Resolved',
+      gu: 'ઉકેલાયેલ',
+      hi: 'समाधान हो गया',
+      mr: 'निवारण झाले'
+    },
+    'Closed': {
+      en: 'Closed',
+      gu: 'બંધ',
+      hi: 'बंद',
+      mr: 'बंद'
+    },
+    'Critical Incident': {
+      en: 'Critical Incident',
+      gu: 'ગંભીર ઘટના',
+      hi: 'गंभीर घटना',
+      mr: 'अति-गंभीर घटना'
     }
   };
 
@@ -1858,6 +2143,38 @@ function localizeNotificationTitleAndMessage(
         : lang === 'hi'
         ? `आपातकालीन DT थर्मल अलर्ट: ${woId}`
         : `आपत्कालीन DT थर्मल इशारा: ${woId}`;
+  } else if ((m = notif.title.match(/^SLA Deadline Approaching:\s*#?(.+)$/))) {
+    const cmpId = m[1];
+    localizedTitle =
+      lang === 'gu'
+        ? `SLA સમયમર્યાદા નજીક: #${cmpId}`
+        : lang === 'hi'
+        ? `SLA समय-सीमा निकट: #${cmpId}`
+        : `SLA मुदत जवळ आली: #${cmpId}`;
+  } else if ((m = notif.title.match(/^SLA Breached:\s*#?(.+)$/))) {
+    const cmpId = m[1];
+    localizedTitle =
+      lang === 'gu'
+        ? `SLA સમયમર્યાદા ભંગ: #${cmpId}`
+        : lang === 'hi'
+        ? `SLA समय-सीमा उल्लंघन: #${cmpId}`
+        : `SLA मुदत भंग: #${cmpId}`;
+  } else if ((m = notif.title.match(/^Application SLA Approaching:\s*(.+)$/))) {
+    const appId = m[1];
+    localizedTitle =
+      lang === 'gu'
+        ? `અરજી SLA સમયમર્યાદા નજીક: ${appId}`
+        : lang === 'hi'
+        ? `आवेदन SLA समय-सीमा निकट: ${appId}`
+        : `अर्ज SLA मुदत जवळ आली: ${appId}`;
+  } else if ((m = notif.title.match(/^Application Target Overdue:\s*(.+)$/))) {
+    const appId = m[1];
+    localizedTitle =
+      lang === 'gu'
+        ? `અરજી લક્ષ્યાંક તારીખ વીતી ગઈ: ${appId}`
+        : lang === 'hi'
+        ? `आवेदन लक्ष्य तिथि समाप्त: ${appId}`
+        : `अर्ज उद्दिष्ट तारीख उलटली: ${appId}`;
   }
 
   // --- MESSAGE PATTERNS ---
@@ -2754,6 +3071,71 @@ function localizeNotificationTitleAndMessage(
         : lang === 'hi'
         ? `${title} के लिए फील्ड निरीक्षण और तकनीकी रिपोर्ट सबमिट की गई है।`
         : `${title} साठी फील्ड तपासणी आणि तांत्रिक अहवाल सादर करण्यात आला आहे.`;
+  } else if (
+    (m = notif.message.match(
+      /^Grievance\s+#?(\S+)\s+\(([^)]+)\)\s+in\s+(.+?)\s+has\s+(\d+)\s+mins\s+remaining before its\s+(\d+)h SLA deadline\s+\(([^)]+)\)\.$/
+    ))
+  ) {
+    const cmpId = m[1];
+    const cat = localizeComplaintCategory(m[2], lang);
+    const sub = localizeSubdivision(m[3], lang);
+    const mins = m[4];
+    const slaHrs = m[5];
+    const due = m[6];
+    localizedMessage =
+      lang === 'gu'
+        ? `${sub} માં ફરિયાદ #${cmpId} (${cat}) ની ${slaHrs} કલાકની SLA સમયમર્યાદા (${due}) પૂર્ણ થવામાં ${mins} મિનિટ બાકી છે.`
+        : lang === 'hi'
+        ? `${sub} में शिकायत #${cmpId} (${cat}) की ${slaHrs} घंटे की SLA समय-सीमा (${due}) समाप्त होने में ${mins} मिनट शेष हैं।`
+        : `${sub} मधील तक्रार #${cmpId} (${cat}) च्या ${slaHrs} तासांच्या SLA मुदतीस (${due}) ${mins} मिनिटे शिल्लक आहेत.`;
+  } else if (
+    (m = notif.message.match(
+      /^Grievance\s+#?(\S+)\s+\(([^)]+)\)\s+in\s+(.+?)\s+has breached its\s+(\d+)h SLA deadline\s+\(([^)]+)\)\.\s*Immediate resolution required\.$/
+    ))
+  ) {
+    const cmpId = m[1];
+    const cat = localizeComplaintCategory(m[2], lang);
+    const sub = localizeSubdivision(m[3], lang);
+    const slaHrs = m[4];
+    const due = m[5];
+    localizedMessage =
+      lang === 'gu'
+        ? `${sub} માં ફરિયાદ #${cmpId} (${cat}) એ તેની ${slaHrs} કલાકની SLA સમયમર્યાદા (${due}) વટાવી દીધી છે. તાત્કાલિક નિવારણ જરૂરી છે.`
+        : lang === 'hi'
+        ? `${sub} में शिकायत #${cmpId} (${cat}) ने अपनी ${slaHrs} घंटे की SLA समय-सीमा (${due}) का उल्लंघन किया है। तत्काल समाधान आवश्यक है।`
+        : `${sub} मधील तक्रार #${cmpId} (${cat}) ने आपली ${slaHrs} तासांची SLA मुदत (${due}) ओलांडली आहे. तात्काळ निवारण आवश्यक आहे.`;
+  } else if (
+    (m = notif.message.match(
+      /^Application\s+(\S+)\s+\(([^)]+)\)\s+in\s+(.+?)\s+has\s+(\d+)\s+mins\s+remaining before its DEMO target completion window\s+\(([^)]+)\)\.$/
+    ))
+  ) {
+    const appId = m[1];
+    const applicant = m[2];
+    const sub = localizeSubdivision(m[3], lang);
+    const mins = m[4];
+    const due = m[5];
+    localizedMessage =
+      lang === 'gu'
+        ? `${sub} માં અરજી ${appId} (${applicant}) ના DEMO લક્ષ્યાંક પૂર્ણતા સમયગાળા (${due}) પહેલાં ${mins} મિનિટ બાકી છે.`
+        : lang === 'hi'
+        ? `${sub} में आवेदन ${appId} (${applicant}) की DEMO लक्ष्य पूर्णता अवधि (${due}) से पहले ${mins} मिनट शेष हैं।`
+        : `${sub} मधील अर्ज ${appId} (${applicant}) च्या DEMO उद्दिष्ट कालावधीपूर्वी (${due}) ${mins} मिनिटे शिल्लक आहेत.`;
+  } else if (
+    (m = notif.message.match(
+      /^Application\s+(\S+)\s+\(([^)]+)\)\s+in\s+(.+?)\s+has passed its DEMO target completion date\s+\(([^)]+)\)\s+at stage\s+(.+)\.$/
+    ))
+  ) {
+    const appId = m[1];
+    const applicant = m[2];
+    const sub = localizeSubdivision(m[3], lang);
+    const due = m[4];
+    const stage = localizeApplicationStatus(m[5], lang);
+    localizedMessage =
+      lang === 'gu'
+        ? `${sub} માં અરજી ${appId} (${applicant}) એ ${stage} તબક્કામાં તેની DEMO લક્ષ્યાંક પૂર્ણતા તારીખ (${due}) વટાવી દીધી છે.`
+        : lang === 'hi'
+        ? `${sub} में आवेदन ${appId} (${applicant}) ने ${stage} चरण में अपनी DEMO लक्ष्य पूर्णता तिथि (${due}) पार कर ली है।`
+        : `${sub} मधील अर्ज ${appId} (${applicant}) ने ${stage} टप्प्यावर आपली DEMO उद्दिष्ट पूर्णता तारीख (${due}) ओलांडली आहे.`;
   }
 
   return {

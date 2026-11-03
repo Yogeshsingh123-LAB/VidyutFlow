@@ -14,6 +14,28 @@ export interface RoleConfig {
 
 export type TariffCategory = 'Residential (RGPU)' | 'Commercial (NRGP)' | 'Industrial (LTMD)' | 'Agricultural (AG)';
 
+export type BillingCycleType = 'MONTHLY' | 'BI_MONTHLY';
+
+export type MeterReadingProvenance =
+  | 'RECORDED'
+  | 'AMR_SMART_METER'
+  | 'FIELD_VERIFIED'
+  | 'ESTIMATED_AVERAGE'
+  | 'SIMULATED_DEMO'
+  | 'METER_RESET_OR_REPLACED';
+
+export type TariffCyclePolicyMode =
+  | 'MONTHLY_STANDARD'
+  | 'BI_MONTHLY_PROPORTIONAL_2X_DEMO'
+  | 'BI_MONTHLY_UNSCALED_SLABS_DEMO';
+
+export interface BillAuditMetadata {
+  createdByRole?: UserRole;
+  createdByActor?: string;
+  calculationNotes?: string;
+  isDemoTariffAssumption?: boolean;
+}
+
 export interface ElectricityConnection {
   consumerNo: string;
   connectionId: string;
@@ -34,11 +56,15 @@ export interface ElectricityConnection {
   securityDeposit: number;
   accountId?: string;
   accountEmail?: string;
+  billingCycleType?: BillingCycleType;
+  billingCycleAnchorMonth?: number; // 1-12
+  periodStartDate?: string;
 }
 
 export interface ElectricityBill {
   billNo: string;
   consumerNo: string;
+  connectionId?: string;
   billMonth: string;
   billDate: string;
   dueDate: string;
@@ -49,11 +75,38 @@ export interface ElectricityBill {
   electricityDuty: number;
   rebateOrSubsidy: number;
   totalAmount: number;
-  status: 'Paid' | 'Unpaid' | 'Overdue';
+  status: 'Paid' | 'Unpaid' | 'Overdue' | 'Partially Paid';
   paidDate?: string;
   transactionRef?: string;
   slabBreakdown: { slab: string; units: number; rate: number; amount: number }[];
   accountId?: string;
+  paidAmount?: number;
+  remainingBalance?: number;
+  outstandingBalance?: number;
+  isSimulatedDemoBill?: boolean;
+  generatedAt?: string;
+  // Backward-compatible Bi-Monthly & Cycle Metadata
+  billingCycleType?: BillingCycleType;
+  periodStartDate?: string;
+  periodEndDate?: string;
+  billingPeriodLabel?: string;
+  previousReadingKwh?: number;
+  currentReadingKwh?: number;
+  previousReadingDate?: string;
+  currentReadingDate?: string;
+  readingProvenance?: MeterReadingProvenance;
+  meterMultiplier?: number;
+  meterReplacementAdjustmentKwh?: number;
+  oldMeterPreviousReadingKwh?: number;
+  oldMeterFinalReadingKwh?: number;
+  newMeterInitialReadingKwh?: number;
+  otherAdjustmentsInr?: number;
+  tariffConfigVersion?: string;
+  tariffCyclePolicyMode?: TariffCyclePolicyMode;
+  isPartialPeriod?: boolean;
+  billedDaysCount?: number;
+  standardCycleDaysCount?: number;
+  auditMetadata?: BillAuditMetadata;
 }
 
 export interface PaymentTransaction {
@@ -67,6 +120,13 @@ export interface PaymentTransaction {
   bankReference: string;
   accountId?: string;
 }
+
+export type ConsumerServiceRequestType =
+  | 'NEW_CONNECTION'
+  | 'SOLAR_NET_METERING'
+  | 'LOAD_CHANGE';
+
+export type LoadChangeDirection = 'EXTENSION' | 'REDUCTION' | 'UNCHANGED';
 
 export interface NewConnectionApplication {
   id: string;
@@ -96,6 +156,74 @@ export interface NewConnectionApplication {
   archivedAt?: string;
   archivedBy?: string;
   archiveReason?: string;
+  serviceRequestType?: ConsumerServiceRequestType;
+  loadChangeDirection?: LoadChangeDirection;
+  currentSanctionedLoadKw?: number;
+  requestedTotalLoadKw?: number;
+  targetConsumerNo?: string;
+  solarInstallationType?: 'ROOFTOP' | 'GROUND_MOUNTED';
+  proposedSolarCapacityKw?: number;
+  solarInverterRatingKva?: number;
+  prefillSourceConsumerNo?: string;
+  prefillSourceBillNo?: string;
+  linkedConsumerNo?: string;
+  linkedMeterNo?: string;
+  loadChangeConfirmed?: boolean;
+  solarInterest?: boolean;
+  purpose?: string;
+  request_type?: string;
+}
+
+export type EvidenceType = 'before' | 'after' | 'inspection' | 'other';
+export type EvidenceVerificationStatus = 'pending' | 'accepted' | 'rejected';
+export type WorkOrderVerificationStatus = 'unsubmitted' | 'pending_verification' | 'approved' | 'rejected' | 'more_info_needed';
+
+export interface FieldEvidenceItem {
+  id: string;
+  workOrderId: string;
+  relatedComplaintId?: string;
+  relatedIncidentId?: string;
+  type: EvidenceType;
+  capturedAt?: string;
+  submittedAt: string;
+  submittedByRole: string;
+  submittedByUser: string;
+  storageRef: string;
+  mimeType: string;
+  fileSize: number;
+  verificationStatus: EvidenceVerificationStatus;
+  source: 'DEMO' | 'backend';
+  thumbnailUrl?: string;
+  caption?: string;
+}
+
+export interface WorkOrderCompletionReport {
+  technicalObservations: string;
+  repairAction: string;
+  materialsUsed?: string[];
+  checklist: Record<string, boolean>;
+  completionRemarks: string;
+  completedAt: string;
+  locationEvidencePermitted?: boolean;
+  gpsLocation?: string;
+  evidenceItems: FieldEvidenceItem[];
+  clientUuid?: string;
+  safetyPhotoExemptionReason?: string;
+}
+
+export interface WorkOrderVerificationReview {
+  reviewedBy: string;
+  reviewedByRole: string;
+  reviewedAt: string;
+  action: 'approve' | 'request_more_info' | 'reject' | 'reassign';
+  reason: string;
+}
+
+export interface ComplaintFeedback {
+  rating: number;
+  confirmedSatisfaction: boolean;
+  comments?: string;
+  submittedAt: string;
 }
 
 export interface ComplaintRecord {
@@ -119,6 +247,11 @@ export interface ComplaintRecord {
   resolvedAt?: string;
   timeline: { time: string; stage: string; actor: string; remark: string }[];
   accountId?: string;
+  verificationStatus?: WorkOrderVerificationStatus;
+  feedback?: ComplaintFeedback;
+  reopenedFromComplaintId?: string;
+  reopenReason?: string;
+  followUpComplaintId?: string;
 }
 
 export interface WorkOrder {
@@ -133,7 +266,7 @@ export interface WorkOrder {
   consumerName?: string;
   priority: 'Emergency' | 'High' | 'Routine';
   scheduledDate: string;
-  status: 'Pending' | 'En Route' | 'On Site' | 'Completed' | 'Deferred';
+  status: 'Pending' | 'Assigned' | 'En Route' | 'On Site' | 'In Progress' | 'Completed' | 'Deferred';
   assignedTo: string;
   materialsNeeded: string[];
   complaintId?: string;
@@ -149,6 +282,9 @@ export interface WorkOrder {
     technicianRemarks: string;
     photoUploaded: boolean;
   };
+  verificationStatus?: WorkOrderVerificationStatus;
+  completionReport?: WorkOrderCompletionReport;
+  verificationReview?: WorkOrderVerificationReview;
 }
 
 export interface FeederHealth {
@@ -302,7 +438,8 @@ export type IncidentEventType =
   | 'ASSISTANCE_REQUESTED'
   | 'RESOLUTION_SUBMITTED'
   | 'RESOLVED'
-  | 'CLOSED';
+  | 'CLOSED'
+  | 'SEVERITY_CHANGED';
 
 export type EmergencyHazardClassification =
   | 'ELECTROCUTION_RISK'

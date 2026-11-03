@@ -133,9 +133,29 @@ def ensure_default_premises(db: Session, u: User) -> None:
 
 
 class Register(BaseModel):
+    model_config = {"extra": "ignore"}
     email: EmailStr
     name: str
     password: str
+    role: str = "consumer"
+    zone: str = "North"
+    phone: str | None = None
+    mobileNumber: str | None = Field(default=None, alias="mobile_number")
+
+    @field_validator("password")
+    @classmethod
+    def password_fits_bcrypt(cls, password: str) -> str:
+        validate_password_policy(password)
+        return password
+
+
+class SignupRequest(BaseModel):
+    model_config = {"extra": "ignore"}
+    name: str = Field(..., min_length=2, max_length=120)
+    email: EmailStr
+    password: str
+    mobileNumber: str | None = Field(default=None, alias="mobile_number")
+    phone: str | None = None
     role: str = "consumer"
     zone: str = "North"
 
@@ -188,37 +208,124 @@ class PremiseCreateBody(BaseModel):
     premises_type: str = "Owned"
 
 
-@router.post("/register", status_code=201, dependencies=[Depends(enforce_login_limit)])
-def register(body: Register, db: Session = Depends(get_db)):
-    if body.role != "consumer":
+def register_consumer_internal(
+    db: Session,
+    email: str,
+    name: str,
+    password: str,
+    role: str = "consumer",
+    zone: str = "North",
+    phone: str | None = None,
+) -> User:
+    if role != "consumer":
         raise HTTPException(403, "Public registration is restricted to consumers")
-    canonical_zone = resolve_active_zone(db, body.zone)
-    norm_email = body.email.strip().lower()
+    canonical_zone = resolve_active_zone(db, zone)
+    norm_email = email.strip().lower()
     if db.query(User).filter(func.lower(User.email) == norm_email).first():
-        # Generic message avoids confirming whether the account exists
         raise HTTPException(
-            400,
-            "Registration could not be completed with the provided details. Please verify your information or proceed to login.",
+            409,
+            "An account with this email address already exists. Please proceed to login.",
         )
     try:
-        pw_hash = hash_password(body.password)
+        pw_hash = hash_password(password)
     except ValueError as exc:
         raise HTTPException(422, str(exc))
 
-    clean_name = sanitize_untrusted_text(body.name)
+    clean_name = sanitize_untrusted_text(name)
     if not clean_name:
         raise HTTPException(422, "Valid applicant name is required")
     u = User(
         email=norm_email,
         name=clean_name,
-        role=body.role,
+        role=role,
         zone=canonical_zone,
         hashed_password=pw_hash,
     )
     db.add(u)
     db.commit()
     db.refresh(u)
+    audit(db, u.id, "USER_REGISTERED", "user", u.id, f"email={norm_email}")
+    db.commit()
+    return u
+
+
+@router.post("/register", status_code=201, dependencies=[Depends(enforce_login_limit)])
+def register(body: Register, db: Session = Depends(get_db)):
+    u = register_consumer_internal(
+        db,
+        email=body.email,
+        name=body.name,
+        password=body.password,
+        role=body.role,
+        zone=body.zone,
+        phone=getattr(body, "phone", None) or getattr(body, "mobileNumber", None),
+    )
     return {"id": u.id, "email": u.email, "name": u.name, "role": u.role, "zone": u.zone}
+
+
+@router.post("/signup", status_code=201, dependencies=[Depends(enforce_login_limit)])
+def signup(
+    body: SignupRequest,
+    response: Response,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Public consumer registration issuing HttpOnly session cookie and structured identity payload."""
+    phone_val = body.phone or body.mobileNumber or ""
+    u = register_consumer_internal(
+        db,
+        email=body.email,
+        name=body.name,
+        password=body.password,
+        role=body.role,
+        zone=body.zone,
+        phone=phone_val,
+    )
+
+    access_tok = create_token(u.id, u.role, token_type="access", expires_minutes=int(settings.access_token_minutes))
+    refresh_tok = generate_refresh_token()
+    refresh_h = hash_token(refresh_tok)
+
+    now_dt = datetime.now(timezone.utc)
+    exp_dt = now_dt + timedelta(days=int(settings.refresh_token_days))
+
+    p = decode_token(access_tok, expected_type="access") or {}
+    jti = p.get("jti") or str(uuid.uuid4())
+    client_ip = request.client.host if request.client else ""
+    user_agent = request.headers.get("user-agent", "")
+
+    sess = UserSession(
+        user_id=u.id,
+        jti=jti,
+        refresh_token_hash=refresh_h,
+        token_family=str(uuid.uuid4()),
+        ip_address=client_ip,
+        user_agent=user_agent[:255] if user_agent else "",
+        expires_at=exp_dt,
+    )
+    db.add(sess)
+    db.commit()
+
+    _set_auth_cookie(response, access_tok)
+    _set_refresh_cookie(response, refresh_tok)
+
+    login_time = now_dt.isoformat()
+    expires_at_ms = int((now_dt + timedelta(minutes=int(settings.access_token_minutes))).timestamp() * 1000)
+
+    return {
+        "authenticated": True,
+        "user": {
+            "id": u.id,
+            "email": u.email,
+            "name": u.name,
+            "role": u.role,
+            "mobileNumber": phone_val,
+            "isDemoAccount": False,
+        },
+        "role": u.role,
+        "loginTime": login_time,
+        "expiresAt": expires_at_ms,
+    }
 
 
 @router.post("/login", dependencies=[Depends(enforce_login_limit)])

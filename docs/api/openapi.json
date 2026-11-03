@@ -111,7 +111,7 @@
             "type": "string"
           },
           "document": {
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "Document",
             "type": "string"
           },
@@ -213,13 +213,12 @@
                 "type": "null"
               }
             ],
-            "format": "password",
             "title": "Client Secret"
           },
           "grant_type": {
             "anyOf": [
               {
-                "pattern": "^password$",
+                "pattern": "password",
                 "type": "string"
               },
               {
@@ -229,7 +228,6 @@
             "title": "Grant Type"
           },
           "password": {
-            "format": "password",
             "title": "Password",
             "type": "string"
           },
@@ -420,6 +418,131 @@
           "name"
         ],
         "title": "CreateWorkflowTemplateBody",
+        "type": "object"
+      },
+      "EvidenceReviewReq": {
+        "properties": {
+          "review_remarks": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Review notes or feedback remarks",
+            "title": "Review Remarks"
+          },
+          "verification_status": {
+            "description": "approved | rejected | more_info_needed",
+            "title": "Verification Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verification_status"
+        ],
+        "title": "EvidenceReviewReq",
+        "type": "object"
+      },
+      "EvidenceSubmitReq": {
+        "properties": {
+          "client_uuid": {
+            "description": "RFC-4122 Client UUID for idempotent offline submission",
+            "title": "Client Uuid",
+            "type": "string"
+          },
+          "complaint_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional linked complaint ID",
+            "title": "Complaint Id"
+          },
+          "evidence_type": {
+            "description": "photo_before | photo_after | checklist | technical_report | safety_exemption",
+            "title": "Evidence Type",
+            "type": "string"
+          },
+          "file_size_bytes": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "File Size Bytes",
+            "type": "integer"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "metadata_json": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Json"
+          },
+          "mime_type": {
+            "default": "image/jpeg",
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "sha256_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256 Hash"
+          },
+          "storage_ref": {
+            "description": "IndexedDB storage key or asset reference",
+            "title": "Storage Ref",
+            "type": "string"
+          },
+          "work_order_id": {
+            "description": "Target work order ID",
+            "title": "Work Order Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_uuid",
+          "work_order_id",
+          "evidence_type",
+          "storage_ref"
+        ],
+        "title": "EvidenceSubmitReq",
         "type": "object"
       },
       "FieldSync": {
@@ -984,13 +1107,6 @@
       },
       "ValidationError": {
         "properties": {
-          "ctx": {
-            "title": "Context",
-            "type": "object"
-          },
-          "input": {
-            "title": "Input"
-          },
           "loc": {
             "items": {
               "anyOf": [
@@ -2335,6 +2451,178 @@
         "summary": "Trigger Erp Sync",
         "tags": [
           "erp"
+        ]
+      }
+    },
+    "/evidence": {
+      "post": {
+        "description": "Additive endpoint for submitting work order completion evidence with client UUID idempotency.",
+        "operationId": "submit_evidence_evidence_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceSubmitReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Submit Evidence",
+        "tags": [
+          "evidence"
+        ]
+      }
+    },
+    "/evidence/kpis/summary": {
+      "get": {
+        "description": "Aggregate KPI metrics for field completion verification.",
+        "operationId": "get_evidence_kpis_evidence_kpis_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Get Evidence Kpis",
+        "tags": [
+          "evidence"
+        ]
+      }
+    },
+    "/evidence/work-order/{work_order_id}": {
+      "get": {
+        "description": "Retrieve all evidence records associated with a work order (staff/admin only).",
+        "operationId": "get_work_order_evidence_evidence_work_order__work_order_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_order_id",
+            "required": true,
+            "schema": {
+              "title": "Work Order Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Get Work Order Evidence",
+        "tags": [
+          "evidence"
+        ]
+      }
+    },
+    "/evidence/{evidence_id}/verify": {
+      "post": {
+        "description": "Authorized employee or admin reviews submitted evidence and approves, rejects, or requests more information.",
+        "operationId": "review_evidence_evidence__evidence_id__verify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evidence_id",
+            "required": true,
+            "schema": {
+              "title": "Evidence Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceReviewReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Review Evidence",
+        "tags": [
+          "evidence"
         ]
       }
     },

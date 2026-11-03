@@ -1,0 +1,769 @@
+import { ElectricityBill, ElectricityConnection, PaymentTransaction, UserRole } from '../types';
+import { Language } from '../i18n/types';
+import {
+  ReconciledElectricityBill,
+  reconcileBillWithPayments,
+  parseVidyutDateToUtcMs,
+} from './billingEngine';
+import {
+  UGVCL_COMPANY_NAME_EN,
+  UGVCL_COMPANY_NAME_GU,
+  UGVCL_CORPORATE_IDENTITY,
+} from '../components/common/UgvclBrandIdentity';
+
+export interface PaymentCalendarEvent {
+  id: string; // e.g. CAL-EVT-BILL-UG-2026-10-8821
+  billNo: string;
+  consumerNo: string;
+  connectionId: string;
+  consumerName: string;
+  subdivision: string;
+  tariffCategory: string;
+  billMonth: string;
+  billDate: string;
+  dueDate: string; // e.g. '22-Oct-2026'
+  dueDateIso: string; // e.g. '2026-10-22'
+  dueDay: number;
+  dueMonth: number; // 0-11
+  dueYear: number;
+  totalAmount: number;
+  paidAmount: number;
+  outstandingBalance: number;
+  status: 'Paid' | 'Unpaid' | 'Overdue' | 'Partially Paid';
+  isDue: boolean;
+  isOverdue: boolean;
+  isFullyPaid: boolean;
+  isPartiallyPaid: boolean;
+  isSimulatedDemoBill: boolean;
+  billingCycleType?: 'MONTHLY' | 'BI_MONTHLY';
+  periodStartDate?: string;
+  periodEndDate?: string;
+  billingPeriodLabel?: string;
+  reminderStage?: 'UPCOMING_DUE_5D' | 'UPCOMING_DUE_1D' | 'DUE_TODAY' | 'OVERDUE' | 'PAID';
+}
+
+export interface CalendarMonthDay {
+  dateIso: string; // YYYY-MM-DD
+  dayNumber: number;
+  month: number; // 0-11
+  year: number;
+  isCurrentMonth: boolean;
+  isToday: boolean;
+  events: PaymentCalendarEvent[];
+  hasDueBills: boolean;
+  hasPaidBills: boolean;
+  hasOverdueBills: boolean;
+}
+
+export interface PaymentCalendarSummary {
+  totalBillsCount: number;
+  dueBillsCount: number;
+  paidBillsCount: number;
+  totalDueAmount: number;
+  totalPaidAmount: number;
+  nextUpcomingDueDate: string | null;
+  eventsByConnectionNo: Record<string, PaymentCalendarEvent[]>;
+}
+
+export interface CalendarLocalizationStrings {
+  calendarTitle: string;
+  calendarSubtitle: string;
+  allConnectionsLabel: string;
+  filterByConnectionLabel: string;
+  filterStatusLabel: string;
+  statusAll: string;
+  statusDueOnly: string;
+  statusPaidOnly: string;
+  todayBtn: string;
+  prevMonthAria: string;
+  nextMonthAria: string;
+  billsDueCountBadge: (count: number) => string;
+  selectedDateDetailsTitle: string;
+  noBillsOnDate: string;
+  viewBillBtn: string;
+  payNowBtn: string;
+  addToGoogleCalendarBtn: string;
+  downloadIcsBtn: string;
+  dueLabel: string;
+  paidLabel: string;
+  partiallyPaidLabel: string;
+  overdueLabel: string;
+  nextDueCardLabel: string;
+  totalOutstandingCardLabel: string;
+  paidBillsCardLabel: string;
+  demoCalendarNotice: string;
+  weekdaysShort: [string, string, string, string, string, string, string];
+  monthsFull: [
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+  ];
+}
+
+export const CALENDAR_LOCALIZATION: Record<Language, CalendarLocalizationStrings> = {
+  en: {
+    calendarTitle: 'Smart Payment Calendar',
+    calendarSubtitle: 'Automatic billing schedules, due date indicators & personal calendar sync',
+    allConnectionsLabel: 'All Owned Connections',
+    filterByConnectionLabel: 'Filter Connection',
+    filterStatusLabel: 'Filter Status',
+    statusAll: 'All Bills',
+    statusDueOnly: 'Due & Outstanding Only',
+    statusPaidOnly: 'Paid Only',
+    todayBtn: 'Today',
+    prevMonthAria: 'Previous Month',
+    nextMonthAria: 'Next Month',
+    billsDueCountBadge: (count: number) => `${count} ${count === 1 ? 'Bill Due' : 'Bills Due'}`,
+    selectedDateDetailsTitle: 'Billing Schedule on',
+    noBillsOnDate: 'No electricity bills due on this date.',
+    viewBillBtn: 'View Bill',
+    payNowBtn: 'Pay Now',
+    addToGoogleCalendarBtn: 'Add to Google Calendar',
+    downloadIcsBtn: 'Download .ics Event',
+    dueLabel: 'Due',
+    paidLabel: 'Paid',
+    partiallyPaidLabel: 'Partially Paid',
+    overdueLabel: 'Overdue',
+    nextDueCardLabel: 'Next Upcoming Due Date',
+    totalOutstandingCardLabel: 'Total Outstanding Payable',
+    paidBillsCardLabel: 'Settled Bills (This Month)',
+    demoCalendarNotice: 'DEMO Calendar: Event schedules automatically synchronize with UGVCL billing records in real time.',
+    weekdaysShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+    monthsFull: [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ],
+  },
+  gu: {
+    calendarTitle: 'સ્માર્ટ પેમેન્ટ કેલેન્ડર',
+    calendarSubtitle: 'આપોઆપ બિલિંગ શેડ્યૂલ, છેલ્લી તારીખ સૂચક અને કેલેન્ડર સિંક',
+    allConnectionsLabel: 'બધા માલિકીના કનેક્શન્સ',
+    filterByConnectionLabel: 'કનેક્શન ફિલ્ટર',
+    filterStatusLabel: 'સ્થિતિ ફિલ્ટર',
+    statusAll: 'બધા બિલ',
+    statusDueOnly: 'ફક્ત બાકી બિલ',
+    statusPaidOnly: 'ફક્ત ચૂકવેલા બિલ',
+    todayBtn: 'આજે',
+    prevMonthAria: 'ગત મહિનો',
+    nextMonthAria: 'આગામી મહિનો',
+    billsDueCountBadge: (count: number) => `${count} બિલ બાકી`,
+    selectedDateDetailsTitle: 'આ તારીખનું બિલિંગ શેડ્યૂલ',
+    noBillsOnDate: 'આ તારીખે કોઈ વીજળી બિલ બાકી નથી.',
+    viewBillBtn: 'બિલ જુઓ',
+    payNowBtn: 'હવે ચૂકવો',
+    addToGoogleCalendarBtn: 'ગૂગલ કેલેન્ડરમાં ઉમેરો',
+    downloadIcsBtn: '.ics ઇવેન્ટ ડાઉનલોડ કરો',
+    dueLabel: 'બાકી',
+    paidLabel: 'ચૂકવેલ',
+    partiallyPaidLabel: 'અંશતઃ ચૂકવેલ',
+    overdueLabel: 'મુદતવીતી',
+    nextDueCardLabel: 'આગામી છેલ્લી તારીખ',
+    totalOutstandingCardLabel: 'કુલ બાકી રકમ',
+    paidBillsCardLabel: 'ચૂકવેલા બિલ (આ મહિને)',
+    demoCalendarNotice: 'DEMO કેલેન્ડર: ઇવેન્ટ શેડ્યૂલ UGVCL બિલિંગ રેકોર્ડ્સ સાથે રીઅલ-ટાઇમમાં સિંક થાય છે.',
+    weekdaysShort: ['રવિ', 'સોમ', 'મંગળ', 'બુધ', 'ગુરુ', 'શુક્ર', 'શનિ'],
+    monthsFull: [
+      'જાન્યુઆરી', 'ફેબ્રુઆરી', 'માર્ચ', 'એપ્રિલ', 'મે', 'જૂન',
+      'જુલાઈ', 'ઓગસ્ટ', 'સપ્ટેમ્બર', 'ઓક્ટોબર', 'નવેમ્બર', 'ડિસેમ્બર'
+    ],
+  },
+  hi: {
+    calendarTitle: 'स्मार्ट भुगतान कैलेंडर',
+    calendarSubtitle: 'स्वचालित बिलिंग समय सारणी, देय तिथि संकेतक एवं व्यक्तिगत कैलेंडर सिंक',
+    allConnectionsLabel: 'सभी स्वामित्व वाले कनेक्शन',
+    filterByConnectionLabel: 'कनेक्शन फ़िल्टर',
+    filterStatusLabel: 'स्थिति फ़िल्टर',
+    statusAll: 'सभी बिल',
+    statusDueOnly: 'केवल बकाया बिल',
+    statusPaidOnly: 'केवल भुगतान किए गए बिल',
+    todayBtn: 'आज',
+    prevMonthAria: 'पिछला महीना',
+    nextMonthAria: 'अगला महीना',
+    billsDueCountBadge: (count: number) => `${count} बिल देय`,
+    selectedDateDetailsTitle: 'इस तिथि का बिलिंग विवरण',
+    noBillsOnDate: 'इस तिथि पर कोई विद्युत बिल देय नहीं है।',
+    viewBillBtn: 'बिल देखें',
+    payNowBtn: 'अभी भुगतान करें',
+    addToGoogleCalendarBtn: 'Google कैलेंडर में जोड़ें',
+    downloadIcsBtn: '.ics इवेंट डाउनलोड करें',
+    dueLabel: 'देय',
+    paidLabel: 'भुगतान पूर्ण',
+    partiallyPaidLabel: 'आंशिक भुगतान',
+    overdueLabel: 'अतिदेय (Overdue)',
+    nextDueCardLabel: 'अगली आगामी देय तिथि',
+    totalOutstandingCardLabel: 'कुल शेष देय राशि',
+    paidBillsCardLabel: 'निपटाए गए बिल (इस माह)',
+    demoCalendarNotice: 'DEMO कैलेंडर: बिलिंग कार्यक्रम UGVCL रिकॉर्ड के साथ वास्तविक समय में समन्वयित होता है।',
+    weekdaysShort: ['रवि', 'सोम', 'मंगल', 'बुध', 'गुरु', 'शुक्र', 'शनि'],
+    monthsFull: [
+      'जनवरी', 'फ़रवरी', 'मार्च', 'अप्रैल', 'मई', 'जून',
+      'जुलाई', 'अगस्त', 'सितंबर', 'अक्टूबर', 'नवंबर', 'दिसंबर'
+    ],
+  },
+  mr: {
+    calendarTitle: 'स्मार्ट पेमेंट कॅलेंडर',
+    calendarSubtitle: 'स्वयंचलित बिलिंग वेळापत्रक, देय तारीख निर्देशक आणि कॅलेंडर सिंक',
+    allConnectionsLabel: 'सर्व मालकीच्या जोडण्या',
+    filterByConnectionLabel: 'जोडणी फिल्टर',
+    filterStatusLabel: 'स्थिती फिल्टर',
+    statusAll: 'सर्व बिले',
+    statusDueOnly: 'फक्त थकीत बिले',
+    statusPaidOnly: 'फक्त भरलेली बिले',
+    todayBtn: 'आज',
+    prevMonthAria: 'मागील महिना',
+    nextMonthAria: 'पुढील महिना',
+    billsDueCountBadge: (count: number) => `${count} बिले देय`,
+    selectedDateDetailsTitle: 'या तारखेचे बिलिंग वेळापत्रक',
+    noBillsOnDate: 'या तारखेला कोणतेही वीज बिल देय नाही.',
+    viewBillBtn: 'बिल पहा',
+    payNowBtn: 'आता भरा',
+    addToGoogleCalendarBtn: 'Google कॅलेंडरमध्ये जोडा',
+    downloadIcsBtn: '.ics इव्हेंट डाउनलोड करा',
+    dueLabel: 'देय',
+    paidLabel: 'भरलेले',
+    partiallyPaidLabel: 'अंशतः भरलेले',
+    overdueLabel: 'मुदतबाह्य',
+    nextDueCardLabel: 'पुढील देय तारीख',
+    totalOutstandingCardLabel: 'एकूण शिल्लक देय रक्कम',
+    paidBillsCardLabel: 'भरलेली बिले (या महिन्यात)',
+    demoCalendarNotice: 'DEMO कॅलेंडर: इव्हेंट वेळापत्रक UGVCL नोंदींशी रिअल-टाइममध्ये समक्रमित होते.',
+    weekdaysShort: ['रवि', 'सोम', 'मंगळ', 'बुध', 'गुरु', 'शुक्र', 'शनि'],
+    monthsFull: [
+      'जानेवारी', 'फेब्रुवारी', 'मार्च', 'एप्रिल', 'मे', 'जून',
+      'जुलै', 'ऑगस्ट', 'सप्टेंबर', 'ऑक्टोबर', 'नोव्हेंबर', 'डिसेंबर'
+    ],
+  },
+};
+
+/**
+ * Parses any VidyutFlow date string ('22-Oct-2026', '2026-10-22') into ISO 'YYYY-MM-DD'
+ * and decomposed year, month, day components deterministically.
+ */
+export function parseDateToYearMonthDay(dateStr: string | null | undefined): {
+  year: number;
+  month: number;
+  day: number;
+  isoDate: string;
+} | null {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const trimmed = dateStr.trim();
+  if (!trimmed) return null;
+
+  // Format 1: ISO YYYY-MM-DD
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const year = parseInt(isoMatch[1], 10);
+    const month = parseInt(isoMatch[2], 10) - 1;
+    const day = parseInt(isoMatch[3], 10);
+    const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return { year, month, day, isoDate };
+  }
+
+  // Format 2: DD-MMM-YYYY (e.g. '22-Oct-2026')
+  const ms = parseVidyutDateToUtcMs(trimmed);
+  if (ms !== null) {
+    const d = new Date(ms);
+    const year = d.getUTCFullYear();
+    const month = d.getUTCMonth();
+    const day = d.getUTCDate();
+    const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return { year, month, day, isoDate };
+  }
+
+  return null;
+}
+
+/**
+ * Derives canonical PaymentCalendarEvents from recorded electricity bills,
+ * ensuring strict consumer authorization and accurate reconciliation.
+ */
+export function derivePaymentCalendarEvents(
+  paramsOrBills:
+    | {
+        bills: ElectricityBill[];
+        connections?: ElectricityConnection[];
+        payments?: PaymentTransaction[];
+        authorizedConsumerNos?: string[];
+        referenceDate?: string;
+      }
+    | ElectricityBill[],
+  argConnections?: ElectricityConnection[],
+  argPayments?: PaymentTransaction[],
+  argAuthorizedConsumerNos?: string[],
+  argReferenceDate?: string
+): PaymentCalendarEvent[] {
+  let bills: ElectricityBill[] = [];
+  let connections: ElectricityConnection[] = [];
+  let payments: PaymentTransaction[] = [];
+  let authorizedConsumerNos: string[] | undefined;
+  let referenceDate = '15-Oct-2026';
+
+  if (Array.isArray(paramsOrBills)) {
+    bills = paramsOrBills;
+    connections = argConnections || [];
+    payments = argPayments || [];
+    authorizedConsumerNos = argAuthorizedConsumerNos;
+    referenceDate = argReferenceDate || '15-Oct-2026';
+  } else if (paramsOrBills && typeof paramsOrBills === 'object') {
+    bills = paramsOrBills.bills || [];
+    connections = paramsOrBills.connections || [];
+    payments = paramsOrBills.payments || [];
+    authorizedConsumerNos = paramsOrBills.authorizedConsumerNos;
+    referenceDate = paramsOrBills.referenceDate || '15-Oct-2026';
+  }
+
+  const allowedSet = authorizedConsumerNos
+    ? new Set(authorizedConsumerNos.map((c) => c.trim().toUpperCase()))
+    : null;
+
+  const connMap = new Map<string, ElectricityConnection>();
+  for (const c of connections) {
+    connMap.set(c.consumerNo.toUpperCase(), c);
+  }
+
+  const events: PaymentCalendarEvent[] = [];
+
+  for (const bill of bills) {
+    const normalizedConsumerNo = bill.consumerNo ? bill.consumerNo.trim().toUpperCase() : '';
+    if (allowedSet && !allowedSet.has(normalizedConsumerNo)) {
+      continue;
+    }
+
+    const conn = connMap.get(normalizedConsumerNo);
+    const parsedDue = parseDateToYearMonthDay(bill.dueDate);
+    if (!parsedDue) continue;
+
+    const reconciled = reconcileBillWithPayments(bill, payments, referenceDate);
+
+    const refDate = new Date(referenceDate);
+    refDate.setHours(0, 0, 0, 0);
+    const dueTime = new Date(parsedDue.year, parsedDue.month - 1, parsedDue.day).getTime();
+    const daysUntilDue = Math.round((dueTime - refDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    let reminderStage: PaymentCalendarEvent['reminderStage'];
+    if (reconciled.isPaid) {
+      reminderStage = 'PAID';
+    } else if (reconciled.isOverdue || daysUntilDue < 0) {
+      reminderStage = 'OVERDUE';
+    } else if (daysUntilDue === 0) {
+      reminderStage = 'DUE_TODAY';
+    } else if (daysUntilDue === 1) {
+      reminderStage = 'UPCOMING_DUE_1D';
+    } else if (daysUntilDue <= 5 && daysUntilDue > 1) {
+      reminderStage = 'UPCOMING_DUE_5D';
+    }
+
+    events.push({
+      id: `CAL-EVT-${bill.billNo}`,
+      billNo: bill.billNo,
+      consumerNo: bill.consumerNo,
+      connectionId: bill.connectionId || conn?.connectionId || bill.consumerNo,
+      consumerName: conn?.consumerName || 'Registered UGVCL Consumer',
+      subdivision: conn?.subdivision || 'Mehsana City North',
+      tariffCategory: conn?.tariffCategory || 'Residential (RGPU)',
+      billMonth: bill.billMonth,
+      billDate: bill.billDate,
+      dueDate: bill.dueDate,
+      dueDateIso: parsedDue.isoDate,
+      dueDay: parsedDue.day,
+      dueMonth: parsedDue.month,
+      dueYear: parsedDue.year,
+      totalAmount: reconciled.totalAmount,
+      paidAmount: reconciled.paidAmount,
+      outstandingBalance: reconciled.outstandingBalance,
+      status: reconciled.effectiveStatus,
+      isDue: reconciled.isDue,
+      isOverdue: reconciled.isOverdue,
+      isFullyPaid: reconciled.isPaid,
+      isPartiallyPaid: reconciled.isPartiallyPaid,
+      isSimulatedDemoBill: Boolean(bill.isSimulatedDemoBill),
+      billingCycleType: reconciled.billingCycleType,
+      periodStartDate: reconciled.periodStartDate,
+      periodEndDate: reconciled.periodEndDate,
+      billingPeriodLabel: reconciled.billingPeriodLabel,
+      reminderStage,
+    });
+  }
+
+  // Sort chronologically by due date, then by billNo
+  events.sort((a, b) => {
+    if (a.dueDateIso !== b.dueDateIso) {
+      return a.dueDateIso.localeCompare(b.dueDateIso);
+    }
+    return a.billNo.localeCompare(b.billNo);
+  });
+
+  return events;
+}
+
+/**
+ * Builds the month calendar matrix (42 cells: 6 weeks x 7 days)
+ * populated with genuine billing events.
+ */
+export function buildMonthCalendarGrid(
+  paramsOrYear:
+    | {
+        year: number;
+        month: number; // 0-11
+        events: PaymentCalendarEvent[];
+        todayIso?: string; // default '2026-10-15'
+      }
+    | number,
+  argMonth?: number,
+  argEvents?: PaymentCalendarEvent[],
+  argTodayIso?: string
+): CalendarMonthDay[] {
+  let year = 2026;
+  let month = 9;
+  let events: PaymentCalendarEvent[] = [];
+  let todayIso = '2026-10-15';
+
+  if (typeof paramsOrYear === 'number') {
+    year = paramsOrYear;
+    month = argMonth ?? 9;
+    events = argEvents || [];
+    todayIso = argTodayIso || '2026-10-15';
+  } else if (paramsOrYear && typeof paramsOrYear === 'object') {
+    year = paramsOrYear.year;
+    month = paramsOrYear.month;
+    events = paramsOrYear.events || [];
+    todayIso = paramsOrYear.todayIso || '2026-10-15';
+  }
+
+  // First day of target month (0 = Sun, 1 = Mon, ..., 6 = Sat)
+  const firstDayOfMonth = new Date(Date.UTC(year, month, 1));
+  const startingDayOfWeek = firstDayOfMonth.getUTCDay();
+
+  // Number of days in target month
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
+  // Number of days in preceding month
+  const daysInPrevMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+  // Map events by ISO date for O(1) lookup
+  const eventsByDate = new Map<string, PaymentCalendarEvent[]>();
+  for (const ev of events) {
+    const list = eventsByDate.get(ev.dueDateIso) || [];
+    list.push(ev);
+    eventsByDate.set(ev.dueDateIso, list);
+  }
+
+  const cells: CalendarMonthDay[] = [];
+
+  // 1. Preceding month padding days
+  for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+    const day = daysInPrevMonth - i;
+    const prevMonthIdx = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    const dateIso = `${prevYear}-${String(prevMonthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const dayEvents = eventsByDate.get(dateIso) || [];
+
+    cells.push({
+      dateIso,
+      dayNumber: day,
+      month: prevMonthIdx,
+      year: prevYear,
+      isCurrentMonth: false,
+      isToday: dateIso === todayIso,
+      events: dayEvents,
+      hasDueBills: dayEvents.some((e) => e.isDue),
+      hasPaidBills: dayEvents.some((e) => e.isFullyPaid),
+      hasOverdueBills: dayEvents.some((e) => e.isOverdue),
+    });
+  }
+
+  // 2. Current month days
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateIso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const dayEvents = eventsByDate.get(dateIso) || [];
+
+    cells.push({
+      dateIso,
+      dayNumber: day,
+      month,
+      year,
+      isCurrentMonth: true,
+      isToday: dateIso === todayIso,
+      events: dayEvents,
+      hasDueBills: dayEvents.some((e) => e.isDue),
+      hasPaidBills: dayEvents.some((e) => e.isFullyPaid),
+      hasOverdueBills: dayEvents.some((e) => e.isOverdue),
+    });
+  }
+
+  // 3. Succeeding month padding days to complete standard 35 or 42 grid cells
+  const remainingCells = (7 - (cells.length % 7)) % 7;
+  const targetTotal = cells.length + remainingCells < 35 ? 35 : cells.length + remainingCells;
+  const paddingNeeded = targetTotal - cells.length;
+
+  for (let day = 1; day <= paddingNeeded; day++) {
+    const nextMonthIdx = month === 11 ? 0 : month + 1;
+    const nextYear = month === 11 ? year + 1 : year;
+    const dateIso = `${nextYear}-${String(nextMonthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const dayEvents = eventsByDate.get(dateIso) || [];
+
+    cells.push({
+      dateIso,
+      dayNumber: day,
+      month: nextMonthIdx,
+      year: nextYear,
+      isCurrentMonth: false,
+      isToday: dateIso === todayIso,
+      events: dayEvents,
+      hasDueBills: dayEvents.some((e) => e.isDue),
+      hasPaidBills: dayEvents.some((e) => e.isFullyPaid),
+      hasOverdueBills: dayEvents.some((e) => e.isOverdue),
+    });
+  }
+
+  return cells;
+}
+
+/**
+ * Summarizes payment calendar metrics for a filtered set of events.
+ */
+export function computeCalendarSummary(events: PaymentCalendarEvent[]): PaymentCalendarSummary {
+  let dueBillsCount = 0;
+  let paidBillsCount = 0;
+  let totalDueAmount = 0;
+  let totalPaidAmount = 0;
+  let nextUpcomingDueDate: string | null = null;
+  const eventsByConnectionNo: Record<string, PaymentCalendarEvent[]> = {};
+
+  for (const ev of events) {
+    if (!eventsByConnectionNo[ev.consumerNo]) {
+      eventsByConnectionNo[ev.consumerNo] = [];
+    }
+    eventsByConnectionNo[ev.consumerNo].push(ev);
+
+    if (ev.isDue) {
+      dueBillsCount += 1;
+      totalDueAmount += ev.outstandingBalance;
+      if (!nextUpcomingDueDate || ev.dueDateIso < nextUpcomingDueDate) {
+        nextUpcomingDueDate = ev.dueDate;
+      }
+    }
+
+    if (ev.isFullyPaid) {
+      paidBillsCount += 1;
+      totalPaidAmount += ev.totalAmount;
+    } else if (ev.isPartiallyPaid) {
+      totalPaidAmount += ev.paidAmount;
+    }
+  }
+
+  return {
+    totalBillsCount: events.length,
+    dueBillsCount,
+    paidBillsCount,
+    totalDueAmount,
+    totalPaidAmount,
+    nextUpcomingDueDate,
+    eventsByConnectionNo,
+  };
+}
+
+/**
+ * Builds a valid Google Calendar Web URL for manual template creation.
+ * Does not write directly to the user's personal calendar; opens in a secure browser tab.
+ */
+export function buildGoogleCalendarUrl(
+  event: PaymentCalendarEvent,
+  language: Language = 'en'
+): string {
+  const parsed = parseDateToYearMonthDay(event.dueDate);
+  const compactDate = parsed
+    ? `${parsed.year}${String(parsed.month + 1).padStart(2, '0')}${String(parsed.day).padStart(2, '0')}`
+    : '20261022';
+
+  // Set 09:00 to 18:00 local time
+  const startStamp = `${compactDate}T090000`;
+  const endStamp = `${compactDate}T180000`;
+
+  const title = `UGVCL Electricity Bill Due: ${event.billNo} (₹${event.outstandingBalance.toLocaleString('en-IN')})`;
+  const details = [
+    `Uttar Gujarat Vij Company Limited (UGVCL)`,
+    `Bill Number: ${event.billNo}`,
+    `Consumer Number: ${event.consumerNo}`,
+    `Consumer Name: ${event.consumerName}`,
+    `Billing Period: ${event.billMonth}`,
+    `Outstanding Payable: ₹${event.outstandingBalance.toLocaleString('en-IN')}`,
+    `Payment Status: ${event.status}`,
+    `Due Date: ${event.dueDate}`,
+    `Sub-Division Office: ${event.subdivision}`,
+    `Official UGVCL Portal: https://www.ugvcl.com`,
+    `* VidyutFlow 2.0 Demonstration ERP Platform Notification`,
+  ].join('\n');
+
+  const location = `UGVCL ${event.subdivision} Sub-Division Office, North Gujarat`;
+
+  const query = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: title,
+    dates: `${startStamp}/${endStamp}`,
+    details,
+    location,
+  });
+
+  return `https://calendar.google.com/calendar/render?${query.toString()}`;
+}
+
+/**
+ * Escapes special characters for RFC 5545 iCalendar content lines:
+ * backslash, semicolon, comma, and newline.
+ */
+export function escapeIcsText(str: string): string {
+  return String(str || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r?\n/g, '\\n');
+}
+
+/**
+ * Folds iCalendar lines according to RFC 5545 (max 75 octets per line).
+ */
+export function foldIcsLine(line: string): string {
+  const MAX_LEN = 72;
+  if (line.length <= MAX_LEN) return line;
+
+  let result = '';
+  let remaining = line;
+  let isFirst = true;
+
+  while (remaining.length > 0) {
+    if (isFirst) {
+      result += remaining.slice(0, MAX_LEN);
+      remaining = remaining.slice(MAX_LEN);
+      isFirst = false;
+    } else {
+      result += '\r\n ' + remaining.slice(0, MAX_LEN - 1);
+      remaining = remaining.slice(MAX_LEN - 1);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Generates an RFC 5545 compliant `.ics` calendar file content string
+ * for an electricity bill due date event.
+ */
+export function generateIcsCalendarEvent(
+  event: PaymentCalendarEvent,
+  language: Language = 'en'
+): string {
+  const parsed = parseDateToYearMonthDay(event.dueDate);
+  const compactDate = parsed
+    ? `${parsed.year}${String(parsed.month + 1).padStart(2, '0')}${String(parsed.day).padStart(2, '0')}`
+    : '20261022';
+
+  // Next day for full-day event boundary
+  const nextDayDate = parsed
+    ? new Date(Date.UTC(parsed.year, parsed.month, parsed.day + 1))
+    : new Date(Date.UTC(2026, 9, 23));
+  const compactNextDay = `${nextDayDate.getUTCFullYear()}${String(nextDayDate.getUTCMonth() + 1).padStart(2, '0')}${String(nextDayDate.getUTCDate()).padStart(2, '0')}`;
+
+  const summary = `UGVCL Electricity Bill Due: ${event.billNo} (INR ${event.outstandingBalance})`;
+  const description = [
+    `Uttar Gujarat Vij Company Limited (UGVCL)`,
+    `Bill Number: ${event.billNo}`,
+    `Consumer Number: ${event.consumerNo}`,
+    `Consumer Name: ${event.consumerName}`,
+    `Billing Month: ${event.billMonth}`,
+    `Total Bill: INR ${event.totalAmount}`,
+    `Previously Paid: INR ${event.paidAmount}`,
+    `Outstanding Balance: INR ${event.outstandingBalance}`,
+    `Status: ${event.status}`,
+    `Due Date: ${event.dueDate}`,
+    `Sub-Division: ${event.subdivision}`,
+    `Official UGVCL Portal: https://www.ugvcl.com`,
+    `CIN: ${UGVCL_CORPORATE_IDENTITY.cin}`,
+  ].join('\n');
+
+  const location = `UGVCL ${event.subdivision} Sub-Division Office, North Gujarat`;
+
+  const lines: string[] = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//VidyutFlow//UGVCL Smart Utility Calendar//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:BILL-DUE-${event.billNo}-${compactDate}@vidyutflow.ugvcl.demo`,
+    'DTSTAMP:20261101T000000Z',
+    `DTSTART;VALUE=DATE:${compactDate}`,
+    `DTEND;VALUE=DATE:${compactNextDay}`,
+    foldIcsLine(`SUMMARY:${escapeIcsText(summary)}`),
+    foldIcsLine(`DESCRIPTION:${escapeIcsText(description)}`),
+    foldIcsLine(`LOCATION:${escapeIcsText(location)}`),
+    'STATUS:CONFIRMED',
+    'TRANSP:OPAQUE',
+    'CLASS:PUBLIC',
+    'BEGIN:VALARM',
+    'TRIGGER:-P1D',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:UGVCL Electricity Bill Due Tomorrow',
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ];
+
+  return lines.join('\r\n') + '\r\n';
+}
+
+/**
+ * Triggers genuine `.ics` calendar event download in the browser.
+ */
+export function triggerIcsDownload(
+  event: PaymentCalendarEvent,
+  languageOrOptions: Language | { skipBrowserDownload?: boolean } = 'en',
+  options?: { skipBrowserDownload?: boolean }
+): { downloaded: boolean; filename: string; icsContent: string; byteLength: number; mimeType: string } {
+  const language: Language = typeof languageOrOptions === 'string' ? languageOrOptions : 'en';
+  const effectiveOptions = typeof languageOrOptions === 'object' && languageOrOptions !== null ? languageOrOptions : options;
+  const safeBillRef = event.billNo.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+  const filename = `ugvcl-bill-due-${safeBillRef}.ics`;
+  const icsContent = generateIcsCalendarEvent(event, language);
+
+  if (!effectiveOptions?.skipBrowserDownload && typeof window !== 'undefined' && typeof document !== 'undefined') {
+    try {
+      const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.rel = 'noopener';
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          // ignore
+        }
+      }, 2500);
+    } catch {
+      // Fallback
+    }
+  }
+
+  return {
+    downloaded: true,
+    filename,
+    icsContent,
+    byteLength: new TextEncoder().encode(icsContent).byteLength,
+    mimeType: 'text/calendar;charset=utf-8',
+  };
+}

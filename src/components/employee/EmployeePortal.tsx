@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { LiveRequestQueue } from '../common/LiveRequestQueue';
 import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -21,7 +20,8 @@ import {
   localizeConnectionStatus,
   localizeComplaintCategory,
   localizeComplaintDescription,
-  localizeComplaintStatus
+  localizeComplaintStatus,
+  localizeBillingCycleShortBadge
 } from '../../i18n/consumerContentTranslations';
 import {
   localizeEmployeeDesignation,
@@ -32,12 +32,22 @@ import {
   localizeAIRecommendation
 } from '../../i18n/employeeContentTranslations';
 import {
-  SUBDIVISION_PERFORMANCE
+  SUBDIVISION_PERFORMANCE,
+  EXECUTIVE_MONTHLY_METRICS
 } from '../../data/mockData';
+import { ExportMenu } from '../common/ExportMenu';
+import { OfficialDocumentModal } from '../common/OfficialDocumentModal';
+import {
+  GeneratedOfficialDocument,
+  getDocumentUiTranslations,
+  generateApplicationAcknowledgmentDocument,
+  generateComplaintAcknowledgmentDocument,
+} from '../../utils/documentEngine';
 import {
   getApplicationStatusDisplayMeta,
   canArchiveApplication
 } from '../../services/erpAdapter';
+import { localizeServiceRequestTypeBadge } from '../../utils/consumerServicePrefill';
 import {
   Inbox,
   CheckSquare,
@@ -54,7 +64,7 @@ import {
   MapPin,
   Calendar,
   Layers,
-  Lightbulb,
+  Sparkles,
   Building2,
   HardHat,
   ShieldCheck,
@@ -80,16 +90,40 @@ import {
 } from 'recharts';
 import { CriticalIncident } from '../../types';
 import { formatErpDateTime } from '../../utils/dateUtils';
+import {
+  evaluateApplicationSla,
+  evaluateComplaintSla,
+  formatLocalizedSlaRemainingTime,
+  getSlaDashboardUiStrings,
+  localizeDemoSlaTargetDisclaimer,
+  localizeSlaRiskStateBadge
+} from '../../utils/slaEngine';
+import {
+  getAnalyticsTransparencyDictionary,
+  resolveAnalyticsDataSourceClassification
+} from '../../utils/analyticsTransparency';
+import {
+  selectEmployeeWorkloadAndSlaMetrics,
+  getCanonicalAnalyticsTranslations
+} from '../../utils/canonicalAnalytics';
+import { LiveRequestQueue } from '../common/LiveRequestQueue';
 
 export const EmployeePortal: React.FC = () => {
   const { t, language } = useLanguage();
   const te = t.employee;
+  const docUi = getDocumentUiTranslations(language);
+  const at = getAnalyticsTransparencyDictionary(language);
+  const caTranslations = getCanonicalAnalyticsTranslations(language);
   const {
     activeTab,
     setActiveTab,
     connections,
     applications,
     complaints,
+    workOrders,
+    bills,
+    payments,
+    incidents,
     recommendations,
     roleIncidents,
     fieldEngineers,
@@ -106,8 +140,35 @@ export const EmployeePortal: React.FC = () => {
     updateComplaintStatus,
     openCaseDrawer,
     showToast,
-    activeUser
+    activeUser,
+    dataMode,
+    backendStatus,
+    isBrowserOffline,
+    isOfflineSimulated
   } = useApp();
+
+  const employeeCanonicalMetrics = React.useMemo(
+    () =>
+      selectEmployeeWorkloadAndSlaMetrics({
+        applications,
+        complaints,
+        workOrders,
+        incidents,
+        bills,
+        payments,
+        fieldEngineers,
+        activeUser
+      }),
+    [applications, complaints, workOrders, incidents, bills, payments, fieldEngineers, activeUser]
+  );
+
+  const empAnalyticsSource = resolveAnalyticsDataSourceClassification({
+    dataMode,
+    backendStatusState: backendStatus.state,
+    isBrowserOffline,
+    isOfflineSimulated,
+    language
+  });
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
@@ -126,6 +187,15 @@ export const EmployeePortal: React.FC = () => {
   const [escalateReasonInput, setEscalateReasonInput] = useState<string>('');
   const [targetManagerId, setTargetManagerId] = useState<string>('usr_mgmt_01');
   const [detailsIncident, setDetailsIncident] = useState<CriticalIncident | null>(null);
+  const [employeeOfficialDoc, setEmployeeOfficialDoc] = useState<GeneratedOfficialDocument | null>(null);
+
+  const employeeDocumentActor = {
+    id: activeUser.name || 'emp_mehsana_01',
+    name: activeUser.name,
+    role: 'employee' as const,
+    email: activeUser.email,
+    subdivision: activeUser.subdivision,
+  };
 
   const activeApplications = applications.filter(a => !a.isArchived);
   const archivedApplications = applications.filter(a => Boolean(a.isArchived));
@@ -163,9 +233,9 @@ export const EmployeePortal: React.FC = () => {
     );
   });
 
-  const pendingCount = activeApplications.filter(a => a.status === 'Submitted' || a.status === 'Document Verification').length;
-  const inspectionCount = activeApplications.filter(a => a.status === 'Site Inspection').length;
-  const sanctionCount = activeApplications.filter(a => a.status === 'Sanction Approval').length;
+  const pendingCount = employeeCanonicalMetrics.applications.pendingScrutinyCount;
+  const inspectionCount = employeeCanonicalMetrics.applications.siteInspectionCount;
+  const sanctionCount = employeeCanonicalMetrics.applications.awaitingSanctionCount;
   const actionRequiredCount = activeApplications.filter(a => getApplicationStatusDisplayMeta(a).requiresEmployeeAction).length;
 
   const handleConfirmArchive = (id: string) => {
@@ -193,16 +263,17 @@ export const EmployeePortal: React.FC = () => {
     if (incidentStatusFilter === 'Acknowledged') return inc.status === 'ACKNOWLEDGED';
     if (incidentStatusFilter === 'Assigned') return inc.status === 'ASSIGNED';
     if (incidentStatusFilter === 'Escalated') return inc.status === 'ESCALATED';
-    if (incidentStatusFilter === 'Resolved') return inc.status === 'RESOLVED';
+    if (incidentStatusFilter === 'Resolved') return inc.status === 'RESOLVED' || inc.status === 'CLOSED';
     return inc.status === incidentStatusFilter;
   });
 
-  const newIncidentsCount = roleIncidents.filter(i => i.status === 'DETECTED').length;
-  const acknowledgedIncidentsCount = roleIncidents.filter(i => i.status === 'ACKNOWLEDGED').length;
-  const assignedIncidentsCount = roleIncidents.filter(i => i.status === 'ASSIGNED').length;
-  const escalatedIncidentsCount = roleIncidents.filter(i => i.status === 'ESCALATED').length;
-  const resolvedIncidentsCount = roleIncidents.filter(i => i.status === 'RESOLVED').length;
-  const criticalIncidentsCount = roleIncidents.filter(i => i.severity === 'CRITICAL' && i.status !== 'RESOLVED').length;
+  const newIncidentsCount = employeeCanonicalMetrics.incidents.byStatus.DETECTED;
+  const acknowledgedIncidentsCount = employeeCanonicalMetrics.incidents.byStatus.ACKNOWLEDGED;
+  const assignedIncidentsCount = employeeCanonicalMetrics.incidents.byStatus.ASSIGNED;
+  const escalatedIncidentsCount = employeeCanonicalMetrics.incidents.byStatus.ESCALATED;
+  const resolvedIncidentsCount = employeeCanonicalMetrics.incidents.resolvedClosedCount;
+  const criticalIncidentsCount = employeeCanonicalMetrics.incidents.criticalActiveCount;
+  const activeEmployeeIncidentsCount = employeeCanonicalMetrics.incidents.activeCount;
 
   const handleOpenAssignModal = (inc: CriticalIncident) => {
     setAssignModalIncident(inc);
@@ -276,7 +347,7 @@ export const EmployeePortal: React.FC = () => {
     setEscalateReasonInput('');
   };
 
-  const localizedSubdivisionChartData = SUBDIVISION_PERFORMANCE.map(item => ({
+  const localizedSubdivisionChartData = employeeCanonicalMetrics.subdivisionPerformanceSeries.map(item => ({
     ...item,
     name: localizeSubdivision(item.name, language)
   }));
@@ -320,14 +391,14 @@ export const EmployeePortal: React.FC = () => {
       {activeTab === 'dashboard' && (
         <div className="space-y-4 sm:space-y-6">
           {/* Active Operational Incidents Alert Banner */}
-          {roleIncidents.filter(i => i.status !== 'RESOLVED').length > 0 && (
+          {activeEmployeeIncidentsCount > 0 && (
             <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <ShieldAlert className="w-6 h-6 text-rose-600 shrink-0" />
                 <div>
                   <div className="text-xs font-bold text-rose-950 dark:text-rose-200 flex items-center gap-2">
                     <span>
-                      {roleIncidents.filter(i => i.status !== 'RESOLVED').length}{' '}
+                      {activeEmployeeIncidentsCount}{' '}
                       {te.activeIncidentsBannerPrefix}
                     </span>
                     {criticalIncidentsCount > 0 && (
@@ -388,17 +459,33 @@ export const EmployeePortal: React.FC = () => {
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
                 {te.kpiActiveGrievancesTitle}
               </span>
-              <div className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
-                {complaints.filter(c => c.status !== 'Resolved').length} {te.kpiTicketsUnit}
+              <div
+                data-testid="employee-kpi-active-grievances"
+                className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums"
+              >
+                {employeeCanonicalMetrics.complaints.activeOpenCount} {te.kpiTicketsUnit}
               </div>
-              <span className="text-xs text-rose-600 dark:text-rose-400 font-medium">{te.kpiZeroBreachedSlas}</span>
+              {(() => {
+                const breachedCount = employeeCanonicalMetrics.complaints.slaSummary.breachedCount;
+                const approachingCount = employeeCanonicalMetrics.complaints.slaSummary.approachingCount;
+                const slaStrings = getSlaDashboardUiStrings(language);
+                return (
+                  <span className="text-xs text-rose-600 dark:text-rose-400 font-medium block">
+                    {breachedCount === 0 && approachingCount === 0
+                      ? te.kpiZeroBreachedSlas
+                      : slaStrings.kpiBreachedCountPattern
+                          .replace('{breached}', String(breachedCount))
+                          .replace('{approaching}', String(approachingCount))}
+                  </span>
+                );
+              })()}
             </div>
           </div>
 
           {/* TAT Analytics & Smart Suggestions */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             <div className="lg:col-span-2 p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-start justify-between gap-2 mb-4 flex-wrap">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     {te.tatChartTitle}
@@ -406,6 +493,20 @@ export const EmployeePortal: React.FC = () => {
                   <p className="text-xs text-slate-500">
                     {te.tatChartSubtitle}
                   </p>
+                  <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
+                    {at.employeeTatChartDisclosure}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span
+                    data-testid="employee-tat-source-badge"
+                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                  >
+                    {empAnalyticsSource.badgeLabel}
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300">
+                    {at.calculated}
+                  </span>
                 </div>
               </div>
 
@@ -414,7 +515,7 @@ export const EmployeePortal: React.FC = () => {
                   <BarChart data={localizedSubdivisionChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.15} />
                     <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
-                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} />
+                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} unit="h" />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: '#101C35',
@@ -432,11 +533,16 @@ export const EmployeePortal: React.FC = () => {
 
             {/* Smart Suggestions */}
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
-              <div className="flex items-center gap-2">
-                <Lightbulb className="w-4 h-4 text-amber-500" />
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                  {te.smartSuggestionsTitle}
-                </h3>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-teal-500" />
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    {te.smartSuggestionsTitle}
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                  {empAnalyticsSource.badgeLabel}
+                </span>
               </div>
 
               <div className="space-y-3 text-xs">
@@ -480,7 +586,6 @@ export const EmployeePortal: React.FC = () => {
       {/* VIEW 2: APPLICATION QUEUE */}
       {(activeTab === 'applications' || activeTab === 'approvals') && (
         <div className="space-y-4 min-w-0">
-          {/* Live Request Queue — wired to VidyutFlow FastAPI backend */}
           <LiveRequestQueue />
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
@@ -554,6 +659,12 @@ export const EmployeePortal: React.FC = () => {
                 </button>
               ))}
             </div>
+            <ExportMenu
+              datasetKey="applications"
+              filteredRecords={filteredApps}
+              allAuthorizedRecords={applications}
+              variant="compact"
+            />
           </div>
 
           {/* Inline Confirmation Banner for Safe Application Archiving */}
@@ -642,11 +753,26 @@ export const EmployeePortal: React.FC = () => {
                           </td>
                           <td className="p-3.5 whitespace-nowrap">
                             <div className="font-semibold text-slate-900 dark:text-white">{app.applicantName}</div>
-                            <div className="text-[11px] text-slate-400">{app.phone}</div>
+                            <div className="text-[11px] text-slate-400">
+                              {app.phone}
+                              {app.linkedConsumerNo ? ` · #${app.linkedConsumerNo}` : ''}
+                            </div>
                           </td>
                           <td className="p-3.5 whitespace-nowrap">
                             <div className="font-medium text-slate-800 dark:text-slate-200">{localizeTariffCategory(app.category, language)}</div>
                             <div className="text-[11px] text-slate-400">{app.requestedLoadKw} kW · {localizePhase(app.phase, language)}</div>
+                            {app.serviceRequestType && app.serviceRequestType !== 'NEW_CONNECTION' && (
+                              <div className="mt-1">
+                                {(() => {
+                                  const reqBadge = localizeServiceRequestTypeBadge(app, language);
+                                  return (
+                                    <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${reqBadge.badgeClasses}`}>
+                                      {reqBadge.label}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+                            )}
                           </td>
                           <td className="p-3.5 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                             {localizeSubdivision(app.subdivision, language)}
@@ -696,10 +822,43 @@ export const EmployeePortal: React.FC = () => {
                                     {te.pillArchived} {app.archivedBy ? `${te.archivedByPrefix} ${app.archivedBy}` : ''}
                                   </span>
                                 )}
+                                {(() => {
+                                  const appSla = evaluateApplicationSla(app);
+                                  const appSlaBadge = localizeSlaRiskStateBadge(
+                                    appSla.state,
+                                    language,
+                                    'application'
+                                  );
+                                  return (
+                                    <span
+                                      className={`text-[10px] font-semibold px-1.5 py-0.2 rounded border ${appSlaBadge.badgeClasses}`}
+                                      title={localizeDemoSlaTargetDisclaimer(language)}
+                                    >
+                                      {appSlaBadge.label} · {formatLocalizedSlaRemainingTime(appSla, language)}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                             </div>
                           </td>
                           <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEmployeeOfficialDoc(
+                                  generateApplicationAcknowledgmentDocument({
+                                    role: 'employee',
+                                    actor: employeeDocumentActor,
+                                    application: app,
+                                    language,
+                                    dataSource: dataMode,
+                                  })
+                                )
+                              }
+                              className="px-2.5 py-1 text-xs font-semibold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors whitespace-nowrap cursor-pointer"
+                            >
+                              {docUi.viewAcknowledgment}
+                            </button>
                             <button
                               type="button"
                               onClick={() => openCaseDrawer('application', app.id)}
@@ -746,13 +905,19 @@ export const EmployeePortal: React.FC = () => {
       {/* VIEW 3: CONSUMER LEDGER */}
       {activeTab === 'consumers' && (
         <div className="space-y-4 min-w-0">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              {te.consumerLedgerTitle}
-            </h2>
-            <p className="text-xs text-slate-500">
-              {te.consumerLedgerSubtitle}
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                {te.consumerLedgerTitle}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {te.consumerLedgerSubtitle}
+              </p>
+            </div>
+            <ExportMenu
+              datasetKey="consumers"
+              filteredRecords={connections}
+            />
           </div>
 
           <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
@@ -780,7 +945,10 @@ export const EmployeePortal: React.FC = () => {
                         <div className="text-[11px] text-slate-400 truncate max-w-xs">{conn.address}</div>
                       </td>
                       <td className="p-3.5 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                        {localizeTariffCategory(conn.tariffCategory, language)}
+                        <div>{localizeTariffCategory(conn.tariffCategory, language)}</div>
+                        <span className="inline-block mt-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                          {localizeBillingCycleShortBadge(conn.billingCycleType, language)}
+                        </span>
                       </td>
                       <td className="p-3.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">
                         {conn.feederName}
@@ -808,13 +976,20 @@ export const EmployeePortal: React.FC = () => {
       {/* VIEW 4: COMPLAINT MANAGEMENT */}
       {activeTab === 'complaints' && (
         <div className="space-y-4 min-w-0">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              {te.complaintMatrixTitle}
-            </h2>
-            <p className="text-xs text-slate-500">
-              {te.complaintMatrixSubtitle}
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                {te.complaintMatrixTitle}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {te.complaintMatrixSubtitle}
+              </p>
+            </div>
+            <ExportMenu
+              datasetKey="complaints"
+              filteredRecords={filteredCmps}
+              allAuthorizedRecords={complaints}
+            />
           </div>
 
           <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
@@ -855,7 +1030,29 @@ export const EmployeePortal: React.FC = () => {
                         </span>
                       </td>
                       <td className="p-3.5 font-mono text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                        {localizeSlaDuration(cmp.slaTargetHours, language)} ({cmp.slaDueTime})
+                        <div>
+                          {localizeSlaDuration(cmp.slaTargetHours, language)} ({cmp.slaDueTime})
+                        </div>
+                        {(() => {
+                          const cmpSla = evaluateComplaintSla(cmp);
+                          const cmpSlaBadge = localizeSlaRiskStateBadge(
+                            cmpSla.state,
+                            language,
+                            'complaint'
+                          );
+                          return (
+                            <div className="mt-1 flex items-center gap-1.5 flex-wrap font-sans">
+                              <span
+                                className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded border ${cmpSlaBadge.badgeClasses}`}
+                              >
+                                {cmpSlaBadge.label}
+                              </span>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                                {formatLocalizedSlaRemainingTime(cmpSla, language)}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="p-3.5 whitespace-nowrap">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -869,10 +1066,27 @@ export const EmployeePortal: React.FC = () => {
                           )}
                         </div>
                       </td>
-                      <td className="p-3.5 text-right whitespace-nowrap">
+                      <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEmployeeOfficialDoc(
+                              generateComplaintAcknowledgmentDocument({
+                                role: 'employee',
+                                actor: employeeDocumentActor,
+                                complaint: cmp,
+                                language,
+                                dataSource: dataMode,
+                              })
+                            )
+                          }
+                          className="px-2.5 py-1 text-xs font-semibold rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 whitespace-nowrap cursor-pointer"
+                        >
+                          {docUi.viewAcknowledgment}
+                        </button>
                         <button
                           onClick={() => openCaseDrawer('complaint', cmp.id)}
-                          className="px-2.5 py-1 text-xs font-semibold rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-blue-600 hover:text-white whitespace-nowrap"
+                          className="px-2.5 py-1 text-xs font-semibold rounded bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-blue-600 hover:text-white whitespace-nowrap cursor-pointer"
                         >
                           {te.actionTicketBtn}
                         </button>
@@ -1141,12 +1355,11 @@ export const EmployeePortal: React.FC = () => {
                 {te.revenueReportSubtitle}
               </p>
             </div>
-            <button
-              onClick={() => showToast(te.exportedCsvToast, 'success')}
-              className="w-full sm:w-auto min-h-11 sm:min-h-[38px] px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shrink-0 cursor-pointer"
-            >
-              {te.exportCsvBtn}
-            </button>
+            <ExportMenu
+              datasetKey="revenue_report"
+              filteredRecords={EXECUTIVE_MONTHLY_METRICS}
+              labelOverride={te.exportCsvBtn}
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
@@ -1161,6 +1374,44 @@ export const EmployeePortal: React.FC = () => {
             <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
               <span className="text-slate-400 block mb-0.5">{te.revEfficiencyTitle}</span>
               <span className="text-xl font-bold font-mono text-blue-600">98.4%</span>
+            </div>
+          </div>
+
+          {/* Canonical Live ERP Billing & Collection Ledger Strip */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {caTranslations.liveErpCollectionLedgerTitle}
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                {employeeCanonicalMetrics.liveBillingLedger.paidBillsCount}/{employeeCanonicalMetrics.liveBillingLedger.totalBillsCount} Paid · {employeeCanonicalMetrics.liveBillingLedger.unpaidBillsCount} Due
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px] mb-0.5">{caTranslations.liveErpBilledLabel}</span>
+                <span data-testid="employee-live-billed-inr" className="text-sm font-bold font-mono text-slate-900 dark:text-white">
+                  ₹{employeeCanonicalMetrics.liveBillingLedger.totalBilledAmountInr.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px] mb-0.5">{caTranslations.liveErpCollectedLabel}</span>
+                <span data-testid="employee-live-collected-inr" className="text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                  ₹{employeeCanonicalMetrics.liveBillingLedger.totalCollectedAmountInr.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px] mb-0.5">{caTranslations.liveErpOutstandingLabel}</span>
+                <span data-testid="employee-live-outstanding-inr" className="text-sm font-bold font-mono text-amber-600 dark:text-amber-400">
+                  ₹{employeeCanonicalMetrics.liveBillingLedger.totalOutstandingAmountInr.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px] mb-0.5">{caTranslations.liveErpCollectionEfficiencyLabel}</span>
+                <span data-testid="employee-live-collection-rate" className="text-sm font-bold font-mono text-blue-600 dark:text-blue-400">
+                  {employeeCanonicalMetrics.liveBillingLedger.liveCollectionEfficiencyPct}%
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -1191,10 +1442,15 @@ export const EmployeePortal: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                 {roleIncidents.length} {t.incident.scopedIncidentsSuffix}
               </span>
+              <ExportMenu
+                datasetKey="incidents"
+                filteredRecords={roleIncidents}
+                variant="compact"
+              />
             </div>
           </div>
 
@@ -1889,7 +2145,11 @@ export const EmployeePortal: React.FC = () => {
           </div>
         </div>
       )}
-
+      <OfficialDocumentModal
+        document={employeeOfficialDoc}
+        isOpen={Boolean(employeeOfficialDoc)}
+        onClose={() => setEmployeeOfficialDoc(null)}
+      />
       {activeTab === 'outage-map' && <LazyOutageMapSection />}
     </div>
   );

@@ -572,6 +572,7 @@ export interface TranslationDictionary {
     navAiInsights: string;
     navExecutiveExport: string;
     navSystemOverview: string;
+    navUgvclDirectory: string;
     navUsersRoles: string;
     navAccessMatrix: string;
     navAuditTrail: string;

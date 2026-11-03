@@ -294,14 +294,17 @@ export async function signupWithServerApi(
   error?: string;
   statusCode?: number;
   code?: string;
+  referenceId?: string;
 }> {
+  const referenceId = `REG-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
   try {
     const response = await fetchImpl('/api/auth/signup', {
       method: 'POST',
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
-        'X-VidyutFlow-CSRF': '1'
+        'X-VidyutFlow-CSRF': '1',
+        'X-Request-Id': referenceId
       },
       body: JSON.stringify({
         name: name.trim(),
@@ -311,14 +314,63 @@ export async function signupWithServerApi(
       })
     });
 
-    const data = (await response.json().catch(() => ({}))) as ServerAuthApiPayload;
+    const serverRequestId = response.headers.get('X-Request-Id') || referenceId;
+    let data: (ServerAuthApiPayload & { detail?: unknown }) = { authenticated: false };
+    try {
+      data = (await response.json()) as (ServerAuthApiPayload & { detail?: unknown });
+    } catch {
+      // JSON parse failed
+    }
 
     if (!response.ok || !data.authenticated) {
+      let resolvedError = data.error;
+      if (!resolvedError && typeof data.detail === 'string') {
+        resolvedError = data.detail;
+      }
+
+      if (!resolvedError) {
+        switch (response.status) {
+          case 400:
+            resolvedError = 'Invalid registration details. Please verify your information and try again.';
+            break;
+          case 401:
+            resolvedError = 'Authentication failed. Please verify credentials.';
+            break;
+          case 403:
+            resolvedError = 'Registration forbidden: Privileged roles cannot be self-registered.';
+            break;
+          case 404:
+            resolvedError = 'Registration endpoint not found on server (/api/auth/signup).';
+            break;
+          case 409:
+            resolvedError = 'An account with this email address already exists. Please proceed to login.';
+            break;
+          case 422:
+            resolvedError = 'Validation failed. Please provide a valid full name, email, and compliant password.';
+            break;
+          case 429:
+            resolvedError = 'Too many registration attempts. Please wait a minute before trying again.';
+            break;
+          case 500:
+            resolvedError = `Internal server error during registration. Support Reference: ${serverRequestId}`;
+            break;
+          case 502:
+            resolvedError = `Registration gateway error: Upstream authentication service unreachable. Support Reference: ${serverRequestId}`;
+            break;
+          case 503:
+            resolvedError = 'Registration service is temporarily unavailable. Please try again later.';
+            break;
+          default:
+            resolvedError = `Registration failed with HTTP ${response.status}. Support Reference: ${serverRequestId}`;
+        }
+      }
+
       return {
         success: false,
-        error: data.error || 'Consumer registration failed on server.',
+        error: resolvedError,
         statusCode: response.status,
-        code: data.code
+        code: data.code || `HTTP_${response.status}`,
+        referenceId: serverRequestId
       };
     }
 
@@ -327,19 +379,26 @@ export async function signupWithServerApi(
       return {
         success: false,
         error: 'Malformed signup response from server.',
-        statusCode: 500
+        statusCode: 500,
+        referenceId: serverRequestId
       };
     }
 
     return {
       success: true,
-      session
+      session,
+      referenceId: serverRequestId
     };
-  } catch {
+  } catch (err: unknown) {
+    const isTimeout = err instanceof Error && (err.name === 'AbortError' || err.message.toLowerCase().includes('timeout'));
     return {
       success: false,
-      error:
-        'Unable to reach the registration server (/api/auth/signup). Server authentication mode does not automatically fall back to client demo mode.'
+      statusCode: isTimeout ? 408 : 503,
+      code: isTimeout ? 'REQUEST_TIMEOUT' : 'CONNECTION_REFUSED',
+      referenceId,
+      error: isTimeout
+        ? 'Registration request timed out. Please check your network connection and try again.'
+        : `Registration service is temporarily unavailable. Please try again later. (Support Ref: ${referenceId})`
     };
   }
 }

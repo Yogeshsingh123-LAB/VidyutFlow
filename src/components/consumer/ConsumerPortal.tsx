@@ -1,92 +1,4 @@
-import {
-  submitLiveRequest,
-  submitLiveRequestWithDocument,
-  fetchDemoLoadPolicy,
-  fetchWorkflowTemplates,
-  type WorkflowTemplateItem,
-} from '../../utils/liveData';
-import { FALLBACK_WORKFLOW_TEMPLATES } from '../admin/LiveWorkflowTemplatesPanel';
-import { validateDocumentUpload, uploadPolicyText } from '../../utils/documentUpload';
-import { subscribeBackendSession } from '../../utils/backendSession';
-import { LiveConsumerRequests } from './LiveConsumerRequests';
-import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
-import { policyText, validLoad, formatValidationIssue, requiresDemoReview } from '../../utils/demoLoadPolicy';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { submissionNoticeFromResponse, submissionNoticeText, type SubmissionNotice } from '../../utils/requestSubmissionStatus';
-import { useApp } from '../../context/AppContext';
-import { useLanguage } from '../../i18n/LanguageContext';
-import { LocationPinPicker } from '../common/LocationPinPicker';
-import { SavedPremisesBar } from './SavedPremisesBar';
-import {
-  localizeTariffCategory,
-  localizeConnectionStatus,
-  localizePhase,
-  localizeSubdivision,
-  localizeFeederName,
-  localizeConsumerAddress,
-  localizeBillMonth,
-  localizeBillStatus,
-  localizePaymentMethod,
-  localizePaymentStatus,
-  localizeApplicationStatus,
-  localizeDocumentName,
-  localizeComplaintCategory,
-  localizeComplaintStatus,
-  localizeComplaintDescription,
-  localizeConsumerNotification,
-  localizeConsumptionMonth,
-  localizeLinkConnectionError
-} from '../../i18n/consumerContentTranslations';
-import { CONSUMPTION_HISTORY } from '../../data/mockData';
-import {
-  Zap,
-  CreditCard,
-  AlertTriangle,
-  Calendar,
-  CheckCircle2,
-  Clock,
-  ArrowUpRight,
-  PlusCircle,
-  FileText,
-  Download,
-  ShieldCheck,
-  TrendingUp,
-  MapPin,
-  Layers,
-  Phone,
-  Mail,
-  ChevronRight,
-  Info,
-  Check,
-  Building,
-  UploadCloud,
-  FileCheck,
-  User,
-  Bell,
-  CheckCheck,
-  ExternalLink,
-  Printer,
-  Link2,
-  Activity,
-  X,
-  Receipt,
-  Plug,
-  Gauge,
-  Trash2,
-  XCircle
-} from 'lucide-react';
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid
-} from 'recharts';
-import { TariffCategory, ElectricityConnection, ElectricityBill, PaymentTransaction } from '../../types';
-import { LanguageCode } from '../../i18n/types';
-
+import type { LanguageCode } from '../../i18n/types';
 export const CONSUMER_WORKFLOW_INTAKE_TEXT: Record<
   LanguageCode,
   {
@@ -157,6 +69,135 @@ export const CONSUMER_WORKFLOW_INTAKE_TEXT: Record<
   },
 };
 
+import React, { useState, useEffect, useMemo } from 'react';
+import { useApp } from '../../context/AppContext';
+import { useLanguage } from '../../i18n/LanguageContext';
+import {
+  localizeTariffCategory,
+  localizeConnectionStatus,
+  localizePhase,
+  localizeSubdivision,
+  localizeFeederName,
+  localizeConsumerAddress,
+  localizeBillMonth,
+  localizeBillStatus,
+  localizePaymentMethod,
+  localizePaymentStatus,
+  localizeApplicationStatus,
+  localizeDocumentName,
+  localizeComplaintCategory,
+  localizeComplaintStatus,
+  localizeComplaintDescription,
+  localizeConsumerNotification,
+  localizeConsumptionMonth,
+  localizeLinkConnectionError,
+  localizeBillingCycleShortBadge
+} from '../../i18n/consumerContentTranslations';
+import {
+  getAnalyticsTransparencyDictionary,
+  resolveAnalyticsDataSourceClassification,
+  resolveAnalyticsTimestampLabel,
+  resolveForecastUncertaintyDisclosure
+} from '../../utils/analyticsTransparency';
+import { CONSUMPTION_HISTORY } from '../../data/mockData';
+import {
+  selectConsumerCanonicalAnalytics,
+  getCanonicalAnalyticsTranslations
+} from '../../utils/canonicalAnalytics';
+import { ExportMenu } from '../common/ExportMenu';
+import { OfficialDocumentModal } from '../common/OfficialDocumentModal';
+import { BillVerificationModal } from '../common/BillVerificationModal';
+import { parseBillVerificationUrl } from '../../utils/qrCodeEngine';
+import { EnterprisePaymentModal } from './EnterprisePaymentModal';
+import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
+import { LiveConsumerRequests } from './LiveConsumerRequests';
+import { submitLiveRequest } from '../../utils/liveData';
+import { ConsumerComplaintTimelineModal } from './ConsumerComplaintTimelineModal';
+import { SmartPaymentCalendar } from './SmartPaymentCalendar';
+import {
+  GeneratedOfficialDocument,
+  getDocumentUiTranslations,
+  BILL_AND_RECEIPT_EXTRA_LABELS,
+  generateElectricityBillDocument,
+  generatePaymentReceiptDocument,
+  generateApplicationAcknowledgmentDocument,
+  generateComplaintAcknowledgmentDocument,
+  triggerOfficialDocumentPdfDownload,
+} from '../../utils/documentEngine';
+import {
+  BillingReminderType,
+  ReconciledElectricityBill,
+  getBillingUiTranslations,
+  buildLocalizedBillingReminderCopy
+} from '../../utils/billingEngine';
+import {
+  Zap,
+  CreditCard,
+  AlertTriangle,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  ArrowUpRight,
+  PlusCircle,
+  FileText,
+  Download,
+  ShieldCheck,
+  TrendingUp,
+  MapPin,
+  Sparkles,
+  Layers,
+  Phone,
+  Mail,
+  ChevronRight,
+  Info,
+  Check,
+  Building,
+  UploadCloud,
+  FileCheck,
+  User,
+  Bell,
+  CheckCheck,
+  ExternalLink,
+  Printer,
+  Link2,
+  Activity,
+  X,
+  Receipt,
+  Plug,
+  Gauge,
+  Trash2,
+  XCircle,
+  QrCode
+} from 'lucide-react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid
+} from 'recharts';
+import {
+  TariffCategory,
+  ElectricityConnection,
+  ElectricityBill,
+  PaymentTransaction,
+  NewConnectionApplication,
+  ComplaintRecord,
+  ConsumerServiceRequestType
+} from '../../types';
+import {
+  ConsumerServicePrefillState,
+  buildConsumerServicePrefillState,
+  evaluateLoadChangeRequest,
+  formatSubmissionAddress,
+  getServiceRequestUiStrings,
+  localizeServiceRequestTypeBadge,
+  mergePrefillPreservingUserEdits,
+  validateServiceRequestSubmission
+} from '../../utils/consumerServicePrefill';
+
 export const ConsumerPortal: React.FC = () => {
   const {
     activeTab,
@@ -168,6 +209,9 @@ export const ConsumerPortal: React.FC = () => {
     complaints,
     notifications,
     userConnections,
+    selectedConsumerConnectionNo,
+    setSelectedConsumerConnectionNo,
+    consumerBillingSummary,
     userApplications,
     userBills,
     userPayments,
@@ -182,52 +226,42 @@ export const ConsumerPortal: React.FC = () => {
     deleteSelectedNotifications,
     clearAllNotifications,
     payBillDemo,
+    payBillDemoDetailed,
+    generateDemoBillForActiveConnection,
     submitApplicationDemo,
     submitComplaintDemo,
     openCaseDrawer,
     showToast,
-    activeUser
+    activeUser,
+    dataMode,
+    backendStatus,
+    isBrowserOffline,
+    isOfflineSimulated
   } = useApp();
 
   const { language, t } = useLanguage();
   const tc = t.consumer;
-  const [liveSubmission, setLiveSubmission] = useState<SubmissionNotice | null>(null);
-  const latestSubmission = useRef(0);
-  useEffect(() => {
-    latestSubmission.current += 1;
-    setLiveSubmission(null);
-  }, [demoSession?.user.id, demoSession?.user.email, demoSession?.role]);
-  useEffect(
-    () =>
-      subscribeBackendSession(() => {
-        latestSubmission.current += 1;
-        setLiveSubmission(null);
-      }),
-    []
-  );
-  const noticeText = submissionNoticeText[language];
-  const loadText = policyText[language];
-  const [policy, setPolicy] = useState<number | null>(null);
-  const [policyState, setPolicyState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
-  const [policyAttempt, setPolicyAttempt] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    setPolicy(null);
-    setPolicyState('loading');
-    fetchDemoLoadPolicy().then(result => {
-      if (!cancelled) { setPolicy(result.review_threshold_kw); setPolicyState('ready'); }
-    }).catch(() => { if (!cancelled) setPolicyState('unavailable'); });
-    return () => { cancelled = true; };
-  }, [policyAttempt]);
-
-  const localizedConsumptionHistory = useMemo(
-    () =>
-      CONSUMPTION_HISTORY.map(item => ({
-        ...item,
-        displayMonth: localizeConsumptionMonth(item.month, language)
-      })),
-    [language]
-  );
+  const docUi = getDocumentUiTranslations(language);
+  const bUi = getBillingUiTranslations(language);
+  const srUi = getServiceRequestUiStrings(language);
+  const at = getAnalyticsTransparencyDictionary(language);
+  const consumerFeederTelemetrySource = resolveAnalyticsDataSourceClassification({
+    isSimulatedView: true,
+    language
+  });
+  const consumerConsumptionSource = resolveAnalyticsDataSourceClassification({
+    dataMode,
+    backendStatusState: backendStatus.state,
+    isBrowserOffline,
+    isOfflineSimulated,
+    isForecastView: true,
+    language
+  });
+  const consumerUncertaintyMeta = resolveForecastUncertaintyDisclosure({
+    hasValidatedStatisticalInterval: false,
+    language
+  });
+  const caTranslations = getCanonicalAnalyticsTranslations(language);
 
   const [consumerNotifFilter, setConsumerNotifFilter] = useState<'all' | 'unread' | 'applications'>('all');
   const [selectedConsumerNotifIds, setSelectedConsumerNotifIds] = useState<string[]>([]);
@@ -249,33 +283,112 @@ export const ConsumerPortal: React.FC = () => {
 
   const hasConnections = consumerConnections.length > 0;
 
-  const [selectedConnectionNo, setSelectedConnectionNo] = useState<string>(
-    () => consumerConnections[0]?.consumerNo || ''
+  const selectedConnectionNo = selectedConsumerConnectionNo || consumerConnections[0]?.consumerNo || '';
+  const setSelectedConnectionNo = setSelectedConsumerConnectionNo;
+
+  const selectedConnection: ElectricityConnection | null =
+    consumerBillingSummary?.selectedConnection ||
+    (hasConnections
+      ? consumerConnections.find(c => c.consumerNo === selectedConnectionNo) || consumerConnections[0]
+      : null);
+
+  // Canonical Consumer Analytics (connection-scoped & account-scoped single source of truth)
+  const consumerCanonicalAnalytics = useMemo(
+    () =>
+      selectConsumerCanonicalAnalytics({
+        connections: consumerConnections,
+        bills: consumerBills,
+        payments: consumerPayments,
+        applications: consumerApplications,
+        complaints: consumerComplaints,
+        notifications: consumerNotifications,
+        actorScope: {
+          accountId: currentUserId === 'anonymous' ? 'demo_consumer' : currentUserId,
+          email: currentUserEmail,
+          linkedConsumerNo: consumerConnections[0]?.consumerNo,
+          consumerName: currentUserName,
+          ownedConsumerNos: consumerConnections.map(c => c.consumerNo)
+        },
+        selectedConnectionNo
+      }),
+    [
+      consumerConnections,
+      consumerBills,
+      consumerPayments,
+      consumerApplications,
+      consumerComplaints,
+      consumerNotifications,
+      currentUserId,
+      currentUserEmail,
+      currentUserName,
+      selectedConnectionNo
+    ]
   );
 
-  // Sync selected connection when consumerConnections changes or when selected connection is no longer valid
-  useEffect(() => {
-    if (consumerConnections.length > 0) {
-      if (!consumerConnections.some(c => c.consumerNo === selectedConnectionNo)) {
-        setSelectedConnectionNo(consumerConnections[0].consumerNo);
-      }
-    } else {
-      setSelectedConnectionNo('');
-    }
-  }, [consumerConnections, selectedConnectionNo]);
-
-  const selectedConnection: ElectricityConnection | null = hasConnections
-    ? (consumerConnections.find(c => c.consumerNo === selectedConnectionNo) || consumerConnections[0])
-    : null;
+  const localizedConsumptionHistory = useMemo(
+    () =>
+      consumerCanonicalAnalytics.consumptionTrendSeries.map(item => ({
+        ...item,
+        displayMonth: localizeConsumptionMonth(item.month, language)
+      })),
+    [consumerCanonicalAnalytics.consumptionTrendSeries, language]
+  );
 
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const [billingSubTab, setBillingSubTab] = useState<'list' | 'calendar'>('list');
+
+  useEffect(() => {
+    if (activeTab === 'calendar') {
+      setBillingSubTab('calendar');
+    }
+  }, [activeTab]);
   const [selectedBillToPay, setSelectedBillToPay] = useState<string | null>(null);
   const [selectedPaymentGateway, setSelectedPaymentGateway] = useState<PaymentTransaction['paymentMethod']>('UPI / BHIM');
+  const [paymentModeOption, setPaymentModeOption] = useState<'FULL' | 'PARTIAL'>('FULL');
+  const [customPaymentAmount, setCustomPaymentAmount] = useState<string>('');
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<ElectricityBill | null>(null);
+  const [activeOfficialDocument, setActiveOfficialDocument] = useState<GeneratedOfficialDocument | null>(null);
+  const [qrVerificationTarget, setQrVerificationTarget] = useState<{
+    billNo: string;
+    consumerNo: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const checkHashForQrVerification = () => {
+      if (typeof window === 'undefined') return;
+      const parsed = parseBillVerificationUrl(window.location.hash || window.location.href);
+      if (parsed.isValid && parsed.ref) {
+        setQrVerificationTarget({
+          billNo: parsed.ref,
+          consumerNo: parsed.consumerNo || '',
+        });
+      }
+    };
+    checkHashForQrVerification();
+    window.addEventListener('hashchange', checkHashForQrVerification);
+    return () => window.removeEventListener('hashchange', checkHashForQrVerification);
+  }, []);
+
+  const consumerDocumentActor = useMemo(
+    () => ({
+      id: currentUserId,
+      name: currentUserName,
+      role: 'consumer' as const,
+      email: currentUserEmail,
+      subdivision: selectedConnection?.subdivision,
+      consumerNo: selectedConnection?.consumerNo,
+      ownedConsumerNos: consumerConnections.map(c => c.consumerNo),
+    }),
+    [currentUserId, currentUserName, currentUserEmail, selectedConnection, consumerConnections]
+  );
 
   // Link Existing Connection Modal State
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [selectedComplaintForTimeline, setSelectedComplaintForTimeline] = useState<ComplaintRecord | null>(null);
+  const activeTimelineComplaint = selectedComplaintForTimeline
+    ? (consumerComplaints.find(c => c.id === selectedComplaintForTimeline.id) || selectedComplaintForTimeline)
+    : null;
   const [linkConsumerNo, setLinkConsumerNo] = useState('');
   const [linkSubdivision, setLinkSubdivision] = useState('Mehsana City North');
   const [linkPhone, setLinkPhone] = useState(demoSession?.user.mobileNumber || '');
@@ -304,9 +417,6 @@ export const ConsumerPortal: React.FC = () => {
   );
 
   const [subdivision, setSubdivision] = useState('Mehsana City North');
-  const [selectedZone, setSelectedZone] = useState('North');
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
   const [address, setAddress] = useState(
     isDefaultDemoConsumer ? '14, Anand Nagar Society, Visnagar Road, Mehsana' : ''
   );
@@ -335,39 +445,21 @@ export const ConsumerPortal: React.FC = () => {
   }, [demoSession?.user.id, isDefaultDemoConsumer]);
 
   const [category, setCategory] = useState<TariffCategory>('Residential (RGPU)');
-  const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowTemplateItem[]>(
-    FALLBACK_WORKFLOW_TEMPLATES
-  );
-  const [selectedTemplateCode, setSelectedTemplateCode] = useState<string>('new_connection');
-  const intakeWfText =
-    CONSUMER_WORKFLOW_INTAKE_TEXT[language] || CONSUMER_WORKFLOW_INTAKE_TEXT.en;
-  const activeSelectedTemplate = useMemo(
-    () =>
-      workflowTemplates.find(t => t.template_code === selectedTemplateCode) ||
-      workflowTemplates[0] ||
-      FALLBACK_WORKFLOW_TEMPLATES[0],
-    [workflowTemplates, selectedTemplateCode]
-  );
-
-  useEffect(() => {
-    const syncTemplates = () => {
-      fetchWorkflowTemplates(false)
-        .then(res => {
-          if (Array.isArray(res.items) && res.items.length > 0) {
-            setWorkflowTemplates(res.items);
-          }
-        })
-        .catch(() => {});
-    };
-    syncTemplates();
-    return subscribeBackendSession(syncTemplates);
-  }, []);
-  const [loadInput, setLoadInput] = useState('6');
-  const loadKw = Number(loadInput);
-  const loadIsValid = validLoad(loadInput);
+  const [loadKw, setLoadKw] = useState<number>(6);
   const [phase, setPhase] = useState<'1-Phase' | '3-Phase'>('3-Phase');
   const [purpose, setPurpose] = useState('Domestic / Residential Lighting & Power');
   const [solarInterest, setSolarInterest] = useState(false);
+
+  // Service request intent & smart prefill state
+  const [serviceRequestType, setServiceRequestType] = useState<ConsumerServiceRequestType>('NEW_CONNECTION');
+  const [selectedTemplateCode, setSelectedTemplateCode] = useState<string>('new_connection');
+  const [linkedConsumerNo, setLinkedConsumerNo] = useState<string>('');
+  const [linkedMeterNo, setLinkedMeterNo] = useState<string>('');
+  const [currentSanctionedLoadKw, setCurrentSanctionedLoadKw] = useState<number | null>(null);
+  const [loadChangeConfirmed, setLoadChangeConfirmed] = useState<boolean>(false);
+  const [userEditedFields, setUserEditedFields] = useState<Set<keyof ConsumerServicePrefillState>>(
+    () => new Set()
+  );
 
   // Document attachments preview state
   const [uploadedDocs, setUploadedDocs] = useState<string[]>([
@@ -375,24 +467,122 @@ export const ConsumerPortal: React.FC = () => {
     'Registered Ownership Deed / Index-II (PDF, 1.2 MB)',
     'Government Licensed Electrical Contractor Test Certificate (PDF, 850 KB)'
   ]);
-  const [attachedDocument, setAttachedDocument] = useState<{ file: File; sanitizedName: string } | null>(null);
-  const [uploadErrorReason, setUploadErrorReason] = useState<'empty' | 'too_large' | 'invalid_name_or_type' | null>(null);
-  const uploadText = uploadPolicyText[language];
-  useEffect(() => {
-    setAttachedDocument(null);
-    setUploadErrorReason(null);
-  }, [demoSession?.user.id, demoSession?.user.email, demoSession?.role]);
+
+  const markFieldEdited = (field: keyof ConsumerServicePrefillState) => {
+    setUserEditedFields(prev => {
+      if (prev.has(field)) return prev;
+      const next = new Set(prev);
+      next.add(field);
+      return next;
+    });
+  };
+
+  const applyPrefillStateToWizard = (prefill: ConsumerServicePrefillState) => {
+    setServiceRequestType(prefill.serviceRequestType);
+    setLinkedConsumerNo(prefill.linkedConsumerNo);
+    setLinkedMeterNo(prefill.linkedMeterNo);
+    setApplicantName(prefill.applicantName);
+    setApplicantPhone(prefill.applicantPhone);
+    setApplicantEmail(prefill.applicantEmail);
+    setSubdivision(prefill.subdivision);
+    setAddress(prefill.address);
+    setPincode(prefill.pincode);
+    setPremisesType(prefill.premisesType);
+    setCategory(prefill.category);
+    setLoadKw(prefill.loadKw);
+    setCurrentSanctionedLoadKw(prefill.currentSanctionedLoadKw);
+    setPhase(prefill.phase);
+    setPurpose(prefill.purpose);
+    setSolarInterest(prefill.solarInterest);
+    setLoadChangeConfirmed(prefill.loadChangeConfirmed);
+    setUploadedDocs(prefill.uploadedDocs);
+  };
+
+  const getCurrentWizardPrefillSnapshot = (): ConsumerServicePrefillState => ({
+    serviceRequestType,
+    linkedConsumerNo,
+    linkedMeterNo,
+    currentSanctionedLoadKw,
+    applicantName,
+    applicantPhone,
+    applicantEmail,
+    subdivision,
+    address,
+    pincode,
+    premisesType,
+    category,
+    loadKw: Number(loadKw),
+    phase,
+    purpose,
+    solarInterest,
+    loadChangeConfirmed,
+    uploadedDocs,
+    prefilledFromConnection: Boolean(linkedConsumerNo)
+  });
+
+  const initializeServiceRequestWizard = (
+    mode: ConsumerServiceRequestType,
+    targetConnNo?: string
+  ) => {
+    const connNoToUse = targetConnNo ?? selectedConnection?.consumerNo ?? '';
+    if (connNoToUse && connNoToUse !== selectedConnectionNo) {
+      setSelectedConnectionNo(connNoToUse);
+    }
+    const nextPrefill = buildConsumerServicePrefillState({
+      requestType: mode,
+      connections: consumerConnections,
+      selectedConnectionNo: connNoToUse,
+      sessionUser: demoSession?.user || null,
+      isDefaultDemoConsumer
+    });
+    setUserEditedFields(new Set());
+    applyPrefillStateToWizard(nextPrefill);
+    setFormStep(1);
+    setActiveTab('new-connection');
+  };
+
+  const handleWizardConnectionSwitch = (nextConnNo: string) => {
+    setSelectedConnectionNo(nextConnNo);
+    if (serviceRequestType === 'SOLAR_NET_METERING' || serviceRequestType === 'LOAD_CHANGE') {
+      const freshPrefill = buildConsumerServicePrefillState({
+        requestType: serviceRequestType,
+        connections: consumerConnections,
+        selectedConnectionNo: nextConnNo,
+        sessionUser: demoSession?.user || null,
+        isDefaultDemoConsumer
+      });
+      const merged = mergePrefillPreservingUserEdits(
+        getCurrentWizardPrefillSnapshot(),
+        freshPrefill,
+        userEditedFields
+      );
+      applyPrefillStateToWizard(merged);
+    }
+  };
 
   // Complaint form states
   const [cmpCategory, setCmpCategory] = useState<'Power Outage' | 'Voltage Fluctuation' | 'Meter Fault' | 'Billing Dispute'>('Voltage Fluctuation');
   const [cmpPriority, setCmpPriority] = useState<'Critical' | 'High' | 'Medium' | 'Low'>('High');
   const [cmpDesc, setCmpDesc] = useState('');
 
-  // Primary active bill for selected connection
-  const currentBill: ElectricityBill | null = selectedConnection
-    ? (consumerBills.find(b => b.consumerNo === selectedConnection.consumerNo && b.status === 'Unpaid') || consumerBills.find(b => b.consumerNo === selectedConnection.consumerNo) || null)
-    : null;
+  // Canonical reconciled bills & primary active bill for the selected connection
+  const selectedConnectionBillingSummary = consumerBillingSummary.selectedConnectionSummary;
+  const selectedConnectionBills: ReconciledElectricityBill[] =
+    selectedConnectionBillingSummary.visibleBills;
+  const selectedConnectionPayments: PaymentTransaction[] =
+    selectedConnectionBillingSummary.paymentHistory;
+  const currentBill: ReconciledElectricityBill | null =
+    selectedConnectionBillingSummary.latestBill;
+  const dashboardBadgeState = selectedConnectionBillingSummary.dashboardBadgeState;
 
+  const billModalTarget: ReconciledElectricityBill | null = useMemo(() => {
+    if (!selectedBillToPay) return currentBill;
+    return (
+      selectedConnectionBills.find(b => b.billNo === selectedBillToPay) ||
+      consumerBillingSummary.allAccountReconciledBills.find(b => b.billNo === selectedBillToPay) ||
+      currentBill
+    );
+  }, [selectedBillToPay, selectedConnectionBills, consumerBillingSummary, currentBill]);
 
   // Dynamic Sanction Cost Calculation Breakdown
   const serviceCharge = loadKw * 1150;
@@ -400,130 +590,230 @@ export const ConsumerPortal: React.FC = () => {
   const meterTestingFee = 800;
   const totalSanctionEstimate = serviceCharge + securityDeposit + meterTestingFee;
 
+  const docExtraUi = BILL_AND_RECEIPT_EXTRA_LABELS[language] || BILL_AND_RECEIPT_EXTRA_LABELS.en;
+
   const handlePayClick = (billNo: string) => {
+    const target =
+      selectedConnectionBills.find(b => b.billNo === billNo) ||
+      consumerBillingSummary.allAccountReconciledBills.find(b => b.billNo === billNo);
     setSelectedBillToPay(billNo);
+    setPaymentModeOption('FULL');
+    setCustomPaymentAmount(
+      target ? String(Math.max(1, Math.round(target.outstandingBalance / 2))) : ''
+    );
     setIsPayModalOpen(true);
   };
 
-  const confirmPayment = () => {
-    if (selectedBillToPay) {
-      payBillDemo(selectedBillToPay, selectedPaymentGateway);
-      setIsPayModalOpen(false);
-      const paidBill = bills.find(b => b.billNo === selectedBillToPay);
-      if (paidBill) {
-        setSelectedReceipt({
-          ...paidBill,
-          status: 'Paid',
-          paidDate: '15-Oct-2026',
-          transactionRef: `TXN-UPI-${Math.floor(1000000000 + Math.random() * 9000000000)}`
-        });
-        setIsReceiptModalOpen(true);
-      }
+  const handleViewElectricityBill = (bill: ElectricityBill) => {
+    const conn =
+      consumerConnections.find(c => c.consumerNo === bill.consumerNo) ||
+      selectedConnection;
+    const doc = generateElectricityBillDocument({
+      role: 'consumer',
+      actor: consumerDocumentActor,
+      bill,
+      connection: conn,
+      payments: consumerPayments,
+      allBills: bills,
+      language,
+      dataSource: dataMode,
+    });
+    setActiveOfficialDocument(doc);
+  };
+
+  const handleDownloadElectricityBillPdf = (bill: ElectricityBill) => {
+    const conn =
+      consumerConnections.find(c => c.consumerNo === bill.consumerNo) ||
+      selectedConnection;
+    const doc = generateElectricityBillDocument({
+      role: 'consumer',
+      actor: consumerDocumentActor,
+      bill,
+      connection: conn,
+      payments: consumerPayments,
+      allBills: bills,
+      language,
+      dataSource: dataMode,
+    });
+    const res = triggerOfficialDocumentPdfDownload(doc);
+    if (res.downloaded) {
+      showToast(`Downloaded ${res.filename}`, 'success');
     }
   };
 
-  const handleViewReceipt = (bill: ElectricityBill) => {
+  const handleViewReceipt = (bill: ElectricityBill, explicitPayment?: PaymentTransaction) => {
     setSelectedReceipt(bill);
+    const conn = consumerConnections.find(c => c.consumerNo === bill.consumerNo) || selectedConnection;
+    const matchingPayment =
+      explicitPayment ||
+      consumerPayments.find(
+        p => p.billNo === bill.billNo && p.status === 'Successful'
+      );
+    const doc = generatePaymentReceiptDocument({
+      role: 'consumer',
+      actor: consumerDocumentActor,
+      bill,
+      payment: matchingPayment || null,
+      connection: conn,
+      allPayments: consumerPayments,
+      language,
+      dataSource: dataMode,
+    });
+    setActiveOfficialDocument(doc);
     setIsReceiptModalOpen(true);
   };
 
+  const handleDownloadReceiptPdf = (
+    bill: ElectricityBill | null,
+    payment?: PaymentTransaction | null
+  ) => {
+    const targetBill =
+      bill ||
+      (payment ? consumerBills.find(b => b.billNo === payment.billNo) || null : null);
+    const targetConsumerNo = targetBill?.consumerNo || payment?.consumerNo;
+    const conn =
+      consumerConnections.find(c => c.consumerNo === targetConsumerNo) ||
+      selectedConnection;
+    const resolvedPayment =
+      payment ||
+      (targetBill
+        ? consumerPayments.find(
+            p => p.billNo === targetBill.billNo && p.status === 'Successful'
+          ) || null
+        : null);
+    const doc = generatePaymentReceiptDocument({
+      role: 'consumer',
+      actor: consumerDocumentActor,
+      bill: targetBill,
+      payment: resolvedPayment,
+      connection: conn,
+      allPayments: consumerPayments,
+      language,
+      dataSource: dataMode,
+    });
+    const res = triggerOfficialDocumentPdfDownload(doc);
+    if (res.downloaded) {
+      showToast(`Downloaded ${res.filename}`, 'success');
+    }
+  };
+
+  const handleDownloadPaymentReceiptPdf = handleDownloadReceiptPdf;
+
+  const handleViewPaymentTransactionReceipt = (payment: PaymentTransaction) => {
+    const linkedBill = consumerBills.find(b => b.billNo === payment.billNo) || null;
+    const conn = consumerConnections.find(c => c.consumerNo === payment.consumerNo) || selectedConnection;
+    const doc = generatePaymentReceiptDocument({
+      role: 'consumer',
+      actor: consumerDocumentActor,
+      bill: linkedBill,
+      payment,
+      connection: conn,
+      allPayments: consumerPayments,
+      language,
+      dataSource: dataMode,
+    });
+    setActiveOfficialDocument(doc);
+    setIsReceiptModalOpen(true);
+  };
+
+  const handleViewApplicationAcknowledgment = (app: NewConnectionApplication) => {
+    const doc = generateApplicationAcknowledgmentDocument({
+      role: 'consumer',
+      actor: consumerDocumentActor,
+      application: app,
+      language,
+      dataSource: dataMode,
+    });
+    setActiveOfficialDocument(doc);
+  };
+
+  const handleViewComplaintAcknowledgment = (cmp: ComplaintRecord) => {
+    const doc = generateComplaintAcknowledgmentDocument({
+      role: 'consumer',
+      actor: consumerDocumentActor,
+      complaint: cmp,
+      language,
+      dataSource: dataMode,
+    });
+    setActiveOfficialDocument(doc);
+  };
+
   const handleLoadPresetChange = (kw: number) => {
-    setLoadInput(String(kw));
+    setLoadKw(kw);
+    markFieldEdited('loadKw');
     // Auto select phase: <=5kW is 1-Phase, >5kW is 3-Phase
     if (kw <= 5) {
       setPhase('1-Phase');
     } else {
       setPhase('3-Phase');
     }
+    markFieldEdited('phase');
   };
 
   const handleNewConnectionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!applicantName || !applicantPhone || !address) {
-      showToast(tc.mandatoryFieldsToast, 'error');
+    const snapshot = getCurrentWizardPrefillSnapshot();
+    const validation = validateServiceRequestSubmission(snapshot, language);
+    if (!validation.valid) {
+      if (
+        validation.errorCode === 'LOAD_CHANGE_UNCHANGED' ||
+        validation.errorCode === 'LOAD_CHANGE_CONFIRMATION_REQUIRED'
+      ) {
+        setFormStep(3);
+      }
+      showToast(validation.errorMessage || tc.mandatoryFieldsToast, 'error');
       return;
     }
 
-    if (!loadIsValid) {
-      showToast(loadText.invalid, 'error');
-      return;
-    }
+    const loadEval = evaluateLoadChangeRequest(currentSanctionedLoadKw, Number(loadKw));
 
-    if (uploadErrorReason) {
-      showToast(uploadText[uploadErrorReason], 'error');
-      return;
-    }
-
-    // Live and local demo records are separate; track the latest live response explicitly.
-    const submissionId = ++latestSubmission.current;
-    setLiveSubmission({ kind: 'pending' });
-    const baseFields: Record<string, string | number> = {
-      applicant_name: applicantName,
-      phone: applicantPhone,
-      address: `${address}, Pin - ${pincode}`,
-      zone: selectedZone || (subdivision.toLowerCase().includes('south') ? 'South' : 'North'),
-      pin_code: pincode,
-      request_type: selectedTemplateCode,
-      description:
-        selectedTemplateCode === 'new_connection'
-          ? `New ${category} connection via consumer wizard`
-          : `${activeSelectedTemplate.name} (${category}) via consumer wizard`,
+    submitLiveRequest({
+      consumer_name: applicantName.trim(),
+      mobile_number: applicantPhone.trim(),
+      email: applicantEmail.trim(),
+      address: formatSubmissionAddress(address, pincode),
+      subdivision,
       requested_load_kw: Number(loadKw),
       tariff_category: category,
       phase,
       premises_type: premisesType,
-    };
-    if (latitude !== null && longitude !== null) {
-      baseFields.latitude = latitude;
-      baseFields.longitude = longitude;
-    }
-    const liveCall = attachedDocument
-      ? submitLiveRequestWithDocument(baseFields, attachedDocument.file, attachedDocument.sanitizedName)
-      : submitLiveRequest({
-          ...baseFields,
-          document_name: uploadedDocs[0] || '',
-        });
-
-    void liveCall
-      .then((result) => {
-        if (submissionId !== latestSubmission.current) return;
-        const notice = submissionNoticeFromResponse(result);
-        setLiveSubmission(notice);
-        showToast(notice.kind === 'correction' ? noticeText.correction : noticeText.received,
-          notice.kind === 'correction' ? 'warning' : 'success');
-      })
-      .catch((err: any) => {
-        if (submissionId !== latestSubmission.current) return;
-        if (attachedDocument && (err?.status === 413 || err?.status === 400)) {
-          setLiveSubmission(null);
-          showToast(uploadText.serverRejected, 'error');
-          return;
-        }
-        setLiveSubmission({ kind: 'unknown' });
-        showToast(noticeText.unknown, 'warning');
-      });
-
-    const submittedDocs = attachedDocument
-      ? [attachedDocument.sanitizedName, ...uploadedDocs]
-      : uploadedDocs;
-    setAttachedDocument(null);
+      document_name: uploadedDocs[0] || ''
+    }).catch(() => null);
 
     const newId = submitApplicationDemo({
-      applicantName,
-      phone: applicantPhone,
-      email: applicantEmail,
-      address: `${address}, Pin - ${pincode}`,
+      applicantName: applicantName.trim(),
+      phone: applicantPhone.trim(),
+      email: applicantEmail.trim(),
+      address: formatSubmissionAddress(address, pincode),
       subdivision,
       category,
       requestedLoadKw: Number(loadKw),
       phase,
       premisesType,
       estimatedSanctionCost: totalSanctionEstimate,
-      documentsSubmitted: submittedDocs
+      documentsSubmitted: uploadedDocs,
+      serviceRequestType,
+      request_type: selectedTemplateCode,
+      linkedConsumerNo: linkedConsumerNo || undefined,
+      linkedMeterNo: linkedMeterNo || undefined,
+      currentSanctionedLoadKw:
+        serviceRequestType === 'LOAD_CHANGE' && currentSanctionedLoadKw !== null
+          ? currentSanctionedLoadKw
+          : undefined,
+      loadChangeDirection:
+        serviceRequestType === 'LOAD_CHANGE' &&
+        (loadEval.direction === 'EXTENSION' || loadEval.direction === 'REDUCTION')
+          ? loadEval.direction
+          : undefined,
+      loadChangeConfirmed:
+        serviceRequestType === 'LOAD_CHANGE' ? loadChangeConfirmed : undefined,
+      solarInterest,
+      purpose
     });
 
     // Reset step
     setFormStep(1);
+    setUserEditedFields(new Set());
     // Switch to connections tab to track
     setActiveTab('connections');
     // Open case drawer directly for the newly created application
@@ -555,23 +845,6 @@ export const ConsumerPortal: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6 min-w-0">
-      {liveSubmission && (
-        <section role="status" aria-live="polite" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-slate-900 dark:border-blue-800 dark:bg-slate-900 dark:text-slate-100">
-          <p className="font-semibold">{noticeText[liveSubmission.kind]}</p>
-          {(liveSubmission.kind === 'received' || liveSubmission.kind === 'correction') && (
-            <div className="mt-2 break-words">
-              <p>Reference: {liveSubmission.reference}</p>
-              <p>Status: {liveSubmission.status}</p>
-              {liveSubmission.issues.length > 0 ? (
-                <ul className="list-disc pl-5">{liveSubmission.issues.map((issue, index) => (
-                  <li key={`${issue.code}-${index}`}>{formatValidationIssue(issue, language)}</li>
-                ))}</ul>
-              ) : liveSubmission.notes && <p>{liveSubmission.notes}</p>}
-            </div>
-          )}
-          <p className="mt-2 text-xs">{noticeText.separate}</p>
-        </section>
-      )}
       {/* Account & Connection Summary Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
@@ -652,16 +925,21 @@ export const ConsumerPortal: React.FC = () => {
                   id="active-meter-select"
                   value={selectedConnection?.consumerNo}
                   onChange={e => {
-                    setSelectedConnectionNo(e.target.value);
+                    handleWizardConnectionSwitch(e.target.value);
                   }}
                   aria-label={tc.selectActiveMeterAria}
                   className="min-h-11 sm:min-h-9 min-w-0 w-full sm:w-auto px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 dark:bg-[#131D31] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-colors cursor-pointer"
                 >
-                  {consumerConnections.map(c => (
-                    <option key={c.consumerNo} value={c.consumerNo}>
-                      {c.consumerNo} — {localizeTariffCategory(c.tariffCategory, language)} ({c.sanctionedLoadKw} kW)
-                    </option>
-                  ))}
+                  {consumerConnections.map(c => {
+                    const connDue =
+                      consumerBillingSummary.summariesByConnectionNo[c.consumerNo]?.dueBillCount || 0;
+                    return (
+                      <option key={c.consumerNo} value={c.consumerNo}>
+                        {c.consumerNo} — {localizeTariffCategory(c.tariffCategory, language)} ({c.sanctionedLoadKw} kW)
+                        {connDue > 0 ? ` · ${bUi.dueBillsCountBadge(connDue)}` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
                 <button
                   type="button"
@@ -677,7 +955,7 @@ export const ConsumerPortal: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
               <button
                 type="button"
-                onClick={() => setActiveTab('new-connection')}
+                onClick={() => initializeServiceRequestWizard('NEW_CONNECTION')}
                 className="flex-1 sm:flex-initial min-h-11 sm:min-h-9 px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
               >
                 <PlusCircle className="w-3.5 h-3.5" />
@@ -723,7 +1001,7 @@ export const ConsumerPortal: React.FC = () => {
               <div className="flex flex-wrap items-center gap-3 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setActiveTab('new-connection')}
+                  onClick={() => initializeServiceRequestWizard('NEW_CONNECTION')}
                   className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-semibold shadow-xs flex items-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
                 >
                   <PlusCircle className="w-4 h-4" />
@@ -741,83 +1019,157 @@ export const ConsumerPortal: React.FC = () => {
             </div>
           )}
 
-          {/* Primary KPI Cards Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {/* Card 1: Current Electricity Bill */}
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                      <Receipt className="w-4 h-4" />
-                    </div>
-                    <span className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">
-                      {tc.currentElectricityBill}
-                    </span>
-                  </div>
-                  <span className={`text-[11px] font-semibold inline-flex items-center gap-1.5 ${
-                    !hasConnections
-                      ? 'text-slate-500 dark:text-slate-400'
-                      : currentBill?.status === 'Unpaid'
-                      ? 'text-amber-700 dark:text-amber-400'
-                      : 'text-emerald-700 dark:text-emerald-400'
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      !hasConnections
-                        ? 'bg-slate-400'
-                        : currentBill?.status === 'Unpaid'
-                        ? 'bg-amber-500'
-                        : 'bg-emerald-500'
-                    }`} />
-                    {!hasConnections ? tc.noActiveConnection : currentBill?.status === 'Unpaid' ? tc.paymentDue : tc.paid}
-                  </span>
-                </div>
-
-                <div className="flex items-baseline gap-2.5 my-1">
-                  <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">
-                    {hasConnections && currentBill ? `₹${currentBill.totalAmount.toLocaleString()}` : '₹0'}
-                  </div>
-                  {hasConnections && currentBill && (
-                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      {tc.forMonthPrefix} {localizeBillMonth(currentBill.billMonth, language)}
-                    </span>
+          {/* Multi-Connection Due Bills Transparency Banner (when other connections have due bills) */}
+          {hasConnections && consumerBillingSummary.otherConnectionsWithDueBills.length > 0 && (
+            <div
+              className="p-3.5 sm:p-4 rounded-xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/90 dark:border-amber-800/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              data-testid="other-connections-due-banner"
+            >
+              <div className="flex items-start sm:items-center gap-2.5 text-xs text-amber-900 dark:text-amber-200">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+                <span>
+                  {bUi.otherConnectionsDueBanner(
+                    consumerBillingSummary.otherConnectionsWithDueBills.reduce(
+                      (s, item) => s + item.dueBillCount,
+                      0
+                    ),
+                    consumerBillingSummary.otherConnectionsWithDueBills.length
                   )}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {consumerBillingSummary.otherConnectionsWithDueBills.map(item => (
+                  <button
+                    key={item.consumerNo}
+                    type="button"
+                    onClick={() => handleWizardConnectionSwitch(item.consumerNo)}
+                    className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-semibold shadow-2xs transition-colors cursor-pointer"
+                  >
+                    {bUi.switchToConnectionWithDueBtn(item.consumerNo, item.dueBillCount)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Primary KPI Cards Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch" data-testid="consumer-kpi-cards-grid">
+            {/* Card 1: Current Electricity Bill */}
+            <div className="h-full p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
+              <div className="flex-1 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start justify-between gap-2.5 min-h-[36px] mb-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                        <Receipt className="w-4 h-4" />
+                      </div>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-[13px] uppercase tracking-wider leading-snug break-words">
+                        {tc.currentElectricityBill}
+                      </span>
+                    </div>
+                    <span
+                      data-testid="dashboard-bill-status-badge"
+                      className={`text-[11px] font-semibold inline-flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-md ${
+                        dashboardBadgeState === 'NO_ACTIVE_CONNECTION' ||
+                        dashboardBadgeState === 'NO_BILL_GENERATED'
+                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700'
+                          : dashboardBadgeState === 'OVERDUE'
+                          ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60'
+                          : dashboardBadgeState === 'PARTIALLY_PAID' ||
+                            dashboardBadgeState === 'UNPAID'
+                          ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60'
+                          : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          dashboardBadgeState === 'NO_ACTIVE_CONNECTION' ||
+                          dashboardBadgeState === 'NO_BILL_GENERATED'
+                            ? 'bg-slate-400'
+                            : dashboardBadgeState === 'OVERDUE'
+                            ? 'bg-rose-500'
+                            : dashboardBadgeState === 'PARTIALLY_PAID' ||
+                              dashboardBadgeState === 'UNPAID'
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                        }`}
+                      />
+                      {dashboardBadgeState === 'NO_ACTIVE_CONNECTION'
+                        ? tc.noActiveConnection
+                        : dashboardBadgeState === 'NO_BILL_GENERATED'
+                        ? bUi.statusNoBill
+                        : dashboardBadgeState === 'OVERDUE'
+                        ? bUi.statusOverdue
+                        : dashboardBadgeState === 'PARTIALLY_PAID'
+                        ? bUi.statusPartiallyPaid
+                        : dashboardBadgeState === 'UNPAID'
+                        ? tc.paymentDue
+                        : tc.paid}
+                    </span>
+                  </div>
+
+                  <div className="min-h-[56px] flex flex-col justify-center my-1.5">
+                    <div className="flex items-baseline gap-2.5 flex-wrap">
+                      <div className="text-2xl sm:text-[28px] font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight leading-tight">
+                        {hasConnections && currentBill
+                          ? `₹${(currentBill.isPartiallyPaid
+                              ? currentBill.outstandingBalance
+                              : currentBill.totalAmount
+                            ).toLocaleString('en-IN')}`
+                          : '₹0'}
+                      </div>
+                      {hasConnections && currentBill && (
+                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-snug inline-flex items-center gap-1.5 flex-wrap">
+                          <span>{tc.forMonthPrefix} {localizeBillMonth(currentBill.billMonth, language)}</span>
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                            {localizeBillingCycleShortBadge(currentBill.billingCycleType, language)}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                    {hasConnections && currentBill?.isPartiallyPaid && (
+                      <div className="text-[11px] text-amber-700 dark:text-amber-400 font-medium mt-0.5">
+                        {bUi.paidAmountLabel}: ₹{currentBill.paidAmount.toLocaleString('en-IN')} ·{' '}
+                        {bUi.totalBillAmountLabel}: ₹{currentBill.totalAmount.toLocaleString('en-IN')}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {hasConnections && currentBill ? (
-                  <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/70 text-xs">
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">{tc.billedConsumption}</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
+                  <div className="grid grid-cols-2 gap-3 pt-3.5 mt-2 border-t border-slate-100 dark:border-slate-800/70 text-xs min-h-[76px] items-start">
+                    <div className="min-w-0">
+                      <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium leading-snug mb-1">{tc.billedConsumption}</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 tabular-nums text-xs sm:text-[13px] leading-snug block">
                         {currentBill.unitsConsumed} kWh
                       </span>
                     </div>
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">{tc.invoiceNumber}</span>
-                      <span className="font-mono font-medium text-slate-700 dark:text-slate-300 text-[11px]">
+                    <div className="min-w-0">
+                      <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium leading-snug mb-1">{tc.invoiceNumber}</span>
+                      <span className="font-mono font-semibold text-slate-700 dark:text-slate-300 text-[11px] leading-snug break-all block">
                         {currentBill.billNo}
                       </span>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 pt-3.5 mt-2 border-t border-slate-100 dark:border-slate-800/70 min-h-[76px] leading-relaxed">
                     {tc.noBillsGeneratedDesc}
                   </p>
                 )}
               </div>
 
-              <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
-                <span className="text-xs text-slate-500 dark:text-slate-400">
+              <div className="pt-3.5 mt-4 border-t border-slate-100 dark:border-slate-800/80 min-h-[44px] flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-xs text-slate-500 dark:text-slate-400 leading-snug">
                   {hasConnections && currentBill?.dueDate ? (
-                    <>{tc.dueDateLabel} <strong className="text-slate-800 dark:text-slate-200 font-semibold">{currentBill.dueDate}</strong></>
+                    <>{tc.dueDateLabel} <strong className="text-slate-800 dark:text-slate-200 font-semibold tabular-nums">{currentBill.dueDate}</strong></>
                   ) : (
                     tc.dueNonePending
                   )}
                 </span>
-                {hasConnections && currentBill?.status === 'Unpaid' ? (
+                {hasConnections && currentBill && currentBill.isDue ? (
                   <button
                     onClick={() => handlePayClick(currentBill.billNo)}
-                    className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
+                    className="min-h-[34px] px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
                   >
                     <span>{tc.payOnlineBtn}</span>
                     <ArrowUpRight className="w-3.5 h-3.5" />
@@ -825,9 +1177,17 @@ export const ConsumerPortal: React.FC = () => {
                 ) : hasConnections && currentBill ? (
                   <button
                     onClick={() => handleViewReceipt(currentBill)}
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
+                    className="min-h-[34px] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
                   >
                     {tc.viewReceiptBtn}
+                  </button>
+                ) : hasConnections && selectedConnection?.status === 'Active' ? (
+                  <button
+                    type="button"
+                    onClick={() => generateDemoBillForActiveConnection(selectedConnection.consumerNo)}
+                    className="min-h-[34px] px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/40 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors cursor-pointer"
+                  >
+                    {bUi.generateDemoBillBtn}
                   </button>
                 ) : (
                   <button
@@ -841,56 +1201,70 @@ export const ConsumerPortal: React.FC = () => {
             </div>
 
             {/* Card 2: Connected Feeder & Supply Status */}
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                      <Zap className="w-4 h-4" />
+            <div className="h-full p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
+              <div className="flex-1 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start justify-between gap-2.5 min-h-[36px] mb-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                        <Zap className="w-4 h-4" />
+                      </div>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-[13px] uppercase tracking-wider leading-snug break-words">
+                        {tc.connectedFeeder}
+                      </span>
                     </div>
-                    <span className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">
-                      {tc.connectedFeeder}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800">
+                        {consumerFeederTelemetrySource.badgeLabel}
+                      </span>
+                      <span className={`text-[11px] font-semibold inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md ${
+                        hasConnections
+                          ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${hasConnections ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                        {hasConnections ? tc.normalSupply : tc.unassigned}
+                      </span>
+                    </div>
                   </div>
-                  <span className={`text-[11px] font-semibold inline-flex items-center gap-1.5 ${
-                    hasConnections
-                      ? 'text-emerald-700 dark:text-emerald-400'
-                      : 'text-slate-500 dark:text-slate-400'
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${hasConnections ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                    {hasConnections ? tc.normalSupply : tc.unassigned}
-                  </span>
-                </div>
 
-                <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight mt-1">
-                  {hasConnections && selectedConnection ? localizeFeederName(selectedConnection.feederName, language) : tc.noFeederAssigned}
+                  <div className="min-h-[56px] flex flex-col justify-center my-1.5">
+                    <div className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-snug break-words">
+                      {hasConnections && selectedConnection ? localizeFeederName(selectedConnection.feederName, language) : tc.noFeederAssigned}
+                    </div>
+                  </div>
                 </div>
 
                 {hasConnections && selectedConnection ? (
-                  <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/70 text-xs">
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">{tc.lineVoltageLabel}</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
-                        {tc.voltageStableValue}
-                      </span>
+                  <div className="pt-3.5 mt-2 border-t border-slate-100 dark:border-slate-800/70 min-h-[76px] flex flex-col justify-between">
+                    <div className="grid grid-cols-2 gap-3 text-xs items-start">
+                      <div className="min-w-0">
+                        <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium leading-snug mb-1">{tc.lineVoltageLabel} ({at.simulatedValue})</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200 tabular-nums text-xs sm:text-[13px] leading-snug block">
+                          {tc.voltageStableValue}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium leading-snug mb-1">{tc.gridFrequencyLabel} ({at.simulatedValue})</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200 tabular-nums text-xs sm:text-[13px] leading-snug block">
+                          50.02 Hz
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">{tc.gridFrequencyLabel}</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
-                        50.02 Hz
-                      </span>
-                    </div>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 leading-snug">
+                      {at.consumerFeederTelemetryNote}
+                    </p>
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 pt-3.5 mt-2 border-t border-slate-100 dark:border-slate-800/70 min-h-[76px] leading-relaxed">
                     {tc.noFeederTelemetryDesc}
                   </p>
                 )}
               </div>
 
-              <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
-                <div className="text-xs">
-                  <span className="text-slate-400">{tc.scheduledOutagesLabel} </span>
+              <div className="pt-3.5 mt-4 border-t border-slate-100 dark:border-slate-800/80 min-h-[44px] flex items-center justify-between gap-2 flex-wrap">
+                <div className="text-xs leading-snug">
+                  <span className="text-slate-500 dark:text-slate-400">{tc.scheduledOutagesLabel} </span>
                   <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                     {hasConnections ? tc.noneInNext48h : tc.notApplicable}
                   </span>
@@ -905,46 +1279,53 @@ export const ConsumerPortal: React.FC = () => {
             </div>
 
             {/* Card 3: Service & Grievance Tracking */}
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                      <FileText className="w-4 h-4" />
+            <div className="h-full p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
+              <div className="flex-1 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start justify-between gap-2.5 min-h-[36px] mb-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-[13px] uppercase tracking-wider leading-snug break-words">
+                        {tc.serviceTracking}
+                      </span>
                     </div>
-                    <span className="font-bold text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">
-                      {tc.serviceTracking}
+                    <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border border-blue-200/60 dark:border-blue-800/60 px-2 py-0.5 rounded-md inline-flex items-center gap-1.5 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                      {tc.liveStatus}
                     </span>
                   </div>
-                  <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 inline-flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                    {tc.liveStatus}
-                  </span>
-                </div>
 
-                <div className="flex items-baseline gap-2.5 my-1">
-                  <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight">
-                    {consumerApplications.length} {consumerApplications.length === 1 ? tc.activeFileSingular : tc.activeFilePlural}
+                  <div className="min-h-[56px] flex flex-col justify-center my-1.5">
+                    <div className="flex items-baseline gap-2.5">
+                      <div className="text-2xl sm:text-[28px] font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight leading-tight">
+                        {consumerCanonicalAnalytics.activeApplicationsCount}{' '}
+                        {consumerCanonicalAnalytics.activeApplicationsCount === 1
+                          ? tc.activeFileSingular
+                          : tc.activeFilePlural}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/70 text-xs">
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">{tc.openGrievances}</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
-                      {consumerComplaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length} {tc.inTriageSuffix}
+                <div className="grid grid-cols-2 gap-3 pt-3.5 mt-2 border-t border-slate-100 dark:border-slate-800/70 text-xs min-h-[76px] items-start">
+                  <div className="min-w-0">
+                    <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium leading-snug mb-1">{tc.openGrievances}</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200 tabular-nums text-xs sm:text-[13px] leading-snug block">
+                      {consumerCanonicalAnalytics.openComplaintsCount} {tc.inTriageSuffix}
                     </span>
                   </div>
-                  <div>
-                    <span className="text-slate-400 block text-[11px]">{tc.latestApplication}</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 break-words leading-snug block">
+                  <div className="min-w-0">
+                    <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium leading-snug mb-1">{tc.latestApplication}</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200 break-words text-xs sm:text-[13px] leading-snug block">
                       {consumerApplications[0] ? localizeApplicationStatus(consumerApplications[0].status, language) : tc.noneSubmitted}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-2">
+              <div className="pt-3.5 mt-4 border-t border-slate-100 dark:border-slate-800/80 min-h-[44px] flex items-center justify-between gap-2 flex-wrap">
                 <button
                   onClick={() => setActiveTab('connections')}
                   className="text-xs text-blue-600 dark:text-cyan-400 font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded cursor-pointer"
@@ -972,11 +1353,11 @@ export const ConsumerPortal: React.FC = () => {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 items-stretch">
               <button
                 type="button"
-                onClick={() => setActiveTab('new-connection')}
-                className="group p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-xs transition-all text-left flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
+                onClick={() => initializeServiceRequestWizard('NEW_CONNECTION')}
+                className="group h-full min-h-[84px] p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-xs transition-all text-left flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors flex items-center justify-center shrink-0">
@@ -1003,7 +1384,7 @@ export const ConsumerPortal: React.FC = () => {
                     setActiveTab('bills');
                   }
                 }}
-                className="group p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-xs transition-all text-left flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
+                className="group h-full min-h-[84px] p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-xs transition-all text-left flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors flex items-center justify-center shrink-0">
@@ -1024,7 +1405,7 @@ export const ConsumerPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setActiveTab('complaints')}
-                className="group p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 hover:border-amber-500 dark:hover:border-amber-500 hover:shadow-xs transition-all text-left flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
+                className="group h-full min-h-[84px] p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 hover:border-amber-500 dark:hover:border-amber-500 hover:shadow-xs transition-all text-left flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 group-hover:bg-amber-600 group-hover:text-white transition-colors flex items-center justify-center shrink-0">
@@ -1045,7 +1426,7 @@ export const ConsumerPortal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setActiveTab('requests')}
-                className="group p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 hover:border-teal-500 dark:hover:border-teal-500 hover:shadow-xs transition-all text-left flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
+                className="group h-full min-h-[84px] p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 hover:border-teal-500 dark:hover:border-teal-500 hover:shadow-xs transition-all text-left flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 group-hover:bg-teal-600 group-hover:text-white transition-colors flex items-center justify-center shrink-0">
@@ -1069,24 +1450,55 @@ export const ConsumerPortal: React.FC = () => {
           <div className="p-5 sm:p-6 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 mb-5 border-b border-slate-100 dark:border-slate-800/80">
               <div>
-                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
-                  {tc.consumptionTrendTitle}
-                </h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                    {tc.consumptionTrendTitle}
+                  </h3>
+                  <span
+                    data-testid="consumer-analytics-source-badge"
+                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800"
+                  >
+                    {consumerConsumptionSource.badgeLabel}
+                  </span>
+                  {selectedConnection?.lastReadingDate && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                      {resolveAnalyticsTimestampLabel({
+                        timestamp: selectedConnection.lastReadingDate,
+                        type: 'measured',
+                        language
+                      }).formattedText}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   {hasConnections && selectedConnection
                     ? `${tc.consumptionTrendSubConnected} ${selectedConnection.meterNo}`
                     : tc.consumptionTrendSubUnlinked}
                 </p>
+                {hasConnections && (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                    {at.consumerConsumptionDisclosure} · <span className="font-mono text-[10px]">{consumerUncertaintyMeta.badgeText}</span>
+                  </p>
+                )}
               </div>
               {hasConnections && selectedConnection && (
                 <div className="flex flex-wrap items-center gap-4 text-xs">
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">{tc.sixMonthAverage}</span>
-                    <span className="font-bold text-slate-900 dark:text-white tabular-nums">418 kWh {tc.perMonthSuffix}</span>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">
+                      {tc.sixMonthAverage} ({at.calculated})
+                    </span>
+                    <span
+                      data-testid="consumer-avg-monthly-kwh"
+                      className="font-bold text-slate-900 dark:text-white tabular-nums"
+                    >
+                      {consumerCanonicalAnalytics.averageMonthlyKwh.toLocaleString()} kWh {tc.perMonthSuffix}
+                    </span>
                   </div>
                   <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block" />
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">{tc.latestMeterReading}</span>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">
+                      {tc.latestMeterReading} ({at.measured})
+                    </span>
                     <span className="font-bold text-blue-600 dark:text-cyan-400 tabular-nums">
                       {selectedConnection.currentReadingKwh.toLocaleString()} kWh
                     </span>
@@ -1094,6 +1506,17 @@ export const ConsumerPortal: React.FC = () => {
                 </div>
               )}
             </div>
+            {hasConnections && consumerCanonicalAnalytics.isInsufficientTrendHistory && (
+              <div
+                data-testid="consumer-insufficient-trend-note"
+                className="mb-3 px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400 flex items-center justify-between gap-2 flex-wrap"
+              >
+                <span>{caTranslations.insufficientTrendHistoryNote}</span>
+                <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">
+                  {caTranslations.connectionScopedSeriesBadge}: {selectedConnection?.consumerNo}
+                </span>
+              </div>
+            )}
 
             {hasConnections ? (
               <div className="h-72 w-full">
@@ -1200,6 +1623,7 @@ export const ConsumerPortal: React.FC = () => {
       {/* SUBVIEW 2: MY CONNECTIONS & SANCTION TRACKING */}
       {(activeTab === 'connections' || activeTab === 'applications') && (
         <div className="space-y-8">
+          <LiveConsumerRequests />
           {/* Active Connections Section */}
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1212,7 +1636,7 @@ export const ConsumerPortal: React.FC = () => {
                 </p>
               </div>
               <button
-                onClick={() => setActiveTab('new-connection')}
+                onClick={() => initializeServiceRequestWizard('NEW_CONNECTION')}
                 className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
               >
                 <PlusCircle className="w-4 h-4" />
@@ -1328,8 +1752,6 @@ export const ConsumerPortal: React.FC = () => {
             )}
           </div>
 
-          <LiveConsumerRequests />
-
           {/* Submitted In-Progress Applications Section */}
           <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
             <div className="flex items-center justify-between">
@@ -1342,9 +1764,16 @@ export const ConsumerPortal: React.FC = () => {
                   {tc.myApplicationsSub}
                 </p>
               </div>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                {consumerApplications.length} {consumerApplications.length === 1 ? tc.activeApplicationSingular : tc.activeApplicationPlural}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                  {consumerApplications.length} {consumerApplications.length === 1 ? tc.activeApplicationSingular : tc.activeApplicationPlural}
+                </span>
+                <ExportMenu
+                  datasetKey="applications"
+                  filteredRecords={consumerApplications}
+                  variant="compact"
+                />
+              </div>
             </div>
 
             {consumerApplications.length > 0 ? (
@@ -1360,23 +1789,45 @@ export const ConsumerPortal: React.FC = () => {
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-mono text-sm font-bold text-blue-600 dark:text-blue-400">
                               {app.id}
                             </span>
+                            {(() => {
+                              const reqBadge = localizeServiceRequestTypeBadge(app, language);
+                              return (
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded border ${reqBadge.badgeClasses}`}
+                                >
+                                  {reqBadge.label}
+                                </span>
+                              );
+                            })()}
                             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                               {tc.stepPrefix} {app.workflowStep}{tc.ofFivePrefix} {localizeApplicationStatus(app.status, language)}
                             </span>
                           </div>
                           <div className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                            {tc.applicantLabel} <strong>{app.applicantName}</strong> · {tc.requestedLoadLabel} <strong>{app.requestedLoadKw} kW ({localizePhase(app.phase, language)})</strong> · {localizeTariffCategory(app.category, language)}
+                            {tc.applicantLabel} <strong>{app.applicantName}</strong>
+                            {app.linkedConsumerNo ? (
+                              <> · {tc.consumerNoLabel} <strong className="font-mono">{app.linkedConsumerNo}</strong></>
+                            ) : null}{' '}
+                            · {tc.requestedLoadLabel} <strong>{app.requestedLoadKw} kW ({localizePhase(app.phase, language)})</strong> · {localizeTariffCategory(app.category, language)}
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => handleViewApplicationAcknowledgment(app)}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                            <span>{docUi.viewAcknowledgment}</span>
+                          </button>
                           <button
                             onClick={() => openCaseDrawer('application', app.id)}
-                            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5"
+                            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                           >
                             <span>{tc.inspectFileBtn}</span>
                             <ChevronRight className="w-3.5 h-3.5" />
@@ -1470,16 +1921,119 @@ export const ConsumerPortal: React.FC = () => {
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="p-6 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-6">
             {/* Header */}
-            <div className="border-b border-slate-100 dark:border-slate-800 pb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                  {tc.newConnFormTitle}
-                </h2>
+            <div className="border-b border-slate-100 dark:border-slate-800 pb-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                      {serviceRequestType === 'SOLAR_NET_METERING'
+                        ? srUi.modeSolarNetMetering
+                        : serviceRequestType === 'LOAD_CHANGE'
+                        ? srUi.modeLoadChange
+                        : tc.newConnFormTitle}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {tc.newConnFormSub}
+                  </p>
+                </div>
+
+                {/* Service Request Mode Switcher */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(
+                    [
+                      { mode: 'NEW_CONNECTION', label: srUi.modeNewConnection },
+                      { mode: 'SOLAR_NET_METERING', label: srUi.modeSolarNetMetering },
+                      { mode: 'LOAD_CHANGE', label: srUi.modeLoadChange }
+                    ] as const
+                  ).map(item => (
+                    <button
+                      key={item.mode}
+                      type="button"
+                      onClick={() => initializeServiceRequestWizard(item.mode, selectedConnection?.consumerNo)}
+                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                        serviceRequestType === item.mode
+                          ? item.mode === 'SOLAR_NET_METERING'
+                            ? 'bg-teal-600 text-white shadow-2xs'
+                            : 'bg-blue-600 text-white shadow-2xs'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <p className="text-xs text-slate-500">
-                {tc.newConnFormSub}
-              </p>
+
+              {/* Smart Prefill Banner for Solar Net-Metering and Load Change */}
+              {(serviceRequestType === 'SOLAR_NET_METERING' || serviceRequestType === 'LOAD_CHANGE') && (
+                hasConnections && selectedConnection ? (
+                  <div className="p-3.5 rounded-xl bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/70 space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs font-bold text-teal-900 dark:text-teal-200">
+                        <Sparkles className="w-4 h-4 text-teal-600 shrink-0" />
+                        <span>
+                          {srUi.prefilledFromConnectionBannerTitle}:{' '}
+                          <span className="font-mono">{linkedConsumerNo || selectedConnection.consumerNo}</span>
+                          {linkedMeterNo ? ` (${tc.meterLabel} ${linkedMeterNo})` : ''}
+                        </span>
+                      </div>
+
+                      {consumerConnections.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <label
+                            htmlFor="wizard-service-connection-select"
+                            className="text-[11px] font-semibold text-teal-800 dark:text-teal-300 whitespace-nowrap"
+                          >
+                            {srUi.selectConnectionForRequestLabel}
+                          </label>
+                          <select
+                            id="wizard-service-connection-select"
+                            value={linkedConsumerNo || selectedConnection.consumerNo}
+                            onChange={e => handleWizardConnectionSwitch(e.target.value)}
+                            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border border-teal-300 dark:border-teal-700 text-slate-800 dark:text-slate-200"
+                          >
+                            {consumerConnections.map(c => (
+                              <option key={c.consumerNo} value={c.consumerNo}>
+                                {c.consumerNo} — {localizeTariffCategory(c.tariffCategory, language)} ({c.sanctionedLoadKw} kW)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-teal-800 dark:text-teal-300">
+                      {srUi.prefilledFromConnectionBannerDescPattern
+                        .replace('{consumerNo}', linkedConsumerNo || selectedConnection.consumerNo)
+                        .replace('{consumerName}', selectedConnection.consumerName)
+                        .replace('{currentLoad}', String(selectedConnection.sanctionedLoadKw))
+                        .replace('{subdivision}', localizeSubdivision(selectedConnection.subdivision, language))}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>{srUi.noLinkedConnectionWarningTitle}</span>
+                      </div>
+                      <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                        {serviceRequestType === 'SOLAR_NET_METERING'
+                          ? srUi.noLinkedConnectionSolarDesc
+                          : srUi.noLinkedConnectionLoadChangeDesc}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsLinkModalOpen(true)}
+                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shrink-0 cursor-pointer"
+                    >
+                      {tc.linkExistingBtn}
+                    </button>
+                  </div>
+                )
+              )}
             </div>
 
             {/* Stepper Tabs */}
@@ -1509,54 +2063,6 @@ export const ConsumerPortal: React.FC = () => {
               {/* STEP 1: APPLICANT IDENTITY */}
               {formStep === 1 && (
                 <div className="space-y-4 animate-in fade-in">
-                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                        {intakeWfText.selectorLabel}
-                      </label>
-                      <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                        <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950/60 font-semibold text-blue-700 dark:text-blue-300 tabular-nums">
-                          {intakeWfText.slaTarget}: {activeSelectedTemplate.sla_hours}h
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                          {activeSelectedTemplate.require_document
-                            ? intakeWfText.docMandatory
-                            : intakeWfText.docOptional}
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
-                          {activeSelectedTemplate.require_field_visit
-                            ? intakeWfText.fieldSurvey
-                            : intakeWfText.deskReview}
-                        </span>
-                      </div>
-                    </div>
-                    <select
-                      value={selectedTemplateCode}
-                      onChange={e => setSelectedTemplateCode(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-blue-500"
-                    >
-                      {workflowTemplates.map(tpl => {
-                        const localizedName =
-                          tpl.template_code === 'new_connection'
-                            ? intakeWfText.optionNewConnection
-                            : tpl.template_code === 'load_extension'
-                              ? intakeWfText.optionLoadExtension
-                              : tpl.template_code === 'meter_replacement'
-                                ? intakeWfText.optionMeterReplacement
-                                : tpl.template_code === 'billing_dispute'
-                                  ? intakeWfText.optionBillingDispute
-                                  : tpl.template_code === 'outage_safety'
-                                    ? intakeWfText.optionOutageSafety
-                                    : tpl.name;
-                        return (
-                          <option key={tpl.template_code} value={tpl.template_code}>
-                            {localizedName} ({tpl.sla_hours}h SLA)
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
@@ -1565,7 +2071,10 @@ export const ConsumerPortal: React.FC = () => {
                       <input
                         type="text"
                         value={applicantName}
-                        onChange={e => setApplicantName(e.target.value)}
+                        onChange={e => {
+                          setApplicantName(e.target.value);
+                          markFieldEdited('applicantName');
+                        }}
                         required
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-blue-500"
                       />
@@ -1593,7 +2102,10 @@ export const ConsumerPortal: React.FC = () => {
                       <input
                         type="tel"
                         value={applicantPhone}
-                        onChange={e => setApplicantPhone(e.target.value)}
+                        onChange={e => {
+                          setApplicantPhone(e.target.value);
+                          markFieldEdited('applicantPhone');
+                        }}
                         required
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       />
@@ -1606,7 +2118,10 @@ export const ConsumerPortal: React.FC = () => {
                       <input
                         type="email"
                         value={applicantEmail}
-                        onChange={e => setApplicantEmail(e.target.value)}
+                        onChange={e => {
+                          setApplicantEmail(e.target.value);
+                          markFieldEdited('applicantEmail');
+                        }}
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       />
                     </div>
@@ -1659,55 +2174,6 @@ export const ConsumerPortal: React.FC = () => {
               {/* STEP 2: PREMISES & SUBDIVISION */}
               {formStep === 2 && (
                 <div className="space-y-4 animate-in fade-in">
-                  {/* Reusable Saved Premises Bar (Item #29) */}
-                  <SavedPremisesBar
-                    userKey={currentUserEmail || currentUserId}
-                    currentDraft={{
-                      applicantName,
-                      phone: applicantPhone,
-                      address,
-                      zone: selectedZone,
-                      subdivision,
-                      pinCode: pincode,
-                      premisesType,
-                      latitude,
-                      longitude,
-                    }}
-                    onApplyPremise={prem => {
-                      if (prem.applicant_name) setApplicantName(prem.applicant_name);
-                      if (prem.phone) setApplicantPhone(prem.phone);
-                      if (prem.address) setAddress(prem.address);
-                      if (prem.zone) setSelectedZone(prem.zone);
-                      if (prem.subdivision) setSubdivision(prem.subdivision);
-                      if (prem.pin_code) setPincode(prem.pin_code);
-                      if (
-                        prem.premises_type === 'Owned' ||
-                        prem.premises_type === 'Rented' ||
-                        prem.premises_type === 'Government Leased'
-                      ) {
-                        setPremisesType(prem.premises_type);
-                      }
-                      setLatitude(prem.latitude ?? null);
-                      setLongitude(prem.longitude ?? null);
-                    }}
-                    onNotify={msg => showToast(msg, 'success')}
-                  />
-
-                  {/* Interactive GPS & Subdivision Map Pin Picker (Item #28) */}
-                  <LocationPinPicker
-                    value={{ latitude, longitude, zone: selectedZone }}
-                    onSelect={pin => {
-                      setLatitude(pin.latitude);
-                      setLongitude(pin.longitude);
-                      setSelectedZone(pin.zone);
-                      setSubdivision(pin.subdivision);
-                      setPincode(pin.pinCode);
-                      if (!address.trim() || address.startsWith('Plot ') || address.startsWith('Survey ') || address.startsWith('GPS (')) {
-                        setAddress(pin.suggestedAddress);
-                      }
-                    }}
-                  />
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
@@ -1716,18 +2182,13 @@ export const ConsumerPortal: React.FC = () => {
                       <select
                         value={subdivision}
                         onChange={e => {
-                          const val = e.target.value;
-                          setSubdivision(val);
-                          const low = val.toLowerCase();
-                          if (low.includes('gandhinagar')) setSelectedZone('South');
-                          else if (low.includes('visnagar')) setSelectedZone('East');
-                          else if (low.includes('patan')) setSelectedZone('West');
-                          else if (low.includes('kalol')) setSelectedZone('Central');
-                          else setSelectedZone('North');
+                          setSubdivision(e.target.value);
+                          markFieldEdited('subdivision');
                         }}
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       >
                         <option value="Mehsana City North">{tc.subdivMehsanaNorthHq}</option>
+                        <option value="Mehsana Industrial GIDC">{localizeSubdivision('Mehsana Industrial GIDC', language)}</option>
                         <option value="Gandhinagar Sub-Division 2">{tc.subdivGandhinagar2}</option>
                         <option value="Visnagar Division">{tc.subdivVisnagar}</option>
                         <option value="Kalol Sub-Division">{tc.subdivKalol}</option>
@@ -1742,7 +2203,10 @@ export const ConsumerPortal: React.FC = () => {
                       </label>
                       <select
                         value={premisesType}
-                        onChange={e => setPremisesType(e.target.value as any)}
+                        onChange={e => {
+                          setPremisesType(e.target.value as any);
+                          markFieldEdited('premisesType');
+                        }}
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       >
                         <option value="Owned">{tc.ownershipOwnedOption}</option>
@@ -1758,7 +2222,10 @@ export const ConsumerPortal: React.FC = () => {
                     </label>
                     <textarea
                       value={address}
-                      onChange={e => setAddress(e.target.value)}
+                      onChange={e => {
+                        setAddress(e.target.value);
+                        markFieldEdited('address');
+                      }}
                       rows={2}
                       required
                       className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
@@ -1773,7 +2240,10 @@ export const ConsumerPortal: React.FC = () => {
                       <input
                         type="text"
                         value={pincode}
-                        onChange={e => setPincode(e.target.value)}
+                        onChange={e => {
+                          setPincode(e.target.value);
+                          markFieldEdited('pincode');
+                        }}
                         required
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
                       />
@@ -1822,7 +2292,10 @@ export const ConsumerPortal: React.FC = () => {
                       </label>
                       <select
                         value={category}
-                        onChange={e => setCategory(e.target.value as TariffCategory)}
+                        onChange={e => {
+                          setCategory(e.target.value as TariffCategory);
+                          markFieldEdited('category');
+                        }}
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       >
                         <option value="Residential (RGPU)">{tc.tariffResidentialOption}</option>
@@ -1838,7 +2311,10 @@ export const ConsumerPortal: React.FC = () => {
                       </label>
                       <select
                         value={purpose}
-                        onChange={e => setPurpose(e.target.value)}
+                        onChange={e => {
+                          setPurpose(e.target.value);
+                          markFieldEdited('purpose');
+                        }}
                         className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       >
                         <option value="Domestic / Residential Lighting & Power">{tc.purposeDomesticOption}</option>
@@ -1849,11 +2325,88 @@ export const ConsumerPortal: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Load Extension / Reduction Comparison & Confirmation Card */}
+                  {serviceRequestType === 'LOAD_CHANGE' &&
+                    (() => {
+                      const loadEval = evaluateLoadChangeRequest(currentSanctionedLoadKw, Number(loadKw));
+                      return (
+                        <div className="p-4 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/70 space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                            <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                              <span className="text-[11px] text-slate-500 block">
+                                {srUi.currentSanctionedLoadLabel}
+                              </span>
+                              <span className="text-base font-extrabold font-mono text-slate-900 dark:text-white">
+                                {currentSanctionedLoadKw !== null ? `${currentSanctionedLoadKw} kW` : tc.notApplicable}
+                              </span>
+                            </div>
+
+                            <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                              <span className="text-[11px] text-slate-500 block">
+                                {srUi.requestedNewLoadLabel}
+                              </span>
+                              <span className="text-base font-extrabold font-mono text-blue-600 dark:text-blue-400">
+                                {loadKw} kW
+                              </span>
+                            </div>
+
+                            <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                              <span className="text-[11px] text-slate-500 block">
+                                {srUi.loadDeltaLabel}
+                              </span>
+                              <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                <span
+                                  className={`text-[11px] font-bold px-2 py-0.5 rounded border ${
+                                    loadEval.direction === 'EXTENSION'
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300'
+                                      : loadEval.direction === 'REDUCTION'
+                                      ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300'
+                                      : 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-300'
+                                  }`}
+                                >
+                                  {loadEval.direction === 'EXTENSION'
+                                    ? `${srUi.directionExtensionBadge} (+${loadEval.deltaKw} kW)`
+                                    : loadEval.direction === 'REDUCTION'
+                                    ? `${srUi.directionReductionBadge} (${loadEval.deltaKw} kW)`
+                                    : srUi.directionUnchangedBadge}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {!loadEval.isValidChange && (
+                            <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                              <span>{srUi.loadChangeInstructionNote}</span>
+                            </p>
+                          )}
+
+                          <label className="flex items-start gap-2 text-xs text-slate-800 dark:text-slate-200 cursor-pointer pt-1">
+                            <input
+                              id="load-change-confirm-checkbox"
+                              type="checkbox"
+                              checked={loadChangeConfirmed}
+                              onChange={e => {
+                                setLoadChangeConfirmed(e.target.checked);
+                                markFieldEdited('loadChangeConfirmed');
+                              }}
+                              className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="font-semibold leading-snug">
+                              {srUi.loadChangeConfirmCheckboxLabel}
+                            </span>
+                          </label>
+                        </div>
+                      );
+                    })()}
+
                   {/* Load kW selector with quick buttons and slider */}
                   <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                        {tc.requestedSanctionLoadLabel}
+                        {serviceRequestType === 'LOAD_CHANGE'
+                          ? srUi.requestedNewLoadLabel
+                          : tc.requestedSanctionLoadLabel}
                       </label>
                       <span className="text-base font-extrabold text-blue-600 dark:text-blue-400 font-mono">
                         {loadKw} kW
@@ -1881,27 +2434,15 @@ export const ConsumerPortal: React.FC = () => {
                       type="range"
                       min="1"
                       max="50"
-                      aria-label={loadText.slider}
-                      value={Math.min(50, Math.max(1, Number.isFinite(loadKw) ? loadKw : 1))}
+                      value={loadKw}
                       onChange={e => handleLoadPresetChange(Number(e.target.value))}
                       className="w-full accent-blue-600"
                     />
 
-                    <label htmlFor="requested-load-input" className="block text-xs font-semibold">{loadText.input}</label>
-                    <input id="requested-load-input" type="number" min="0" step="any" value={loadInput}
-                      onChange={e => {
-                        const next = e.target.value;
-                        setLoadInput(next);
-                        if (validLoad(next)) setPhase(Number(next) <= 5 ? '1-Phase' : '3-Phase');
-                      }}
-                      aria-invalid={!loadIsValid} aria-describedby="load-policy-description"
-                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white text-slate-900 dark:bg-slate-900 dark:text-white" />
-                    <div id="load-policy-description" className="text-xs text-slate-600 dark:text-slate-300" aria-live="polite">
-                      {!loadIsValid && <p className="text-red-700 dark:text-red-300">{loadText.invalid}</p>}
-                      {policyState === 'loading' && <p>{loadText.loading}</p>}
-                      {policyState === 'unavailable' && <p>{loadText.unavailable} <button type="button" className="underline" onClick={() => setPolicyAttempt(n => n + 1)}>{loadText.retry}</button></p>}
-                      {policyState === 'ready' && policy !== null && <p>{loadText.threshold(policy)}</p>}
-                      {policyState === 'ready' && policy !== null && loadIsValid && requiresDemoReview(loadKw, policy) && <p className="font-semibold text-amber-800 dark:text-amber-300">{loadText.review}</p>}
+                    <div className="text-[11px] text-slate-500 flex justify-between">
+                      <span>{tc.minLoadNote}</span>
+                      <span>{tc.phaseRequirementNote}</span>
+                      <span>{tc.maxLtLoadNote}</span>
                     </div>
                   </div>
 
@@ -1917,7 +2458,10 @@ export const ConsumerPortal: React.FC = () => {
                             type="radio"
                             name="phase"
                             checked={phase === '1-Phase'}
-                            onChange={() => setPhase('1-Phase')}
+                            onChange={() => {
+                              setPhase('1-Phase');
+                              markFieldEdited('phase');
+                            }}
                           />
                           <span>{tc.phase1Option}</span>
                         </label>
@@ -1926,7 +2470,10 @@ export const ConsumerPortal: React.FC = () => {
                             type="radio"
                             name="phase"
                             checked={phase === '3-Phase'}
-                            onChange={() => setPhase('3-Phase')}
+                            onChange={() => {
+                              setPhase('3-Phase');
+                              markFieldEdited('phase');
+                            }}
                           />
                           <span>{tc.phase3Option}</span>
                         </label>
@@ -1938,7 +2485,10 @@ export const ConsumerPortal: React.FC = () => {
                         <input
                           type="checkbox"
                           checked={solarInterest}
-                          onChange={e => setSolarInterest(e.target.checked)}
+                          onChange={e => {
+                            setSolarInterest(e.target.checked);
+                            markFieldEdited('solarInterest');
+                          }}
                           className="rounded text-blue-600 focus:ring-blue-500"
                         />
                         <span className="font-semibold">
@@ -1961,8 +2511,7 @@ export const ConsumerPortal: React.FC = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => { if (loadIsValid) setFormStep(4); else showToast(loadText.invalid, 'error'); }}
-                      disabled={!loadIsValid}
+                      onClick={() => setFormStep(4)}
                       className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5"
                     >
                       <span>{tc.reviewCostEstimateBtn}</span>
@@ -2001,57 +2550,6 @@ export const ConsumerPortal: React.FC = () => {
                           </span>
                         </div>
                       ))}
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-2 text-xs">
-                      <label htmlFor="supporting-document-upload" className="font-semibold text-slate-800 dark:text-slate-200 block">
-                        {uploadText.attachLabel}
-                      </label>
-                      <input
-                        id="supporting-document-upload"
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png,.txt"
-                        onChange={e => {
-                          const file = e.target.files?.[0];
-                          if (!file) {
-                            setAttachedDocument(null);
-                            setUploadErrorReason(null);
-                            return;
-                          }
-                          const check = validateDocumentUpload(file);
-                          if (!check.valid) {
-                            setAttachedDocument(null);
-                            setUploadErrorReason(check.reason);
-                            return;
-                          }
-                          setUploadErrorReason(null);
-                          setAttachedDocument({ file, sanitizedName: check.sanitizedName });
-                        }}
-                        className="block w-full text-xs text-slate-700 dark:text-slate-200 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
-                      />
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">{uploadText.hint}</p>
-                      {uploadErrorReason && (
-                        <p role="alert" className="text-xs font-medium text-rose-600 dark:text-rose-400">
-                          {uploadText[uploadErrorReason]}
-                        </p>
-                      )}
-                      {attachedDocument && !uploadErrorReason && (
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-3 py-2">
-                          <span className="break-all text-emerald-900 dark:text-emerald-200">
-                            {uploadText.selectedPrefix} <strong className="font-mono">{attachedDocument.sanitizedName}</strong> ({Math.max(1, Math.round(attachedDocument.file.size / 1024))} KB)
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAttachedDocument(null);
-                              setUploadErrorReason(null);
-                            }}
-                            className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline"
-                          >
-                            {uploadText.removeBtn}
-                          </button>
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -2112,13 +2610,15 @@ export const ConsumerPortal: React.FC = () => {
         </div>
       )}
 
-      {/* SUBVIEW 4: ELECTRICITY BILLS & PAYMENTS */}
-      {(activeTab === 'bills' || activeTab === 'quick-pay') && (
+      {/* SUBVIEW 4: ELECTRICITY BILLS & PAYMENTS & SMART PAYMENT CALENDAR */}
+      {(activeTab === 'bills' || activeTab === 'quick-pay' || activeTab === 'calendar') && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                {tc.billsTitle}
+                {activeTab === 'calendar' || billingSubTab === 'calendar'
+                  ? (language === 'gu' ? 'સ્માર્ટ ચુકવણી કેલેન્ડર' : language === 'hi' ? 'स्मार्ट भुगतान कैलेंडर' : language === 'mr' ? 'स्मार्ट देयक दिनदर्शिका' : 'Smart Payment Calendar')
+                  : tc.billsTitle}
               </h2>
               <p className="text-xs text-slate-500">
                 {selectedConnection ? (
@@ -2128,100 +2628,314 @@ export const ConsumerPortal: React.FC = () => {
                 )}
               </p>
             </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="inline-flex items-center p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBillingSubTab('list');
+                    if (activeTab === 'calendar') setActiveTab('bills');
+                  }}
+                  data-testid="toggle-bill-list-view"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    billingSubTab === 'list' && activeTab !== 'calendar'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>{language === 'gu' ? 'બિલ યાદી' : language === 'hi' ? 'बिल सूची' : language === 'mr' ? 'बिल यादी' : 'Bill List'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBillingSubTab('calendar');
+                    if (activeTab !== 'calendar') setActiveTab('calendar');
+                  }}
+                  data-testid="toggle-smart-payment-calendar"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    billingSubTab === 'calendar' || activeTab === 'calendar'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>{language === 'gu' ? 'સ્માર્ટ ચુકવણી કેલેન્ડર' : language === 'hi' ? 'स्मार्ट भुगतान कैलेंडर' : language === 'mr' ? 'स्मार्ट देयक दिनदर्शिका' : 'Smart Payment Calendar'}</span>
+                </button>
+              </div>
+
+              {hasConnections && selectedConnection?.status === 'Active' && (
+                <button
+                  type="button"
+                  data-testid="generate-bimonthly-demo-bill-btn"
+                  onClick={() =>
+                    generateDemoBillForActiveConnection(
+                      selectedConnection.consumerNo,
+                      undefined,
+                      { billingCycleType: 'BI_MONTHLY' }
+                    )
+                  }
+                  className="px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/50 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Receipt className="w-3.5 h-3.5" />
+                  <span>{bUi.generateDemoBiMonthlyBillBtn}</span>
+                </button>
+              )}
+
+              <ExportMenu
+                datasetKey="bills"
+                filteredRecords={selectedConnectionBills}
+                allAuthorizedRecords={consumerBillingSummary.allAccountReconciledBills}
+              />
+            </div>
           </div>
 
-          <div className="space-y-4">
-            {consumerBills.length > 0 ? (
-              consumerBills
-                .filter(b => !selectedConnection || b.consumerNo === selectedConnection.consumerNo)
-                .map(bill => (
-                  <div
-                    key={bill.billNo}
-                    className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4"
+          {hasConnections && consumerBillingSummary.otherConnectionsWithDueBills.length > 0 && (
+            <div
+              className="p-3.5 sm:p-4 rounded-xl bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200/90 dark:border-amber-800/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              data-testid="bills-other-connections-due-banner"
+            >
+              <div className="flex items-start sm:items-center gap-2.5 text-xs text-amber-900 dark:text-amber-200">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+                <span>
+                  {bUi.otherConnectionsDueBanner(
+                    consumerBillingSummary.otherConnectionsWithDueBills.reduce(
+                      (s, item) => s + item.dueBillCount,
+                      0
+                    ),
+                    consumerBillingSummary.otherConnectionsWithDueBills.length
+                  )}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {consumerBillingSummary.otherConnectionsWithDueBills.map(item => (
+                  <button
+                    key={item.consumerNo}
+                    type="button"
+                    onClick={() => handleWizardConnectionSwitch(item.consumerNo)}
+                    className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-semibold shadow-2xs transition-colors cursor-pointer"
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">
-                            {bill.billNo}
-                          </span>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
-                            bill.status === 'Paid'
+                    {bUi.switchToConnectionWithDueBtn(item.consumerNo, item.dueBillCount)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(billingSubTab === 'calendar' || activeTab === 'calendar') ? (
+            <SmartPaymentCalendar
+              bills={consumerBillingSummary.allAccountReconciledBills}
+              connections={consumerConnections}
+              payments={consumerPayments}
+              language={language}
+              selectedConnectionNo={selectedConnection?.consumerNo}
+              onSelectConnection={(no) => setSelectedConnectionNo(no)}
+              onViewBill={(b) => handleViewElectricityBill(b)}
+              onPayBill={(bNo) => handlePayClick(bNo)}
+            />
+          ) : (
+            <div className="space-y-4">
+              {selectedConnectionBills.length > 0 ? (
+              selectedConnectionBills.map(bill => (
+                <div
+                  key={bill.billNo}
+                  data-testid={`bill-card-${bill.billNo}`}
+                  className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-sm font-bold text-slate-900 dark:text-white">
+                          {bill.billNo}
+                        </span>
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                            bill.effectiveStatus === 'Paid'
                               ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                              : bill.effectiveStatus === 'Overdue'
+                              ? 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
                               : 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
-                          }`}>
-                            {localizeBillStatus(bill.status, language)}
+                          }`}
+                        >
+                          {localizeBillStatus(bill.effectiveStatus, language)}
+                        </span>
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                            bill.billingCycleType === 'BI_MONTHLY'
+                              ? 'bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                          }`}
+                          data-testid={`bill-cycle-badge-${bill.billNo}`}
+                        >
+                          {localizeBillingCycleShortBadge(bill.billingCycleType, language)}
+                        </span>
+                        {bill.isSimulatedDemoBill && (
+                          <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800">
+                            {bUi.demoBillDisclosureBadge}
                           </span>
-                        </div>
-                        <span className="text-xs text-slate-500">
-                          {tc.monthLabel} {localizeBillMonth(bill.billMonth, language)} · {tc.billDateLabel} {bill.billDate} · {tc.dueDateLabel} {bill.dueDate}
+                        )}
+                      </div>
+                      <span className="text-xs text-slate-500 block mt-0.5">
+                        {tc.monthLabel} {localizeBillMonth(bill.billMonth, language)}
+                        {bill.periodStartDate && bill.periodEndDate
+                          ? ` (${bill.periodStartDate} – ${bill.periodEndDate})`
+                          : ''}{' '}
+                        · {tc.billDateLabel} {bill.billDate} · {tc.dueDateLabel} {bill.dueDate}
+                      </span>
+                      {bill.isPartiallyPaid && (
+                        <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400 block mt-1">
+                          {bUi.paidAmountLabel}: ₹{bill.paidAmount.toLocaleString('en-IN')} · {bUi.remainingBalanceLabel}: ₹{bill.outstandingBalance.toLocaleString('en-IN')}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <div className="text-right mr-1">
+                        <span className="text-xs text-slate-400 block text-[11px]">
+                          {bill.isPartiallyPaid ? bUi.remainingBalanceLabel : tc.payableAmountLabel}
+                        </span>
+                        <span className="text-lg font-extrabold text-slate-900 dark:text-white font-mono">
+                          ₹{(bill.isPartiallyPaid ? bill.outstandingBalance : bill.totalAmount).toLocaleString('en-IN')}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <span className="text-xs text-slate-400 block text-[11px]">{tc.payableAmountLabel}</span>
-                          <span className="text-lg font-extrabold text-slate-900 dark:text-white font-mono">
-                            ₹{bill.totalAmount.toLocaleString()}
-                          </span>
-                        </div>
+                      <button
+                        type="button"
+                        onClick={() => handleViewElectricityBill(bill)}
+                        data-testid={`view-bill-btn-${bill.billNo}`}
+                        className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                        <span>{docExtraUi.viewElectricityBill}</span>
+                      </button>
 
-                        {bill.status === 'Unpaid' ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadElectricityBillPdf(bill)}
+                        data-testid={`download-bill-pdf-btn-${bill.billNo}`}
+                        className="px-3 py-2 rounded-lg border border-blue-200 dark:border-blue-800/80 bg-blue-50/60 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100/80 dark:hover:bg-blue-900/50 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>{docExtraUi.downloadBillPdf}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setQrVerificationTarget({
+                            billNo: bill.billNo,
+                            consumerNo: bill.consumerNo,
+                          })
+                        }
+                        data-testid={`verify-bill-qr-btn-${bill.billNo}`}
+                        className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <QrCode className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                        <span>{language === 'gu' ? 'QR ચકાસણી' : language === 'hi' ? 'QR सत्यापन' : language === 'mr' ? 'QR पडताळणी' : 'Verify QR'}</span>
+                      </button>
+
+                      {bill.isDue && (
+                        <button
+                          type="button"
+                          onClick={() => handlePayClick(bill.billNo)}
+                          data-testid={`pay-online-btn-${bill.billNo}`}
+                          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs cursor-pointer"
+                        >
+                          {tc.payOnlineBtn}
+                        </button>
+                      )}
+                      {(bill.isPaid || bill.paidAmount > 0) && (
+                        <>
                           <button
-                            onClick={() => handlePayClick(bill.billNo)}
-                            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs"
-                          >
-                            {tc.payOnlineBtn}
-                          </button>
-                        ) : (
-                          <button
+                            type="button"
                             onClick={() => handleViewReceipt(bill)}
-                            className="px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium flex items-center gap-1.5"
+                            data-testid={`view-receipt-btn-${bill.billNo}`}
+                            className="px-3 py-2 rounded-lg border border-emerald-200 dark:border-emerald-800/80 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/70 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                           >
-                            <Download className="w-3.5 h-3.5" />
+                            <Receipt className="w-3.5 h-3.5" />
                             <span>{tc.viewReceiptBtn}</span>
                           </button>
-                        )}
-                      </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadReceiptPdf(bill)}
+                            data-testid={`download-receipt-pdf-btn-${bill.billNo}`}
+                            className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>{docExtraUi.downloadReceiptPdf}</span>
+                          </button>
+                        </>
+                      )}
                     </div>
+                  </div>
 
-                    {/* Tariff Details */}
-                    <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-2 text-xs">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                        {tc.tariffItemizationTitle}
-                      </span>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        <div>
-                          <span className="text-slate-400 block text-[11px]">{tc.energyChargesLabel}</span>
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">₹{bill.energyCharges}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[11px]">{tc.fixedChargesLabel}</span>
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">₹{bill.fixedCharges}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[11px]">{tc.fuelPriceAdjLabel}</span>
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">₹{bill.fuelPriceAdjustment}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block text-[11px]">{tc.electricityDutyLabel}</span>
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">₹{bill.electricityDuty}</span>
-                        </div>
+                  {/* Tariff Details */}
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 space-y-2 text-xs">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                      {tc.tariffItemizationTitle}
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div>
+                        <span className="text-slate-400 block text-[11px]">{tc.energyChargesLabel}</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">₹{bill.energyCharges}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[11px]">{tc.fixedChargesLabel}</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">₹{bill.fixedCharges}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[11px]">{tc.fuelPriceAdjLabel}</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">₹{bill.fuelPriceAdjustment}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[11px]">{tc.electricityDutyLabel}</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">₹{bill.electricityDuty}</span>
                       </div>
                     </div>
                   </div>
-                ))
+                </div>
+              ))
             ) : (
-              <div className="p-8 text-center rounded-xl bg-white dark:bg-[#101C35] border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
+              <div
+                data-testid="bills-empty-state-card"
+                className="p-8 text-center rounded-xl bg-white dark:bg-[#101C35] border border-dashed border-slate-200 dark:border-slate-800 space-y-3"
+              >
                 <FileText className="w-10 h-10 text-slate-400 mx-auto" />
                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                  {tc.noBillsFoundTitle}
+                  {hasConnections ? bUi.noBillsForConnectionTitle : tc.noBillsFoundTitle}
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
                   {hasConnections
-                    ? tc.noBillsFoundConnectedDesc
+                    ? bUi.noBillsForConnectionDesc
                     : tc.noBillsFoundUnlinkedDesc}
                 </p>
+                {hasConnections && selectedConnection?.status === 'Active' && (
+                  <div className="pt-1 flex flex-wrap items-center justify-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => generateDemoBillForActiveConnection(selectedConnection.consumerNo)}
+                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Receipt className="w-3.5 h-3.5" />
+                      <span>{bUi.generateDemoBillBtn}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        generateDemoBillForActiveConnection(
+                          selectedConnection.consumerNo,
+                          undefined,
+                          { billingCycleType: 'BI_MONTHLY' }
+                        )
+                      }
+                      className="px-4 py-2 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Receipt className="w-3.5 h-3.5" />
+                      <span>{bUi.generateDemoBiMonthlyBillBtn}</span>
+                    </button>
+                  </div>
+                )}
                 {!hasConnections && (
                   <button
                     type="button"
@@ -2235,19 +2949,27 @@ export const ConsumerPortal: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    )}
 
       {/* SUBVIEW 5: PAYMENT HISTORY */}
       {activeTab === 'payments' && (
         <div className="space-y-6 min-w-0">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              {tc.paymentHistoryTitle}
-            </h2>
-            <p className="text-xs text-slate-500">
-              {tc.paymentHistorySub} ({currentUserName})
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                {tc.paymentHistoryTitle}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {tc.paymentHistorySub} ({selectedConnection ? `${selectedConnection.consumerName} · ${selectedConnection.consumerNo}` : currentUserName})
+              </p>
+            </div>
+            <ExportMenu
+              datasetKey="payments"
+              filteredRecords={selectedConnection ? selectedConnectionPayments : consumerPayments}
+              allAuthorizedRecords={consumerPayments}
+            />
           </div>
 
           <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
@@ -2262,6 +2984,7 @@ export const ConsumerPortal: React.FC = () => {
                     <th className="p-3.5 font-semibold whitespace-nowrap">{tc.colBankRef}</th>
                     <th className="p-3.5 font-semibold text-right whitespace-nowrap">{tc.colAmount}</th>
                     <th className="p-3.5 font-semibold text-center whitespace-nowrap">{tc.colStatus}</th>
+                    <th className="p-3.5 font-semibold text-right whitespace-nowrap">{docUi.paymentReceipt}</th>
                   </tr>
                 </thead>
                 {consumerPayments.length > 0 ? (
@@ -2283,9 +3006,45 @@ export const ConsumerPortal: React.FC = () => {
                           ₹{p.amount.toLocaleString()}
                         </td>
                         <td className="p-3.5 text-center whitespace-nowrap">
-                          <span className="inline-block text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
+                          <span
+                            className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded whitespace-nowrap ${
+                              p.status === 'Successful'
+                                ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                                : p.status === 'Pending Verification'
+                                ? 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
+                                : 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+                            }`}
+                          >
                             {localizePaymentStatus(p.status, language)}
                           </span>
+                        </td>
+                        <td className="p-3.5 text-right whitespace-nowrap">
+                          {p.status === 'Successful' ? (
+                            <div className="inline-flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleViewPaymentTransactionReceipt(p)}
+                                data-testid={`payment-history-view-receipt-${p.txId}`}
+                                className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <Receipt className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                <span>{docUi.viewReceipt}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadReceiptPdf(null, p)}
+                                data-testid={`payment-history-download-pdf-${p.txId}`}
+                                className="px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800/80 bg-blue-50/50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <Download className="w-3.5 h-3.5" />
+                                <span>{docExtraUi.downloadPdf}</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 italic">
+                              —
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -2293,7 +3052,7 @@ export const ConsumerPortal: React.FC = () => {
                 ) : (
                   <tbody>
                     <tr>
-                      <td colSpan={7} className="p-8 text-center text-slate-500 dark:text-slate-400">
+                      <td colSpan={8} className="p-8 text-center text-slate-500 dark:text-slate-400">
                         {tc.noPaymentsRecorded}
                       </td>
                     </tr>
@@ -2377,9 +3136,16 @@ export const ConsumerPortal: React.FC = () => {
 
           {/* Active Grievances List */}
           <div className="lg:col-span-2 space-y-4">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              {tc.grievanceTrackingTitle}
-            </h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                {tc.grievanceTrackingTitle}
+              </h3>
+              <ExportMenu
+                datasetKey="complaints"
+                filteredRecords={consumerComplaints}
+                variant="compact"
+              />
+            </div>
 
             {consumerComplaints.length > 0 ? (
               <div className="space-y-3">
@@ -2408,12 +3174,23 @@ export const ConsumerPortal: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
                       <span>{tc.filedLabel} {cmp.filedAt}</span>
                       <span>{tc.slaLabel} {cmp.slaTargetHours} {tc.hoursSuffix}</span>
                       <span className="text-blue-600 dark:text-blue-400 font-medium">
                         {tc.expectedResolutionLabel} {cmp.slaDueTime}
                       </span>
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleViewComplaintAcknowledgment(cmp);
+                        }}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <FileText className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                        <span>{docUi.viewAcknowledgment}</span>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -2463,8 +3240,8 @@ export const ConsumerPortal: React.FC = () => {
               </p>
               <button
                 onClick={() => {
+                  initializeServiceRequestWizard('SOLAR_NET_METERING', selectedConnection?.consumerNo);
                   showToast(tc.solarFormInitToast, 'info');
-                  setActiveTab('new-connection');
                 }}
                 className="w-full py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold cursor-pointer"
               >
@@ -2489,8 +3266,13 @@ export const ConsumerPortal: React.FC = () => {
               </p>
               <button
                 onClick={() => {
-                  showToast(`${tc.loadChangeInitToastPrefix}${selectedConnection?.consumerNo || 'account'}`, 'info');
-                  setActiveTab('new-connection');
+                  initializeServiceRequestWizard('LOAD_CHANGE', selectedConnection?.consumerNo);
+                  showToast(
+                    selectedConnection
+                      ? `${tc.loadChangeInitToastPrefix}${selectedConnection.consumerNo}`
+                      : srUi.noLinkedConnectionLoadChangeDesc,
+                    'info'
+                  );
                 }}
                 className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer"
               >
@@ -2640,7 +3422,37 @@ export const ConsumerPortal: React.FC = () => {
                   ? 'bg-amber-50 text-amber-800 border-amber-200'
                   : 'bg-blue-50 text-blue-700 border-blue-200';
 
-                const localizedNotif = localizeConsumerNotification(n, language);
+                let localizedNotif = localizeConsumerNotification(n, language);
+                if (
+                  n.eventKey &&
+                  n.eventKey.startsWith('BILL-REMINDER:') &&
+                  n.relatedEntityId
+                ) {
+                  const matchedBill = consumerBillingSummary.allAccountReconciledBills.find(
+                    b => b.billNo === n.relatedEntityId
+                  );
+                  if (matchedBill && n.notificationType) {
+                    const reminderCopy = buildLocalizedBillingReminderCopy({
+                      reminderType: n.notificationType as BillingReminderType,
+                      billNo: matchedBill.billNo,
+                      consumerNo: matchedBill.consumerNo,
+                      billMonth: matchedBill.billMonth,
+                      dueDate: matchedBill.dueDate,
+                      outstandingBalance: matchedBill.outstandingBalance,
+                      totalAmount: matchedBill.totalAmount,
+                      isPartiallyPaid: matchedBill.isPartiallyPaid,
+                      paidAmount: matchedBill.paidAmount,
+                      txId: matchedBill.transactionRef,
+                      language
+                    });
+                    localizedNotif = {
+                      ...localizedNotif,
+                      title: reminderCopy.title,
+                      message: reminderCopy.message,
+                      badgeLabel: reminderCopy.statusBadge
+                    };
+                  }
+                }
 
                 return (
                   <div
@@ -2841,138 +3653,114 @@ export const ConsumerPortal: React.FC = () => {
         </div>
       )}
 
-      {/* DEMO PAYMENT MODAL */}
-      {isPayModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs">
-          <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-blue-600" />
-                <span>{tc.simulatedBillPaymentTitle}</span>
-              </h3>
-              <button
-                onClick={() => setIsPayModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                ✕
-              </button>
-            </div>
+      {/* REDESIGNED ENTERPRISE PAYMENT MODAL (PHASE 5 STEP 5.2) */}
+      <EnterprisePaymentModal
+        isOpen={isPayModalOpen}
+        bill={billModalTarget}
+        connection={
+          consumerConnections.find(
+            c => c.consumerNo === (billModalTarget?.consumerNo || selectedConnection?.consumerNo)
+          ) || selectedConnection
+        }
+        existingPayments={consumerPayments}
+        language={language}
+        onClose={() => setIsPayModalOpen(false)}
+        onExecutePayment={({
+          billNo,
+          paymentMethod,
+          amountToPay,
+          simulatedOutcome,
+        }) => {
+          return payBillDemoDetailed(billNo, paymentMethod, amountToPay, {
+            simulatedOutcome,
+          });
+        }}
+        onViewReceipt={(arg1: any, arg2: any) => {
+          setIsPayModalOpen(false);
+          const b = arg1 && 'totalAmount' in arg1 ? arg1 : arg2;
+          const p = arg1 && 'txId' in arg1 ? arg1 : arg2;
+          handleViewReceipt(b, p);
+        }}
+        onDownloadReceiptPdf={(arg1: any, arg2: any) => {
+          const b = arg1 && 'totalAmount' in arg1 ? arg1 : arg2;
+          const p = arg1 && 'txId' in arg1 ? arg1 : arg2;
+          handleDownloadReceiptPdf(b, p);
+        }}
+      />
 
-            <div className="p-4 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 text-center">
-              <span className="text-xs text-slate-400 block mb-0.5">{tc.amountPayableModalLabel}</span>
-              <span className="text-3xl font-extrabold text-blue-600 dark:text-blue-400 font-mono">
-                ₹{currentBill?.totalAmount.toLocaleString()}
-              </span>
-              <p className="text-[11px] text-slate-500 mt-1">
-                {tc.billRefLabel} {selectedBillToPay} · {tc.consumerLabel} {selectedConnection?.consumerNo}
-              </p>
-            </div>
+      {/* OFFICIAL DOCUMENT & RECEIPT MODAL */}
+      <OfficialDocumentModal
+        document={
+          activeOfficialDocument ||
+          (isReceiptModalOpen && selectedReceipt
+            ? generatePaymentReceiptDocument({
+                role: 'consumer',
+                actor: consumerDocumentActor,
+                bill: selectedReceipt,
+                payment:
+                  consumerPayments.find(
+                    p => p.billNo === selectedReceipt.billNo && p.status === 'Successful'
+                  ) || null,
+                connection:
+                  consumerConnections.find(c => c.consumerNo === selectedReceipt.consumerNo) ||
+                  selectedConnection,
+                allPayments: consumerPayments,
+                language,
+                dataSource: dataMode,
+              })
+            : null)
+        }
+        isOpen={Boolean(activeOfficialDocument) || (isReceiptModalOpen && Boolean(selectedReceipt))}
+        onClose={() => {
+          setActiveOfficialDocument(null);
+          setIsReceiptModalOpen(false);
+        }}
+        onVerifyBillQr={(billNo, consumerNo) => {
+          setActiveOfficialDocument(null);
+          setQrVerificationTarget({ billNo, consumerNo });
+        }}
+      />
 
-            <div className="space-y-2 text-xs">
-              <span className="text-slate-400 font-semibold block">{tc.selectPaymentGatewayLabel}</span>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  'UPI / BHIM',
-                  'Net Banking',
-                  'Debit Card',
-                  'RTGS/NEFT'
-                ].map(method => (
-                  <button
-                    key={method}
-                    type="button"
-                    onClick={() => setSelectedPaymentGateway(method as any)}
-                    className={`p-3 rounded-lg border text-left font-semibold transition-all ${
-                      selectedPaymentGateway === method
-                        ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
-                        : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    {localizePaymentMethod(method, language)}
-                  </button>
-                ))}
-              </div>
-            </div>
+      {/* QR CODE BILL VERIFICATION & DIGITAL PAYMENT ENTRY MODAL */}
+      <BillVerificationModal
+        isOpen={Boolean(qrVerificationTarget)}
+        rawReference={qrVerificationTarget?.billNo || ''}
+        bill={
+          qrVerificationTarget
+            ? bills.find(b => b.billNo === qrVerificationTarget.billNo) || null
+            : null
+        }
+        connection={
+          qrVerificationTarget
+            ? connections.find(c => c.consumerNo === qrVerificationTarget.consumerNo) || null
+            : null
+        }
+        isAuthorized={
+          qrVerificationTarget
+            ? consumerConnections.some(c => c.consumerNo === qrVerificationTarget.consumerNo)
+            : false
+        }
+        language={language}
+        onClose={() => {
+          setQrVerificationTarget(null);
+          if (typeof window !== 'undefined' && window.location.hash.includes('verify-bill')) {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          }
+        }}
+        onViewBill={(bill: ElectricityBill) => {
+          setQrVerificationTarget(null);
+          handleViewElectricityBill(bill);
+        }}
+        onDownloadPdf={(bill: ElectricityBill) => {
+          handleDownloadElectricityBillPdf(bill);
+        }}
+        onPayBill={(billNo: string) => {
+          setQrVerificationTarget(null);
+          handlePayClick(billNo);
+        }}
+      />
 
-            <div className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded border border-amber-200 dark:border-amber-800">
-              {tc.demoPaymentReconciliationNote}
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => setIsPayModalOpen(false)}
-                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer"
-              >
-                {tc.cancelBtn}
-              </button>
-              <button
-                onClick={confirmPayment}
-                className="flex-1 py-2 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
-              >
-                {tc.authorizeAndPayBtn}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* RECEIPT MODAL */}
-      {isReceiptModalOpen && selectedReceipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs">
-          <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in">
-            <div className="text-center pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 flex items-center justify-center mx-auto mb-2">
-                <CheckCircle2 className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                {tc.officialPaymentReceiptTitle}
-              </h3>
-              <p className="text-xs text-slate-400">{tc.ugvclFullTitle}</p>
-            </div>
-
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">{tc.receiptRefLabel}</span>
-                <span className="font-mono font-semibold">{selectedReceipt.transactionRef || 'TXN-UPI-9921448102'}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">{tc.billNumberLabel}</span>
-                <span className="font-mono font-semibold">{selectedReceipt.billNo}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">{tc.consumerNoLabel}</span>
-                <span className="font-mono font-semibold">{selectedReceipt.consumerNo}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">{tc.paidDateLabel}</span>
-                <span>{selectedReceipt.paidDate || '15-Oct-2026'}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400">{tc.amountSettledLabel}</span>
-                <span className="font-bold text-emerald-600 text-sm">₹{selectedReceipt.totalAmount.toLocaleString()}</span>
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => {
-                  showToast(tc.receiptPrintedToast, 'success');
-                  setIsReceiptModalOpen(false);
-                }}
-                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>{tc.printDownloadBtn}</span>
-              </button>
-              <button
-                onClick={() => setIsReceiptModalOpen(false)}
-                className="flex-1 py-2 text-xs font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-xs cursor-pointer"
-              >
-                {tc.doneBtn}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {activeTab === 'outage-map' && <LazyOutageMapSection />}
 
       {/* LINK EXISTING CONNECTION MODAL */}
       {isLinkModalOpen && (
@@ -3166,8 +3954,6 @@ export const ConsumerPortal: React.FC = () => {
           </div>
         </div>
       )}
-
-      {activeTab === 'outage-map' && <LazyOutageMapSection />}
     </div>
   );
 };

@@ -17,11 +17,25 @@ interface UgvclBrandIdentityProps {
   className?: string;
 }
 
+export const UGVCL_LOGO_ASSET_PATH = '/assets/ugvcl-logo.png';
+export const UGVCL_COMPANY_NAME_EN = 'Uttar Gujarat Vij Company Limited';
+export const UGVCL_COMPANY_NAME_GU = 'ઉત્તર ગુજરાત વીજ કંપની લિમિટેડ';
+export const UGVCL_TAGLINE_EN = 'Consumer Satisfaction through Service Excellence';
+
+export const UGVCL_CORPORATE_IDENTITY = {
+  logoPath: UGVCL_LOGO_ASSET_PATH,
+  companyNameEn: UGVCL_COMPANY_NAME_EN,
+  companyNameGu: UGVCL_COMPANY_NAME_GU,
+  taglineEn: UGVCL_TAGLINE_EN,
+  cin: 'U40102GJ2003SGC042906',
+  registeredOffice: 'Visnagar Road, Mehsana - 384001, North Gujarat, India',
+};
+
 export const UGVCL_BRAND_NAMES = {
-  primary: 'Uttar Gujarat Vij Company Limited',
+  primary: UGVCL_COMPANY_NAME_EN,
   acronym: 'UGVCL',
-  gujarati: 'ઉત્તર ગુજરાત વીજ કંપની લિમિટેડ',
-  mission: 'Consumer Satisfaction through Service Excellence',
+  gujarati: UGVCL_COMPANY_NAME_GU,
+  mission: UGVCL_TAGLINE_EN,
   demoNote: 'VidyutOne · Independent Demonstration Platform',
   cin: 'CIN: U40102GJ2003SGC042906'
 };

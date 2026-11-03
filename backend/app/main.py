@@ -5,9 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import inspect as sa_inspect, text
 from sqlalchemy.exc import OperationalError
-from .db import Base, engine, SessionLocal
+from .db import Base, engine, SessionLocal, check_database_health
 from . import models  # noqa
-from .routers import auth, requests, assistant, system, notifications, erp, workflows, staff
+from .routers import auth, requests, assistant, system, notifications, erp, workflows, staff, evidence, directory
 from .routers.staff import ensure_subdivision_zones
 from .erp_adapter import record_erp_sync
 from .alerts import evaluate_and_dispatch_alerts
@@ -184,12 +184,16 @@ def migrate_auth_session_security(db_engine):
 
 @asynccontextmanager
 async def lifespan(_app):
-    Base.metadata.create_all(bind=engine)
-    migrate_audit_chain()
-    migrate_validation_issues(engine)
-    migrate_geo_columns(engine)
-    migrate_auth_session_security(engine)
-    ensure_performance_indexes(engine)
+    # In development, auto-sync convenience tables. In production, schema is managed strictly via Alembic.
+    if settings.app_env != "production":
+        Base.metadata.create_all(bind=engine)
+        migrate_audit_chain()
+        migrate_validation_issues(engine)
+        migrate_geo_columns(engine)
+        migrate_auth_session_security(engine)
+        ensure_performance_indexes(engine)
+    else:
+        logger.info("Production mode: schema is managed strictly via Alembic migrations (runtime DDL skipped)")
     bump_all_caches()
     try: ensure_models()
     except Exception as e: print(f"[warn] model training skipped: {e}")
@@ -278,4 +282,21 @@ app.add_middleware(ApiVersionPrefixMiddleware)
 @app.get("/health")
 def health(): return {"status": "ok", "service": "VidyutFlow", "data_notice": "Demo uses synthetic data only."}
 
-app.include_router(auth.router); app.include_router(requests.router); app.include_router(assistant.router); app.include_router(system.router); app.include_router(notifications.router); app.include_router(erp.router); app.include_router(workflows.router); app.include_router(staff.router)
+@app.get("/health/db")
+@app.get("/api/health/db")
+def health_database():
+    """Verify database connection pool status, read latency, and write readiness."""
+    return check_database_health()
+
+app.include_router(auth.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(requests.router)
+app.include_router(assistant.router)
+app.include_router(system.router)
+app.include_router(notifications.router)
+app.include_router(erp.router)
+app.include_router(workflows.router)
+app.include_router(staff.router)
+app.include_router(evidence.router)
+app.include_router(directory.router)
+app.include_router(directory.router, prefix="/api")

@@ -1141,6 +1141,7 @@ console.log('\n--- Criteria 21-28: Field Engineer Escalation Routing & Review As
     path.resolve(process.cwd(), 'src/components/layout/TopNav.tsx'),
     'utf8'
   );
+  const enterpriseMenuSrc = fs.existsSync(path.resolve(process.cwd(), 'src/components/common/EnterpriseAccountMenu.tsx')) ? fs.readFileSync(path.resolve(process.cwd(), 'src/components/common/EnterpriseAccountMenu.tsx'), 'utf8') : '';
   const appContextSrc = fs.readFileSync(
     path.resolve(process.cwd(), 'src/context/AppContext.tsx'),
     'utf8'
@@ -1156,9 +1157,8 @@ console.log('\n--- Criteria 21-28: Field Engineer Escalation Routing & Review As
   );
 
   assert(
-    topNavSrc.includes("dataMode === 'DEMO' && roleDemoAccounts.length > 1") &&
-      !topNavSrc.includes("authMode === 'demo' && roleDemoAccounts.length > 1") &&
-      topNavSrc.includes('Switch Demo Engineer'),
+    ((topNavSrc.includes("dataMode === 'DEMO' && roleDemoAccounts.length > 1") && topNavSrc.includes('Switch Demo Engineer')) || (enterpriseMenuSrc.includes("params.dataMode === 'DEMO' && accounts.length > 1") && enterpriseMenuSrc.includes('switchDemoEngineer'))) &&
+      !topNavSrc.includes("authMode === 'demo' && roleDemoAccounts.length > 1"),
     'Criterion 44: TopNav renders "Switch Demo Engineer" profile switcher in default browser DEMO mode (dataMode === "DEMO")'
   );
 

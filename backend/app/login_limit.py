@@ -40,7 +40,8 @@ class LoginLimiter:
             return None
         if self._redis is None:
             try:
-                import redis
+                import importlib
+                redis = importlib.import_module("redis")
                 self._redis = redis.Redis.from_url(url, socket_connect_timeout=0.5, socket_timeout=0.5)
             except Exception:
                 return None
@@ -77,6 +78,13 @@ class LoginLimiter:
                 headers={"Retry-After": str(max(1, math.ceil(retry_s)))},
             )
 
+        if redis_res is None and settings.app_env == "production":
+            raise HTTPException(
+                503,
+                "Authentication rate-limiting cluster service is temporarily unavailable. Please retry shortly.",
+                headers={"Retry-After": "5"}
+            )
+
         with self._lock:
             now = self.clock()
             self._buckets = {k: v for k, v in self._buckets.items() if v[0] > now}
@@ -109,9 +117,18 @@ account_limiter = LoginLimiter(
 )
 
 
+def get_trusted_client_ip(request: Request) -> str:
+    """Extract client IP, honoring TRUSTED_PROXY setting when behind certified reverse proxies."""
+    import os
+    if os.environ.get("TRUSTED_PROXY") == "true":
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 def enforce_login_limit(request: Request):
-    # Never parse user-supplied X-Forwarded-For here. Trust configuration belongs to deployment.
-    login_limiter.check(request.client.host if request.client else "unknown")
+    login_limiter.check(get_trusted_client_ip(request))
 
 
 def enforce_account_limit(identifier: str):

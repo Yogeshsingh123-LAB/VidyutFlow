@@ -4,13 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-tesseract-assets.mjs",
+    "predev:3000": "node scripts/copy-tesseract-assets.mjs",
     "dev": "vite --port=3000 --host=0.0.0.0",
     "start": "tsx src/server/prodServer.ts",
-    "build": "vite build",
+    "build": "node scripts/copy-tesseract-assets.mjs && vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "tsx tests/auth-access.test.ts && tsx tests/demo-data-integrity.test.ts && tsx tests/ai-assistant-resilience.test.ts && tsx tests/server-auth-foundation.test.ts && tsx tests/server-auth-api.test.ts && tsx tests/navigation-views.test.ts && tsx tests/agentic-ai-tools.test.ts && tsx tests/critical-incidents.test.ts && tsx tests/incident-routing-escalation.test.ts && tsx tests/erp-workflows.test.ts && tsx tests/human-in-the-loop.test.ts && tsx tests/backend-readiness.test.ts && tsx tests/ui-ux-accessibility.test.ts && tsx tests/security-resilience-stress.test.ts && tsx tests/e2e-hackathon-readiness.test.ts && tsx tests/consumer-portal-security.test.ts && tsx tests/notification-application-queue.test.ts && tsx tests/multilingual-infrastructure.test.ts && tsx tests/multilingual-cards-repair.test.ts && tsx tests/erp-multilingual-navigation.test.ts && tsx tests/consumer-portal-multilingual.test.ts && tsx tests/live-api-wiring.test.ts && tsx tests/request-submission-status.test.ts && tsx tests/demo-load-policy.test.ts && tsx tests/backend-session-boundary.test.ts && tsx tests/document-upload.test.ts && tsx tests/ai-story-alignment.test.ts && tsx tests/offline-field-sync.test.ts && tsx tests/erp-adapter.test.ts && tsx tests/alert-engine.test.ts && tsx tests/workflow-templates.test.ts && tsx tests/performance-monitoring.test.ts && tsx tests/executive-analytics.test.ts && tsx tests/ai-governance.test.ts && tsx tests/infra-and-workload-evidence.test.ts && tsx tests/page-weight-and-five-portal-qa.test.ts && tsx tests/teammate-backlog-completion.test.ts && tsx tests/judge-gap-closure.test.ts && tsx tests/phase10-outage-map-and-timeline.test.ts",
+    "test": "tsx tests/auth-access.test.ts && tsx tests/demo-data-integrity.test.ts && tsx tests/ai-assistant-resilience.test.ts && tsx tests/server-auth-foundation.test.ts && tsx tests/server-auth-api.test.ts && tsx tests/navigation-views.test.ts && tsx tests/agentic-ai-tools.test.ts && tsx tests/critical-incidents.test.ts && tsx tests/incident-routing-escalation.test.ts && tsx tests/erp-workflows.test.ts && tsx tests/human-in-the-loop.test.ts && tsx tests/backend-readiness.test.ts && tsx tests/ui-ux-accessibility.test.ts && tsx tests/security-resilience-stress.test.ts && tsx tests/e2e-hackathon-readiness.test.ts && tsx tests/consumer-portal-security.test.ts && tsx tests/notification-application-queue.test.ts && tsx tests/multilingual-infrastructure.test.ts && tsx tests/multilingual-cards-repair.test.ts && tsx tests/erp-multilingual-navigation.test.ts && tsx tests/consumer-portal-multilingual.test.ts && tsx tests/live-api-wiring.test.ts && tsx tests/request-submission-status.test.ts && tsx tests/demo-load-policy.test.ts && tsx tests/backend-session-boundary.test.ts && tsx tests/document-upload.test.ts && tsx tests/ai-story-alignment.test.ts && tsx tests/offline-field-sync.test.ts && tsx tests/erp-adapter.test.ts && tsx tests/alert-engine.test.ts && tsx tests/workflow-templates.test.ts && tsx tests/performance-monitoring.test.ts && tsx tests/executive-analytics.test.ts && tsx tests/ai-governance.test.ts && tsx tests/infra-and-workload-evidence.test.ts && tsx tests/page-weight-and-five-portal-qa.test.ts && tsx tests/teammate-backlog-completion.test.ts && tsx tests/judge-gap-closure.test.ts && tsx tests/phase10-outage-map-and-timeline.test.ts && tsx tests/meter-reading.test.ts && tsx tests/phase13-verified-field-completion.test.ts && tsx tests/ugvcl-directory.test.ts",
+    "test:directory": "tsx tests/ugvcl-directory.test.ts",
+    "test:phase13": "tsx tests/phase13-verified-field-completion.test.ts",
     "test:phase10": "tsx tests/phase10-outage-map-and-timeline.test.ts",
     "test:auth": "tsx tests/auth-access.test.ts",
     "test:server-auth": "tsx tests/server-auth-foundation.test.ts && tsx tests/server-auth-api.test.ts",
@@ -38,21 +42,40 @@
     "test:backend-session": "tsx tests/backend-session-boundary.test.ts",
     "test:document-upload": "tsx tests/document-upload.test.ts",
     "test:playwright": "playwright test",
-    "test:playwright:a11y": "playwright test e2e/accessibility.spec.ts"
+    "test:playwright:a11y": "playwright test e2e/accessibility.spec.ts",
+    "test:phase7": "tsx tests/phase7-performance-reliability.test.ts",
+    "test:phase8a": "tsx tests/phase8a-e2e-verification.test.ts",
+    "test:phase8b": "tsx tests/phase8b-workflow-integration.test.ts",
+    "test:phase8c": "tsx tests/phase8c-billing-pdf-backup.test.ts",
+    "test:phase8d": "tsx tests/phase8d-enterprise-verification.test.ts",
+    "test:phase8e": "tsx tests/phase8e-final-release-readiness.test.ts",
+    "test:phase9-step1": "tsx tests/phase9-step1-bimonthly-billing.test.ts",
+    "test:phase9-step2": "tsx tests/phase9-step2-multilingual-bimonthly-pdf.test.ts",
+    "test:billing-consistency": "tsx tests/billing-consistency-repair.test.ts",
+    "test:documents": "tsx tests/enterprise-document-system.test.ts",
+    "test:export": "tsx tests/enterprise-export-system.test.ts",
+    "test:enterprise-ui": "tsx tests/enterprise-ui-typography-account-menu.test.ts",
+    "test:analytics-transparency": "tsx tests/analytics-forecasting-transparency.test.ts",
+    "test:incident-lifecycle": "tsx tests/incident-notifications-lifecycle.test.ts",
+    "test:field-notifications": "tsx tests/field-engineer-notifications.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-react": "^6.1.1",
     "dotenv": "^17.2.3",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "qrcode": "^1.5.4",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "recharts": "^3.10.1",
     "sharp": "^0.35.5",
-    "vite": "^8.3.0"
+    "tesseract.js": "^7.0.0",
+    "vite": "^8.3.0",
+    "express": "^4.21.2"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
@@ -65,6 +88,7 @@
     "esbuild": "^0.28.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "@types/express": "^4.17.21"
   }
 }

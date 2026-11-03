@@ -556,6 +556,7 @@ export const gu: TranslationDictionary = {
     navAiInsights: 'UGVCL AI વિશ્લેષણ',
     navExecutiveExport: 'એક્ઝિક્યુટિવ નિકાસ',
     navSystemOverview: 'સિસ્ટમ ઝાંખી',
+    navUgvclDirectory: 'યુજીવીસીએલ ડિરેક્ટરી',
     navUsersRoles: 'વપરાશકર્તાઓ અને ભૂમિકાઓ',
     navAccessMatrix: 'એક્સેસ મેટ્રિક્સ',
     navAuditTrail: 'ઓડિટ ટ્રેલ',

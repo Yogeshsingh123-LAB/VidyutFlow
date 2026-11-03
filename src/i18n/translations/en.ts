@@ -556,6 +556,7 @@ export const en: TranslationDictionary = {
     navAiInsights: 'UGVCL AI Insights',
     navExecutiveExport: 'Executive Export',
     navSystemOverview: 'System Overview',
+    navUgvclDirectory: 'UGVCL Directory',
     navUsersRoles: 'Users & Roles',
     navAccessMatrix: 'Access Matrix',
     navAuditTrail: 'Audit Trail',

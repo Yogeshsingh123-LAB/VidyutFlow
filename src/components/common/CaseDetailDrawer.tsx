@@ -96,12 +96,16 @@ export function sanitizeConsumerTimelineEntry(
     time: string;
     stage: string;
     actor: string;
-    remark: string;
+    remark?: string;
+    action?: string;
   },
   lang: LanguageCode = 'en'
 ): { time: string; stage: string; actorLabel: string; remark: string } {
-  let cleanRemark = entry.remark
+  const rawText = entry.remark || entry.action || '';
+  let cleanRemark = rawText
     .replace(/Work Order:\s*WO-[A-Z0-9-]+(\.)?/gi, '')
+    .replace(/WO-[A-Z0-9-]+(\.)?/gi, 'field service order')
+    .replace(/Dispatched .+ to replacement crew with truck [A-Z0-9-]+/gi, 'Dispatched to field technical crew for on-site resolution.')
     .replace(/Assigned to field engineer [^.]+\./gi, 'Field technical team dispatched for on-site inspection.')
     .replace(/Sent to automated triage queue\./gi, 'Assigned to sub-divisional service desk.')
     .trim();

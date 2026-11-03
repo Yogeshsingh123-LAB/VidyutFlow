@@ -6,6 +6,7 @@ import { defaultServerDataStore } from './dataStore';
 import { AGENTIC_PERSONAS } from './agenticPersonas';
 import { getRoleToolDeclarations, executeAgenticTool } from './agenticTools';
 import { defaultAiCacheManager } from './aiCache';
+import { handleMeterReadingRoute } from './meterReadingRoutes';
 import { detectPromptInjection, redactSensitiveData } from '../utils/securityHardening';
 import { UserRole } from '../types';
 
@@ -159,6 +160,37 @@ export function createAiChatHandler() {
       return;
     }
 
+    // Reject cross-origin state/quota requests against cookie-authenticated /api/ai-chat
+    const secFetchSite = String(req.headers['sec-fetch-site'] || '').trim().toLowerCase();
+    if (secFetchSite && secFetchSite !== 'same-origin' && secFetchSite !== 'same-site' && secFetchSite !== 'none') {
+      res.statusCode = 403;
+      res.end(JSON.stringify({ error: 'Cross-origin request rejected.', code: 'CSRF_ORIGIN_MISMATCH' }));
+      return;
+    }
+    const originHeader = req.headers.origin;
+    if (typeof originHeader === 'string' && originHeader.trim()) {
+      try {
+        const originHostname = new URL(originHeader).hostname.toLowerCase();
+        const allowedHostRaw = String(req.headers['x-forwarded-host'] || req.headers.host || '');
+        const allowedHostname = allowedHostRaw.split(',')[0].trim().split(':')[0].toLowerCase();
+        const isLocal =
+          (originHostname === 'localhost' || originHostname === '127.0.0.1') &&
+          (!allowedHostname || allowedHostname === 'localhost' || allowedHostname === '127.0.0.1');
+        const isProxiedCloudRunPreview =
+          (allowedHostname === 'localhost' || allowedHostname === '127.0.0.1') &&
+          originHostname.endsWith('.run.app');
+        if (!isLocal && !isProxiedCloudRunPreview && allowedHostname && originHostname !== allowedHostname) {
+          res.statusCode = 403;
+          res.end(JSON.stringify({ error: 'Cross-origin request rejected.', code: 'CSRF_ORIGIN_MISMATCH' }));
+          return;
+        }
+      } catch {
+        res.statusCode = 403;
+        res.end(JSON.stringify({ error: 'Malformed Origin header.', code: 'CSRF_ORIGIN_INVALID' }));
+        return;
+      }
+    }
+
     const clientIp = getUnspoofableClientIp(req);
     const now = Date.now();
     const ipTimestamps = (rateLimitMap.get(`ip:${clientIp}`) || []).filter(
@@ -201,7 +233,8 @@ export function createAiChatHandler() {
     const safeRole: UserRole = session.role;
     const userId = session.userId;
 
-    let rawBody = '';
+    const bodyChunks: Buffer[] = [];
+    let bodyBytes = 0;
     let bodyTooLarge = false;
 
     req.on('error', () => {
@@ -219,10 +252,18 @@ export function createAiChatHandler() {
     });
 
     req.on('data', (chunk: Buffer | string) => {
-      rawBody += chunk;
-      if (rawBody.length > 50000) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), 'utf8');
+      bodyBytes += buf.length;
+      if (bodyBytes > 50000) {
         bodyTooLarge = true;
+        if (bodyBytes > 1_048_576 && !res.writableEnded) {
+          res.statusCode = 413;
+          res.end(JSON.stringify({ error: 'Payload too large.' }));
+          req.destroy?.();
+        }
+        return;
       }
+      bodyChunks.push(buf);
     });
 
     req.on('end', async () => {
@@ -234,6 +275,7 @@ export function createAiChatHandler() {
       }
 
       try {
+        const rawBody = Buffer.concat(bodyChunks).toString('utf8');
         const body = JSON.parse(rawBody || '{}');
         const { message, accountContext, history } = body;
 
@@ -624,4 +666,7 @@ export function attachVidyutServerMiddlewares(middlewares: {
   middlewares.use('/api/health', createHealthHandler());
   middlewares.use('/api/auth', createAuthApiHandler());
   middlewares.use('/api/ai-chat', createAiChatHandler());
+  middlewares.use('/api/meter-readings', (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => {
+    void handleMeterReadingRoute(req, res).then(handled => { if (!handled) next(); }).catch(next);
+  });
 }

@@ -25,7 +25,11 @@ import {
   IncidentSeverity,
   IncidentStatus,
   EmergencyHazardClassification,
-  AIActionRecommendation
+  AIActionRecommendation,
+  WorkOrderCompletionReport,
+  WorkOrderVerificationReview,
+  ComplaintFeedback,
+  LoadChangeDirection
 } from '../types';
 import {
   validateApprovalPermission,
@@ -109,6 +113,12 @@ import {
   normalizeCanonicalTariffCategory
 } from '../i18n/consumerContentTranslations';
 import {
+  buildProactiveSlaNotifications,
+  computeDynamicApplicationSlaFields,
+  computeDynamicComplaintSlaFields,
+  filterProactiveSlaNotificationsForRole
+} from '../utils/slaEngine';
+import {
   isAudioAlertsEnabled,
   toggleAudioAlerts,
   playIncidentSound
@@ -118,7 +128,10 @@ import {
   isValidComplaintTransition,
   isValidWorkOrderTransition,
   isActionAuthorized,
-  canArchiveApplication
+  canArchiveApplication,
+  ensureSiteInspectionWorkOrderForApplication,
+  reconcileApplicationWorkOrderLinks,
+  SiteInspectionWorkOrderResolution
 } from '../services/erpAdapter';
 import { OperatingDataMode, isIncidentRoleAuthorized } from '../services/erpApiContracts';
 import {
@@ -135,32 +148,45 @@ import {
   redactSensitiveData,
   DuplicateSubmissionGuard
 } from '../utils/securityHardening';
+import {
+  safeStorageSet
+} from '../utils/safeStorage';
+import {
+  FIELD_OFFLINE_QUEUE_STORAGE_KEY,
+  FieldOfflineQueueItem,
+  FieldOfflineReplaySummary,
+  loadFieldOfflineQueue,
+  enqueueFieldInspectionAction,
+  enqueueFieldWorkOrderStatusAction,
+  replayFieldOfflineQueue
+} from '../utils/fieldOfflineQueue';
+import {
+  resolveCanonicalFieldEngineerIdentity,
+  buildWorkOrderAssignedNotification,
+  buildWorkOrderReassignedNotification,
+  buildWorkOrderUpdatedNotification,
+  buildSiteInspectionDispatchNotification,
+  buildOfflineSyncOutcomeNotification,
+  reassignWorkOrderRecord,
+  updateWorkOrderPriorityAndScheduleRecord,
+  filterFieldEngineerNotifications
+} from '../utils/fieldNotificationEngine';
+import {
+  ConsumerAccountBillingSummary,
+  ApplyPaymentToBillResult,
+  SimulatedPaymentOutcome,
+  selectConsumerAccountBillingSummary,
+  applyPaymentToBill,
+  generateDeterministicDemoBillForConnection,
+  generateDeterministicBiMonthlyBillForConnection,
+  resolveNextNonOverlappingBiMonthlyPeriod,
+  evaluateGentleBillingReminders,
+  createPaymentConfirmedNotification,
+  normalizeBillingIdentifier
+} from '../utils/billingEngine';
+import type { RestoredLiveRuntimeState } from '../utils/demoBackupEngine';
 
-function calculateComplaintSlaDueTime(filedAt: string, slaTargetHours: number): string | null {
-  const filedAtDate = parseDateSafe(filedAt);
-  if (!filedAtDate || !Number.isFinite(slaTargetHours) || slaTargetHours <= 0) return null;
-  return formatErpDateTime(
-    new Date(filedAtDate.getTime() + slaTargetHours * 60 * 60 * 1000),
-    ''
-  ) || null;
-}
-
-function normalizeComplaintSlaDeadline(complaint: ComplaintRecord): ComplaintRecord {
-  // New complaints are account-linked. Correct deadlines saved by older builds,
-  // which used a fixed timestamp unrelated to the selected priority.
-  if (!complaint.accountId) return complaint;
-  const expectedDueAt = calculateComplaintSlaDueTime(complaint.filedAt, complaint.slaTargetHours);
-  if (!expectedDueAt) return complaint;
-
-  const currentDueDate = parseDateSafe(complaint.slaDueTime);
-  const expectedDueDate = parseDateSafe(expectedDueAt);
-  if (currentDueDate && expectedDueDate && Math.abs(currentDueDate.getTime() - expectedDueDate.getTime()) < 60_000) {
-    return complaint;
-  }
-  return { ...complaint, slaDueTime: expectedDueAt };
-}
-
-export type { ActiveUserIdentity, AuthMode, OperatingDataMode };
+export type { ActiveUserIdentity, AuthMode, OperatingDataMode, FieldOfflineQueueItem, FieldOfflineReplaySummary, ConsumerAccountBillingSummary, ApplyPaymentToBillResult, SimulatedPaymentOutcome, RestoredLiveRuntimeState };
 export { getInitialsFromName };
 
 export interface BackendSyncStatus {
@@ -703,8 +729,15 @@ export function filterEmployeeApplicationNotifications(
     if (!n || n.targetRole !== 'employee') continue;
     if (dismissed && dismissed.has(n.id)) continue;
 
-    // Exclude non-application categories (Outage, Security, Billing)
-    if (n.category === 'Security' || n.category === 'Outage' || n.category === 'Billing') {
+    // Exclude non-application categories (Outage, Security, Billing) and proactive SLA notifications (which are combined separately in employeeNotifications)
+    if (
+      n.category === 'Security' ||
+      n.category === 'Outage' ||
+      n.category === 'Billing' ||
+      n.notificationType === 'SLA_APPROACHING' ||
+      n.notificationType === 'SLA_BREACHED' ||
+      (n.eventKey && n.eventKey.startsWith('EVT-SLA-'))
+    ) {
       continue;
     }
 
@@ -775,11 +808,7 @@ export function filterEmployeeApplicationNotifications(
 }
 
 function saveStorage<T>(key: string, value: T): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
-    // Storage quota or sandboxed iframe restriction
-  }
+  safeStorageSet(key, value);
 }
 
 interface AppContextType {
@@ -801,9 +830,28 @@ interface AppContextType {
   payments: PaymentTransaction[];
   notifications: AppNotification[];
   auditLogs: AuditLogItem[];
-  // Offline simulation for Field Engineer
+  // Offline simulation & persistent queue for Field Engineer
   isOfflineSimulated: boolean;
   setIsOfflineSimulated: (v: boolean) => void;
+  isBrowserOffline: boolean;
+  isFieldOfflineActive: boolean;
+  isFieldSyncing: boolean;
+  fieldOfflineQueue: FieldOfflineQueueItem[];
+  enqueueFieldInspectionOffline: (
+    woId: string,
+    report: NonNullable<WorkOrder['inspectionReport']>,
+    submittedBy: string
+  ) => FieldOfflineQueueItem;
+  enqueueFieldStatusOffline: (
+    woId: string,
+    status: WorkOrder['status'],
+    report?: WorkOrder['inspectionReport']
+  ) => FieldOfflineQueueItem;
+  syncFieldOfflineQueue: (options?: {
+    restoreOnline?: boolean;
+    targetClientUuid?: string;
+  }) => FieldOfflineReplaySummary;
+  refreshFieldOfflineQueueFromStorage: () => FieldOfflineQueueItem[];
   // Cinematic Intro & Welcome Page states
   isIntroActive: boolean;
   setIsIntroActive: (v: boolean) => void;
@@ -826,7 +874,31 @@ interface AppContextType {
   openCaseDrawer: (type: 'application' | 'complaint' | 'workorder', id: string) => void;
   closeCaseDrawer: () => void;
   // Shared actions
-  payBillDemo: (billNo: string, paymentMethod?: PaymentTransaction['paymentMethod']) => void;
+  payBillDemo: (
+    billNo: string,
+    paymentMethod?: PaymentTransaction['paymentMethod'],
+    customAmount?: number,
+    options?: {
+      simulatedOutcome?: SimulatedPaymentOutcome;
+      simulatedFailureReason?: string;
+    }
+  ) => boolean;
+  payBillDemoDetailed: (
+    billNo: string,
+    paymentMethod?: PaymentTransaction['paymentMethod'],
+    customAmount?: number,
+    options?: {
+      simulatedOutcome?: SimulatedPaymentOutcome;
+      simulatedFailureReason?: string;
+    }
+  ) => ApplyPaymentToBillResult;
+  generateDemoBillForActiveConnection: (
+    consumerNo: string,
+    billMonth?: string,
+    options?: {
+      billingCycleType?: 'MONTHLY' | 'BI_MONTHLY';
+    }
+  ) => { created: boolean; bill: ElectricityBill | null; reason: string };
   submitApplicationDemo: (appData: Partial<NewConnectionApplication>) => string;
   submitComplaintDemo: (cmpData: Partial<ComplaintRecord>) => string;
   updateApplicationStatus: (id: string, status: NewConnectionApplication['status'], note?: string) => void;
@@ -834,8 +906,16 @@ interface AppContextType {
   archiveApplication: (id: string, reason?: string) => boolean;
   restoreApplication: (id: string) => boolean;
   updateComplaintStatus: (id: string, status: ComplaintRecord['status'], remark?: string) => void;
-  updateWorkOrderStatus: (id: string, status: WorkOrder['status'], report?: WorkOrder['inspectionReport']) => void;
+  updateWorkOrderStatus: (
+    id: string,
+    status: WorkOrder['status'],
+    report?: WorkOrder['inspectionReport'],
+    options?: { bypassOfflineQueue?: boolean; silentToast?: boolean }
+  ) => { success: boolean; error?: string; conflict?: boolean };
   assignComplaintToField: (complaintId: string, engineerName: string, priority?: string, notes?: string) => boolean;
+  assignWorkOrder: (woId: string, engineerIdOrName: string, notes?: string) => boolean;
+  reassignWorkOrder: (woId: string, newEngineerIdOrName: string, reason?: string) => boolean;
+  updateWorkOrderPriorityAndSchedule: (woId: string, priority?: WorkOrder['priority'], scheduledDate?: string, notes?: string) => boolean;
   reportFeederFault: (feederId: string, faultType: string, remarks: string, severity?: IncidentSeverity, emergencyClassification?: EmergencyHazardClassification) => void;
   markNotificationRead: (id: string) => void;
   markSelectedNotificationsRead: (ids: string[]) => void;
@@ -844,7 +924,9 @@ interface AppContextType {
   deleteSelectedNotifications: (ids: string[]) => void;
   clearAllNotifications: () => void;
   addAuditEvent: (action: string, resource: string, metaDetail: string, actor?: string, status?: AuditLogItem['status']) => void;
+  evaluateSlaDeadlinesNow: (referenceNow?: Date | string | number) => AppNotification[];
   resetDemoData: () => void;
+  applyRestoredDemoBackupState: (restoredState: RestoredLiveRuntimeState) => void;
   // Toast notifications
   toasts: ToastMessage[];
   showToast: (message: string, type?: ToastMessage['type']) => void;
@@ -855,6 +937,9 @@ interface AppContextType {
   isVerifyingServerSession: boolean;
   demoSession: DemoSession | null;
   userConnections: ElectricityConnection[];
+  selectedConsumerConnectionNo: string;
+  setSelectedConsumerConnectionNo: (consumerNo: string) => void;
+  consumerBillingSummary: ConsumerAccountBillingSummary;
   userApplications: NewConnectionApplication[];
   userBills: ElectricityBill[];
   userPayments: PaymentTransaction[];
@@ -864,7 +949,6 @@ interface AppContextType {
   scopedNotifications: AppNotification[];
   linkConnectionDemo: (consumerNo: string) => { success: boolean; error?: string; connection?: ElectricityConnection };
   loginDemoUser: (email: string, password: string, targetRole: UserRole, selectedUserId?: string) => Promise<{ success: boolean; error?: string }>;
-  loginViaSimulatedSso: (email: string, targetRole: UserRole, providerId?: string) => Promise<{ success: boolean; error?: string }>;
   loginAsCanonicalDemoAccount: (accountId: string, targetRole?: UserRole) => Promise<{ success: boolean; error?: string }>;
   switchDemoUserAccount: (accountId: string) => { success: boolean; error?: string };
   canonicalDemoAccounts: CanonicalDemoIdentity[];
@@ -884,6 +968,7 @@ interface AppContextType {
   reassignIncidentToField: (incidentId: string, newEngineerId: string, newEngineerName: string, reason: string) => boolean;
   escalateIncident: (id: string, targetRole: UserRole, reason: string, targetUserId?: string, targetUserName?: string) => void;
   resolveIncident: (id: string, resolutionNotes: string) => void;
+  updateIncidentSeverity: (id: string, newSeverity: IncidentSeverity, reason: string) => boolean;
   acceptFieldAssignment: (incidentId: string) => boolean;
   declineFieldAssignment: (incidentId: string, reason: string) => boolean;
   startFieldInspection: (incidentId: string, notes?: string) => boolean;
@@ -913,6 +998,16 @@ interface AppContextType {
   backendStatus: BackendSyncStatus;
   syncWithBackend: () => Promise<{ success: boolean; error?: string; requestId?: string }>;
   repositories: ErpRepositoryBundle;
+  // Phase 13 Field Completion Evidence & Complaint Feedback
+  submitWorkOrderCompletionEvidence: (woId: string, report: WorkOrderCompletionReport) => boolean;
+  reviewWorkOrderCompletion: (woId: string, review: WorkOrderVerificationReview) => boolean;
+  submitComplaintFeedback: (complaintId: string, feedback: ComplaintFeedback) => boolean;
+  reopenComplaint: (complaintId: string, reason: string) => ComplaintRecord | null;
+  loginViaSimulatedSso: (
+    email: string,
+    targetRole: UserRole,
+    providerId?: string
+  ) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -1281,13 +1376,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loadStorage('vidyutone_connections', INITIAL_CONNECTIONS)
   );
 
-  const [applications, setApplications] = useState<NewConnectionApplication[]>(() =>
-    ensureUniqueRecordIds(
+  const initialAppWoLinks = useMemo(() => {
+    const rawApps = ensureUniqueRecordIds(
       loadStorage('vidyutone_applications', INITIAL_APPLICATIONS),
       'APP-2026-',
       846,
       4
-    )
+    );
+    const rawWos = ensureUniqueRecordIds(
+      loadStorage('vidyutone_workorders', INITIAL_WORK_ORDERS),
+      'WO-',
+      4405,
+      4
+    );
+    return reconcileApplicationWorkOrderLinks(rawApps, rawWos);
+  }, []);
+
+  const [applications, setApplications] = useState<NewConnectionApplication[]>(
+    () => initialAppWoLinks.applications
   );
 
   const [complaints, setComplaints] = useState<ComplaintRecord[]>(() =>
@@ -1296,16 +1402,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'CMP-',
       8831,
       4
-    ).map(normalizeComplaintSlaDeadline)
+    )
   );
 
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>(() =>
-    ensureUniqueRecordIds(
-      loadStorage('vidyutone_workorders', INITIAL_WORK_ORDERS),
-      'WO-',
-      4405,
-      4
-    )
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>(
+    () => initialAppWoLinks.workOrders
   );
 
   const [employees, setEmployees] = useState<EmployeeRecord[]>(() => {
@@ -1427,6 +1528,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 
   const [isOfflineSimulated, setIsOfflineSimulated] = useState<boolean>(false);
+  const [isBrowserOffline, setIsBrowserOffline] = useState<boolean>(
+    () => typeof navigator !== 'undefined' && navigator.onLine === false
+  );
+  const isFieldOfflineActive = isOfflineSimulated || isBrowserOffline;
+  const [fieldOfflineQueue, setFieldOfflineQueue] = useState<FieldOfflineQueueItem[]>(() =>
+    loadFieldOfflineQueue()
+  );
+  const [isFieldSyncing, setIsFieldSyncing] = useState<boolean>(false);
+  const fieldOfflineQueueRef = React.useRef<FieldOfflineQueueItem[]>(fieldOfflineQueue);
+  const applicationsRef = React.useRef<NewConnectionApplication[]>(applications);
+  const workOrdersRef = React.useRef<WorkOrder[]>(workOrders);
+  const processedOfflineUuidsRef = React.useRef<Set<string>>(new Set());
+  const isReplayingOfflineQueueRef = React.useRef<boolean>(false);
 
   // Modals & Drawers
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -1478,7 +1592,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { saveStorage('vidyutflow_incidents', incidents); }, [incidents]);
   useEffect(() => { saveStorage('vidyut_ai_recommendations', recommendations); }, [recommendations]);
 
-  // Cross-tab synchronization for applications, notifications, and inbox state
+  useEffect(() => {
+    fieldOfflineQueueRef.current = fieldOfflineQueue;
+  }, [fieldOfflineQueue]);
+
+  useEffect(() => {
+    applicationsRef.current = applications;
+  }, [applications]);
+
+  useEffect(() => {
+    workOrdersRef.current = workOrders;
+  }, [workOrders]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleOnline = () => setIsBrowserOffline(false);
+    const handleOffline = () => setIsBrowserOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Cross-tab synchronization for applications, notifications, inbox state, and offline queue
   useEffect(() => {
     const handleStorageSync = (e: StorageEvent) => {
       if (!e.key || !e.newValue) return;
@@ -1489,6 +1627,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setNotifications(loadStorage('vidyutone_notifications', INITIAL_NOTIFICATIONS));
         } else if (e.key === 'vidyutflow_notification_inbox_state') {
           setInboxStateMap(loadStorage('vidyutflow_notification_inbox_state', {}));
+        } else if (e.key === FIELD_OFFLINE_QUEUE_STORAGE_KEY) {
+          const loaded = loadFieldOfflineQueue();
+          fieldOfflineQueueRef.current = loaded;
+          setFieldOfflineQueue(loaded);
         }
       } catch {
         // Ignore storage sync parse errors
@@ -1536,6 +1678,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return getActiveUserIdentity(demoSession, effectiveRole);
   }, [demoSession, effectiveRole]);
 
+  // Selected active connection state for Consumer Portal (persisted per user account)
+  const [selectedConsumerConnMap, setSelectedConsumerConnMap] = useState<Record<string, string>>(
+    () => loadStorage<Record<string, string>>('vidyutflow_selected_consumer_connection', {})
+  );
+
+  useEffect(() => {
+    saveStorage('vidyutflow_selected_consumer_connection', selectedConsumerConnMap);
+  }, [selectedConsumerConnMap]);
+
   // Account-to-Consumer multi-tenant data scoping
   const userConnections = useMemo(() => {
     if (!demoSession) return [];
@@ -1543,11 +1694,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const userId = demoSession.user.id;
     const userEmail = (demoSession.user.email || '').toLowerCase();
 
-    // Default fictional demo consumer owns the sample connections (04281-99231, 04281-77190)
+    // Default fictional demo consumer owns the sample connections (04281-99231, 04281-77190) plus any demo_consumer connections
     if (userId === 'demo_consumer' || userEmail === 'consumer@vidyutflow.demo') {
-      return connections.filter(
+      const rawOwned = connections.filter(
         c => c.consumerNo === '04281-99231' || c.consumerNo === '04281-77190' || c.accountId === 'demo_consumer'
       );
+      const canonicalOrder = ['04281-99231', '04281-77190'];
+      return [...rawOwned].sort((a, b) => {
+        const aIdx = canonicalOrder.indexOf(a.consumerNo);
+        const bIdx = canonicalOrder.indexOf(b.consumerNo);
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+        if (aIdx !== -1) return -1;
+        if (bIdx !== -1) return 1;
+        return 0;
+      });
     }
 
     // Custom registered consumers only access connections specifically linked to their account
@@ -1559,6 +1719,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         storedLinks.includes(c.consumerNo)
     );
   }, [demoSession, connections]);
+
+  const consumerScopeUserId = demoSession?.user?.id || 'demo_consumer';
+
+  // Build legacy/application connection alias map so bills linked by CONN- ID or application linkedConsumerNo resolve cleanly
+  const legacyIdentifierMap = useMemo<Record<string, string[]>>(() => {
+    const map: Record<string, string[]> = {};
+    for (const conn of userConnections) {
+      const aliases: string[] = [];
+      if (conn.connectionId) aliases.push(conn.connectionId);
+      map[conn.consumerNo] = aliases;
+    }
+    return map;
+  }, [userConnections]);
+
+  const consumerBillingSummary = useMemo<ConsumerAccountBillingSummary>(() => {
+    const storedLinks =
+      loadStorage<Record<string, string[]>>('vidyutflow_account_connections', {})[
+        consumerScopeUserId
+      ] || [];
+    const ownedNos = Array.from(
+      new Set([
+        ...userConnections.map(c => c.consumerNo),
+        ...storedLinks
+      ])
+    );
+    const explicitSelectedNo = selectedConsumerConnMap[consumerScopeUserId] || null;
+    return selectConsumerAccountBillingSummary({
+      allConnections: userConnections,
+      allBills: bills,
+      allPayments: payments,
+      actorScope: {
+        accountId: consumerScopeUserId,
+        email: demoSession?.user?.email,
+        linkedConsumerNo: userConnections[0]?.consumerNo,
+        consumerName: demoSession?.user?.name,
+        ownedConsumerNos: ownedNos,
+        legacyIdentifierMap
+      },
+      selectedConnectionNo: explicitSelectedNo,
+      referenceDate: '15-Oct-2026'
+    });
+  }, [
+    userConnections,
+    bills,
+    payments,
+    consumerScopeUserId,
+    demoSession,
+    selectedConsumerConnMap,
+    legacyIdentifierMap
+  ]);
+
+  const selectedConsumerConnectionNo = consumerBillingSummary.selectedConnectionNo;
+
+  const setSelectedConsumerConnectionNo = React.useCallback(
+    (consumerNo: string) => {
+      if (!consumerNo) return;
+      setSelectedConsumerConnMap(prev => ({
+        ...prev,
+        [consumerScopeUserId]: consumerNo
+      }));
+    },
+    [consumerScopeUserId]
+  );
 
   const userApplications = useMemo(() => {
     if (!demoSession) return [];
@@ -1580,18 +1803,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const userBills = useMemo(() => {
     if (!demoSession) return [];
     if (demoSession.role !== 'consumer') return bills;
-    const userId = demoSession.user.id;
-    const connectionNos = userConnections.map(c => c.consumerNo);
-    return bills.filter(b => (b.accountId && b.accountId === userId) || connectionNos.includes(b.consumerNo));
-  }, [demoSession, bills, userConnections]);
+    return consumerBillingSummary.allAccountReconciledBills;
+  }, [demoSession, bills, consumerBillingSummary]);
 
   const userPayments = useMemo(() => {
     if (!demoSession) return [];
     if (demoSession.role !== 'consumer') return payments;
-    const userId = demoSession.user.id;
-    const connectionNos = userConnections.map(c => c.consumerNo);
-    return payments.filter(p => (p.accountId && p.accountId === userId) || connectionNos.includes(p.consumerNo));
-  }, [demoSession, payments, userConnections]);
+    return consumerBillingSummary.allAccountPayments;
+  }, [demoSession, payments, consumerBillingSummary]);
 
   const userComplaints = useMemo(() => {
     if (!demoSession) return [];
@@ -1654,6 +1873,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (n.targetRole !== 'consumer' && n.targetRole !== 'all') return false;
 
         // Never expose internal operational or SCADA/SLA diagnostics in consumer notifications
+        if (
+          n.notificationType === 'SLA_APPROACHING' ||
+          n.notificationType === 'SLA_BREACHED' ||
+          (n.eventKey && n.eventKey.startsWith('EVT-SLA-'))
+        ) {
+          return false;
+        }
         const lowerText = `${n.title} ${n.message}`.toLowerCase();
         if (
           lowerText.includes('gerc sla breach') ||
@@ -1775,9 +2001,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
       .map(n => (readSet.has(n.id) ? { ...n, read: true } : n));
 
+    const slaProactiveNotifs = filterProactiveSlaNotificationsForRole(
+      notifications,
+      'employee',
+      {
+        subdivisionScope: effectiveSubdivisionScope,
+        dismissedIds: dismissedSet,
+        readIds: readSet
+      }
+    );
+
     const seenIds = new Set<string>();
     const combined: AppNotification[] = [];
-    for (const item of [...appNotifs, ...incidentDecisionNotifs, ...complaintAndWorkOrderNotifs]) {
+    for (const item of [
+      ...appNotifs,
+      ...incidentDecisionNotifs,
+      ...complaintAndWorkOrderNotifs,
+      ...slaProactiveNotifs
+    ]) {
       if (!seenIds.has(item.id)) {
         seenIds.add(item.id);
         combined.push(item);
@@ -1792,6 +2033,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const readSet = new Set(currentInboxScopeState.readIds);
     const dismissedSet = new Set(currentInboxScopeState.dismissedIds);
+
+    if (effectiveRole === 'field') {
+      const fieldScoped = filterFieldEngineerNotifications({
+        notifications,
+        workOrders: workOrdersRef.current,
+        incidents,
+        activeUser: { id: activeUser.id, name: activeUser.name },
+        readIds: readSet,
+        dismissedIds: dismissedSet
+      });
+      return sortNotificationsNewestFirst(fieldScoped);
+    }
+
     return sortNotificationsNewestFirst(
       sanitizeAndScopeIncidentNotifications(
         notifications,
@@ -1802,7 +2056,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dismissedSet
       )
     );
-  }, [effectiveRole, userNotifications, employeeNotifications, notifications, incidents, activeUser, currentInboxScopeState]);
+  }, [effectiveRole, userNotifications, employeeNotifications, notifications, incidents, workOrders, activeUser, currentInboxScopeState]);
 
   // Deliver non-blocking auto-dismissing toast when a new actionable application notification arrives in scope
   useEffect(() => {
@@ -1853,6 +2107,110 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const ownedConsumerNos = useMemo(() => {
     return new Set(userConnections.map(c => c.consumerNo));
   }, [userConnections]);
+
+  // Persistent deduplication set for proactive SLA notifications
+  const emittedSlaEventKeysRef = React.useRef<Set<string>>(
+    new Set(loadStorage<string[]>('vidyutflow_sla_emitted_event_keys', []))
+  );
+
+  const evaluateSlaDeadlinesNow = React.useCallback(
+    (referenceNow?: Date | string | number): AppNotification[] => {
+      // Only evaluate non-seed newly created records OR records explicitly evaluated,
+      // while preserving INITIAL_COMPLAINTS and INITIAL_APPLICATIONS seed dates untouched.
+      const seedComplaintIds = new Set(INITIAL_COMPLAINTS.map(c => c.id));
+      const seedApplicationIds = new Set(INITIAL_APPLICATIONS.map(a => a.id));
+
+      const dynamicComplaints = complaints.filter(c => !seedComplaintIds.has(c.id));
+      const dynamicApplications = applications.filter(a => !seedApplicationIds.has(a.id));
+
+      const result = buildProactiveSlaNotifications({
+        complaints: dynamicComplaints,
+        applications: dynamicApplications,
+        existingNotifications: notifications,
+        emittedEventKeys: emittedSlaEventKeysRef.current,
+        referenceNow
+      });
+
+      if (result.newNotifications.length > 0) {
+        emittedSlaEventKeysRef.current = result.emittedEventKeys;
+        saveStorage(
+          'vidyutflow_sla_emitted_event_keys',
+          Array.from(result.emittedEventKeys)
+        );
+        setNotifications(prev => upsertNotificationList(prev, result.newNotifications));
+      }
+
+      // Synchronize slaBreached flag on dynamically created complaints if their deadline passed
+      setComplaints(prev => {
+        let changed = false;
+        const next = prev.map(c => {
+          if (seedComplaintIds.has(c.id)) return c;
+          const evalItem = result.evaluations.complaints[c.id];
+          if (evalItem && evalItem.isBreached && !c.slaBreached) {
+            changed = true;
+            return { ...c, slaBreached: true };
+          }
+          if (evalItem && evalItem.isResolved && c.slaBreached) {
+            changed = true;
+            return { ...c, slaBreached: false };
+          }
+          return c;
+        });
+        return changed ? next : prev;
+      });
+
+      return result.newNotifications;
+    },
+    [complaints, applications, notifications]
+  );
+
+  // Bounded periodic SLA evaluation (every 60 seconds with clean teardown on unmount)
+  useEffect(() => {
+    if (!hasEnteredPlatform) return;
+    evaluateSlaDeadlinesNow();
+    const timerId = window.setInterval(() => {
+      evaluateSlaDeadlinesNow();
+    }, 60000);
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [hasEnteredPlatform, evaluateSlaDeadlinesNow]);
+
+  // Persistent deduplication set for gentle billing reminders (Phase 5 Interim Fix)
+  const emittedBillingReminderKeysRef = React.useRef<Set<string>>(
+    new Set(loadStorage<string[]>('vidyutflow_billing_reminder_keys', []))
+  );
+
+  // Reactive gentle billing reminder evaluation for the active consumer's connections
+  useEffect(() => {
+    if (!demoSession || demoSession.role !== 'consumer' || userConnections.length === 0) return;
+
+    const evalResult = evaluateGentleBillingReminders({
+      ownedConnections: userConnections,
+      bills,
+      payments,
+      existingNotifications: notifications,
+      emittedReminderKeys: Array.from(emittedBillingReminderKeysRef.current),
+      accountId: demoSession.user.id,
+      referenceDate: '15-Oct-2026',
+      language: 'en'
+    });
+
+    if (evalResult.newReminderKeys.length > 0) {
+      emittedBillingReminderKeysRef.current = new Set(evalResult.updatedEmittedReminderKeys);
+      saveStorage('vidyutflow_billing_reminder_keys', evalResult.updatedEmittedReminderKeys);
+    }
+
+    if (evalResult.newNotifications.length > 0 || evalResult.suppressedNotificationIds.length > 0) {
+      const suppressSet = new Set(evalResult.suppressedNotificationIds);
+      setNotifications(prev => {
+        const cleaned = suppressSet.size > 0
+          ? prev.map(n => (suppressSet.has(n.id) ? { ...n, read: true } : n))
+          : prev;
+        return upsertNotificationList(cleaned, evalResult.newNotifications);
+      });
+    }
+  }, [demoSession, userConnections, bills, payments]);
 
   // Synchronize deterministic anomaly detection across ERP datasets (Phase 2)
   useEffect(() => {
@@ -2065,6 +2423,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (activeCriticalModalIncident?.id === id) {
       setActiveCriticalModalIncident(null);
     }
+
+    const ackNotif: AppNotification = {
+      id: `NOTIF-${Date.now()}-EMP-ACK-${id}`,
+      notificationType: 'ACKNOWLEDGED',
+      title: `Incident Acknowledged: ${id}`,
+      message: `Incident ${id} has been acknowledged by ${actor}. Initial triage underway.`,
+      time: 'Just now',
+      createdAt: nowIso,
+      formattedTimestamp: formatErpDateTime(nowIso),
+      targetRole: 'employee',
+      role: 'employee',
+      targetUserId: activeUser.id,
+      incidentId: id,
+      actionUrl: `/employee/incidents?incident=${id}`,
+      type: 'info',
+      read: false,
+      category: 'Outage',
+      statusBadge: 'Acknowledged',
+      subdivision: targetInc.subdivision,
+      actorName: actor,
+      actorRole: effectiveRole,
+      eventKey: `EVT-INC-${id}-ACK`
+    };
+    setNotifications(prev => upsertNotificationList(prev, [ackNotif]));
 
     addAuditEvent('INCIDENT_ACKNOWLEDGED', id, `Incident acknowledged by ${actor}. ${notes || ''}`, actor);
     showToast(`Incident ${id} acknowledged.`, 'info');
@@ -2417,8 +2799,215 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActiveCriticalModalIncident(null);
     }
 
+    const origEmp = resolveIncidentOriginatingEmployee(targetInc);
+    const empResNotif: AppNotification = {
+      id: `NOTIF-${Date.now()}-EMP-RES-${id}`,
+      notificationType: 'RESOLVED',
+      title: `Incident Resolved: ${id}`,
+      message: `Incident ${id} resolved by ${actor}. Resolution: ${resolutionNotes || 'Incident verified and marked resolved.'}`,
+      time: 'Just now',
+      createdAt: nowIso,
+      formattedTimestamp: formatErpDateTime(nowIso),
+      targetRole: 'employee',
+      role: 'employee',
+      targetUserId: origEmp.id,
+      incidentId: id,
+      actionUrl: `/employee/incidents?incident=${id}`,
+      type: 'success',
+      read: false,
+      category: 'Outage',
+      statusBadge: 'Resolved',
+      subdivision: targetInc.subdivision,
+      actorName: actor,
+      actorUserId: activeUser.id,
+      actorRole: effectiveRole,
+      eventKey: `EVT-INC-${id}-RESOLVED-EMP`
+    };
+
+    const resNotifs: AppNotification[] = [empResNotif];
+
+    // Notify assigned Field Engineer if one was assigned
+    if (targetInc.assignedToUserId) {
+      resNotifs.push({
+        id: `NOTIF-${Date.now()}-FLD-RES-${id}`,
+        notificationType: 'RESOLVED',
+        title: `Incident Resolved: ${id}`,
+        message: `Incident ${id} resolved by ${actor}. Resolution: ${resolutionNotes || 'Incident verified and marked resolved.'}`,
+        time: 'Just now',
+        createdAt: nowIso,
+        formattedTimestamp: formatErpDateTime(nowIso),
+        targetRole: 'field',
+        role: 'field',
+        targetUserId: targetInc.assignedToUserId,
+        incidentId: id,
+        actionUrl: `/field/incidents?incident=${id}`,
+        type: 'success',
+        read: false,
+        category: 'Outage',
+        statusBadge: 'Resolved',
+        subdivision: targetInc.subdivision,
+        actorName: actor,
+        actorRole: effectiveRole,
+        eventKey: `EVT-INC-${id}-RESOLVED-FIELD`
+      });
+    }
+
+    // Notify Management if incident was escalated
+    if (targetInc.status === 'ESCALATED' || targetInc.escalatedTo === 'management') {
+      resNotifs.push({
+        id: `NOTIF-${Date.now()}-MGMT-RES-${id}`,
+        notificationType: 'RESOLVED',
+        title: `Incident Resolved: ${id}`,
+        message: `Escalated incident ${id} resolved by ${actor}. Resolution: ${resolutionNotes || 'Incident verified and marked resolved.'}`,
+        time: 'Just now',
+        createdAt: nowIso,
+        formattedTimestamp: formatErpDateTime(nowIso),
+        targetRole: 'management',
+        role: 'management',
+        targetUserId: targetInc.escalatedToUserId,
+        incidentId: id,
+        type: 'success',
+        read: false,
+        category: 'Approval',
+        statusBadge: 'Resolved',
+        subdivision: targetInc.subdivision,
+        actorName: actor,
+        actorRole: effectiveRole,
+        eventKey: `EVT-INC-${id}-RESOLVED-MGMT`
+      });
+    }
+
+    setNotifications(prev => upsertNotificationList(prev, resNotifs));
+
+    // Consumer Protection: If linked to a consumer complaint, update consumer-facing complaint status safely
+    if (targetInc.entityType === 'complaint' && targetInc.entityId) {
+      setComplaints(prev =>
+        prev.map(c =>
+          c.id === targetInc.entityId && c.status !== 'Resolved' && c.status !== 'Closed'
+            ? {
+                ...c,
+                status: 'Resolved',
+                resolvedAt: nowIso,
+                remarks: `Resolved by ${actor}. Substation repairs completed.`
+              }
+            : c
+        )
+      );
+    }
+
     addAuditEvent('INCIDENT_RESOLVED', id, `Incident resolved by ${actor}: ${resolutionNotes}`, actor);
     showToast(`Incident ${id} resolved successfully.`, 'success');
+  };
+
+  const updateIncidentSeverity = (
+    id: string,
+    newSeverity: IncidentSeverity,
+    reason: string
+  ): boolean => {
+    if (!isIncidentRoleAuthorized(effectiveRole)) {
+      showToast(`Access Denied: Role "${effectiveRole.toUpperCase()}" cannot update incident severity.`, 'error');
+      return false;
+    }
+
+    const targetInc = incidents.find(i => i.id === id);
+    if (!targetInc) {
+      showToast(`Incident #${id} not found.`, 'error');
+      return false;
+    }
+
+    const empAuth = authorizeEmployeeAction(targetInc, effectiveRole, activeUser);
+    if (!empAuth.isAuthorized) {
+      showToast(empAuth.denialReason, 'error');
+      return false;
+    }
+
+    // Suppress duplicate notification if severity is unchanged
+    if (targetInc.severity === newSeverity) {
+      return false;
+    }
+
+    const prevSeverity = targetInc.severity;
+    const actor = activeUser.name || effectiveRole.toUpperCase();
+    const nowIso = new Date().toISOString();
+    const cleanReason = reason.trim() || 'Severity reassessed in operational dashboard.';
+
+    setIncidents(prev =>
+      prev.map(inc => {
+        if (inc.id !== id) return inc;
+        const newEvent = {
+          id: `EVT-INC-${id}-SEV-${Date.now()}`,
+          incidentId: id,
+          timestamp: nowIso,
+          stage: inc.status,
+          eventType: 'SEVERITY_CHANGED' as const,
+          actor,
+          actorUserId: activeUser.id,
+          actorRole: effectiveRole,
+          previousSeverity: prevSeverity,
+          newSeverity,
+          notes: `Severity changed from ${prevSeverity} to ${newSeverity}. Reason: ${cleanReason}`
+        };
+        return {
+          ...inc,
+          severity: newSeverity,
+          history: [...inc.history, newEvent]
+        };
+      })
+    );
+
+    const origEmp = resolveIncidentOriginatingEmployee(targetInc);
+    const sevNotifs: AppNotification[] = [
+      {
+        id: `NOTIF-${Date.now()}-EMP-SEV-${id}`,
+        notificationType: 'SEVERITY_CHANGED',
+        title: `Incident Severity Changed: #${id}`,
+        message: `Incident ${id} severity changed from ${prevSeverity} to ${newSeverity} by ${actor}. Reason: ${cleanReason}`,
+        time: 'Just now',
+        createdAt: nowIso,
+        formattedTimestamp: formatErpDateTime(nowIso),
+        targetRole: 'employee',
+        role: 'employee',
+        targetUserId: origEmp.id,
+        incidentId: id,
+        actionUrl: `/employee/incidents?incident=${id}`,
+        type: newSeverity === 'CRITICAL' ? 'alert' : 'warning',
+        read: false,
+        category: 'Outage',
+        subdivision: targetInc.subdivision,
+        actorName: actor,
+        actorRole: effectiveRole,
+        eventKey: `EVT-INC-${id}-SEV-${newSeverity}`
+      }
+    ];
+
+    if (targetInc.assignedToUserId) {
+      sevNotifs.push({
+        id: `NOTIF-${Date.now()}-FLD-SEV-${id}`,
+        notificationType: 'SEVERITY_CHANGED',
+        title: `Incident Severity Changed: #${id}`,
+        message: `Incident ${id} severity changed from ${prevSeverity} to ${newSeverity} by ${actor}. Reason: ${cleanReason}`,
+        time: 'Just now',
+        createdAt: nowIso,
+        formattedTimestamp: formatErpDateTime(nowIso),
+        targetRole: 'field',
+        role: 'field',
+        targetUserId: targetInc.assignedToUserId,
+        incidentId: id,
+        actionUrl: `/field/incidents?incident=${id}`,
+        type: newSeverity === 'CRITICAL' ? 'alert' : 'warning',
+        read: false,
+        category: 'Outage',
+        subdivision: targetInc.subdivision,
+        actorName: actor,
+        actorRole: effectiveRole,
+        eventKey: `EVT-INC-${id}-SEV-FLD-${newSeverity}`
+      });
+    }
+
+    setNotifications(prev => upsertNotificationList(prev, sevNotifs));
+    addAuditEvent('INCIDENT_SEVERITY_CHANGED', id, `Severity updated ${prevSeverity} -> ${newSeverity} by ${actor}: ${cleanReason}`, actor);
+    showToast(`Incident ${id} severity updated to ${newSeverity}.`, newSeverity === 'CRITICAL' ? 'warning' : 'info');
+    return true;
   };
 
   // --------------------------------------------------------------------------
@@ -3592,7 +4181,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const demoSessionRef = React.useRef<DemoSession | null>(demoSession);
   useEffect(() => {
     demoSessionRef.current = demoSession;
-    notifyPortalIdentityChanged(demoSession?.user.email ?? null, demoSession?.role ?? null);
   }, [demoSession]);
 
   const authModeRef = React.useRef<AuthMode>(authMode);
@@ -3822,7 +4410,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const nextMode = resolveEffectiveAuthMode(mode);
     if (nextMode === authMode) return;
-    clearBackendSession();
     setStoredAuthMode(nextMode);
     setAuthModeState(nextMode);
 
@@ -3974,7 +4561,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     identity: CanonicalDemoIdentity,
     preserveCurrentTab: boolean = false
   ): DemoSession => {
-    clearBackendSession();
     const baseSession = createDemoSessionForIdentity(identity);
     const activeModeSession: DemoSession =
       authMode === 'server'
@@ -4010,76 +4596,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setIsRoleSwitcherModalOpenState(false);
     return activeModeSession;
-  };
-
-  const loginViaSimulatedSso = async (
-    email: string,
-    targetRole: UserRole,
-    providerId?: string
-  ): Promise<{ success: boolean; error?: string }> => {
-    const resolvedProvider =
-      providerId ||
-      (targetRole === 'consumer' ? 'parichay-gujarat-demo' : 'ugvcl-workforce-oidc-demo');
-    const stateToken = `oidc_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    const fallbackIdentity = getDefaultCanonicalIdentityForRole(targetRole);
-    const chosenEmail = (email || fallbackIdentity.email).trim().toLowerCase();
-
-    if (authMode === 'server') {
-      const ssoRes = await loginWithSimulatedSsoApi({
-        email: chosenEmail,
-        providerId: resolvedProvider,
-        state: stateToken,
-        targetRole
-      });
-      if (!ssoRes.success || !ssoRes.session) {
-        return { success: false, error: ssoRes.error || 'Simulated SSO login failed.' };
-      }
-      const meCheck = await verifyServerSessionApi();
-      const verifiedSession = meCheck.authenticated && meCheck.session ? meCheck.session : ssoRes.session;
-      const assignedRole = verifiedSession.role;
-      const targetTab =
-        assignedRole === 'consumer' && pendingConsumerTabRef.current
-          ? pendingConsumerTabRef.current
-          : 'dashboard';
-      pendingConsumerTabRef.current = null;
-      clearTransientUserModals();
-      demoSessionRef.current = verifiedSession;
-      currentRoleRef.current = assignedRole;
-      activeTabRef.current = targetTab;
-      hasEnteredPlatformRef.current = true;
-      setStoredActivePortalRuntime({
-        session: verifiedSession,
-        role: assignedRole,
-        tab: targetTab,
-        entered: true,
-        authMode
-      });
-      setDemoSession(verifiedSession);
-      void syncBackendSsoSession(resolvedProvider, verifiedSession.user.email, assignedRole, stateToken, {
-        portalCookieVerified: meCheck.authenticated
-      });
-      setCurrentRoleState(assignedRole);
-      setActiveTabState(targetTab);
-      setHasEnteredPlatformState(true);
-      if (typeof window !== 'undefined') {
-        window.history.pushState(null, '', `/${assignedRole}/${targetTab}`);
-      }
-      setIsRoleSwitcherModalOpenState(false);
-      showToast(
-        `Signed in via Simulated SSO (${resolvedProvider}) as ${verifiedSession.user.name}.`,
-        'success'
-      );
-      addAuditEvent(
-        'SIMULATED_SSO_LOGIN',
-        `Workspace:${assignedRole}`,
-        `Simulated OIDC (${resolvedProvider}) login for ${verifiedSession.user.email}`,
-        verifiedSession.user.name,
-        'SUCCESS'
-      );
-      return { success: true };
-    }
-
-    return loginAsCanonicalDemoAccount(fallbackIdentity.id, targetRole);
   };
 
   const loginAsCanonicalDemoAccount = async (
@@ -4208,8 +4724,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         authMode,
       });
       setDemoSession(verifiedSession);
-      // Never link a token to a different portal identity. Exact credentials are
-      // checked again against FastAPI, including /auth/me and mapped role.
       if (verifiedSession.user.email.trim().toLowerCase() === email.trim().toLowerCase()) {
         void syncBackendSession(verifiedSession.user.email, password, assignedRole, {
           portalCookieVerified: meCheck.authenticated,
@@ -4337,7 +4851,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         sessionToken: `vidyutflow_demo_${Date.now()}`
       };
 
-      clearBackendSession();
       setStoredDemoSession(newSession);
       setDemoSession(newSession);
       setCurrentRoleState('consumer');
@@ -4386,7 +4899,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const verifiedSession =
         meCheck.authenticated && meCheck.session ? meCheck.session : serverResult.session;
 
-      clearBackendSession();
       const targetTab = resolvePostLoginTab('consumer', pendingConsumerTabRef.current);
       pendingConsumerTabRef.current = null;
       demoSessionRef.current = verifiedSession;
@@ -4491,7 +5003,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       sessionToken: `vidyutflow_demo_${Date.now()}`
     };
 
-    clearBackendSession();
     setStoredDemoSession(newSession);
     const targetTab = resolvePostLoginTab('consumer', pendingConsumerTabRef.current);
     pendingConsumerTabRef.current = null;
@@ -4523,8 +5034,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logoutDemoSession = async (): Promise<void> => {
+    clearBackendSession();
     pendingConsumerTabRef.current = null;
-    void logoutBackendCookieSession();
     demoSessionRef.current = null;
     hasEnteredPlatformRef.current = false;
     setStoredActivePortalRuntime(null);
@@ -4620,69 +5131,300 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // Demo Actions
-  const payBillDemo = (billNo: string, paymentMethod: PaymentTransaction['paymentMethod'] = 'UPI / BHIM') => {
+  const payBillDemoDetailed = (
+    billNo: string,
+    paymentMethod: PaymentTransaction['paymentMethod'] = 'UPI / BHIM',
+    customAmount?: number,
+    options?: {
+      simulatedOutcome?: SimulatedPaymentOutcome;
+      simulatedFailureReason?: string;
+    }
+  ): ApplyPaymentToBillResult => {
+    const targetBill = bills.find(b => b.billNo === billNo);
+    const makeRejection = (reason: string): ApplyPaymentToBillResult => {
+      const dummyBill: ElectricityBill = targetBill || {
+        billNo,
+        consumerNo: '',
+        billMonth: 'October 2026',
+        billDate: '05-Oct-2026',
+        dueDate: '20-Oct-2026',
+        unitsConsumed: 0,
+        energyCharges: 0,
+        fixedCharges: 0,
+        fuelPriceAdjustment: 0,
+        electricityDuty: 0,
+        rebateOrSubsidy: 0,
+        totalAmount: 0,
+        status: 'Unpaid',
+        slabBreakdown: [],
+      };
+      return {
+        success: false,
+        outcome: 'FAILED',
+        reason,
+        updatedBill: dummyBill,
+        reconciledBill: {
+          ...dummyBill,
+          rawStatus: dummyBill.status,
+          effectiveStatus: 'Unpaid',
+          paidAmount: dummyBill.paidAmount || 0,
+          outstandingBalance: dummyBill.remainingBalance ?? dummyBill.totalAmount,
+          remainingBalance: dummyBill.remainingBalance ?? dummyBill.totalAmount,
+          isDue: true,
+          isOverdue: false,
+          isPartiallyPaid: false,
+          isPaid: false,
+          appliedPayments: [],
+          unappliedPaymentAttempts: [],
+          hasConflict: false,
+          billingCycleType: dummyBill.billingCycleType || 'MONTHLY',
+          periodStartDate: dummyBill.periodStartDate || '01-Sep-2026',
+          periodEndDate: dummyBill.periodEndDate || '30-Sep-2026',
+          billingPeriodLabel: dummyBill.billingPeriodLabel || '01-Sep-2026 to 30-Sep-2026'
+        },
+        paymentTransaction: null,
+        previouslySettledAmount: dummyBill.paidAmount || 0,
+        paidAmountApplied: 0,
+        remainingBalance: dummyBill.remainingBalance ?? dummyBill.totalAmount,
+        isFullyPaid: false,
+        settlementClassification: 'NONE'
+      };
+    };
+
     if (!isActionAuthorized(effectiveRole, 'POST /api/v1/billing/pay')) {
-      showToast(`Access Denied: Role "${effectiveRole.toUpperCase()}" is not authorized to pay bills.`, 'error');
-      return;
+      const msg = `Access Denied: Role "${effectiveRole.toUpperCase()}" is not authorized to pay bills.`;
+      showToast(msg, 'error');
+      return makeRejection(msg);
     }
     if (effectiveRole === 'consumer' && !userBills.some(b => b.billNo === billNo)) {
-      showToast('Access Denied: You can only pay bills belonging to your linked consumer accounts.', 'error');
+      const msg = 'Access Denied: You can only pay bills belonging to your linked consumer accounts.';
+      showToast(msg, 'error');
       addAuditEvent('ACCESS_DENIED', `Bill:${billNo}`, 'Consumer attempted to pay bill for unowned connection', activeUser.name, 'WARNING');
-      return;
+      return makeRejection(msg);
     }
-    const targetBill = bills.find(b => b.billNo === billNo);
-    if (!targetBill) return;
+    if (!targetBill) {
+      return makeRejection(`Bill ${billNo} not found.`);
+    }
 
-    const txId = `TXN-UPI-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
+    const txPrefix =
+      paymentMethod === 'UPI / BHIM'
+        ? 'TXN-UPI'
+        : paymentMethod === 'Net Banking'
+        ? 'TXN-NEFT'
+        : paymentMethod === 'Debit Card'
+        ? 'TXN-CARD'
+        : 'TXN-RTGS';
+    const txId = `${txPrefix}-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
     const now = new Date();
     const formattedDate = `${now.getDate().toString().padStart(2, '0')}-Oct-2026 ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
-    // Mark bill paid
-    setBills(prev =>
-      prev.map(b => (b.billNo === billNo ? { ...b, status: 'Paid', paidDate: formattedDate, transactionRef: txId } : b))
-    );
-
-    // Add payment entry
-    const newPayment: PaymentTransaction = {
-      txId,
-      consumerNo: targetBill.consumerNo,
-      billNo: targetBill.billNo,
-      date: formattedDate,
-      amount: targetBill.totalAmount,
+    const settlementResult = applyPaymentToBill({
+      bill: targetBill,
+      existingPayments: payments,
       paymentMethod,
-      status: 'Successful',
-      bankReference: `SBI/BBPS/${Math.floor(1000000000 + Math.random() * 9000000000)}`
-    };
-    setPayments(prev => [newPayment, ...prev]);
+      amountToPay: customAmount,
+      paymentDate: formattedDate,
+      txId,
+      bankReference: `UGVCL/DEMO/${Math.floor(1000000000 + Math.random() * 9000000000)}`,
+      accountId: demoSession?.user.id || targetBill.accountId,
+      referenceDate: '15-Oct-2026',
+      simulatedOutcome: options?.simulatedOutcome || 'SUCCESS',
+      simulatedFailureReason: options?.simulatedFailureReason
+    });
 
-    // Add notification
+    if (settlementResult.outcome === 'FAILED') {
+      if (settlementResult.paymentTransaction) {
+        setPayments(prev => [settlementResult.paymentTransaction!, ...prev]);
+        addAuditEvent(
+          'BILL_PAYMENT_FAILED',
+          `BILL#${targetBill.billNo}`,
+          `Payment attempt of ₹${settlementResult.paymentTransaction.amount.toLocaleString('en-IN')} via ${paymentMethod} failed (Ref: ${settlementResult.paymentTransaction.txId}). Balance unchanged: ₹${settlementResult.remainingBalance.toLocaleString('en-IN')}.`,
+          activeUser.name,
+          'WARNING'
+        );
+      }
+      showToast(settlementResult.reason, 'error');
+      return settlementResult;
+    }
+
+    if (settlementResult.outcome === 'PENDING') {
+      if (settlementResult.paymentTransaction) {
+        setPayments(prev => [settlementResult.paymentTransaction!, ...prev]);
+        addAuditEvent(
+          'BILL_PAYMENT_PENDING_VERIFICATION',
+          `BILL#${targetBill.billNo}`,
+          `Payment of ₹${settlementResult.paymentTransaction.amount.toLocaleString('en-IN')} via ${paymentMethod} marked Pending Verification (Ref: ${settlementResult.paymentTransaction.txId}). Balance unchanged until settled.`,
+          activeUser.name,
+          'WARNING'
+        );
+      }
+      showToast(settlementResult.reason, 'warning');
+      return settlementResult;
+    }
+
+    if (!settlementResult.success || !settlementResult.paymentTransaction) {
+      showToast(settlementResult.reason, 'warning');
+      return settlementResult;
+    }
+
+    const { updatedBill, paymentTransaction, paidAmountApplied, remainingBalance, isFullyPaid } =
+      settlementResult;
+
+    // Update bill status & balance in state
+    setBills(prev => prev.map(b => (b.billNo === billNo ? updatedBill : b)));
+
+    // Prepend payment transaction
+    setPayments(prev => [paymentTransaction, ...prev]);
+
+    // Emit payment confirmation notification and mark any prior due/overdue reminders for this bill as read if fully paid
     const nowIso = now.toISOString();
-    const newNotif: AppNotification = {
-      id: `NOTIF-${Date.now()}`,
-      title: 'Payment Successful',
-      message: `₹${targetBill.totalAmount.toLocaleString()} paid for Bill #${targetBill.billNo}. Reference: ${txId}`,
-      time: 'Just now',
+    const confirmNotif = createPaymentConfirmedNotification({
+      bill: updatedBill,
+      payment: paymentTransaction,
+      remainingBalance,
+      accountId: demoSession?.user.id || targetBill.accountId,
+      language: 'en'
+    });
+    const enrichedNotif: AppNotification = {
+      ...confirmNotif,
       createdAt: nowIso,
-      formattedTimestamp: formatErpDateTime(nowIso),
-      targetRole: 'consumer',
-      type: 'success',
-      read: false,
-      category: 'Billing',
-      accountId: demoSession?.user.id,
-      targetConsumerNo: targetBill.consumerNo,
-      relatedEntityType: 'bill',
-      relatedEntityId: targetBill.billNo
+      formattedTimestamp: formatErpDateTime(nowIso)
     };
-    setNotifications(prev => [newNotif, ...prev]);
+
+    setNotifications(prev => {
+      const normalizedBillNo = normalizeBillingIdentifier(billNo);
+      const updatedExisting = isFullyPaid
+        ? prev.map(n =>
+            n.category === 'Billing' &&
+            n.relatedEntityType === 'bill' &&
+            normalizeBillingIdentifier(n.relatedEntityId) === normalizedBillNo
+              ? { ...n, read: true }
+              : n
+          )
+        : prev;
+      return upsertNotificationList(updatedExisting, [enrichedNotif]);
+    });
 
     // Record audit event
     addAuditEvent(
-      'BILL_PAYMENT_COLLECTED',
+      isFullyPaid ? 'BILL_PAYMENT_COLLECTED' : 'BILL_PARTIAL_PAYMENT_COLLECTED',
       `BILL#${targetBill.billNo}`,
-      `₹${targetBill.totalAmount.toLocaleString()} paid via ${paymentMethod} (Ref: ${txId})`
+      `₹${paidAmountApplied.toLocaleString()} paid via ${paymentMethod} (Ref: ${txId}). Remaining balance: ₹${remainingBalance.toLocaleString()}`
     );
 
-    showToast(`Payment of ₹${targetBill.totalAmount.toLocaleString()} completed successfully! Receipt generated.`, 'success');
+    showToast(
+      isFullyPaid
+        ? `Payment of ₹${paidAmountApplied.toLocaleString()} completed successfully! Receipt generated.`
+        : `Partial payment of ₹${paidAmountApplied.toLocaleString()} recorded! Remaining balance: ₹${remainingBalance.toLocaleString()}.`,
+      'success'
+    );
+    return settlementResult;
+  };
+
+  const payBillDemo = (
+    billNo: string,
+    paymentMethod: PaymentTransaction['paymentMethod'] = 'UPI / BHIM',
+    customAmount?: number,
+    options?: {
+      simulatedOutcome?: SimulatedPaymentOutcome;
+      simulatedFailureReason?: string;
+    }
+  ): boolean => {
+    const res = payBillDemoDetailed(billNo, paymentMethod, customAmount, options);
+    return res.success;
+  };
+
+  const generateDemoBillForActiveConnection = (
+    consumerNo: string,
+    billMonth: string = 'October 2026',
+    options?: {
+      billingCycleType?: 'MONTHLY' | 'BI_MONTHLY';
+    }
+  ): { created: boolean; bill: ElectricityBill | null; reason: string } => {
+    const cleanNo = normalizeBillingIdentifier(consumerNo);
+    const targetConn = connections.find(
+      c =>
+        normalizeBillingIdentifier(c.consumerNo) === cleanNo ||
+        normalizeBillingIdentifier(c.connectionId) === cleanNo
+    );
+    if (!targetConn) {
+      showToast(`Connection ${consumerNo} not found.`, 'error');
+      return { created: false, bill: null, reason: `Connection ${consumerNo} not found.` };
+    }
+
+    if (
+      effectiveRole === 'consumer' &&
+      !userConnections.some(
+        c => normalizeBillingIdentifier(c.consumerNo) === normalizeBillingIdentifier(targetConn.consumerNo)
+      )
+    ) {
+      showToast('Access Denied: You can only generate DEMO cycle bills for your own active connections.', 'error');
+      return { created: false, bill: null, reason: 'Unauthorized connection.' };
+    }
+
+    const requestedCycleType =
+      options?.billingCycleType ||
+      (targetConn.billingCycleType === 'BI_MONTHLY' ? 'BI_MONTHLY' : 'MONTHLY');
+
+    if (requestedCycleType === 'BI_MONTHLY') {
+      const biMonthlyGenResult = generateDeterministicBiMonthlyBillForConnection({
+        connection: targetConn,
+        existingBills: bills,
+        startYear: 2026,
+        startMonth1To12: 9,
+        autoResolveNonOverlappingPeriod: true,
+        createdByRole: effectiveRole,
+        createdByActor: activeUser.name || 'VidyutFlow Billing Engine'
+      });
+
+      if (!biMonthlyGenResult.created || !biMonthlyGenResult.bill) {
+        showToast(biMonthlyGenResult.reason, 'info');
+        return {
+          created: false,
+          bill: biMonthlyGenResult.bill,
+          reason: biMonthlyGenResult.reason
+        };
+      }
+
+      setBills(biMonthlyGenResult.updatedBills);
+      addAuditEvent(
+        'DEMO_BIMONTHLY_BILL_GENERATED',
+        `BILL#${biMonthlyGenResult.bill.billNo}`,
+        `Deterministic BI_MONTHLY DEMO cycle bill generated for connection ${targetConn.consumerNo} (${biMonthlyGenResult.bill.billMonth}, ${biMonthlyGenResult.bill.periodStartDate} to ${biMonthlyGenResult.bill.periodEndDate}): ₹${biMonthlyGenResult.bill.totalAmount.toLocaleString()}`
+      );
+      showToast(
+        `Bi-Monthly DEMO Bill ${biMonthlyGenResult.bill.billNo} (${biMonthlyGenResult.bill.billMonth}, ₹${biMonthlyGenResult.bill.totalAmount.toLocaleString('en-IN')}) generated for connection ${targetConn.consumerNo}.`,
+        'success'
+      );
+      return {
+        created: true,
+        bill: biMonthlyGenResult.bill,
+        reason: biMonthlyGenResult.reason
+      };
+    }
+
+    const genResult = generateDeterministicDemoBillForConnection({
+      connection: targetConn,
+      existingBills: bills,
+      billMonth
+    });
+
+    if (!genResult.created || !genResult.bill) {
+      showToast(genResult.reason, 'info');
+      return { created: false, bill: genResult.bill, reason: genResult.reason };
+    }
+
+    setBills(genResult.updatedBills);
+    addAuditEvent(
+      'DEMO_BILL_GENERATED',
+      `BILL#${genResult.bill.billNo}`,
+      `Deterministic DEMO cycle bill generated for connection ${targetConn.consumerNo} (${billMonth}): ₹${genResult.bill.totalAmount.toLocaleString()}`
+    );
+    showToast(
+      `DEMO Bill ${genResult.bill.billNo} (₹${genResult.bill.totalAmount.toLocaleString('en-IN')}) generated for connection ${targetConn.consumerNo}.`,
+      'success'
+    );
+    return { created: true, bill: genResult.bill, reason: genResult.reason };
   };
 
   const submitApplicationDemo = (data: Partial<NewConnectionApplication>) => {
@@ -4708,10 +5450,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const nowDate = new Date();
     const nowIso = nowDate.toISOString();
-    const appliedDateStr = formatErpDateOnly(nowDate, '15-Oct-2026');
-    const targetDateObj = new Date(nowDate.getTime() + 15 * 24 * 60 * 60 * 1000);
-    const targetDateStr = formatErpDateOnly(targetDateObj, '30-Oct-2026');
+    const dynamicAppSla = computeDynamicApplicationSlaFields({
+      submittedAt: data.appliedDate || nowDate
+    });
+    const appliedDateStr = data.appliedDate || dynamicAppSla.appliedDate;
+    const targetDateStr = data.targetCompletionDate || dynamicAppSla.targetCompletionDate;
     const noteTimestampStr = formatErpDateTime(nowDate, '15-Oct 06:19');
+
+    // Verify consumer ownership of linkedConsumerNo if provided
+    let verifiedLinkedConsumerNo = data.linkedConsumerNo?.trim() || undefined;
+    let verifiedLinkedMeterNo = data.linkedMeterNo?.trim() || undefined;
+    let verifiedCurrentLoadKw =
+      typeof data.currentSanctionedLoadKw === 'number' &&
+      Number.isFinite(data.currentSanctionedLoadKw) &&
+      data.currentSanctionedLoadKw > 0
+        ? data.currentSanctionedLoadKw
+        : undefined;
+
+    if (effectiveRole === 'consumer' && verifiedLinkedConsumerNo) {
+      const ownedConn = userConnections.find(
+        c => c.consumerNo === verifiedLinkedConsumerNo
+      );
+      if (!ownedConn) {
+        showToast(
+          'Access Denied: You can only submit service requests for your own linked consumer numbers.',
+          'error'
+        );
+        addAuditEvent(
+          'ACCESS_DENIED',
+          `Connection:${verifiedLinkedConsumerNo}`,
+          'Consumer blocked from submitting service request on unowned connection',
+          activeUser.name,
+          'WARNING'
+        );
+        return '';
+      }
+      verifiedLinkedMeterNo = verifiedLinkedMeterNo || ownedConn.meterNo;
+      if (verifiedCurrentLoadKw === undefined && ownedConn.sanctionedLoadKw > 0) {
+        verifiedCurrentLoadKw = ownedConn.sanctionedLoadKw;
+      }
+    }
+
+    const effectiveRequestType =
+      data.serviceRequestType ||
+      (data.solarInterest ? 'SOLAR_NET_METERING' : 'NEW_CONNECTION');
+    const effectiveSolarInterest = Boolean(
+      data.solarInterest || effectiveRequestType === 'SOLAR_NET_METERING'
+    );
+    const effectiveLoadDirection: LoadChangeDirection | undefined =
+      effectiveRequestType === 'LOAD_CHANGE'
+        ? data.loadChangeDirection ||
+          (verifiedCurrentLoadKw !== undefined && kw < verifiedCurrentLoadKw
+            ? 'REDUCTION'
+            : 'EXTENSION')
+        : undefined;
+
+    const initialNoteText =
+      effectiveRequestType === 'SOLAR_NET_METERING'
+        ? verifiedLinkedConsumerNo
+          ? `Rooftop Solar Net-Metering (Surya Gujarat) request registered for existing connection #${verifiedLinkedConsumerNo} (${kw} kW ${canonicalCategory}) at ${canonicalSubdivision}.`
+          : `Rooftop Solar Net-Metering (Surya Gujarat) application registered for ${kw} kW ${canonicalCategory} supply at ${canonicalSubdivision}.`
+        : effectiveRequestType === 'LOAD_CHANGE'
+        ? `${effectiveLoadDirection === 'REDUCTION' ? 'Load Reduction' : 'Load Extension'} request registered for connection #${verifiedLinkedConsumerNo || 'UNLINKED'}: current sanctioned load ${verifiedCurrentLoadKw ?? kw} kW to requested load ${kw} kW (${canonicalCategory}) at ${canonicalSubdivision}.`
+        : `New LT connection application registered for ${kw} kW ${canonicalCategory} supply at ${canonicalSubdivision}.`;
 
     const newApp: NewConnectionApplication = {
       id: newId,
@@ -4735,11 +5536,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         : ['Identity Proof (Aadhaar / PAN)', 'Premises Ownership Deed / Index-II', 'Wiring Test Certificate'],
       workflowStep: 1,
       accountId: currentUserId,
+      serviceRequestType: effectiveRequestType,
+      linkedConsumerNo: verifiedLinkedConsumerNo,
+      linkedMeterNo: verifiedLinkedMeterNo,
+      currentSanctionedLoadKw: verifiedCurrentLoadKw,
+      loadChangeDirection: effectiveLoadDirection,
+      loadChangeConfirmed:
+        effectiveRequestType === 'LOAD_CHANGE'
+          ? Boolean(data.loadChangeConfirmed ?? true)
+          : undefined,
+      solarInterest: effectiveSolarInterest,
+      purpose: data.purpose,
       notesHistory: [
         {
           timestamp: noteTimestampStr,
           author: 'Citizen Self-Service Portal',
-          note: `New LT connection application registered for ${kw} kW ${canonicalCategory} supply at ${canonicalSubdivision}.`
+          note: initialNoteText
         }
       ]
     };
@@ -4784,9 +5596,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Record audit event
     addAuditEvent(
-      'NEW_CONNECTION_APPLICATION_SUBMITTED',
+      effectiveRequestType === 'SOLAR_NET_METERING'
+        ? 'SOLAR_NET_METERING_REQUEST_SUBMITTED'
+        : effectiveRequestType === 'LOAD_CHANGE'
+        ? 'LOAD_CHANGE_REQUEST_SUBMITTED'
+        : 'NEW_CONNECTION_APPLICATION_SUBMITTED',
       newId,
-      `Applicant: ${newApp.applicantName}, Load: ${kw}kW, Subdiv: ${newApp.subdivision}`
+      `Type: ${effectiveRequestType}, Applicant: ${newApp.applicantName}, Load: ${kw}kW, Subdiv: ${newApp.subdivision}`
     );
 
     showToast(`Application ${newId} submitted! Confirmation and tracking enabled.`, 'info');
@@ -4817,10 +5633,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       4
     );
     const prio = data.priority || 'High';
-    const slaHours = prio === 'Critical' ? 4 : prio === 'High' ? 12 : 24;
-    const filedAtDate = new Date();
-    const filedAt = formatErpDateTime(filedAtDate);
-    const slaDueTime = calculateComplaintSlaDueTime(filedAt, slaHours) || '';
+    const dynamicSla = computeDynamicComplaintSlaFields({
+      priority: prio,
+      slaTargetHours: data.slaTargetHours,
+      submittedAt: data.filedAt
+    });
 
     const currentUserId = demoSession?.user.id || 'anonymous';
     const currentUserName = demoSession?.user.name || data.consumerName || 'Citizen Consumer';
@@ -4837,14 +5654,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'Registered',
       subdivision: data.subdivision || 'Mehsana City North',
       feederName: data.feederName || 'Local Feeder',
-      filedAt,
-      slaTargetHours: slaHours,
-      slaDueTime,
+      filedAt: data.filedAt || dynamicSla.filedAt,
+      slaTargetHours: dynamicSla.slaTargetHours,
+      slaDueTime: data.slaDueTime || dynamicSla.slaDueTime,
       slaBreached: false,
       accountId: currentUserId,
       timeline: [
         {
-          time: filedAt,
+          time: dynamicSla.timelineTimeLabel,
           stage: 'Registered',
           actor: 'Consumer Portal',
           remark: 'Grievance ticket registered. Assigned to sub-divisional service desk.'
@@ -4891,7 +5708,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         consumerNo: newCmp.consumerNo,
         consumerName: newCmp.consumerName,
         priority: newCmp.priority === 'Critical' ? 'Emergency' : 'High',
-        scheduledDate: '15-Oct-2026',
+        scheduledDate: dynamicSla.scheduledWorkOrderDate,
         status: 'Pending',
         assignedTo: 'Vikramaditya Solanki (JE Field)',
         materialsNeeded: ['Safety Gear', 'Digital Clamp Meter', 'Insulated Tool Kit'],
@@ -4909,13 +5726,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const fieldNotif: AppNotification = {
         id: `NOTIF-${Date.now()}-FLD`,
+        notificationType: 'WORK_ORDER_ASSIGNED',
         title: `Urgent Field Dispatch: ${woId}`,
         message: `${newCmp.category} reported at ${newCmp.subdivision}. Assigned to JE Field.`,
         time: 'Just now',
         targetRole: 'field',
+        targetUserId: 'FLD-UG-201',
         type: 'alert',
         read: false,
         category: 'Outage',
+        statusBadge: 'Emergency Dispatch',
         complaintId: newId,
         workOrderId: woId,
         subdivision: newCmp.subdivision,
@@ -4932,7 +5752,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `Category: ${newCmp.category}, Consumer: ${newCmp.consumerNo}, Priority: ${prio}`
     );
 
-    showToast(`Complaint ${newId} registered successfully! Assigned SLA: ${slaHours}h.`, 'success');
+    showToast(`Complaint ${newId} registered successfully! Assigned SLA: ${dynamicSla.slaTargetHours}h.`, 'success');
     return newId;
   };
 
@@ -4944,7 +5764,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    const targetApp = applications.find(a => a.id === id);
+    const targetApp =
+      applicationsRef.current.find(a => a.id === id) ||
+      applications.find(a => a.id === id);
     if (!targetApp) {
       showToast(`Application #${id} was not found in the ERP database.`, 'error');
       return;
@@ -4955,6 +5777,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       showToast(`Invalid lifecycle progression: cannot advance from "${targetApp.status}" directly to "${status}".`, 'error');
       return;
     }
+
+    const isStatusChange = targetApp.status !== status;
 
     const stepMap: Record<NewConnectionApplication['status'], number> = {
       'Submitted': 1,
@@ -4969,104 +5793,147 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ? [...targetApp.notesHistory, { timestamp: '15-Oct 06:19', author: `${activeUser.name} (${effectiveRole.toUpperCase()})`, note }]
       : targetApp.notesHistory;
 
+    // If entering or updating in Site Inspection, ensure a linked site-inspection WorkOrder exists before committing state
+    let siteInspectionWoResolution: SiteInspectionWorkOrderResolution | undefined;
+    if (status === 'Site Inspection') {
+      siteInspectionWoResolution = ensureSiteInspectionWorkOrderForApplication({
+        app: targetApp,
+        workOrders: workOrdersRef.current,
+        actorLabel: activeUser.name,
+        timestamp: new Date().toISOString()
+      });
+      workOrdersRef.current = siteInspectionWoResolution.updatedWorkOrders;
+      setWorkOrders(siteInspectionWoResolution.updatedWorkOrders);
+    }
+
     const updatedTargetApp: NewConnectionApplication = {
       ...targetApp,
       status,
       workflowStep: stepMap[status],
       clarificationRequested: false,
       clarificationNote: undefined,
+      ...(siteInspectionWoResolution
+        ? {
+            assignedWorkOrderId: siteInspectionWoResolution.assignedWorkOrderId,
+            ...(siteInspectionWoResolution.assignedEngineer
+              ? { assignedEngineer: siteInspectionWoResolution.assignedEngineer }
+              : {})
+          }
+        : {}),
       notesHistory: newHistory
     };
 
-    setApplications(prev =>
-      prev.map(app => (app.id === id ? updatedTargetApp : app))
+    const nextApplications = applicationsRef.current.map(app =>
+      app.id === id ? updatedTargetApp : app
     );
+    applicationsRef.current = nextApplications;
+    setApplications(nextApplications);
 
-    // If moved to Site Inspection, automatically dispatch a linked Work Order for the Field Engineer
-    if (status === 'Site Inspection') {
+    // Emit Field Engineer inspection dispatch notification only when work order is newly created or stage just transitioned
+    if (status === 'Site Inspection' && siteInspectionWoResolution && (siteInspectionWoResolution.created || isStatusChange)) {
       const app = updatedTargetApp;
-      const woId = `WO-INS-${app.id.replace('APP-', '')}`;
-      const existingWo = workOrders.find(w => w.id === woId);
-      if (!existingWo) {
-        const newWo: WorkOrder = {
-          id: woId,
-          title: `Site Feasibility & Meter Load Inspection (${app.id})`,
-          type: 'New Connection Verification',
-          subdivision: app.subdivision,
-          feederName: '11kV Visnagar Road Feeder',
-          location: `${app.applicantName}, ${app.address}`,
-          gpsCoordinates: { lat: 23.6042, lng: 72.3995 },
-          consumerName: app.applicantName,
-          priority: 'High',
-          scheduledDate: '15-Oct-2026',
-          status: 'Pending',
-          assignedTo: 'Vikramaditya Solanki (JE Field)',
-          materialsNeeded: ['Earthing Resistance Meter', 'GPS Geotag Camera', 'Digital Clamp Meter'],
-          applicationId: app.id,
-          actionHistory: [
-            {
-              timestamp: new Date().toISOString(),
-              stage: 'Pending',
-              actor: activeUser.name,
-              notes: 'Inspection order created from Document Verification approval.'
-            }
-          ]
-        };
-        setWorkOrders(prev => [newWo, ...prev]);
-
-        // Link WO ID back to application
-        setApplications(prev => prev.map(a => a.id === app.id ? { ...a, assignedWorkOrderId: woId } : a));
-
-        // Field Notification
-        const fieldNotif: AppNotification = {
-          id: `NOTIF-${Date.now()}-FLD-INS`,
-          title: `New Site Inspection Order: ${woId}`,
-          message: `Feasibility check scheduled for ${app.applicantName} (${app.requestedLoadKw}kW) in ${app.subdivision}.`,
-          time: 'Just now',
-          targetRole: 'field',
-          type: 'info',
-          read: false,
-          category: 'Inspection',
-          applicationId: app.id,
-          workOrderId: woId,
-          subdivision: app.subdivision,
-          eventKey: `FLD:${woId}:SITE_INSPECTION_ASSIGNED`
-        };
-        setNotifications(prev => upsertNotificationList(prev, [fieldNotif]));
-      }
+      const woId = siteInspectionWoResolution.assignedWorkOrderId;
+      const assignedEng = resolveCanonicalFieldEngineerIdentity(
+        siteInspectionWoResolution.assignedEngineer || app.assignedEngineer,
+        fieldEngineers
+      );
+      const fieldNotif: AppNotification = {
+        id: `NOTIF-${Date.now()}-FLD-INS`,
+        notificationType: 'SITE_INSPECTION_ASSIGNED',
+        title: `New Site Inspection Order: ${woId}`,
+        message: `Feasibility check scheduled for ${app.applicantName} (${app.requestedLoadKw}kW) in ${app.subdivision}.`,
+        time: 'Just now',
+        targetRole: 'field',
+        targetUserId: assignedEng.id,
+        type: 'info',
+        read: false,
+        category: 'Inspection',
+        statusBadge: 'Site Inspection',
+        applicationId: app.id,
+        workOrderId: woId,
+        subdivision: app.subdivision,
+        eventKey: `FLD:${woId}:SITE_INSPECTION_ASSIGNED`
+      };
+      setNotifications(prev => upsertNotificationList(prev, [fieldNotif]));
     }
 
-    // If moved to Meter Installed, automatically provision a new active Electricity Connection!
+    // If moved to Meter Installed, provision or update the active Electricity Connection deterministically!
     let provisionedConnMeta: { newConsumerNo: string; newMeterNo: string } | undefined;
     if (status === 'Meter Installed') {
       const app = updatedTargetApp;
-      const newConsumerNo = `04281-${Math.floor(10000 + Math.random() * 90000)}`;
-      const newMeterNo = `MTR-2026-${Math.floor(10000 + Math.random() * 90000)}`;
-      provisionedConnMeta = { newConsumerNo, newMeterNo };
+      const isLinkedServiceModification =
+        (app.serviceRequestType === 'SOLAR_NET_METERING' ||
+          app.serviceRequestType === 'LOAD_CHANGE') &&
+        Boolean(app.linkedConsumerNo);
+      const existingLinkedConn = isLinkedServiceModification
+        ? connections.find(
+            c =>
+              normalizeBillingIdentifier(c.consumerNo) ===
+              normalizeBillingIdentifier(app.linkedConsumerNo)
+          )
+        : undefined;
 
-      const newConn: ElectricityConnection = {
-        consumerNo: newConsumerNo,
-        connectionId: `CONN-${app.id.replace('APP-', '')}`,
-        consumerName: app.applicantName,
-        meterNo: newMeterNo,
-        sanctionedLoadKw: app.requestedLoadKw,
-        phase: app.phase,
-        tariffCategory: app.category,
-        address: app.address,
-        subdivision: app.subdivision,
-        feederName: '11kV Visnagar Road Feeder',
-        status: 'Active',
-        connectedDate: '15-Oct-2026',
-        lastReadingDate: '15-Oct-2026',
-        currentReadingKwh: 12,
-        previousReadingKwh: 0,
-        averageMonthlyKwh: app.requestedLoadKw * 60,
-        securityDeposit: app.estimatedSanctionCost * 0.4,
-        accountId: app.accountId,
-        accountEmail: app.email
-      };
+      if (existingLinkedConn) {
+        // Update the existing connection's sanctioned load / attributes without creating a duplicate connection
+        provisionedConnMeta = {
+          newConsumerNo: existingLinkedConn.consumerNo,
+          newMeterNo: existingLinkedConn.meterNo
+        };
+        setConnections(prev =>
+          prev.map(c =>
+            c.consumerNo === existingLinkedConn.consumerNo
+              ? {
+                  ...c,
+                  sanctionedLoadKw:
+                    app.serviceRequestType === 'LOAD_CHANGE'
+                      ? app.requestedLoadKw
+                      : c.sanctionedLoadKw,
+                  phase: app.phase || c.phase,
+                  status: 'Active'
+                }
+              : c
+          )
+        );
+      } else {
+        const expectedConnId = `CONN-${app.id.replace('APP-', '')}`;
+        const existingAppConn = connections.find(c => c.connectionId === expectedConnId);
+        if (existingAppConn) {
+          provisionedConnMeta = {
+            newConsumerNo: existingAppConn.consumerNo,
+            newMeterNo: existingAppConn.meterNo
+          };
+        } else {
+          const deterministicSuffix = app.id.replace(/[^0-9]/g, '').slice(-5).padStart(5, '4');
+          const newConsumerNo = `04281-${deterministicSuffix}`;
+          const newMeterNo = `MTR-2026-${deterministicSuffix}`;
+          provisionedConnMeta = { newConsumerNo, newMeterNo };
 
-      setConnections(prev => [newConn, ...prev]);
+          const newConn: ElectricityConnection = {
+            consumerNo: newConsumerNo,
+            connectionId: expectedConnId,
+            consumerName: app.applicantName,
+            meterNo: newMeterNo,
+            sanctionedLoadKw: app.requestedLoadKw,
+            phase: app.phase,
+            tariffCategory: app.category,
+            address: app.address,
+            subdivision: app.subdivision,
+            feederName: '11kV Visnagar Road Feeder',
+            status: 'Active',
+            connectedDate: '15-Oct-2026',
+            lastReadingDate: '15-Oct-2026',
+            currentReadingKwh: Math.max(85, Math.round(app.requestedLoadKw * 55)),
+            previousReadingKwh: 0,
+            averageMonthlyKwh: app.requestedLoadKw * 60,
+            securityDeposit: app.estimatedSanctionCost * 0.4,
+            accountId: app.accountId,
+            accountEmail: app.email
+          };
+
+          // Append new connection so existing primary selection is preserved
+          setConnections(prev => [...prev, newConn]);
+        }
+      }
     }
 
     const { employeeNotif, consumerNotif } = buildApplicationLifecycleNotifications(
@@ -5455,15 +6322,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     // Notify field engineer
+    const assignedEng = resolveCanonicalFieldEngineerIdentity(engineerName, fieldEngineers);
+    const isEmergency = (priority as WorkOrder['priority']) === 'Emergency' || targetCmp.priority === 'Critical';
     const fieldNotif: AppNotification = {
       id: `NOTIF-${Date.now()}-FLD-CMP`,
+      notificationType: 'WORK_ORDER_ASSIGNED',
       title: `New Dispatch: ${woId}`,
       message: `${targetCmp.category} assigned at ${targetCmp.subdivision} for ${targetCmp.consumerName}.`,
       time: 'Just now',
       targetRole: 'field',
+      targetUserId: assignedEng.id,
       type: 'alert',
       read: false,
       category: 'Outage',
+      statusBadge: isEmergency ? 'Emergency Dispatch' : 'Field Assignment',
       complaintId: complaintId,
       workOrderId: woId,
       subdivision: targetCmp.subdivision,
@@ -5499,59 +6371,296 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  const updateWorkOrderStatus = (id: string, status: WorkOrder['status'], report?: WorkOrder['inspectionReport']) => {
-    if (!isActionAuthorized(effectiveRole, 'PATCH /api/v1/workorders/:id/status')) {
-      showToast(`Access Denied: Role "${effectiveRole.toUpperCase()}" cannot update work order status.`, 'error');
-      addAuditEvent('ACCESS_DENIED', `WorkOrder:${id}`, `Unauthorized attempt to update work order status by ${effectiveRole}`, activeUser.name, 'WARNING');
-      return;
+  const assignWorkOrder = (
+    woId: string,
+    engineerIdOrName: string,
+    notes?: string
+  ): boolean => {
+    if (effectiveRole === 'consumer') {
+      showToast('Access Denied: Consumers cannot assign work orders.', 'error');
+      addAuditEvent('ACCESS_DENIED', `WorkOrder:${woId}`, 'Unauthorized work order assignment attempt by consumer', activeUser.name, 'WARNING');
+      return false;
     }
 
-    const targetWo = workOrders.find(w => w.id === id);
+    const targetWo = workOrdersRef.current.find(w => w.id === woId);
     if (!targetWo) {
-      showToast(`Work Order #${id} was not found.`, 'error');
-      return;
+      showToast(`Work Order #${woId} was not found.`, 'error');
+      return false;
     }
 
-    if (!isValidWorkOrderTransition(targetWo.status, status)) {
-      showToast(`Invalid progression from "${targetWo.status}" to "${status}".`, 'error');
-      return;
+    const assignedEng = resolveCanonicalFieldEngineerIdentity(engineerIdOrName, fieldEngineers);
+    const nowIso = new Date().toISOString();
+
+    const updatedWo: WorkOrder = {
+      ...targetWo,
+      assignedTo: assignedEng.name,
+      actionHistory: [
+        ...(targetWo.actionHistory || []),
+        {
+          timestamp: nowIso,
+          stage: targetWo.status,
+          actor: `${activeUser.name} (${effectiveRole.toUpperCase()})`,
+          notes: `Assigned to ${assignedEng.name} (${assignedEng.id}).${notes ? ` ${notes}` : ''}`
+        }
+      ]
+    };
+
+    const nextWorkOrders = workOrdersRef.current.map(w => (w.id === woId ? updatedWo : w));
+    workOrdersRef.current = nextWorkOrders;
+    setWorkOrders(nextWorkOrders);
+
+    const notif = buildWorkOrderAssignedNotification({
+      wo: updatedWo,
+      targetEngineer: assignedEng,
+      actorLabel: activeUser.name,
+      notes,
+      nowIso
+    });
+    setNotifications(prev => upsertNotificationList(prev, [notif]));
+
+    addAuditEvent(
+      'WORK_ORDER_ASSIGNED',
+      woId,
+      `Assigned to ${assignedEng.name} (${assignedEng.id}) by ${activeUser.name}`,
+      activeUser.name
+    );
+
+    showToast(`Work Order ${woId} assigned to ${assignedEng.name}`, 'success');
+    return true;
+  };
+
+  const reassignWorkOrder = (
+    woId: string,
+    newEngineerIdOrName: string,
+    reason?: string
+  ): boolean => {
+    const res = reassignWorkOrderRecord({
+      woId,
+      newEngineerIdOrName,
+      reason,
+      actorUser: activeUser,
+      effectiveRole,
+      workOrders: workOrdersRef.current,
+      fieldEngineers,
+      notifications,
+      nowIso: new Date().toISOString()
+    });
+
+    if (!res.success) {
+      showToast(res.error || 'Failed to reassign work order.', 'error');
+      return false;
+    }
+
+    workOrdersRef.current = res.updatedWorkOrders;
+    setWorkOrders(res.updatedWorkOrders);
+    setNotifications(res.updatedNotifications);
+
+    addAuditEvent(
+      'WORK_ORDER_REASSIGNED',
+      woId,
+      `Reassigned: ${reason || 'Task re-allocation'} by ${activeUser.name}`,
+      activeUser.name
+    );
+
+    showToast(`Work Order ${woId} reassigned successfully.`, 'success');
+    return true;
+  };
+
+  const updateWorkOrderPriorityAndSchedule = (
+    woId: string,
+    priority?: WorkOrder['priority'],
+    scheduledDate?: string,
+    notes?: string
+  ): boolean => {
+    const res = updateWorkOrderPriorityAndScheduleRecord({
+      woId,
+      newPriority: priority,
+      newScheduledDate: scheduledDate,
+      notes,
+      actorUser: activeUser,
+      effectiveRole,
+      workOrders: workOrdersRef.current,
+      fieldEngineers,
+      notifications,
+      nowIso: new Date().toISOString()
+    });
+
+    if (!res.success) {
+      showToast(res.error || 'Failed to update work order parameters.', 'error');
+      return false;
+    }
+
+    workOrdersRef.current = res.updatedWorkOrders;
+    setWorkOrders(res.updatedWorkOrders);
+    setNotifications(res.updatedNotifications);
+
+    addAuditEvent(
+      'WORK_ORDER_UPDATED',
+      woId,
+      `Priority: ${priority || 'unchanged'}, Scheduled: ${scheduledDate || 'unchanged'} by ${activeUser.name}`,
+      activeUser.name
+    );
+
+    showToast(`Work Order ${woId} parameters updated.`, 'info');
+    return true;
+  };
+
+  const refreshFieldOfflineQueueFromStorage = (): FieldOfflineQueueItem[] => {
+    const loaded = loadFieldOfflineQueue();
+    fieldOfflineQueueRef.current = loaded;
+    setFieldOfflineQueue(loaded);
+    return loaded;
+  };
+
+  const enqueueFieldInspectionOffline = (
+    woId: string,
+    report: NonNullable<WorkOrder['inspectionReport']>,
+    submittedBy: string
+  ): FieldOfflineQueueItem => {
+    const { item, queue } = enqueueFieldInspectionAction({
+      woId,
+      canonicalWorkOrders: workOrdersRef.current,
+      existingQueue: fieldOfflineQueueRef.current,
+      inspectionReport: report,
+      submittedBy
+    });
+    fieldOfflineQueueRef.current = queue;
+    setFieldOfflineQueue(queue);
+    addAuditEvent(
+      'FIELD_OFFLINE_ACTION_QUEUED',
+      woId,
+      `Offline site inspection queued (UUID: ${item.client_uuid}, Meter: ${report.meterSerialScanned})`,
+      activeUser.name
+    );
+    showToast(
+      `Inspection report for ${woId} queued locally (Offline Queue). Canonical ERP state will update after DEMO replay.`,
+      'info'
+    );
+    return item;
+  };
+
+  const enqueueFieldStatusOffline = (
+    woId: string,
+    status: WorkOrder['status'],
+    report?: WorkOrder['inspectionReport']
+  ): FieldOfflineQueueItem => {
+    const { item, queue } = enqueueFieldWorkOrderStatusAction({
+      woId,
+      targetStatus: status,
+      canonicalWorkOrders: workOrdersRef.current,
+      existingQueue: fieldOfflineQueueRef.current,
+      inspectionReport: report,
+      submittedBy: `${activeUser.name} (${activeUser.id})`
+    });
+    fieldOfflineQueueRef.current = queue;
+    setFieldOfflineQueue(queue);
+    addAuditEvent(
+      'FIELD_OFFLINE_ACTION_QUEUED',
+      woId,
+      `Offline work order status update -> "${status}" queued (UUID: ${item.client_uuid})`,
+      activeUser.name
+    );
+    showToast(
+      `Work Order #${woId} status change to "${status}" queued locally (Offline Queue).`,
+      'info'
+    );
+    return item;
+  };
+
+  const updateWorkOrderStatus = (
+    id: string,
+    status: WorkOrder['status'],
+    report?: WorkOrder['inspectionReport'],
+    options?: { bypassOfflineQueue?: boolean; silentToast?: boolean }
+  ): { success: boolean; error?: string; conflict?: boolean } => {
+    if (!isActionAuthorized(effectiveRole, 'PATCH /api/v1/workorders/:id/status')) {
+      const errMsg = `Access Denied: Role "${effectiveRole.toUpperCase()}" cannot update work order status.`;
+      showToast(errMsg, 'error');
+      addAuditEvent('ACCESS_DENIED', `WorkOrder:${id}`, `Unauthorized attempt to update work order status by ${effectiveRole}`, activeUser.name, 'WARNING');
+      return { success: false, error: errMsg };
+    }
+
+    // Intercept Field Engineer actions when offline mode (simulated or browser offline) is active
+    if (effectiveRole === 'field' && isFieldOfflineActive && !options?.bypassOfflineQueue) {
+      if (status === 'Completed' && report && report.meterSerialScanned) {
+        enqueueFieldInspectionOffline(
+          id,
+          report,
+          `${activeUser.name} (${activeUser.id})`
+        );
+      } else {
+        enqueueFieldStatusOffline(id, status, report);
+      }
+      return { success: true };
+    }
+
+    const targetWo = workOrdersRef.current.find(w => w.id === id);
+    if (!targetWo) {
+      const errMsg = `Work Order #${id} was not found.`;
+      if (!options?.silentToast) showToast(errMsg, 'error');
+      return { success: false, error: errMsg };
+    }
+
+    const isSignedInspectionCompletion =
+      status === 'Completed' &&
+      Boolean(report && report.meterSerialScanned) &&
+      (targetWo.status === 'Pending' || targetWo.status === 'En Route' || targetWo.status === 'On Site');
+
+    if (!isSignedInspectionCompletion && !isValidWorkOrderTransition(targetWo.status, status)) {
+      const errMsg = `Invalid progression from "${targetWo.status}" to "${status}".`;
+      if (!options?.silentToast) showToast(errMsg, 'error');
+      return {
+        success: false,
+        error: errMsg,
+        conflict: targetWo.status === 'Completed' || targetWo.status === 'Deferred'
+      };
     }
 
     const nowIso = new Date().toISOString();
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    setWorkOrders(prev =>
-      prev.map(wo => {
-        if (wo.id !== id) return wo;
-        const newHistory = [
-          ...(wo.actionHistory || []),
-          {
-            timestamp: nowIso,
-            stage: status,
-            actor: `${activeUser.name} (${currentRole.toUpperCase()})`,
-            notes: report?.technicianRemarks || `Work Order status progressed to ${status}`
-          }
-        ];
-        return {
-          ...wo,
-          status,
-          ...(report ? { inspectionReport: report } : {}),
-          actionHistory: newHistory
-        };
-      })
-    );
+    const nextWorkOrders = workOrdersRef.current.map(wo => {
+      if (wo.id !== id) return wo;
+      const newHistory = [
+        ...(wo.actionHistory || []),
+        {
+          timestamp: nowIso,
+          stage: status,
+          actor: `${activeUser.name} (${currentRole.toUpperCase()})`,
+          notes: report?.technicianRemarks || `Work Order status progressed to ${status}`
+        }
+      ];
+      return {
+        ...wo,
+        status,
+        ...(report ? { inspectionReport: report } : {}),
+        actionHistory: newHistory
+      };
+    });
+
+    workOrdersRef.current = nextWorkOrders;
+    setWorkOrders(nextWorkOrders);
 
     // Cross-portal completion sync
     if (status === 'Completed') {
       // 1. Linked application site feasibility inspection
-      const targetAppId = targetWo.applicationId || (id.startsWith('WO-INS-') ? id.replace('WO-INS-', 'APP-') : null);
+      const titleAppMatch = targetWo.title?.match(/\b(APP-\d{4}-\d+)\b/)?.[1];
+      const byAssignedWoApp = applicationsRef.current.find(a => a.assignedWorkOrderId === id);
+      const targetAppId =
+        targetWo.applicationId ||
+        byAssignedWoApp?.id ||
+        titleAppMatch ||
+        (id === 'WO-4402' ? 'APP-2026-0842' : id.startsWith('WO-INS-') ? id.replace('WO-INS-', 'APP-') : null);
       if (targetAppId) {
-        const currentApp = applications.find(a => a.id === targetAppId);
+        const currentApp =
+          applicationsRef.current.find(a => a.id === targetAppId) ||
+          applications.find(a => a.id === targetAppId);
         const updatedApp: NewConnectionApplication | null = currentApp
           ? {
               ...currentApp,
               status: 'Sanction Approval',
               workflowStep: 4,
+              assignedWorkOrderId: currentApp.assignedWorkOrderId || id,
               notesHistory: [
                 ...currentApp.notesHistory,
                 {
@@ -5563,9 +6672,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           : null;
 
-        setApplications(prev =>
-          prev.map(app => (app.id === targetAppId && updatedApp ? updatedApp : app))
-        );
+        if (updatedApp) {
+          const nextApps = applicationsRef.current.map(app =>
+            app.id === targetAppId ? updatedApp : app
+          );
+          applicationsRef.current = nextApps;
+          setApplications(nextApps);
+        }
 
         if (updatedApp) {
           const { employeeNotif, consumerNotif } = buildApplicationLifecycleNotifications(
@@ -5649,8 +6762,143 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       activeUser.name
     );
 
-    showToast(`Work Order ${id} updated to "${status}"`, 'success');
+    if (!options?.silentToast) {
+      showToast(`Work Order ${id} updated to "${status}"`, 'success');
+    }
+
+    return { success: true };
   };
+
+  const syncFieldOfflineQueue = (options?: {
+    restoreOnline?: boolean;
+    targetClientUuid?: string;
+  }): FieldOfflineReplaySummary => {
+    if (isReplayingOfflineQueueRef.current) {
+      return {
+        queue: fieldOfflineQueueRef.current,
+        syncedCount: 0,
+        failedCount: 0,
+        conflictCount: 0,
+        skippedCount: 0,
+        blockedOffline: false,
+        error: 'Offline queue replay is already in progress.'
+      };
+    }
+
+    if (isBrowserOffline) {
+      showToast('Cannot replay queued actions while browser network is offline.', 'warning');
+      return {
+        queue: fieldOfflineQueueRef.current,
+        syncedCount: 0,
+        failedCount: 0,
+        conflictCount: 0,
+        skippedCount: fieldOfflineQueueRef.current.filter(i => i.status === 'PENDING').length,
+        blockedOffline: true,
+        error: 'Cannot replay queued actions while browser network is offline.'
+      };
+    }
+
+    if (options?.restoreOnline && isOfflineSimulated) {
+      setIsOfflineSimulated(false);
+    }
+
+    const effectiveOnline = options?.restoreOnline ? !isBrowserOffline : !isFieldOfflineActive;
+    if (!effectiveOnline) {
+      return {
+        queue: fieldOfflineQueueRef.current,
+        syncedCount: 0,
+        failedCount: 0,
+        conflictCount: 0,
+        skippedCount: fieldOfflineQueueRef.current.filter(i => i.status === 'PENDING').length,
+        blockedOffline: true,
+        error: 'Cannot replay queued actions while offline mode is active.'
+      };
+    }
+
+    isReplayingOfflineQueueRef.current = true;
+    setIsFieldSyncing(true);
+    try {
+      const currentQueue = loadFieldOfflineQueue();
+      const summary = replayFieldOfflineQueue({
+        queue: currentQueue,
+        isOnline: true,
+        dataMode,
+        isLiveBackendConnected: backendStatus.state === 'LIVE_CONNECTED',
+        processedUuids: processedOfflineUuidsRef.current,
+        targetClientUuid: options?.targetClientUuid,
+        getWorkOrder: (woId: string) => workOrdersRef.current.find(w => w.id === woId),
+        executeWorkflowUpdate: (item: FieldOfflineQueueItem) => {
+          return updateWorkOrderStatus(
+            item.payload.woId,
+            item.payload.targetStatus,
+            item.payload.inspectionReport,
+            { bypassOfflineQueue: true, silentToast: true }
+          );
+        }
+      });
+
+      fieldOfflineQueueRef.current = summary.queue;
+      setFieldOfflineQueue(summary.queue);
+
+      if (summary.blockedLiveBackendUnavailable && summary.error) {
+        showToast(summary.error, 'warning');
+      } else if (summary.syncedCount > 0 && summary.failedCount === 0) {
+        addAuditEvent(
+          'FIELD_OFFLINE_QUEUE_REPLAYED',
+          `Items:${summary.syncedCount}`,
+          `Replayed ${summary.syncedCount} queued field action(s) into local DEMO ERP state`,
+          activeUser.name
+        );
+        showToast(
+          `DEMO Replay Complete: ${summary.syncedCount} queued action(s) applied to local ERP state.`,
+          'success'
+        );
+        const syncNotif = buildOfflineSyncOutcomeNotification({
+          summary,
+          activeEngineerId: activeUser.id || 'FLD-UG-201'
+        });
+        if (syncNotif) {
+          setNotifications(prev => upsertNotificationList(prev, [syncNotif]));
+        }
+      } else if (summary.failedCount > 0) {
+        addAuditEvent(
+          'FIELD_OFFLINE_QUEUE_CONFLICT',
+          `Failed:${summary.failedCount}`,
+          `DEMO replay completed with ${summary.syncedCount} applied and ${summary.failedCount} failed/conflicted item(s)`,
+          activeUser.name,
+          'WARNING'
+        );
+        showToast(
+          `DEMO Replay: ${summary.syncedCount} applied, ${summary.failedCount} failed/conflicted. Review failed items in Offline Queue.`,
+          'warning'
+        );
+        const syncNotif = buildOfflineSyncOutcomeNotification({
+          summary,
+          activeEngineerId: activeUser.id || 'FLD-UG-201'
+        });
+        if (syncNotif) {
+          setNotifications(prev => upsertNotificationList(prev, [syncNotif]));
+        }
+      } else {
+        showToast('No pending offline actions to replay.', 'info');
+      }
+
+      return summary;
+    } finally {
+      isReplayingOfflineQueueRef.current = false;
+      setIsFieldSyncing(false);
+    }
+  };
+
+  // Automatically replay pending offline queue actions when real or simulated connectivity is restored
+  useEffect(() => {
+    if (!isFieldOfflineActive) {
+      const hasPending = fieldOfflineQueueRef.current.some(item => item.status === 'PENDING');
+      if (hasPending && !isReplayingOfflineQueueRef.current) {
+        syncFieldOfflineQueue({ restoreOnline: false });
+      }
+    }
+  }, [isFieldOfflineActive]);
 
   const reportFeederFault = (
     feederId: string,
@@ -5737,21 +6985,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       playIncidentSound('WARNING');
     }
 
-    // If life threatening emergency, broadcast alert to management & field immediately
+    // Employee-First Critical Incident Rule: Newly detected incidents notify authorized Employee desk
+    const empDetectedNotif: AppNotification = {
+      id: `NOTIF-${Date.now()}-EMP-INC-${incId}`,
+      notificationType: 'CRITICAL_INCIDENT_DETECTED',
+      title: `Critical Incident Detected: ${incId}`,
+      message: `${newInc.title}. Feeder: ${feederId}. Subdivision: ${newInc.subdivision}. Immediate operational review required.`,
+      time: 'Just now',
+      createdAt: nowIso,
+      formattedTimestamp: formatErpDateTime(nowIso),
+      targetRole: 'employee',
+      role: 'employee',
+      targetUserId: 'EMP-UG-1101',
+      incidentId: incId,
+      actionUrl: `/employee/incidents?incident=${incId}`,
+      type: 'alert',
+      read: false,
+      category: 'Outage',
+      subdivision: newInc.subdivision,
+      statusBadge: 'Critical Incident',
+      eventKey: `EVT-INC-${incId}-DETECTED`
+    };
+
+    const newFaultNotifs = [empDetectedNotif];
+
+    // If life threatening emergency, broadcast alert to management immediately
     if (isLifeThreatening) {
-      const mgmtNotif: AppNotification = {
+      newFaultNotifs.push({
         id: `NOTIF-${Date.now()}-MGMT-FAULT`,
         title: `EMERGENCY SAFETY OVERRIDE: ${feederId}`,
         message: `${faultType} (${effectiveEmergencyClassification}) reported by field engineer: ${remarks}`,
         time: 'Just now',
+        createdAt: nowIso,
+        formattedTimestamp: formatErpDateTime(nowIso),
         targetRole: 'management',
+        role: 'management',
         type: 'alert',
         read: false,
         category: 'Outage',
-        subdivision: 'Mehsana City North'
-      };
-      setNotifications(prev => [mgmtNotif, ...prev]);
+        subdivision: 'Mehsana City North',
+        eventKey: `EVT-INC-${incId}-EMERG-MGMT`
+      });
     }
+
+    setNotifications(prev => upsertNotificationList(prev, newFaultNotifs));
 
     addAuditEvent(
       'FEEDER_FAULT_REPORTED_FROM_FIELD',
@@ -5913,10 +7190,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.removeItem('vidyut_ai_recommendations');
       localStorage.removeItem('vidyutflow_dismissed_modals');
       localStorage.removeItem('vidyutflow_field_offline_queue');
+      localStorage.removeItem('vidyutflow_sla_emitted_event_keys');
     } catch (e) {}
 
     dismissedCriticalModalIdsRef.current.clear();
     executedRecommendationIdsRef.current.clear();
+    emittedSlaEventKeysRef.current.clear();
 
     const initialDetected = detectAnomalies({
       complaints: INITIAL_COMPLAINTS,
@@ -5935,11 +7214,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       existingRecommendations: []
     });
 
+    const reconciledReset = reconcileApplicationWorkOrderLinks(
+      INITIAL_APPLICATIONS,
+      INITIAL_WORK_ORDERS
+    );
     setConsumers(INITIAL_CONSUMERS);
     setConnections(INITIAL_CONNECTIONS);
-    setApplications(INITIAL_APPLICATIONS);
+    applicationsRef.current = reconciledReset.applications;
+    setApplications(reconciledReset.applications);
     setComplaints(INITIAL_COMPLAINTS);
-    setWorkOrders(INITIAL_WORK_ORDERS);
+    workOrdersRef.current = reconciledReset.workOrders;
+    setWorkOrders(reconciledReset.workOrders);
     setEmployees(INITIAL_EMPLOYEES);
     setFieldEngineers(CANONICAL_FIELD_ENGINEERS);
     setBills(INITIAL_BILLS);
@@ -5955,6 +7240,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     showToast('Demo dataset reset to initial state!', 'success');
   };
+
+  const applyRestoredDemoBackupState = React.useCallback((restoredState: RestoredLiveRuntimeState) => {
+    const reconciled = reconcileApplicationWorkOrderLinks(
+      restoredState.applications,
+      restoredState.workOrders
+    );
+    setConsumers(restoredState.consumers);
+    setConnections(restoredState.connections);
+    applicationsRef.current = reconciled.applications;
+    setApplications(reconciled.applications);
+    setComplaints(restoredState.complaints);
+    workOrdersRef.current = reconciled.workOrders;
+    setWorkOrders(reconciled.workOrders);
+    setEmployees(restoredState.employees);
+    setFieldEngineers(restoredState.fieldEngineers);
+    setBills(restoredState.bills);
+    setPayments(restoredState.payments);
+    setNotifications(restoredState.notifications);
+    setInboxStateMap(restoredState.notificationInboxState);
+    setAuditLogs(restoredState.auditLogs);
+    setIncidents(restoredState.incidents);
+    setRecommendations(restoredState.aiRecommendations);
+    fieldOfflineQueueRef.current = restoredState.fieldOfflineQueue;
+    setFieldOfflineQueue(restoredState.fieldOfflineQueue);
+    setSelectedConsumerConnMap(restoredState.selectedConsumerConnections);
+
+    emittedBillingReminderKeysRef.current = new Set(restoredState.billingReminderKeys);
+    emittedSlaEventKeysRef.current = new Set(restoredState.slaEmittedEventKeys);
+    dismissedCriticalModalIdsRef.current = new Set(restoredState.dismissedModalIds);
+
+    setActiveCriticalModalIncident(null);
+    setActiveApprovalRecommendation(null);
+    setActiveIncidentModalId(null);
+  }, []);
 
   // ==========================================================================
   // PHASE 5: PERSISTENT BACKEND INTEGRATION & LIVE/DEMO MODE SEPARATION
@@ -6036,6 +7355,332 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [dataMode, currentRole]);
 
+
+  // ---------------------------------------------------------------------------
+  // Work Order Completion Evidence & Verification Governance (Phase 13)
+  // ---------------------------------------------------------------------------
+  const submitWorkOrderCompletionEvidence = (woId: string, report: WorkOrderCompletionReport): boolean => {
+    if (effectiveRole === 'consumer') {
+      showToast('Access Denied: Consumers cannot submit work order completion evidence.', 'error');
+      addAuditEvent('ACCESS_DENIED', `WorkOrder:${woId}`, `Unauthorized attempt to submit completion evidence by ${effectiveRole}`, activeUser.name, 'WARNING');
+      return false;
+    }
+
+    const targetWo = workOrders.find(w => w.id === woId);
+    if (!targetWo) {
+      showToast(`Work Order #${woId} was not found.`, 'error');
+      return false;
+    }
+
+    const nowIso = new Date().toISOString();
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    setWorkOrders(prev =>
+      prev.map(wo => {
+        if (wo.id !== woId) return wo;
+        const newHistory = [
+          ...(wo.actionHistory || []),
+          {
+            timestamp: nowIso,
+            stage: 'Completed',
+            actor: `${activeUser.name} (Field JE)`,
+            notes: `Work completed with field evidence: ${report.completionRemarks || report.repairAction || 'Site restoration complete.'}`
+          }
+        ];
+        return {
+          ...wo,
+          status: 'Completed',
+          verificationStatus: 'pending_verification',
+          completionReport: report,
+          actionHistory: newHistory
+        };
+      })
+    );
+
+    const targetCmpId = targetWo.complaintId || (woId === 'WO-4401' ? 'CMP-8821' : woId.startsWith('WO-CMP-') ? woId.replace('WO-CMP-', 'CMP-') : null);
+    if (targetCmpId) {
+      setComplaints(prev =>
+        prev.map(c => {
+          if (c.id !== targetCmpId) return c;
+          return {
+            ...c,
+            verificationStatus: 'pending_verification',
+            timeline: [
+              ...c.timeline,
+              {
+                time: `15-Oct ${timeStr}`,
+                stage: 'Under Verification',
+                actor: `${activeUser.name} (Field JE)`,
+                remark: 'Restoration completed on site. Evidence and checklist submitted for authorized employee review.'
+              }
+            ]
+          };
+        })
+      );
+    }
+
+    const employeeNotif: AppNotification = {
+      id: `NOTIF-${Date.now()}-EMP-EVIDENCE-SUBMITTED`,
+      title: `Completion Evidence Submitted: ${woId}`,
+      message: `Field Engineer ${activeUser.name} submitted completion evidence for ${targetWo.title}. Verification required before closure.`,
+      time: 'Just now',
+      targetRole: 'employee',
+      type: 'info',
+      read: false,
+      category: 'Outage',
+      complaintId: targetCmpId || undefined,
+      workOrderId: woId,
+      subdivision: targetWo.subdivision,
+      eventKey: `EVT-EMP-WO-${woId}-Evidence-Submitted`
+    };
+    setNotifications(prev => upsertNotificationList(prev, [employeeNotif]));
+
+    addAuditEvent(
+      'SUBMIT_COMPLETION_EVIDENCE',
+      `WorkOrder:${woId}`,
+      `Field completion evidence submitted with ${report.evidenceItems?.length || 0} photos by ${activeUser.name}`,
+      activeUser.name,
+      'SUCCESS'
+    );
+
+    showToast(`Work Order ${woId} completion submitted for employee verification`, 'success');
+    return true;
+  };
+
+  const reviewWorkOrderCompletion = (woId: string, review: WorkOrderVerificationReview): boolean => {
+    if (effectiveRole !== 'employee' && effectiveRole !== 'admin') {
+      showToast(`Access Denied: Role "${effectiveRole.toUpperCase()}" is not authorized to verify field completion evidence.`, 'error');
+      addAuditEvent('ACCESS_DENIED', `WorkOrder:${woId}`, `Unauthorized verification attempt by ${effectiveRole} (${activeUser.name})`, activeUser.name, 'WARNING');
+      return false;
+    }
+
+    const targetWo = workOrders.find(w => w.id === woId);
+    if (!targetWo) {
+      showToast(`Work Order #${woId} was not found.`, 'error');
+      return false;
+    }
+
+    const nowIso = new Date().toISOString();
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const targetCmpId = targetWo.complaintId || (woId === 'WO-4401' ? 'CMP-8821' : woId.startsWith('WO-CMP-') ? woId.replace('WO-CMP-', 'CMP-') : null);
+
+    if (review.action === 'approve') {
+      setWorkOrders(prev =>
+        prev.map(wo => {
+          if (wo.id !== woId) return wo;
+          return {
+            ...wo,
+            verificationStatus: 'approved',
+            verificationReview: review,
+            actionHistory: [
+              ...(wo.actionHistory || []),
+              {
+                timestamp: nowIso,
+                stage: 'Verified',
+                actor: `${activeUser.name} (${review.reviewedByRole})`,
+                notes: `Evidence approved: ${review.reason || 'Restoration verified.'}`
+              }
+            ]
+          };
+        })
+      );
+
+      if (targetCmpId) {
+        setComplaints(prev =>
+          prev.map(c => {
+            if (c.id !== targetCmpId) return c;
+            return {
+              ...c,
+              status: 'Closed',
+              verificationStatus: 'approved',
+              resolvedBy: activeUser.name,
+              resolvedAt: nowIso,
+              resolutionRemarks: review.reason || 'Field restoration evidence reviewed and verified.',
+              timeline: [
+                ...c.timeline,
+                {
+                  time: `15-Oct ${timeStr}`,
+                  stage: 'Resolved',
+                  actor: `${activeUser.name} (Desk Officer)`,
+                  remark: `Verification accepted: ${review.reason || 'Restoration verified and complaint resolved.'}`
+                }
+              ]
+            };
+          })
+        );
+      }
+      showToast(`Work Order ${woId} completion verified and approved.`, 'success');
+      return true;
+    }
+
+    if (review.action === 'request_more_info') {
+      setWorkOrders(prev =>
+        prev.map(wo => {
+          if (wo.id !== woId) return wo;
+          return {
+            ...wo,
+            verificationStatus: 'more_info_needed',
+            verificationReview: review,
+            status: 'In Progress'
+          };
+        })
+      );
+      showToast(`Returned Work Order ${woId} to field engineer for clarification.`, 'warning');
+      return true;
+    }
+
+    if (review.action === 'reject') {
+      setWorkOrders(prev =>
+        prev.map(wo => {
+          if (wo.id !== woId) return wo;
+          return {
+            ...wo,
+            verificationStatus: 'rejected',
+            verificationReview: review,
+            status: 'Assigned'
+          };
+        })
+      );
+      showToast(`Work Order ${woId} completion rejected. Re-inspection required.`, 'error');
+      return true;
+    }
+
+    return false;
+  };
+
+  const submitComplaintFeedback = (complaintId: string, feedback: ComplaintFeedback): boolean => {
+    const target = complaints.find(c => c.id === complaintId);
+    if (!target) {
+      showToast(`Complaint ${complaintId} not found.`, 'error');
+      return false;
+    }
+
+    setComplaints(prev =>
+      prev.map(c => {
+        if (c.id !== complaintId) return c;
+        return {
+          ...c,
+          feedback,
+          timeline: [
+            ...c.timeline,
+            {
+              time: 'Just now',
+              stage: 'Feedback Submitted',
+              actor: `${activeUser.name} (Consumer)`,
+              remark: `Rating: ${feedback.rating}/5 stars. ${feedback.comments || ''}`
+            }
+          ]
+        };
+      })
+    );
+    showToast('Thank you for rating our restoration service!', 'success');
+    return true;
+  };
+
+  const reopenComplaint = (complaintId: string, reason: string): ComplaintRecord | null => {
+    const original = complaints.find(c => c.id === complaintId);
+    if (!original) {
+      showToast(`Complaint ${complaintId} was not found.`, 'error');
+      return null;
+    }
+
+    const cleanReason = (reason || '').trim() || 'Consumer reported unresolved grievance.';
+    const nowIso = new Date().toISOString();
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const newComplaintId = `CMP-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const newComplaint: ComplaintRecord = {
+      id: newComplaintId,
+      consumerNo: original.consumerNo,
+      consumerName: original.consumerName,
+      phone: original.phone,
+      category: original.category,
+      description: `[Reopened from ${original.id}] ${cleanReason}`,
+      priority: original.priority === 'Low' ? 'Medium' : original.priority,
+      status: 'Registered',
+      subdivision: original.subdivision,
+      feederName: original.feederName,
+      filedAt: nowIso,
+      slaTargetHours: original.slaTargetHours,
+      slaDueTime: new Date(Date.now() + original.slaTargetHours * 3600 * 1000).toISOString(),
+      slaBreached: false,
+      accountId: original.accountId,
+      reopenedFromComplaintId: original.id,
+      reopenReason: cleanReason,
+      timeline: [
+        {
+          time: `15-Oct ${timeStr}`,
+          stage: 'Reopened',
+          actor: `${activeUser.name} (Consumer)`,
+          remark: `Reopened follow-up referencing #${original.id}: ${cleanReason}`
+        }
+      ]
+    };
+
+    setComplaints(prev => [
+      newComplaint,
+      ...prev.map(c => (c.id === complaintId ? { ...c, followUpComplaintId: newComplaintId } : c))
+    ]);
+
+    showToast(`Complaint reopened as #${newComplaintId}. Our operations desk has been alerted.`, 'success');
+    return newComplaint;
+  };
+
+  const loginViaSimulatedSso = async (
+    email: string,
+    targetRole: UserRole,
+    providerId?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    const resolvedProvider =
+      providerId ||
+      (targetRole === 'consumer' ? 'parichay-gujarat-demo' : 'ugvcl-workforce-oidc-demo');
+    const stateToken = `oidc_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const fallbackIdentity = getDefaultCanonicalIdentityForRole(targetRole);
+    const chosenEmail = (email || fallbackIdentity.email).trim().toLowerCase();
+
+    if (authMode === 'server') {
+      const ssoRes = await loginWithSimulatedSsoApi({
+        email: chosenEmail,
+        providerId: resolvedProvider,
+        state: stateToken,
+        targetRole
+      });
+      if (!ssoRes.success || !ssoRes.session) {
+        return { success: false, error: ssoRes.error || 'Simulated SSO login failed.' };
+      }
+      const meCheck = await verifyServerSessionApi();
+      const verifiedSession = meCheck.authenticated && meCheck.session ? meCheck.session : ssoRes.session;
+      const assignedRole = verifiedSession.role;
+      const targetTab = 'dashboard';
+      clearTransientUserModals();
+      setStoredActivePortalRuntime({
+        session: verifiedSession,
+        role: assignedRole,
+        tab: targetTab,
+        entered: true,
+        authMode
+      });
+      setDemoSession(verifiedSession);
+      void syncBackendSsoSession(resolvedProvider, verifiedSession.user.email, assignedRole, stateToken, {
+        portalCookieVerified: meCheck.authenticated
+      });
+      setCurrentRoleState(assignedRole);
+      setActiveTabState(targetTab);
+      setHasEnteredPlatformState(true);
+      if (typeof window !== 'undefined') {
+        window.history.pushState(null, '', `/${assignedRole}/${targetTab}`);
+      }
+      setIsRoleSwitcherModalOpenState(false);
+      showToast(
+        `Signed in via Simulated SSO (${resolvedProvider}) as ${verifiedSession.user.name}.`,
+        'success'
+      );
+      return { success: true };
+    }
+
+    return loginAsCanonicalDemoAccount(fallbackIdentity.id, targetRole);
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -6058,6 +7703,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         auditLogs,
         isOfflineSimulated,
         setIsOfflineSimulated,
+        isBrowserOffline,
+        isFieldOfflineActive,
+        isFieldSyncing,
+        fieldOfflineQueue,
+        enqueueFieldInspectionOffline,
+        enqueueFieldStatusOffline,
+        syncFieldOfflineQueue,
+        refreshFieldOfflineQueueFromStorage,
         isIntroActive,
         setIsIntroActive,
         hasEnteredPlatform,
@@ -6078,6 +7731,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         openCaseDrawer,
         closeCaseDrawer,
         payBillDemo,
+        payBillDemoDetailed,
+        generateDemoBillForActiveConnection,
         submitApplicationDemo,
         submitComplaintDemo,
         updateApplicationStatus,
@@ -6087,6 +7742,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateComplaintStatus,
         updateWorkOrderStatus,
         assignComplaintToField,
+        assignWorkOrder,
+        reassignWorkOrder,
+        updateWorkOrderPriorityAndSchedule,
         reportFeederFault,
         markNotificationRead,
         markSelectedNotificationsRead,
@@ -6095,7 +7753,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteSelectedNotifications,
         clearAllNotifications,
         addAuditEvent,
+        evaluateSlaDeadlinesNow,
         resetDemoData,
+        applyRestoredDemoBackupState,
         toasts,
         showToast,
         dismissToast,
@@ -6104,6 +7764,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isVerifyingServerSession,
         demoSession,
         userConnections,
+        selectedConsumerConnectionNo,
+        setSelectedConsumerConnectionNo,
+        consumerBillingSummary,
         userApplications,
         userBills,
         userPayments,
@@ -6113,7 +7776,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         scopedNotifications,
         linkConnectionDemo,
         loginDemoUser,
-        loginViaSimulatedSso,
         loginAsCanonicalDemoAccount,
         switchDemoUserAccount,
         canonicalDemoAccounts: CANONICAL_DEMO_IDENTITIES,
@@ -6133,6 +7795,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reassignIncidentToField,
         escalateIncident,
         resolveIncident,
+        updateIncidentSeverity,
         acceptFieldAssignment,
         declineFieldAssignment,
         startFieldInspection,
@@ -6161,7 +7824,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setDataMode,
         backendStatus,
         syncWithBackend,
-        repositories
+        repositories,
+        submitWorkOrderCompletionEvidence,
+        reviewWorkOrderCompletion,
+        submitComplaintFeedback,
+        reopenComplaint,
+        loginViaSimulatedSso
       }}
     >
       {children}

@@ -8,7 +8,7 @@ import {
   Plug,
   PlusCircle,
   Receipt,
-  CreditCard,
+  CreditCard, Calendar,
   MessageSquareWarning,
   FileText,
   Bell,
@@ -166,6 +166,7 @@ export const Sidebar: React.FC = () => {
       case 'admin':
         return [
           { id: 'overview', label: t.erp.navSystemOverview, icon: <Activity className="w-4 h-4" /> },
+          { id: 'directory', label: t.erp.navUgvclDirectory, icon: <Network className="w-4 h-4" /> },
           { id: 'outage-map', label: t.erp.navOutageMap, icon: <MapPin className="w-4 h-4" /> },
           { id: 'users', label: t.erp.navUsersRoles, icon: <Users className="w-4 h-4" />, badge: 12 },
           { id: 'access', label: t.erp.navAccessMatrix, icon: <KeyRound className="w-4 h-4" /> },

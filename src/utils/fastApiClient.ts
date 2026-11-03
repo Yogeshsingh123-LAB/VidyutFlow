@@ -8,7 +8,12 @@
  * - /api/system/status (System diagnostic status)
  */
 
-import { clearBackendSession, getBackendToken, getVerifiedBackendToken } from './backendSession';
+import {
+  clearBackendSession,
+  getBackendToken,
+  getVerifiedBackendToken,
+  refreshBackendAccessToken,
+} from './backendSession';
 
 const BASE = (import.meta as any).env?.VITE_API_URL || '/api';
 
@@ -35,11 +40,23 @@ export async function fastApi<T = any>(path: string, opts: FastApiRequestOptions
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${BASE}${path}`, {
+  let res = await fetch(`${BASE}${path}`, {
     credentials: 'same-origin',
     ...fetchOpts,
     headers,
   });
+
+  if (auth && res.status === 401) {
+    const rotated = await refreshBackendAccessToken();
+    if (rotated) {
+      headers['Authorization'] = `Bearer ${rotated}`;
+      res = await fetch(`${BASE}${path}`, {
+        credentials: 'same-origin',
+        ...fetchOpts,
+        headers,
+      });
+    }
+  }
 
   if (!res.ok) {
     if (auth && res.status === 401) {

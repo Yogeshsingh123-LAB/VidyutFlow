@@ -33,10 +33,10 @@ const VALID_ROLES: readonly UserRole[] = [
 ];
 
 export class AuthSecurityError extends Error {
-  public readonly statusCode: 400 | 401 | 403;
+  public readonly statusCode: 400 | 401 | 403 | 409 | 429;
   public readonly code: string;
 
-  constructor(statusCode: 400 | 401 | 403, code: string, message: string) {
+  constructor(statusCode: 400 | 401 | 403 | 409 | 429, code: string, message: string) {
     super(message);
     this.name = 'AuthSecurityError';
     this.statusCode = statusCode;

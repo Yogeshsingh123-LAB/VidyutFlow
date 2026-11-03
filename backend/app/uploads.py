@@ -223,15 +223,206 @@ def decrypt_upload_at_rest(blob: bytes, master_secret: str, aad: bytes = b"") ->
     return AESGCM(key).decrypt(nonce, ciphertext, aad or None)
 
 
+import abc
+import logging
+
+logger = logging.getLogger("vidyutflow.storage")
+
+
+class BaseStorageProvider(abc.ABC):
+    """Abstract interface for storing and retrieving encrypted documents across instances."""
+
+    @abc.abstractmethod
+    def save(self, filename: str, encrypted_bytes: bytes) -> str:
+        """Store encrypted payload and return storage identifier/path."""
+        pass
+
+    @abc.abstractmethod
+    def load(self, filename: str, prefix: str | None = None) -> bytes:
+        """Load encrypted payload by filename or prefix."""
+        pass
+
+    @abc.abstractmethod
+    def exists(self, filename: str, prefix: str | None = None) -> bool:
+        """Check if document exists in storage."""
+        pass
+
+    @abc.abstractmethod
+    def delete(self, filename: str, prefix: str | None = None) -> bool:
+        """Delete document from storage."""
+        pass
+
+
+class LocalStorageProvider(BaseStorageProvider):
+    """Local filesystem storage provider for single-instance or development environments."""
+
+    def __init__(self, vault_dir: str):
+        import os
+        self.vault_dir = vault_dir
+        os.makedirs(self.vault_dir, exist_ok=True)
+
+    def save(self, filename: str, encrypted_bytes: bytes) -> str:
+        import os
+        vault_path = os.path.join(self.vault_dir, filename)
+        with open(vault_path, "wb") as fh:
+            fh.write(encrypted_bytes)
+        return vault_path
+
+    def _find_matches(self, filename: str, prefix: str | None = None) -> list[str]:
+        import glob
+        import os
+        sanitized = PurePosixPath(filename.replace("\\", "/")).name
+        if not sanitized or sanitized != filename:
+            raise ValueError("Invalid document name path structure")
+        if not os.path.isdir(self.vault_dir):
+            raise FileNotFoundError(f"Storage vault directory does not exist: {self.vault_dir}")
+        matches: list[str] = []
+        if prefix:
+            matches = glob.glob(os.path.join(self.vault_dir, f"{prefix}*_{filename}.enc"))
+        if not matches:
+            matches = glob.glob(os.path.join(self.vault_dir, f"*_{filename}.enc"))
+        if not matches:
+            exact = os.path.join(self.vault_dir, filename)
+            if os.path.isfile(exact):
+                matches = [exact]
+        matches.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        return matches
+
+    def load(self, filename: str, prefix: str | None = None) -> bytes:
+        matches = self._find_matches(filename, prefix)
+        if not matches:
+            raise FileNotFoundError(f"Document {filename} not found in storage vault")
+        with open(matches[0], "rb") as fh:
+            return fh.read()
+
+    def exists(self, filename: str, prefix: str | None = None) -> bool:
+        return len(self._find_matches(filename, prefix)) > 0
+
+    def delete(self, filename: str, prefix: str | None = None) -> bool:
+        import os
+        matches = self._find_matches(filename, prefix)
+        if not matches:
+            return False
+        for p in matches:
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+        return True
+
+
+class S3MinioStorageProvider(BaseStorageProvider):
+    """Shared S3/MinIO compatible object storage provider for multi-instance production."""
+
+    def __init__(
+        self,
+        bucket_name: str,
+        endpoint_url: str = "",
+        access_key: str = "",
+        secret_key: str = "",
+        region: str = "us-east-1",
+    ):
+        self.bucket_name = bucket_name
+        self.endpoint_url = endpoint_url
+        self.access_key = access_key
+        self.secret_key = secret_key
+        self.region = region
+        self._client = None
+
+    def _get_client(self):
+        if self._client is None:
+            try:
+                import boto3
+                kwargs = {"region_name": self.region}
+                if self.endpoint_url:
+                    kwargs["endpoint_url"] = self.endpoint_url
+                if self.access_key and self.secret_key:
+                    kwargs["aws_access_key_id"] = self.access_key
+                    kwargs["aws_secret_access_key"] = self.secret_key
+                self._client = boto3.client("s3", **kwargs)
+            except ImportError:
+                logger.warning("boto3 is not installed; S3MinioStorageProvider requires boto3")
+                raise RuntimeError("boto3 library is required for S3/MinIO shared storage")
+        return self._client
+
+    def save(self, filename: str, encrypted_bytes: bytes) -> str:
+        client = self._get_client()
+        client.put_object(
+            Bucket=self.bucket_name,
+            Key=filename,
+            Body=encrypted_bytes,
+            ContentType="application/octet-stream",
+            Metadata={"encrypted": "aes-256-gcm"},
+        )
+        return f"s3://{self.bucket_name}/{filename}"
+
+    def load(self, filename: str, prefix: str | None = None) -> bytes:
+        client = self._get_client()
+        target_key = filename
+        if prefix or not target_key.endswith(".enc"):
+            resp = client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix or "")
+            keys = [obj["Key"] for obj in resp.get("Contents", []) if filename in obj["Key"]]
+            if not keys:
+                raise FileNotFoundError(f"Document {filename} not found in S3 bucket {self.bucket_name}")
+            target_key = keys[0]
+        obj = client.get_object(Bucket=self.bucket_name, Key=target_key)
+        return obj["Body"].read()
+
+    def exists(self, filename: str, prefix: str | None = None) -> bool:
+        client = self._get_client()
+        try:
+            client.head_object(Bucket=self.bucket_name, Key=filename)
+            return True
+        except Exception:
+            return False
+
+    def delete(self, filename: str, prefix: str | None = None) -> bool:
+        client = self._get_client()
+        try:
+            client.delete_object(Bucket=self.bucket_name, Key=filename)
+            return True
+        except Exception:
+            return False
+
+
+def get_storage_provider(vault_dir: str | None = None) -> BaseStorageProvider:
+    """Factory creating configured storage provider (local, s3, or minio)."""
+    import os as _os
+    from .config import settings
+
+    provider_type = (settings.storage_provider or "local").lower().strip()
+    effective_vault = (
+        vault_dir
+        or _os.environ.get("UPLOAD_VAULT_DIR", "").strip()
+        or settings.upload_vault_dir
+    )
+
+    if provider_type in {"s3", "minio"}:
+        return S3MinioStorageProvider(
+            bucket_name=settings.s3_bucket_name,
+            endpoint_url=settings.s3_endpoint_url,
+            access_key=settings.s3_access_key,
+            secret_key=settings.s3_secret_key,
+            region=settings.s3_region,
+        )
+
+    if settings.app_env == "production":
+        logger.warning(
+            "Local storage provider in production cannot be shared across multiple instances. "
+            "Configure STORAGE_PROVIDER=s3 or STORAGE_PROVIDER=minio for multi-instance deployments."
+        )
+
+    return LocalStorageProvider(vault_dir=effective_vault)
+
+
 async def validate_and_encrypt_upload(
     document: UploadFile,
     max_bytes: int,
     master_secret: str,
     vault_dir: str | None = None,
 ) -> tuple[str, str]:
-    """Validate upload, encrypt payload via HKDF-SHA256 + AES-256-GCM, and return (clean_name, ciphertext_sha256)."""
+    """Validate upload, encrypt payload via HKDF-SHA256 + AES-256-GCM, and save via configured storage provider."""
     import hashlib
-    import os as _os
 
     try:
         clean_name = sanitize_uploaded_filename(document.filename)
@@ -253,17 +444,11 @@ async def validate_and_encrypt_upload(
         key_material = master_secret if len(master_secret) >= 16 else (master_secret * 4)[:32]
         encrypted_blob = encrypt_upload_at_rest(raw_bytes, key_material, aad=clean_name.encode("utf-8"))
         cipher_sha256 = hashlib.sha256(encrypted_blob).hexdigest()
-        from .config import settings
 
-        effective_vault = (
-            vault_dir
-            or _os.environ.get("UPLOAD_VAULT_DIR", "").strip()
-            or settings.upload_vault_dir
-        )
-        _os.makedirs(effective_vault, exist_ok=True)
-        vault_path = _os.path.join(effective_vault, f"{cipher_sha256[:24]}_{clean_name}.enc")
-        with open(vault_path, "wb") as fh:
-            fh.write(encrypted_blob)
+        provider = get_storage_provider(vault_dir=vault_dir)
+        storage_filename = f"{cipher_sha256[:24]}_{clean_name}.enc"
+        provider.save(storage_filename, encrypted_blob)
+
         return clean_name, cipher_sha256
     finally:
         await document.close()
@@ -275,43 +460,13 @@ def retrieve_decrypted_document(
     vault_dir: str | None = None,
     prefix: str | None = None,
 ) -> bytes:
-    """Locate encrypted document in vault, authenticate, and decrypt with AES-256-GCM."""
-    import glob
-    import os as _os
-    from .config import settings
-
-    # Ensure no path traversal in clean_name
+    """Locate encrypted document in storage provider, authenticate, and decrypt with AES-256-GCM."""
     sanitized = PurePosixPath(clean_name.replace("\\", "/")).name
     if not sanitized or sanitized != clean_name:
         raise ValueError("Invalid document name path structure")
 
-    effective_vault = (
-        vault_dir
-        or _os.environ.get("UPLOAD_VAULT_DIR", "").strip()
-        or settings.upload_vault_dir
-    )
-    if not _os.path.isdir(effective_vault):
-        raise FileNotFoundError(f"Storage vault directory does not exist: {effective_vault}")
-
-    matches: list[str] = []
-    if prefix:
-        pattern = _os.path.join(effective_vault, f"{prefix}*_{clean_name}.enc")
-        matches = glob.glob(pattern)
-
-    if not matches:
-        pattern = _os.path.join(effective_vault, f"*_{clean_name}.enc")
-        matches = glob.glob(pattern)
-
-    if not matches:
-        raise FileNotFoundError(f"Document {clean_name} not found in storage vault")
-
-    matches.sort(key=lambda p: _os.path.getmtime(p), reverse=True)
-    target_path = matches[0]
-
-    with open(target_path, "rb") as fh:
-        encrypted_blob = fh.read()
+    provider = get_storage_provider(vault_dir=vault_dir)
+    encrypted_blob = provider.load(clean_name, prefix=prefix)
 
     key_material = master_secret if len(master_secret) >= 16 else (master_secret * 4)[:32]
     return decrypt_upload_at_rest(encrypted_blob, key_material, aad=clean_name.encode("utf-8"))
-
-

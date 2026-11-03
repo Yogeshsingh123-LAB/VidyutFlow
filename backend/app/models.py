@@ -254,3 +254,200 @@ class SavedPremise(Base):
     premises_type: Mapped[str] = mapped_column(String, default="Owned")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
+
+class WorkOrderEvidence(Base):
+    """Field completion evidence items (photos, documents, checklists) with cryptographic client UUID and verification state.
+    Phase 13 additive model for field engineer completion verification.
+    """
+    __tablename__ = "work_order_evidence"
+    __table_args__ = (
+        UniqueConstraint("client_uuid", name="uq_work_order_evidence_client_uuid"),
+        Index("ix_work_order_evidence_wo_type", "work_order_id", "evidence_type"),
+        Index("ix_work_order_evidence_status", "verification_status"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    client_uuid: Mapped[str] = mapped_column(String, unique=True, index=True)
+    work_order_id: Mapped[str] = mapped_column(String, index=True)
+    complaint_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True, default=None)
+    evidence_type: Mapped[str] = mapped_column(String)  # photo_before | photo_after | checklist | technical_report | safety_exemption
+    storage_ref: Mapped[str] = mapped_column(String)  # IndexedDB key or S3/Blob URI
+    file_size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    mime_type: Mapped[str] = mapped_column(String, default="image/jpeg")
+    sha256_hash: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    submitted_by: Mapped[str] = mapped_column(String, index=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    verification_status: Mapped[str] = mapped_column(String, default="pending_verification", index=True)  # pending_verification | approved | rejected | more_info_needed
+    reviewed_by: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    review_remarks: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+
+
+class UtilityCompany(Base):
+    """Top-level distribution utility entity (e.g. UGVCL, DGVCL, MGVCL, PGVCL)."""
+    __tablename__ = "utilities"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    code: Mapped[str] = mapped_column(String, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String)
+    legal_name_gu: Mapped[str] = mapped_column(String, default="ઉત્તર ગુજરાત વીજ કંપની લિમિટેડ")
+    cin: Mapped[str] = mapped_column(String, default="U40102GJ2003SGC042906")
+    headquarters: Mapped[str] = mapped_column(String, default="Visnagar Road, Mehsana - 384001, Gujarat")
+    website: Mapped[str] = mapped_column(String, default="https://www.ugvcl.com")
+    helpline: Mapped[str] = mapped_column(String, default="19122 / 1800 233 155335")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class CircleOffice(Base):
+    """Regional Circle Office (e.g. Mehsana Circle, Sabarmati Circle, Himatnagar Circle, Palanpur Circle)."""
+    __tablename__ = "circles"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_circle_code"),
+        Index("ix_circles_utility_active", "utility_id", "is_active"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    utility_id: Mapped[str] = mapped_column(ForeignKey("utilities.id"), index=True)
+    code: Mapped[str] = mapped_column(String, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String)
+    head_designation: Mapped[str] = mapped_column(String, default="Superintending Engineer (SE)")
+    head_name: Mapped[str] = mapped_column(String, default="")
+    phone: Mapped[str] = mapped_column(String, default="")
+    email: Mapped[str] = mapped_column(String, default="")
+    address: Mapped[str] = mapped_column(Text, default="")
+    districts_covered: Mapped[str] = mapped_column(Text, default="[]")
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class DivisionOffice(Base):
+    """Operational Division Office under a Circle (22 divisions in UGVCL)."""
+    __tablename__ = "divisions"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_division_code"),
+        Index("ix_divisions_circle_active", "circle_id", "is_active"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    circle_id: Mapped[str] = mapped_column(ForeignKey("circles.id"), index=True)
+    code: Mapped[str] = mapped_column(String, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String)
+    executive_engineer: Mapped[str] = mapped_column(String, default="")
+    phone: Mapped[str] = mapped_column(String, default="")
+    email: Mapped[str] = mapped_column(String, default="")
+    address: Mapped[str] = mapped_column(Text, default="")
+    pin_code: Mapped[str] = mapped_column(String, default="")
+    talukas_covered: Mapped[str] = mapped_column(Text, default="[]")
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class SubdivisionOffice(Base):
+    """Customer-facing Sub-Division Office (148 regular + 3 REC subdivisions in UGVCL)."""
+    __tablename__ = "subdivisions"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_subdivision_code"),
+        Index("ix_subdivisions_division_active", "division_id", "is_active"),
+        Index("ix_subdivisions_circle", "circle_id"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    division_id: Mapped[str] = mapped_column(ForeignKey("divisions.id"), index=True)
+    circle_id: Mapped[str] = mapped_column(ForeignKey("circles.id"), index=True)
+    code: Mapped[str] = mapped_column(String, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String)
+    deputy_engineer: Mapped[str] = mapped_column(String, default="")
+    phone: Mapped[str] = mapped_column(String, default="")
+    email: Mapped[str] = mapped_column(String, default="")
+    address: Mapped[str] = mapped_column(Text, default="")
+    pin_code: Mapped[str] = mapped_column(String, default="")
+    taluka: Mapped[str] = mapped_column(String, default="")
+    is_rec: Mapped[bool] = mapped_column(Boolean, default=False)
+    working_hours: Mapped[str] = mapped_column(String, default="10:30 AM - 06:10 PM (Mon-Sat, 2nd/4th Sat Off)")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class SectionOffice(Base):
+    """Last-mile Section Office managing localized distribution and O&M crews."""
+    __tablename__ = "section_offices"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_section_code"),
+        Index("ix_sections_subdivision_active", "subdivision_id", "is_active"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    subdivision_id: Mapped[str] = mapped_column(ForeignKey("subdivisions.id"), index=True)
+    code: Mapped[str] = mapped_column(String, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String)
+    officer_in_charge: Mapped[str] = mapped_column(String, default="Junior Engineer / Line Inspector")
+    phone: Mapped[str] = mapped_column(String, default="")
+    email: Mapped[str] = mapped_column(String, default="")
+    address: Mapped[str] = mapped_column(Text, default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class ServiceArea(Base):
+    """Consumer Service Area mapping villages, towns, and PIN codes to responsible Section."""
+    __tablename__ = "service_areas"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_service_area_code"),
+        Index("ix_service_areas_section", "section_id"),
+        Index("ix_service_areas_subdivision", "subdivision_id"),
+        Index("ix_service_areas_pin", "pin_code"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    section_id: Mapped[str] = mapped_column(ForeignKey("section_offices.id"), index=True)
+    subdivision_id: Mapped[str] = mapped_column(ForeignKey("subdivisions.id"), index=True)
+    code: Mapped[str] = mapped_column(String, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String)
+    pin_code: Mapped[str] = mapped_column(String, index=True)
+    villages_json: Mapped[str] = mapped_column(Text, default="[]")
+    feeders_json: Mapped[str] = mapped_column(Text, default="[]")
+    consumer_prefix_patterns: Mapped[str] = mapped_column(Text, default="[]")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class Substation(Base):
+    """Grid Substation (66kV / 132kV / 11kV) supplying power to service areas and feeders."""
+    __tablename__ = "substations"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_substation_code"),
+        Index("ix_substations_section", "section_id"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    section_id: Mapped[str] = mapped_column(ForeignKey("section_offices.id"), index=True)
+    code: Mapped[str] = mapped_column(String, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String)
+    voltage_kv: Mapped[str] = mapped_column(String, default="66/11 kV")
+    capacity_mva: Mapped[float] = mapped_column(Float, default=15.0)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    operational_status: Mapped[str] = mapped_column(String, default="OPERATIONAL")
+    feeders_count: Mapped[int] = mapped_column(Integer, default=6)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class OfficeDataSource(Base):
+    """Provenance and audit tracking for verified official publication records."""
+    __tablename__ = "office_data_sources"
+    __table_args__ = (
+        Index("ix_data_sources_office", "office_type", "office_id"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    office_type: Mapped[str] = mapped_column(String, index=True)
+    office_id: Mapped[str] = mapped_column(String, index=True)
+    source_title: Mapped[str] = mapped_column(String)
+    source_url: Mapped[str] = mapped_column(String, default="")
+    source_type: Mapped[str] = mapped_column(String, default="RTI Proactive Disclosure")
+    publication_date: Mapped[str] = mapped_column(String, default="2025-05-01")
+    verified_date: Mapped[str] = mapped_column(String, default="2026-11-03")
+    verification_status: Mapped[str] = mapped_column(String, default="VERIFIED", index=True)
+    discrepancy_notes: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

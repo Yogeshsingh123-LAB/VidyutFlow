@@ -61,6 +61,16 @@ export default defineConfig(() => {
           changeOrigin: true,
           rewrite: path => path.replace(/^\/api/, '')
         },
+        '/api/evidence': {
+          target: FASTAPI_TARGET,
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api/, '')
+        },
+        '/api/directory': {
+          target: FASTAPI_TARGET,
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api/, '')
+        },
         '/api/system': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
@@ -103,32 +113,54 @@ export default defineConfig(() => {
       rollupOptions: {
         output: {
           manualChunks(id) {
-            if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) {
+            const norm = id.replace(/\\/g, '/');
+            if (norm.includes('node_modules/recharts') || norm.includes('node_modules/d3-')) {
               return 'vendor-recharts';
             }
-            if (id.includes('node_modules/lucide-react')) {
+            if (norm.includes('node_modules/lucide-react')) {
               return 'vendor-icons';
             }
-            if (id.includes('node_modules/motion') || id.includes('node_modules/framer-motion')) {
+            if (norm.includes('node_modules/motion') || norm.includes('node_modules/framer-motion')) {
               return 'vendor-motion';
             }
             if (
-              id.includes('node_modules/react/') ||
-              id.includes('node_modules/react-dom/') ||
-              id.includes('node_modules/scheduler/')
+              norm.includes('node_modules/react/') ||
+              norm.includes('node_modules/react-dom/') ||
+              norm.includes('node_modules/scheduler/')
             ) {
               return 'vendor-react';
             }
-            if (id.includes('/src/i18n/translations/gu.ts')) return 'i18n-gu';
-            if (id.includes('/src/i18n/translations/hi.ts')) return 'i18n-hi';
-            if (id.includes('/src/i18n/translations/mr.ts')) return 'i18n-mr';
-            if (id.includes('/src/i18n/translations/en.ts')) return 'i18n-en';
-            if (id.includes('employeeContentTranslations.ts')) return 'i18n-employee';
-            if (id.includes('consumerContentTranslations.ts')) return 'i18n-consumer';
-            if (id.includes('managementContentTranslations.ts')) return 'i18n-management';
-            if (id.includes('fieldContentTranslations.ts')) return 'i18n-field';
-            if (id.includes('adminContentTranslations.ts')) return 'i18n-admin';
-            if (id.includes('/src/data/')) {
+            if (norm.includes('src/i18n/translations/gu.ts')) return 'i18n-gu';
+            if (norm.includes('src/i18n/translations/hi.ts')) return 'i18n-hi';
+            if (norm.includes('src/i18n/translations/mr.ts')) return 'i18n-mr';
+            if (norm.includes('src/i18n/translations/en.ts')) return 'i18n-en';
+            if (norm.includes('employeeContentTranslations')) return 'i18n-employee';
+            if (norm.includes('consumerContentTranslations')) return 'i18n-consumer';
+            if (norm.includes('managementContentTranslations')) return 'i18n-management';
+            if (norm.includes('fieldContentTranslations')) return 'i18n-field';
+            if (norm.includes('adminContentTranslations')) return 'i18n-admin';
+            if (norm.includes('assistantContentTranslations')) return 'i18n-assistant';
+            if (norm.includes('utilityAiEngine')) return 'ai-engine';
+            if (
+              norm.includes('src/utils/aiRecommendationEngine') ||
+              norm.includes('src/utils/anomalyDetector') ||
+              norm.includes('src/utils/authClient') ||
+              norm.includes('src/utils/backendSession') ||
+              norm.includes('src/utils/offlineFieldSync') ||
+              norm.includes('src/utils/securityHardening') ||
+              norm.includes('src/utils/safeStorage') ||
+              norm.includes('src/utils/dateUtils') ||
+              norm.includes('src/utils/avatarUtils') ||
+              norm.includes('src/utils/audioAlerts') ||
+              norm.includes('src/utils/liveData') ||
+              norm.includes('src/services/erpAdapter') ||
+              norm.includes('src/services/apiClient') ||
+              norm.includes('src/services/repositories') ||
+              norm.includes('src/services/erpApiContracts')
+            ) {
+              return 'app-core-utils';
+            }
+            if (norm.includes('data/') || norm.includes('mockData')) {
               return 'app-datasets';
             }
           }

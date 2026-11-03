@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     max_json_body_bytes: int = Field(default=2 * 1024 * 1024, gt=0, le=50 * 1024 * 1024)
     # Default directory where encrypted KYC / supporting documents (VFENC1 AES-256-GCM) are persisted.
     upload_vault_dir: str = "uploads_encrypted"
+    # Shared storage provider for multi-instance deployment (local, s3, minio)
+    storage_provider: Literal["local", "s3", "minio"] = "local"
+    s3_endpoint_url: str = ""
+    s3_bucket_name: str = "vidyutflow-documents"
+    s3_access_key: str = ""
+    s3_secret_key: str = ""
+    s3_region: str = "us-east-1"
     # Operational alert engine thresholds (Item #17 — simulated SMS/email + in-app + audit log).
     alert_sla_risk_threshold: float = Field(default=0.70, ge=0.0, le=1.0, allow_inf_nan=False)
     alert_unassigned_hours: float = Field(default=4.0, ge=0.0, le=720.0, allow_inf_nan=False)

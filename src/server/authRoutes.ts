@@ -128,23 +128,41 @@ function checkAndRecordAuthRateLimit(clientIp: string, nowMs: number): boolean {
 
 function readJsonBody(req: IncomingMessage, maxBytes = 16384): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
-    let raw = '';
+    const chunks: Buffer[] = [];
+    let byteCount = 0;
     let tooLarge = false;
+    let settled = false;
 
-    req.on('data', chunk => {
-      raw += chunk;
-      if (raw.length > maxBytes) {
+    const rejectOnce = (err: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(err);
+    };
+
+    req.on('data', (chunk: Buffer | string) => {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), 'utf8');
+      byteCount += buf.length;
+      if (byteCount > maxBytes) {
         tooLarge = true;
+        if (byteCount > 1_048_576) {
+          req.destroy?.();
+          rejectOnce(new AuthSecurityError(400, 'PAYLOAD_TOO_LARGE', 'Request payload exceeds maximum size.'));
+        }
+        return;
       }
+      chunks.push(buf);
     });
 
-    req.on('error', err => reject(err));
+    req.on('error', err => rejectOnce(err));
 
     req.on('end', () => {
+      if (settled) return;
+      settled = true;
       if (tooLarge) {
         reject(new AuthSecurityError(400, 'PAYLOAD_TOO_LARGE', 'Request payload exceeds maximum size.'));
         return;
       }
+      const raw = Buffer.concat(chunks).toString('utf8');
       if (!raw.trim()) {
         resolve({});
         return;
