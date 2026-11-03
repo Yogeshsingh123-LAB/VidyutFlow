@@ -12,6 +12,14 @@ import {
   UserRole,
 } from '../types';
 import { Language } from '../i18n/types';
+import {
+  calculateLatePaymentCharges,
+  DEFAULT_LATE_CHARGE_POLICY,
+  OverdueFinancialBreakdown,
+  LateChargePolicy,
+  LateChargeWaiverRecord,
+  PaymentReversalRecord,
+} from './lateChargeEngine';
 
 // ============================================================================
 // CANONICAL BILLING & RECONCILIATION TYPES
@@ -40,12 +48,18 @@ export interface ReconciledElectricityBill extends ElectricityBill {
   rawStatus: ElectricityBill['status'];
   /** Reconciled canonical status after applying successful payments & due-date rules */
   effectiveStatus: CanonicalBillStatus;
+  /** Reconciled canonical status alias */
+  derivedStatus: CanonicalBillStatus;
   /** Total amount settled via verified Successful payments or Paid status */
   paidAmount: number;
   /** Remaining payable balance: max(0, totalAmount - paidAmount) */
   outstandingBalance: number;
   /** Remaining balance alias for UI & export compatibility */
   remainingBalance: number;
+  /** Net accrued late charges payable on this bill */
+  totalAccruedLateCharges: number;
+  /** Total outstanding payable including remaining principal and net accrued late charges */
+  totalOutstandingWithCharges: number;
   /** True if and only if outstandingBalance > 0 */
   isDue: boolean;
   /** True if outstandingBalance > 0 and dueDate < referenceDate (or raw status is Overdue) */
@@ -70,7 +84,11 @@ export interface ReconciledElectricityBill extends ElectricityBill {
   periodEndDate: string;
   /** Resolved human-readable billing period label */
   billingPeriodLabel: string;
+  /** Step 4A: Delayed payment surcharge and overdue financial breakdown */
+  lateChargeBreakdown: OverdueFinancialBreakdown;
 }
+
+export type ReconciledBillSummary = ReconciledElectricityBill;
 
 export interface ConnectionBillingSummary {
   connection: ElectricityConnection | null;
@@ -90,8 +108,20 @@ export interface ConnectionBillingSummary {
   totalBillCount: number;
   /** Total outstanding payable balance across all due bills for this connection */
   totalOutstandingAmount: number;
+  /** Step 4A/4B alias: Total outstanding principal in INR */
+  totalOutstandingPrincipalInr: number;
+  /** Step 4A: Total accrued late charges across due bills */
+  totalAccruedLateCharges?: number;
+  /** Step 4A/4B alias: Total accrued late charges in INR */
+  totalAccruedLateChargesInr: number;
+  /** Step 4A: Total outstanding payable including accrued late charges */
+  totalOutstandingWithCharges?: number;
+  /** Step 4A/4B alias: Total outstanding payable with late charges in INR */
+  totalOutstandingWithChargesInr: number;
   /** Primary bill to display on Dashboard (prioritizes current due bill, else latest generated bill, or null if none) */
   latestBill: ReconciledElectricityBill | null;
+  /** Alias for latestBill for Step 4B consumers/tests */
+  currentBill: ReconciledElectricityBill | null;
   /** Most recent generated bill by billing period regardless of status */
   mostRecentGeneratedBill: ReconciledElectricityBill | null;
   /** Explicit Dashboard KPI card badge state — never 'PAID' when latestBill is null */
@@ -115,6 +145,8 @@ export interface ConnectionDueBreakdownItem {
   dueBillCount: number;
   totalBillCount: number;
   totalOutstandingAmount: number;
+  totalAccruedLateCharges?: number;
+  totalOutstandingWithCharges?: number;
 }
 
 export interface ConsumerAccountBillingSummary {
@@ -133,6 +165,10 @@ export interface ConsumerAccountBillingSummary {
   accountTotalBillCount: number;
   /** Total outstanding amount across ALL connections owned by this consumer account */
   accountTotalOutstandingAmount: number;
+  /** Step 4A: Account-wide total accrued late charges */
+  accountTotalAccruedLateCharges?: number;
+  /** Step 4A: Account-wide total outstanding payable including accrued late charges */
+  accountTotalOutstandingWithCharges?: number;
   /** All reconciled bills across all connections owned by this consumer account */
   allAccountReconciledBills: ReconciledElectricityBill[];
   /** All payment transactions across all connections owned by this consumer account */
@@ -675,10 +711,20 @@ export function matchesPaymentToConnection(
  * - Unpaid bills past their dueDate are marked 'Overdue'.
  * - Failed or Pending Verification payments never reduce outstandingBalance.
  */
+export interface ReconcileBillOptions {
+  policy?: LateChargePolicy;
+  waivers?: LateChargeWaiverRecord[];
+  reversals?: PaymentReversalRecord[];
+  lateChargesSettled?: number;
+  tariffCategory?: TariffCategory;
+  language?: Language;
+}
+
 export function reconcileBillWithPayments(
   bill: ElectricityBill,
   allPayments: PaymentTransaction[] = [],
-  referenceDate: string = '15-Oct-2026'
+  referenceDate: string = '15-Oct-2026',
+  options?: ReconcileBillOptions
 ): ReconciledElectricityBill {
   const normBillNo = normalizeBillingIdentifier(bill.billNo);
   const totalAmount = Math.max(0, Number(bill.totalAmount ?? 0));
@@ -687,16 +733,28 @@ export function reconcileBillWithPayments(
     (p) => p && normalizeBillingIdentifier(p.billNo) === normBillNo
   );
 
-  // Deduplicate successful payments by txId / bankReference
+  const reversedTxIds = new Set<string>(
+    (options?.reversals || [])
+      .filter((r) => !r.billNo || normalizeBillingIdentifier(r.billNo) === normBillNo)
+      .map((r) => normalizeBillingIdentifier(r.txId))
+      .filter(Boolean)
+  );
+  const reversedTotalForBill = (options?.reversals || [])
+    .filter((r) => !r.billNo || normalizeBillingIdentifier(r.billNo) === normBillNo)
+    .reduce((acc, r) => acc + Math.max(0, Number(r.amount ?? 0)), 0);
+
+  // Deduplicate successful non-reversed payments by txId / bankReference
   const appliedPayments: PaymentTransaction[] = [];
   const unappliedPaymentAttempts: PaymentTransaction[] = [];
   const seenTxKeys = new Set<string>();
 
   for (const p of matchingPayments) {
+    const normTxId = normalizeBillingIdentifier(p.txId);
     const txKey =
-      normalizeBillingIdentifier(p.txId) ||
+      normTxId ||
       `${normalizeBillingIdentifier(p.billNo)}:${p.amount}:${p.date}`;
-    if (p.status === 'Successful') {
+    const isReversed = Boolean(normTxId && reversedTxIds.has(normTxId));
+    if (p.status === 'Successful' && !isReversed) {
       if (!seenTxKeys.has(txKey)) {
         seenTxKeys.add(txKey);
         appliedPayments.push(p);
@@ -721,12 +779,19 @@ export function reconcileBillWithPayments(
       : undefined;
 
   if (appliedPayments.length > 0) {
-    // If successful payment transactions exist, reconcile from them (or max with explicit paidAmount if higher from prior partial state)
+    // If successful payment transactions exist, reconcile from them
     paidAmount = Math.min(totalAmount, Number(sumFromTransactions.toFixed(2)));
     if (bill.status === 'Paid' && paidAmount < totalAmount) {
       hasConflict = true;
       conflictReason = `Bill ${bill.billNo} was marked Paid in storage, but verified successful payment transactions total ₹${paidAmount} against bill total ₹${totalAmount}.`;
     }
+  } else if (reversedTxIds.size > 0) {
+    // All matching payments were reversed (or explicit paidAmount reduced by reversal)
+    const fallbackAfterReversal =
+      explicitBillPaidAmount !== undefined
+        ? Math.max(0, Number((explicitBillPaidAmount - reversedTotalForBill).toFixed(2)))
+        : 0;
+    paidAmount = Math.min(totalAmount, fallbackAfterReversal);
   } else if (explicitBillPaidAmount !== undefined) {
     paidAmount = Math.min(totalAmount, Number(explicitBillPaidAmount.toFixed(2)));
     if (bill.status === 'Paid' && paidAmount < totalAmount) {
@@ -770,15 +835,33 @@ export function reconcileBillWithPayments(
     : bill.paidDate || latestAppliedPayment?.date;
   const resolvedTxRef = bill.transactionRef || latestAppliedPayment?.txId;
   const cycleMeta = resolveBillCycleMetadata(bill);
+  const lateChargeBreakdown = calculateLatePaymentCharges({
+    bill,
+    payments: appliedPayments,
+    referenceDate,
+    policy: options?.policy,
+    waivers: options?.waivers,
+    reversals: options?.reversals,
+    lateChargesSettled: options?.lateChargesSettled,
+    tariffCategory: options?.tariffCategory,
+  });
+
+  const totalAccruedLateCharges = lateChargeBreakdown.netLateChargesPayable;
+  const totalOutstandingWithCharges = isPaid
+    ? 0
+    : Math.max(outstandingBalance, lateChargeBreakdown.totalOutstandingPayable);
 
   return {
     ...bill,
     rawStatus: bill.status,
     status: effectiveStatus,
     effectiveStatus,
+    derivedStatus: effectiveStatus,
     paidAmount,
     outstandingBalance,
     remainingBalance: outstandingBalance,
+    totalAccruedLateCharges,
+    totalOutstandingWithCharges,
     isDue,
     isOverdue,
     isPartiallyPaid,
@@ -793,6 +876,7 @@ export function reconcileBillWithPayments(
     periodStartDate: cycleMeta.periodStartDate,
     periodEndDate: cycleMeta.periodEndDate,
     billingPeriodLabel: cycleMeta.billingPeriodLabel,
+    lateChargeBreakdown,
   };
 }
 
@@ -2268,6 +2352,9 @@ export function selectConnectionBillingSummary(
     referenceDate?: string;
     legacyAliases?: string[];
     linkedApplication?: NewConnectionApplication | null;
+    waivers?: LateChargeWaiverRecord[];
+    reversals?: PaymentReversalRecord[];
+    policy?: LateChargePolicy;
   }
 ): ConnectionBillingSummary {
   const referenceDate = options?.referenceDate || '15-Oct-2026';
@@ -2285,7 +2372,13 @@ export function selectConnectionBillingSummary(
       paidBillCount: 0,
       totalBillCount: 0,
       totalOutstandingAmount: 0,
+      totalOutstandingPrincipalInr: 0,
+      totalAccruedLateCharges: 0,
+      totalAccruedLateChargesInr: 0,
+      totalOutstandingWithCharges: 0,
+      totalOutstandingWithChargesInr: 0,
       latestBill: null,
+      currentBill: null,
       mostRecentGeneratedBill: null,
       dashboardBadgeState: 'NO_ACTIVE_CONNECTION',
       paymentHistory: [],
@@ -2311,9 +2404,16 @@ export function selectConnectionBillingSummary(
     uniqueRawBills.push(b);
   }
 
-  // Reconcile every bill against all payments
+  // Reconcile every bill against all payments, waivers, and reversals
   const reconciledBills = sortBillsNewestFirst(
-    uniqueRawBills.map((bill) => reconcileBillWithPayments(bill, allPayments, referenceDate))
+    uniqueRawBills.map((bill) =>
+      reconcileBillWithPayments(bill, allPayments, referenceDate, {
+        waivers: options?.waivers,
+        reversals: options?.reversals,
+        policy: options?.policy,
+        tariffCategory: connection.tariffCategory,
+      })
+    )
   );
 
   const dueBills = reconciledBills.filter((b) => b.isDue && b.outstandingBalance > 0);
@@ -2321,6 +2421,14 @@ export function selectConnectionBillingSummary(
 
   const totalOutstandingAmount = Number(
     dueBills.reduce((sum, b) => sum + b.outstandingBalance, 0).toFixed(2)
+  );
+
+  const totalAccruedLateCharges = Number(
+    dueBills.reduce((sum, b) => sum + (b.lateChargeBreakdown?.netLateChargesPayable || 0), 0).toFixed(2)
+  );
+
+  const totalOutstandingWithCharges = Number(
+    (totalOutstandingAmount + totalAccruedLateCharges).toFixed(2)
   );
 
   const mostRecentGeneratedBill = reconciledBills.length > 0 ? reconciledBills[0] : null;
@@ -2379,7 +2487,13 @@ export function selectConnectionBillingSummary(
     paidBillCount: paidBills.length,
     totalBillCount: reconciledBills.length,
     totalOutstandingAmount,
+    totalOutstandingPrincipalInr: totalOutstandingAmount,
+    totalAccruedLateCharges,
+    totalAccruedLateChargesInr: totalAccruedLateCharges,
+    totalOutstandingWithCharges,
+    totalOutstandingWithChargesInr: totalOutstandingWithCharges,
     latestBill,
+    currentBill: latestBill,
     mostRecentGeneratedBill,
     dashboardBadgeState,
     paymentHistory: uniquePayments,
@@ -2393,27 +2507,47 @@ export function selectConnectionBillingSummary(
  * Sidebar, and MobileNav.
  */
 export function selectConsumerAccountBillingSummary(input: {
-  allConnections: ElectricityConnection[];
-  allBills: ElectricityBill[];
-  allPayments: PaymentTransaction[];
-  actorScope: ConsumerBillingActorScope;
+  allConnections?: ElectricityConnection[];
+  ownedConnections?: ElectricityConnection[];
+  allBills?: ElectricityBill[];
+  bills?: ElectricityBill[];
+  allPayments?: PaymentTransaction[];
+  payments?: PaymentTransaction[];
+  actorScope?: ConsumerBillingActorScope;
+  accountId?: string;
   selectedConnectionNo?: string | null;
+  selectedConsumerNo?: string | null;
   referenceDate?: string;
+  waivers?: LateChargeWaiverRecord[];
+  reversals?: PaymentReversalRecord[];
+  policy?: LateChargePolicy;
 }): ConsumerAccountBillingSummary {
   const referenceDate = input.referenceDate || '15-Oct-2026';
+  const rawConnections = input.allConnections || input.ownedConnections || [];
+  const rawBills = input.allBills || input.bills || [];
+  const rawPayments = input.allPayments || input.payments || [];
+  const actorScope: ConsumerBillingActorScope = input.actorScope || {
+    accountId: input.accountId || 'demo_consumer',
+    ownedConsumerNos: rawConnections.map((c) => c.consumerNo),
+  };
+  const requestedConnNo = input.selectedConnectionNo ?? input.selectedConsumerNo ?? null;
+
   const ownedConnections = resolveOwnedConnectionsForConsumer(
-    input.allConnections,
-    input.actorScope
+    rawConnections,
+    actorScope
   );
 
   const summariesByConnectionNo: Record<string, ConnectionBillingSummary> = {};
   const connectionBreakdown: ConnectionDueBreakdownItem[] = [];
 
   for (const conn of ownedConnections) {
-    const aliases = input.actorScope.legacyIdentifierMap?.[conn.consumerNo] || [];
-    const summary = selectConnectionBillingSummary(conn, input.allBills, input.allPayments, {
+    const aliases = actorScope.legacyIdentifierMap?.[conn.consumerNo] || [];
+    const summary = selectConnectionBillingSummary(conn, rawBills, rawPayments, {
       referenceDate,
       legacyAliases: aliases,
+      waivers: input.waivers,
+      reversals: input.reversals,
+      policy: input.policy,
     });
     summariesByConnectionNo[conn.consumerNo] = summary;
     connectionBreakdown.push({
@@ -2426,6 +2560,8 @@ export function selectConsumerAccountBillingSummary(input: {
       dueBillCount: summary.dueBillCount,
       totalBillCount: summary.totalBillCount,
       totalOutstandingAmount: summary.totalOutstandingAmount,
+      totalAccruedLateCharges: summary.totalAccruedLateCharges,
+      totalOutstandingWithCharges: summary.totalOutstandingWithCharges,
     });
   }
 
@@ -2433,7 +2569,7 @@ export function selectConsumerAccountBillingSummary(input: {
   // 1. Explicit selectedConnectionNo if it matches an owned connection
   // 2. Else the first owned connection that has generated bills (e.g. '04281-99231')
   // 3. Else the first owned connection
-  const requestedNorm = normalizeBillingIdentifier(input.selectedConnectionNo);
+  const requestedNorm = normalizeBillingIdentifier(requestedConnNo);
   let selectedConnection: ElectricityConnection | null = null;
 
   if (requestedNorm) {
@@ -2454,11 +2590,17 @@ export function selectConsumerAccountBillingSummary(input: {
 
   const selectedConnectionSummary = selectedConnection
     ? summariesByConnectionNo[selectedConnection.consumerNo] ||
-      selectConnectionBillingSummary(selectedConnection, input.allBills, input.allPayments, {
+      selectConnectionBillingSummary(selectedConnection, rawBills, rawPayments, {
         referenceDate,
+        waivers: input.waivers,
+        reversals: input.reversals,
+        policy: input.policy,
       })
-    : selectConnectionBillingSummary(null, input.allBills, input.allPayments, {
+    : selectConnectionBillingSummary(null, rawBills, rawPayments, {
         referenceDate,
+        waivers: input.waivers,
+        reversals: input.reversals,
+        policy: input.policy,
       });
 
   // Aggregate across all owned connections (deduplicating bills and payments by ID)
@@ -2493,6 +2635,14 @@ export function selectConsumerAccountBillingSummary(input: {
     accountDueBills.reduce((sum, b) => sum + b.outstandingBalance, 0).toFixed(2)
   );
 
+  const accountTotalAccruedLateCharges = Number(
+    accountDueBills.reduce((sum, b) => sum + (b.lateChargeBreakdown?.netLateChargesPayable || 0), 0).toFixed(2)
+  );
+
+  const accountTotalOutstandingWithCharges = Number(
+    (accountTotalOutstandingAmount + accountTotalAccruedLateCharges).toFixed(2)
+  );
+
   const connectionsWithDueBills = connectionBreakdown.filter((item) => item.dueBillCount > 0);
   const selectedNorm = normalizeBillingIdentifier(selectedConnection?.consumerNo);
   const otherConnectionsWithDueBills = connectionsWithDueBills.filter(
@@ -2509,6 +2659,8 @@ export function selectConsumerAccountBillingSummary(input: {
     accountDueBillCount: accountDueBills.length,
     accountTotalBillCount: sortedAccountBills.length,
     accountTotalOutstandingAmount,
+    accountTotalAccruedLateCharges,
+    accountTotalOutstandingWithCharges,
     allAccountReconciledBills: sortedAccountBills,
     allAccountPayments: sortedAccountPayments,
     connectionBreakdown,
@@ -2534,6 +2686,9 @@ export interface ApplyPaymentToBillInput {
   bankReference?: string;
   accountId?: string;
   referenceDate?: string;
+  includeLateCharges?: boolean;
+  waivers?: LateChargeWaiverRecord[];
+  reversals?: PaymentReversalRecord[];
   simulatedOutcome?: SimulatedPaymentOutcome;
   simulatedFailureReason?: string;
   inFlightBillNos?: Set<string>;
@@ -2548,25 +2703,41 @@ export interface ApplyPaymentToBillResult {
   paymentTransaction: PaymentTransaction | null;
   previouslySettledAmount: number;
   paidAmountApplied: number;
+  lateChargesSettledInPayment: number;
   remainingBalance: number;
+  remainingTotalWithCharges: number;
   isFullyPaid: boolean;
   settlementClassification: 'FULL_SETTLEMENT' | 'PARTIAL_SETTLEMENT' | 'NONE';
 }
 
 export interface PaymentAmountValidationResult {
   isValid: boolean;
+  valid: boolean;
   mode: 'FULL' | 'PARTIAL';
   billTotalAmount: number;
+  originalBillAmount: number;
   previouslyPaidAmount: number;
+  previouslySettledAmount: number;
   currentOutstandingAmount: number;
+  // Step 4B Canonical 9-field extensions:
+  remainingPrincipal: number;
+  accruedLateCharges: number;
+  waivedOrSettledCharges: number;
+  totalOutstandingWithCharges: number;
+  originalDueDate: string;
+  daysOverdue: number;
+  calculationReferenceDate: string;
   selectedPaymentAmount: number;
+  resolvedAmountToPay: number;
   remainingBalanceAfterPayment: number;
+  remainingTotalWithChargesAfterPayment: number;
   isFullSettlement: boolean;
   validationError: string | null;
 }
 
 /**
  * Validates a full or partial payment selection against the canonical reconciled bill balance.
+ * Exposes all 9 canonical financial fields for overdue & current bills.
  */
 export function validatePaymentAmountSelection(params: {
   bill: ElectricityBill;
@@ -2574,27 +2745,61 @@ export function validatePaymentAmountSelection(params: {
   mode: 'FULL' | 'PARTIAL';
   customAmountInput?: string | number;
   referenceDate?: string;
+  includeLateCharges?: boolean;
+  waivers?: LateChargeWaiverRecord[];
+  reversals?: PaymentReversalRecord[];
 }): PaymentAmountValidationResult {
   const referenceDate = params.referenceDate || '15-Oct-2026';
   const reconciled = reconcileBillWithPayments(
     params.bill,
     params.existingPayments,
-    referenceDate
+    referenceDate,
+    {
+      waivers: params.waivers,
+      reversals: params.reversals,
+    }
   );
 
+  const lc = reconciled.lateChargeBreakdown;
   const billTotalAmount = reconciled.totalAmount;
   const previouslyPaidAmount = reconciled.paidAmount;
-  const currentOutstandingAmount = reconciled.outstandingBalance;
+  const remainingPrincipal = reconciled.outstandingBalance;
+  const accruedLateCharges = reconciled.totalAccruedLateCharges;
+  const waivedOrSettledCharges = Number(
+    (lc.lateChargesWaived + lc.lateChargesSettled).toFixed(2)
+  );
+  const totalOutstandingWithCharges = reconciled.totalOutstandingWithCharges;
+  const maxPayableCeiling = Math.max(remainingPrincipal, totalOutstandingWithCharges);
+  const currentOutstandingAmount = params.includeLateCharges
+    ? totalOutstandingWithCharges
+    : remainingPrincipal;
 
-  if (reconciled.isPaid || currentOutstandingAmount <= 0) {
+  const baseNineFields = {
+    billTotalAmount,
+    originalBillAmount: billTotalAmount,
+    previouslyPaidAmount,
+    previouslySettledAmount: previouslyPaidAmount,
+    currentOutstandingAmount,
+    remainingPrincipal,
+    accruedLateCharges,
+    waivedOrSettledCharges,
+    totalOutstandingWithCharges,
+    originalDueDate: params.bill.dueDate,
+    daysOverdue: lc.daysOverdue,
+    calculationReferenceDate: lc.referenceDate,
+  };
+
+  if (reconciled.isPaid || maxPayableCeiling <= 0) {
     return {
       isValid: false,
+      valid: false,
       mode: params.mode,
-      billTotalAmount,
-      previouslyPaidAmount,
+      ...baseNineFields,
       currentOutstandingAmount: 0,
       selectedPaymentAmount: 0,
+      resolvedAmountToPay: 0,
       remainingBalanceAfterPayment: 0,
+      remainingTotalWithChargesAfterPayment: 0,
       isFullSettlement: true,
       validationError: `Bill ${params.bill.billNo} is already fully paid (remaining balance ₹0).`,
     };
@@ -2603,12 +2808,13 @@ export function validatePaymentAmountSelection(params: {
   if (params.mode === 'FULL') {
     return {
       isValid: true,
+      valid: true,
       mode: 'FULL',
-      billTotalAmount,
-      previouslyPaidAmount,
-      currentOutstandingAmount,
+      ...baseNineFields,
       selectedPaymentAmount: currentOutstandingAmount,
+      resolvedAmountToPay: currentOutstandingAmount,
       remainingBalanceAfterPayment: 0,
+      remainingTotalWithChargesAfterPayment: 0,
       isFullSettlement: true,
       validationError: null,
     };
@@ -2622,12 +2828,13 @@ export function validatePaymentAmountSelection(params: {
   if (!rawStr) {
     return {
       isValid: false,
+      valid: false,
       mode: 'PARTIAL',
-      billTotalAmount,
-      previouslyPaidAmount,
-      currentOutstandingAmount,
+      ...baseNineFields,
       selectedPaymentAmount: 0,
+      resolvedAmountToPay: 0,
       remainingBalanceAfterPayment: currentOutstandingAmount,
+      remainingTotalWithChargesAfterPayment: totalOutstandingWithCharges,
       isFullSettlement: false,
       validationError: 'Please enter a valid payment amount greater than ₹0.',
     };
@@ -2637,12 +2844,13 @@ export function validatePaymentAmountSelection(params: {
   if (Number.isNaN(parsed) || !Number.isFinite(parsed)) {
     return {
       isValid: false,
+      valid: false,
       mode: 'PARTIAL',
-      billTotalAmount,
-      previouslyPaidAmount,
-      currentOutstandingAmount,
+      ...baseNineFields,
       selectedPaymentAmount: 0,
+      resolvedAmountToPay: 0,
       remainingBalanceAfterPayment: currentOutstandingAmount,
+      remainingTotalWithChargesAfterPayment: totalOutstandingWithCharges,
       isFullSettlement: false,
       validationError: 'Payment amount must be a valid number.',
     };
@@ -2652,40 +2860,47 @@ export function validatePaymentAmountSelection(params: {
   if (rounded <= 0) {
     return {
       isValid: false,
+      valid: false,
       mode: 'PARTIAL',
-      billTotalAmount,
-      previouslyPaidAmount,
-      currentOutstandingAmount,
+      ...baseNineFields,
       selectedPaymentAmount: 0,
+      resolvedAmountToPay: 0,
       remainingBalanceAfterPayment: currentOutstandingAmount,
+      remainingTotalWithChargesAfterPayment: totalOutstandingWithCharges,
       isFullSettlement: false,
       validationError: 'Payment amount must be greater than ₹0.',
     };
   }
 
-  if (rounded > currentOutstandingAmount) {
+  if (rounded > maxPayableCeiling) {
     return {
       isValid: false,
+      valid: false,
       mode: 'PARTIAL',
-      billTotalAmount,
-      previouslyPaidAmount,
-      currentOutstandingAmount,
+      ...baseNineFields,
       selectedPaymentAmount: rounded,
+      resolvedAmountToPay: rounded,
       remainingBalanceAfterPayment: 0,
+      remainingTotalWithChargesAfterPayment: 0,
       isFullSettlement: false,
-      validationError: `Amount ₹${rounded.toLocaleString('en-IN')} exceeds remaining payable balance ₹${currentOutstandingAmount.toLocaleString('en-IN')}.`,
+      validationError: `Amount ₹${rounded.toLocaleString('en-IN')} exceeds remaining payable balance ₹${maxPayableCeiling.toLocaleString('en-IN')}.`,
     };
   }
 
-  const remainingAfter = Math.max(0, Number((currentOutstandingAmount - rounded).toFixed(2)));
+  const remainingAfter = Math.max(0, Number((remainingPrincipal - rounded).toFixed(2)));
+  const remainingTotalAfter = Math.max(
+    0,
+    Number((totalOutstandingWithCharges - rounded).toFixed(2))
+  );
   return {
     isValid: true,
+    valid: true,
     mode: 'PARTIAL',
-    billTotalAmount,
-    previouslyPaidAmount,
-    currentOutstandingAmount,
+    ...baseNineFields,
     selectedPaymentAmount: rounded,
+    resolvedAmountToPay: rounded,
     remainingBalanceAfterPayment: remainingAfter,
+    remainingTotalWithChargesAfterPayment: remainingTotalAfter,
     isFullSettlement: remainingAfter === 0,
     validationError: null,
   };
@@ -2707,11 +2922,6 @@ export interface TransactionSettlementBreakdown {
 
 /**
  * Computes the exact historical settlement breakdown for a specific PaymentTransaction on a bill.
- * Ensures that:
- * - Partial payment receipt #1 (e.g. ₹1,000 toward ₹2,185) always shows:
- *   Previously Settled: ₹0, Paid in This Transaction: ₹1,000, Remaining Balance After This Payment: ₹1,185 (PARTIAL_SETTLEMENT)
- * - Subsequent payment receipt #2 (e.g. ₹1,185 toward ₹2,185) shows:
- *   Previously Settled: ₹1,000, Paid in This Transaction: ₹1,185, Remaining Balance After This Payment: ₹0 (FULL_SETTLEMENT)
  */
 export function computeTransactionSettlementBreakdown(params: {
   bill: ElectricityBill | null | undefined;
@@ -2745,8 +2955,6 @@ export function computeTransactionSettlementBreakdown(params: {
     matchingSuccessful.push(p);
   }
 
-  // Sort oldest-first: in AppContext, newer transactions are prepended to `payments`,
-  // so reversing the array order when timestamps are equal preserves exact chronological sequence!
   const indexed = matchingSuccessful.map((item, idx) => ({
     item,
     idx,
@@ -2755,7 +2963,6 @@ export function computeTransactionSettlementBreakdown(params: {
 
   indexed.sort((a, b) => {
     if (a.ms !== b.ms) return a.ms - b.ms;
-    // Reverse original array index since newest payments are prepended at index 0
     return b.idx - a.idx;
   });
 
@@ -2782,7 +2989,6 @@ export function computeTransactionSettlementBreakdown(params: {
   }
 
   if (foundIndex === -1) {
-    // Fallback if payment wasn't in chronological list
     const explicitBillPaid =
       typeof bill?.paidAmount === 'number' && bill.paidAmount >= txAmount
         ? Number((bill.paidAmount - txAmount).toFixed(2))
@@ -2819,10 +3025,8 @@ export function computeTransactionSettlementBreakdown(params: {
 /**
  * Applies a full or partial payment to a bill deterministically.
  * - Supports controlled DEMO outcomes: 'SUCCESS' (default), 'FAILED', and 'PENDING'.
- * - Rejects duplicate payments if the bill is already fully paid (outstandingBalance === 0) or in-flight.
- * - Rejects zero, negative, or excessive payment amounts (> outstandingBalance).
- * - Never reduces bill balance or marks bill Paid when outcome is 'FAILED' or 'PENDING'.
- * - Preserves the bill in history with updated status ('Paid' or 'Partially Paid') and accurate remainingBalance on 'SUCCESS'.
+ * - Supports settling either principal or total outstanding with overdue late charges (DPS).
+ * - Never mutates original bill `totalAmount`.
  */
 export function applyPaymentToBill(input: ApplyPaymentToBillInput): ApplyPaymentToBillResult {
   const referenceDate = input.referenceDate || '15-Oct-2026';
@@ -2832,7 +3036,16 @@ export function applyPaymentToBill(input: ApplyPaymentToBillInput): ApplyPayment
   const priorReconciled = reconcileBillWithPayments(
     input.bill,
     input.existingPayments,
-    referenceDate
+    referenceDate,
+    {
+      waivers: input.waivers,
+      reversals: input.reversals,
+    }
+  );
+
+  const maxPayableCeiling = Math.max(
+    priorReconciled.outstandingBalance,
+    priorReconciled.totalOutstandingWithCharges
   );
 
   // Guard against duplicate in-flight submission
@@ -2846,13 +3059,15 @@ export function applyPaymentToBill(input: ApplyPaymentToBillInput): ApplyPayment
       paymentTransaction: null,
       previouslySettledAmount: priorReconciled.paidAmount,
       paidAmountApplied: 0,
+      lateChargesSettledInPayment: 0,
       remainingBalance: priorReconciled.outstandingBalance,
+      remainingTotalWithCharges: priorReconciled.totalOutstandingWithCharges,
       isFullyPaid: priorReconciled.isPaid,
       settlementClassification: 'NONE',
     };
   }
 
-  if (priorReconciled.isPaid || priorReconciled.outstandingBalance <= 0) {
+  if (priorReconciled.isPaid || maxPayableCeiling <= 0) {
     return {
       success: false,
       outcome: 'FAILED',
@@ -2868,16 +3083,22 @@ export function applyPaymentToBill(input: ApplyPaymentToBillInput): ApplyPayment
       paymentTransaction: null,
       previouslySettledAmount: priorReconciled.paidAmount,
       paidAmountApplied: 0,
+      lateChargesSettledInPayment: 0,
       remainingBalance: 0,
+      remainingTotalWithCharges: 0,
       isFullyPaid: true,
       settlementClassification: 'NONE',
     };
   }
 
+  const defaultFullTarget = input.includeLateCharges
+    ? priorReconciled.totalOutstandingWithCharges
+    : priorReconciled.outstandingBalance;
+
   const requestedAmount =
     input.amountToPay !== undefined
       ? Number(Number(input.amountToPay).toFixed(2))
-      : priorReconciled.outstandingBalance;
+      : defaultFullTarget;
 
   if (Number.isNaN(requestedAmount) || requestedAmount <= 0) {
     return {
@@ -2889,23 +3110,27 @@ export function applyPaymentToBill(input: ApplyPaymentToBillInput): ApplyPayment
       paymentTransaction: null,
       previouslySettledAmount: priorReconciled.paidAmount,
       paidAmountApplied: 0,
+      lateChargesSettledInPayment: 0,
       remainingBalance: priorReconciled.outstandingBalance,
+      remainingTotalWithCharges: priorReconciled.totalOutstandingWithCharges,
       isFullyPaid: false,
       settlementClassification: 'NONE',
     };
   }
 
-  if (requestedAmount > priorReconciled.outstandingBalance) {
+  if (requestedAmount > maxPayableCeiling) {
     return {
       success: false,
       outcome: 'FAILED',
-      reason: `Payment amount ₹${requestedAmount} exceeds remaining payable balance ₹${priorReconciled.outstandingBalance}.`,
+      reason: `Payment amount ₹${requestedAmount} exceeds remaining payable balance ₹${maxPayableCeiling}.`,
       updatedBill: input.bill,
       reconciledBill: priorReconciled,
       paymentTransaction: null,
       previouslySettledAmount: priorReconciled.paidAmount,
       paidAmountApplied: 0,
+      lateChargesSettledInPayment: 0,
       remainingBalance: priorReconciled.outstandingBalance,
+      remainingTotalWithCharges: priorReconciled.totalOutstandingWithCharges,
       isFullyPaid: false,
       settlementClassification: 'NONE',
     };
@@ -2921,7 +3146,7 @@ export function applyPaymentToBill(input: ApplyPaymentToBillInput): ApplyPayment
   const bankRef =
     input.bankReference ||
     `UGVCL-DEMO-${input.bill.billNo.replace(/[^A-Za-z0-9]/g, '').slice(-6)}-${attemptIndex}`;
-  const paymentDate = input.paymentDate || '15-Oct-2026 14:30';
+  const paymentDate = input.paymentDate || `${referenceDate} 14:30`;
 
   if (simulatedOutcome === 'FAILED') {
     const failedTx: PaymentTransaction = {
@@ -2939,7 +3164,11 @@ export function applyPaymentToBill(input: ApplyPaymentToBillInput): ApplyPayment
     const postReconciled = reconcileBillWithPayments(
       input.bill,
       updatedPayments,
-      referenceDate
+      referenceDate,
+      {
+        waivers: input.waivers,
+        reversals: input.reversals,
+      }
     );
     return {
       success: false,
@@ -2952,7 +3181,9 @@ export function applyPaymentToBill(input: ApplyPaymentToBillInput): ApplyPayment
       paymentTransaction: failedTx,
       previouslySettledAmount: priorReconciled.paidAmount,
       paidAmountApplied: 0,
+      lateChargesSettledInPayment: 0,
       remainingBalance: priorReconciled.outstandingBalance,
+      remainingTotalWithCharges: priorReconciled.totalOutstandingWithCharges,
       isFullyPaid: false,
       settlementClassification: 'NONE',
     };
@@ -2974,7 +3205,11 @@ export function applyPaymentToBill(input: ApplyPaymentToBillInput): ApplyPayment
     const postReconciled = reconcileBillWithPayments(
       input.bill,
       updatedPayments,
-      referenceDate
+      referenceDate,
+      {
+        waivers: input.waivers,
+        reversals: input.reversals,
+      }
     );
     return {
       success: false,
@@ -2985,7 +3220,9 @@ export function applyPaymentToBill(input: ApplyPaymentToBillInput): ApplyPayment
       paymentTransaction: pendingTx,
       previouslySettledAmount: priorReconciled.paidAmount,
       paidAmountApplied: 0,
+      lateChargesSettledInPayment: 0,
       remainingBalance: priorReconciled.outstandingBalance,
+      remainingTotalWithCharges: priorReconciled.totalOutstandingWithCharges,
       isFullyPaid: false,
       settlementClassification: 'NONE',
     };
@@ -3004,7 +3241,12 @@ export function applyPaymentToBill(input: ApplyPaymentToBillInput): ApplyPayment
   };
 
   const updatedPayments = [newTx, ...(input.existingPayments || [])];
-  const newPaidTotal = Number((priorReconciled.paidAmount + requestedAmount).toFixed(2));
+  const principalApplied = Math.min(priorReconciled.outstandingBalance, requestedAmount);
+  const lateChargesSettledInPayment = Math.max(
+    0,
+    Number((requestedAmount - principalApplied).toFixed(2))
+  );
+  const newPaidTotal = Number((priorReconciled.paidAmount + principalApplied).toFixed(2));
   const newRemaining = Math.max(0, Number((input.bill.totalAmount - newPaidTotal).toFixed(2)));
   const isFullyPaid = newRemaining === 0;
 
@@ -3021,7 +3263,12 @@ export function applyPaymentToBill(input: ApplyPaymentToBillInput): ApplyPayment
   const postReconciled = reconcileBillWithPayments(
     updatedBill,
     updatedPayments,
-    referenceDate
+    referenceDate,
+    {
+      waivers: input.waivers,
+      reversals: input.reversals,
+      lateChargesSettled: lateChargesSettledInPayment,
+    }
   );
 
   return {
@@ -3035,7 +3282,9 @@ export function applyPaymentToBill(input: ApplyPaymentToBillInput): ApplyPayment
     paymentTransaction: newTx,
     previouslySettledAmount: priorReconciled.paidAmount,
     paidAmountApplied: requestedAmount,
+    lateChargesSettledInPayment,
     remainingBalance: newRemaining,
+    remainingTotalWithCharges: postReconciled.totalOutstandingWithCharges,
     isFullyPaid,
     settlementClassification: isFullyPaid ? 'FULL_SETTLEMENT' : 'PARTIAL_SETTLEMENT',
   };

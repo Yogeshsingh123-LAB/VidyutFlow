@@ -6,10 +6,27 @@ import {
   parseVidyutDateToUtcMs,
 } from './billingEngine';
 import {
+  LateChargeWaiverRecord,
+  PaymentReversalRecord,
+} from './lateChargeEngine';
+import {
+  FormalNoticeRecord,
+  FormalNoticeStatus,
+  reconcileFormalNoticeWithStatement,
+  deriveCanonical9FieldBillStatement,
+} from './formalNoticeEngine';
+import {
   UGVCL_COMPANY_NAME_EN,
   UGVCL_COMPANY_NAME_GU,
   UGVCL_CORPORATE_IDENTITY,
 } from '../components/common/UgvclBrandIdentity';
+
+export type CalendarMilestoneType =
+  | 'A_ORIGINAL_BILL_DUE_DATE'
+  | 'B_LATE_CHARGE_ACCRUAL_DATE'
+  | 'C_FORMAL_NOTICE_ISSUE_DATE'
+  | 'D_FORMAL_NOTICE_PAYMENT_DEADLINE'
+  | 'E_AUTHORIZED_DISCONNECTION_REVIEW';
 
 export interface PaymentCalendarEvent {
   id: string; // e.g. CAL-EVT-BILL-UG-2026-10-8821
@@ -29,6 +46,14 @@ export interface PaymentCalendarEvent {
   totalAmount: number;
   paidAmount: number;
   outstandingBalance: number;
+  // Step 4B Canonical 9-Field Financial Breakdown properties:
+  remainingPrincipal: number;
+  accruedLateCharges: number;
+  waivedOrSettledCharges: number;
+  totalOutstandingWithCharges: number;
+  daysOverdue: number;
+  dailyLateChargeAccrual: number;
+  calculationReferenceDate: string;
   status: 'Paid' | 'Unpaid' | 'Overdue' | 'Partially Paid';
   isDue: boolean;
   isOverdue: boolean;
@@ -39,7 +64,37 @@ export interface PaymentCalendarEvent {
   periodStartDate?: string;
   periodEndDate?: string;
   billingPeriodLabel?: string;
-  reminderStage?: 'UPCOMING_DUE_5D' | 'UPCOMING_DUE_1D' | 'DUE_TODAY' | 'OVERDUE' | 'PAID';
+  reminderStage?:
+    | 'UPCOMING_DUE_5D'
+    | 'UPCOMING_DUE_1D'
+    | 'DUE_TODAY'
+    | 'OVERDUE_DAY_1'
+    | 'OVERDUE'
+    | 'FORMAL_NOTICE_ACTIVE'
+    | 'FORMAL_NOTICE_DEADLINE_APPROACHING'
+    | 'FORMAL_NOTICE_DEADLINE_REACHED'
+    | 'PAID';
+  // Step 4B Formal Notice & Milestone Classification (A–E):
+  milestoneType: CalendarMilestoneType;
+  distinguishedMilestones: {
+    originalBillPaymentDeadline: string;
+    lateChargeAccrualStartDate: string;
+    formalNoticeIssueDate: string | null;
+    formalNoticePaymentDeadline: string | null;
+    authorizedDisconnectionReviewStatus: string;
+    includes: (milestone: CalendarMilestoneType) => boolean;
+  };
+  formalNoticeId?: string;
+  formalNoticeStatus?: FormalNoticeStatus;
+  formalNoticeIssueDate?: string;
+  formalNoticeIssueDateIso?: string;
+  formalNoticeServiceDate?: string;
+  formalNoticePaymentDeadline?: string;
+  formalNoticePaymentDeadlineIso?: string;
+  formalNoticeDaysRemaining?: number | null;
+  isFormalNoticeDeadlineExpired?: boolean;
+  isFormalNoticeResolved?: boolean;
+  disconnectionReviewStatus?: FormalNoticeRecord['disconnectionReviewStatus'];
 }
 
 export interface CalendarMonthDay {
@@ -50,9 +105,11 @@ export interface CalendarMonthDay {
   isCurrentMonth: boolean;
   isToday: boolean;
   events: PaymentCalendarEvent[];
+  noticeEvents?: PaymentCalendarEvent[];
   hasDueBills: boolean;
   hasPaidBills: boolean;
   hasOverdueBills: boolean;
+  hasFormalNoticeMilestone?: boolean;
 }
 
 export interface PaymentCalendarSummary {
@@ -60,8 +117,16 @@ export interface PaymentCalendarSummary {
   dueBillsCount: number;
   paidBillsCount: number;
   totalDueAmount: number;
+  totalPrincipalDueAmount: number;
+  totalLateChargesAmount: number;
+  totalDueAmountWithCharges: number;
+  totalOutstandingWithChargesInr: number;
   totalPaidAmount: number;
   nextUpcomingDueDate: string | null;
+  activeFormalNoticesCount: number;
+  activeFormalNoticeCount: number;
+  approachingNoticeDeadlinesCount: number;
+  expiredNoticeDeadlinesCount: number;
   eventsByConnectionNo: Record<string, PaymentCalendarEvent[]>;
 }
 
@@ -170,7 +235,7 @@ export const CALENDAR_LOCALIZATION: Record<Language, CalendarLocalizationStrings
     totalOutstandingCardLabel: 'કુલ બાકી રકમ',
     paidBillsCardLabel: 'ચૂકવેલા બિલ (આ મહિને)',
     demoCalendarNotice: 'DEMO કેલેન્ડર: ઇવેન્ટ શેડ્યૂલ UGVCL બિલિંગ રેકોર્ડ્સ સાથે રીઅલ-ટાઇમમાં સિંક થાય છે.',
-    weekdaysShort: ['રવિ', 'સોમ', 'મંગળ', 'બુધ', 'ગુરુ', 'શુક્ર', 'શનિ'],
+    weekdaysShort: ['રવિ', 'સોમ', 'મંગળ', 'બુધ', 'ગુરુ', 'शुक्र', 'શનિ'],
     monthsFull: [
       'જાન્યુઆરી', 'ફેબ્રુઆરી', 'માર્ચ', 'એપ્રિલ', 'મે', 'જૂન',
       'જુલાઈ', 'ઓગસ્ટ', 'સપ્ટેમ્બર', 'ઓક્ટોબર', 'નવેમ્બર', 'ડિસેમ્બર'
@@ -284,7 +349,8 @@ export function parseDateToYearMonthDay(dateStr: string | null | undefined): {
 
 /**
  * Derives canonical PaymentCalendarEvents from recorded electricity bills,
- * ensuring strict consumer authorization and accurate reconciliation.
+ * ensuring strict consumer authorization, Step 4A/4B canonical 9-field overdue breakdown,
+ * and Formal Notice milestone classification (Milestones A–E).
  */
 export function derivePaymentCalendarEvents(
   paramsOrBills:
@@ -294,31 +360,51 @@ export function derivePaymentCalendarEvents(
         payments?: PaymentTransaction[];
         authorizedConsumerNos?: string[];
         referenceDate?: string;
+        formalNotices?: FormalNoticeRecord[];
+        waivers?: LateChargeWaiverRecord[];
+        reversals?: PaymentReversalRecord[];
       }
     | ElectricityBill[],
   argConnections?: ElectricityConnection[],
   argPayments?: PaymentTransaction[],
-  argAuthorizedConsumerNos?: string[],
-  argReferenceDate?: string
+  argAuthorizedConsumerNosOrRefDate?: string[] | string,
+  argReferenceDateOrNotices?: string | FormalNoticeRecord[],
+  argFormalNotices?: FormalNoticeRecord[]
 ): PaymentCalendarEvent[] {
   let bills: ElectricityBill[] = [];
   let connections: ElectricityConnection[] = [];
   let payments: PaymentTransaction[] = [];
   let authorizedConsumerNos: string[] | undefined;
   let referenceDate = '15-Oct-2026';
+  let formalNotices: FormalNoticeRecord[] = [];
+  let waivers: LateChargeWaiverRecord[] = [];
+  let reversals: PaymentReversalRecord[] = [];
 
   if (Array.isArray(paramsOrBills)) {
     bills = paramsOrBills;
     connections = argConnections || [];
     payments = argPayments || [];
-    authorizedConsumerNos = argAuthorizedConsumerNos;
-    referenceDate = argReferenceDate || '15-Oct-2026';
+    if (typeof argAuthorizedConsumerNosOrRefDate === 'string') {
+      referenceDate = argAuthorizedConsumerNosOrRefDate;
+      if (Array.isArray(argReferenceDateOrNotices)) {
+        formalNotices = argReferenceDateOrNotices;
+      }
+    } else {
+      authorizedConsumerNos = argAuthorizedConsumerNosOrRefDate;
+      if (typeof argReferenceDateOrNotices === 'string') {
+        referenceDate = argReferenceDateOrNotices;
+      }
+      formalNotices = argFormalNotices || [];
+    }
   } else if (paramsOrBills && typeof paramsOrBills === 'object') {
     bills = paramsOrBills.bills || [];
     connections = paramsOrBills.connections || [];
     payments = paramsOrBills.payments || [];
     authorizedConsumerNos = paramsOrBills.authorizedConsumerNos;
     referenceDate = paramsOrBills.referenceDate || '15-Oct-2026';
+    formalNotices = paramsOrBills.formalNotices || [];
+    waivers = paramsOrBills.waivers || [];
+    reversals = paramsOrBills.reversals || [];
   }
 
   const allowedSet = authorizedConsumerNos
@@ -328,6 +414,11 @@ export function derivePaymentCalendarEvents(
   const connMap = new Map<string, ElectricityConnection>();
   for (const c of connections) {
     connMap.set(c.consumerNo.toUpperCase(), c);
+  }
+
+  const noticeMap = new Map<string, FormalNoticeRecord>();
+  for (const n of formalNotices) {
+    noticeMap.set(n.billNo.trim().toUpperCase(), n);
   }
 
   const events: PaymentCalendarEvent[] = [];
@@ -342,15 +433,28 @@ export function derivePaymentCalendarEvents(
     const parsedDue = parseDateToYearMonthDay(bill.dueDate);
     if (!parsedDue) continue;
 
-    const reconciled = reconcileBillWithPayments(bill, payments, referenceDate);
+    const reconciled = reconcileBillWithPayments(bill, payments, referenceDate, {
+      waivers,
+      reversals,
+    });
+    const statement = deriveCanonical9FieldBillStatement(bill, payments, {
+      referenceDate,
+      connection: conn,
+      waivers,
+      reversals,
+    });
 
-    const refDate = new Date(referenceDate);
-    refDate.setHours(0, 0, 0, 0);
-    const dueTime = new Date(parsedDue.year, parsedDue.month - 1, parsedDue.day).getTime();
-    const daysUntilDue = Math.round((dueTime - refDate.getTime()) / (1000 * 60 * 60 * 24));
+    const rawNotice = noticeMap.get(bill.billNo.trim().toUpperCase());
+    const reconciledNotice = rawNotice
+      ? reconcileFormalNoticeWithStatement(rawNotice, statement, referenceDate)
+      : undefined;
+
+    const refMs = parseVidyutDateToUtcMs(referenceDate) ?? Date.parse(referenceDate);
+    const dueMs = Date.UTC(parsedDue.year, parsedDue.month, parsedDue.day);
+    const daysUntilDue = Math.round((dueMs - refMs) / (1000 * 60 * 60 * 24));
 
     let reminderStage: PaymentCalendarEvent['reminderStage'];
-    if (reconciled.isPaid) {
+    if (reconciled.isPaid || statement.isFullySettled) {
       reminderStage = 'PAID';
     } else if (reconciled.isOverdue || daysUntilDue < 0) {
       reminderStage = 'OVERDUE';
@@ -360,6 +464,47 @@ export function derivePaymentCalendarEvents(
       reminderStage = 'UPCOMING_DUE_1D';
     } else if (daysUntilDue <= 5 && daysUntilDue > 1) {
       reminderStage = 'UPCOMING_DUE_5D';
+    }
+
+    // Determine primary milestone classification (A–E)
+    const isIssuedNotice =
+      reconciledNotice &&
+      (reconciledNotice.status === 'ISSUED' ||
+        reconciledNotice.status === 'SERVED' ||
+        reconciledNotice.status === 'DEADLINE_APPROACHING' ||
+        reconciledNotice.status === 'DEADLINE_REACHED' ||
+        reconciledNotice.status === 'ON_HOLD');
+
+    let milestoneType: CalendarMilestoneType = 'A_ORIGINAL_BILL_DUE_DATE';
+    if (reconciledNotice?.status === 'DEADLINE_REACHED') {
+      milestoneType = 'E_AUTHORIZED_DISCONNECTION_REVIEW';
+    } else if (isIssuedNotice && reconciledNotice?.paymentDeadlineDate) {
+      milestoneType = 'D_FORMAL_NOTICE_PAYMENT_DEADLINE';
+    } else if (isIssuedNotice && reconciledNotice?.issueDate) {
+      milestoneType = 'C_FORMAL_NOTICE_ISSUE_DATE';
+    } else if (statement.daysOverdue > 0 && !statement.isFullySettled) {
+      milestoneType = 'B_LATE_CHARGE_ACCRUAL_DATE';
+    }
+
+    const parsedNoticeIssue = isIssuedNotice && reconciledNotice?.issueDate
+      ? parseDateToYearMonthDay(reconciledNotice.issueDate)
+      : null;
+    const parsedNoticeDeadline = isIssuedNotice && reconciledNotice?.paymentDeadlineDate
+      ? parseDateToYearMonthDay(reconciledNotice.paymentDeadlineDate)
+      : null;
+
+    const activeMilestoneList: CalendarMilestoneType[] = ['A_ORIGINAL_BILL_DUE_DATE'];
+    if (statement.daysOverdue > 0 && !statement.isFullySettled) {
+      activeMilestoneList.push('B_LATE_CHARGE_ACCRUAL_DATE');
+    }
+    if (isIssuedNotice && reconciledNotice?.issueDate) {
+      activeMilestoneList.push('C_FORMAL_NOTICE_ISSUE_DATE');
+    }
+    if (isIssuedNotice && reconciledNotice?.paymentDeadlineDate) {
+      activeMilestoneList.push('D_FORMAL_NOTICE_PAYMENT_DEADLINE');
+    }
+    if (reconciledNotice?.status === 'DEADLINE_REACHED') {
+      activeMilestoneList.push('E_AUTHORIZED_DISCONNECTION_REVIEW');
     }
 
     events.push({
@@ -380,6 +525,14 @@ export function derivePaymentCalendarEvents(
       totalAmount: reconciled.totalAmount,
       paidAmount: reconciled.paidAmount,
       outstandingBalance: reconciled.outstandingBalance,
+      // Canonical Step 4A/4B 9-Field properties:
+      remainingPrincipal: statement.remainingPrincipal,
+      accruedLateCharges: statement.accruedLatePaymentCharges,
+      waivedOrSettledCharges: statement.chargesAlreadyPaidOrWaived,
+      totalOutstandingWithCharges: statement.totalCurrentOutstanding,
+      daysOverdue: statement.daysOverdue,
+      dailyLateChargeAccrual: statement.dailyLateChargeAccrual,
+      calculationReferenceDate: statement.lastCalculationDate,
       status: reconciled.effectiveStatus,
       isDue: reconciled.isDue,
       isOverdue: reconciled.isOverdue,
@@ -391,6 +544,33 @@ export function derivePaymentCalendarEvents(
       periodEndDate: reconciled.periodEndDate,
       billingPeriodLabel: reconciled.billingPeriodLabel,
       reminderStage,
+      milestoneType,
+      distinguishedMilestones: {
+        originalBillPaymentDeadline: bill.dueDate,
+        lateChargeAccrualStartDate: reconciled.lateChargeBreakdown.gracePeriodEndsOn,
+        formalNoticeIssueDate: isIssuedNotice ? reconciledNotice?.issueDate || null : null,
+        formalNoticePaymentDeadline: isIssuedNotice
+          ? reconciledNotice?.paymentDeadlineDate || null
+          : null,
+        authorizedDisconnectionReviewStatus: reconciledNotice
+          ? reconciledNotice.disconnectionReviewStatus
+          : 'NOT_APPLICABLE',
+        includes: (m: CalendarMilestoneType) => activeMilestoneList.includes(m),
+      },
+      formalNoticeId: reconciledNotice?.noticeId,
+      formalNoticeStatus: reconciledNotice?.status,
+      formalNoticeIssueDate: isIssuedNotice ? reconciledNotice?.issueDate : undefined,
+      formalNoticeIssueDateIso: parsedNoticeIssue?.isoDate,
+      formalNoticeServiceDate: isIssuedNotice ? reconciledNotice?.serviceDate : undefined,
+      formalNoticePaymentDeadline: isIssuedNotice
+        ? reconciledNotice?.paymentDeadlineDate
+        : undefined,
+      formalNoticePaymentDeadlineIso: parsedNoticeDeadline?.isoDate,
+      formalNoticeDaysRemaining: reconciledNotice?.daysRemainingUntilDeadline ?? null,
+      isFormalNoticeDeadlineExpired: Boolean(reconciledNotice?.isDeadlineReached),
+      isFormalNoticeResolved:
+        reconciledNotice?.status === 'RESOLVED' || reconciledNotice?.status === 'WITHDRAWN',
+      disconnectionReviewStatus: reconciledNotice?.disconnectionReviewStatus,
     });
   }
 
@@ -406,8 +586,8 @@ export function derivePaymentCalendarEvents(
 }
 
 /**
- * Builds the month calendar matrix (42 cells: 6 weeks x 7 days)
- * populated with genuine billing events.
+ * Builds the month calendar matrix (35 or 42 cells)
+ * populated with genuine billing due-date events and formal notice milestones.
  */
 export function buildMonthCalendarGrid(
   paramsOrYear:
@@ -449,15 +629,57 @@ export function buildMonthCalendarGrid(
   // Number of days in preceding month
   const daysInPrevMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
 
-  // Map events by ISO date for O(1) lookup
+  // Map events by ISO due date for O(1) lookup, and track formal notice issue/deadline dates
   const eventsByDate = new Map<string, PaymentCalendarEvent[]>();
+  const noticeEventsByDate = new Map<string, PaymentCalendarEvent[]>();
+
   for (const ev of events) {
     const list = eventsByDate.get(ev.dueDateIso) || [];
     list.push(ev);
     eventsByDate.set(ev.dueDateIso, list);
+
+    if (ev.formalNoticeIssueDateIso) {
+      const nList = noticeEventsByDate.get(ev.formalNoticeIssueDateIso) || [];
+      if (!nList.some((x) => x.billNo === ev.billNo)) nList.push(ev);
+      noticeEventsByDate.set(ev.formalNoticeIssueDateIso, nList);
+    }
+    if (ev.formalNoticePaymentDeadlineIso) {
+      const nList = noticeEventsByDate.get(ev.formalNoticePaymentDeadlineIso) || [];
+      if (!nList.some((x) => x.billNo === ev.billNo)) nList.push(ev);
+      noticeEventsByDate.set(ev.formalNoticePaymentDeadlineIso, nList);
+    }
   }
 
   const cells: CalendarMonthDay[] = [];
+
+  const createCell = (
+    dateIso: string,
+    dayNumber: number,
+    cellMonth: number,
+    cellYear: number,
+    isCurrentMonth: boolean
+  ): CalendarMonthDay => {
+    const dayEvents = eventsByDate.get(dateIso) || [];
+    const dayNoticeEvents = noticeEventsByDate.get(dateIso) || [];
+    const combinedEvents =
+      dayEvents.length > 0
+        ? dayEvents
+        : dayNoticeEvents.filter(ne => ne.formalNoticePaymentDeadlineIso === dateIso);
+    return {
+      dateIso,
+      dayNumber,
+      month: cellMonth,
+      year: cellYear,
+      isCurrentMonth,
+      isToday: dateIso === todayIso,
+      events: combinedEvents,
+      noticeEvents: dayNoticeEvents,
+      hasDueBills: dayEvents.some((e) => e.isDue),
+      hasPaidBills: dayEvents.some((e) => e.isFullyPaid),
+      hasOverdueBills: dayEvents.some((e) => e.isOverdue),
+      hasFormalNoticeMilestone: dayNoticeEvents.length > 0,
+    };
+  };
 
   // 1. Preceding month padding days
   for (let i = startingDayOfWeek - 1; i >= 0; i--) {
@@ -465,39 +687,13 @@ export function buildMonthCalendarGrid(
     const prevMonthIdx = month === 0 ? 11 : month - 1;
     const prevYear = month === 0 ? year - 1 : year;
     const dateIso = `${prevYear}-${String(prevMonthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const dayEvents = eventsByDate.get(dateIso) || [];
-
-    cells.push({
-      dateIso,
-      dayNumber: day,
-      month: prevMonthIdx,
-      year: prevYear,
-      isCurrentMonth: false,
-      isToday: dateIso === todayIso,
-      events: dayEvents,
-      hasDueBills: dayEvents.some((e) => e.isDue),
-      hasPaidBills: dayEvents.some((e) => e.isFullyPaid),
-      hasOverdueBills: dayEvents.some((e) => e.isOverdue),
-    });
+    cells.push(createCell(dateIso, day, prevMonthIdx, prevYear, false));
   }
 
   // 2. Current month days
   for (let day = 1; day <= daysInMonth; day++) {
     const dateIso = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const dayEvents = eventsByDate.get(dateIso) || [];
-
-    cells.push({
-      dateIso,
-      dayNumber: day,
-      month,
-      year,
-      isCurrentMonth: true,
-      isToday: dateIso === todayIso,
-      events: dayEvents,
-      hasDueBills: dayEvents.some((e) => e.isDue),
-      hasPaidBills: dayEvents.some((e) => e.isFullyPaid),
-      hasOverdueBills: dayEvents.some((e) => e.isOverdue),
-    });
+    cells.push(createCell(dateIso, day, month, year, true));
   }
 
   // 3. Succeeding month padding days to complete standard 35 or 42 grid cells
@@ -509,20 +705,7 @@ export function buildMonthCalendarGrid(
     const nextMonthIdx = month === 11 ? 0 : month + 1;
     const nextYear = month === 11 ? year + 1 : year;
     const dateIso = `${nextYear}-${String(nextMonthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const dayEvents = eventsByDate.get(dateIso) || [];
-
-    cells.push({
-      dateIso,
-      dayNumber: day,
-      month: nextMonthIdx,
-      year: nextYear,
-      isCurrentMonth: false,
-      isToday: dateIso === todayIso,
-      events: dayEvents,
-      hasDueBills: dayEvents.some((e) => e.isDue),
-      hasPaidBills: dayEvents.some((e) => e.isFullyPaid),
-      hasOverdueBills: dayEvents.some((e) => e.isOverdue),
-    });
+    cells.push(createCell(dateIso, day, nextMonthIdx, nextYear, false));
   }
 
   return cells;
@@ -534,9 +717,14 @@ export function buildMonthCalendarGrid(
 export function computeCalendarSummary(events: PaymentCalendarEvent[]): PaymentCalendarSummary {
   let dueBillsCount = 0;
   let paidBillsCount = 0;
-  let totalDueAmount = 0;
+  let totalPrincipalDueAmount = 0;
+  let totalLateChargesAmount = 0;
+  let totalDueAmountWithCharges = 0;
   let totalPaidAmount = 0;
   let nextUpcomingDueDate: string | null = null;
+  let activeFormalNoticesCount = 0;
+  let approachingNoticeDeadlinesCount = 0;
+  let expiredNoticeDeadlinesCount = 0;
   const eventsByConnectionNo: Record<string, PaymentCalendarEvent[]> = {};
 
   for (const ev of events) {
@@ -547,9 +735,26 @@ export function computeCalendarSummary(events: PaymentCalendarEvent[]): PaymentC
 
     if (ev.isDue) {
       dueBillsCount += 1;
-      totalDueAmount += ev.outstandingBalance;
+      totalPrincipalDueAmount += ev.outstandingBalance;
+      totalLateChargesAmount += ev.accruedLateCharges || 0;
+      totalDueAmountWithCharges += ev.totalOutstandingWithCharges ?? ev.outstandingBalance;
       if (!nextUpcomingDueDate || ev.dueDateIso < nextUpcomingDueDate) {
         nextUpcomingDueDate = ev.dueDate;
+      }
+    }
+
+    if (
+      ev.formalNoticeId &&
+      ev.formalNoticeStatus &&
+      ev.formalNoticeStatus !== 'RESOLVED' &&
+      ev.formalNoticeStatus !== 'WITHDRAWN' &&
+      ev.formalNoticeStatus !== 'NOT_REQUIRED'
+    ) {
+      activeFormalNoticesCount += 1;
+      if (ev.formalNoticeStatus === 'DEADLINE_APPROACHING') {
+        approachingNoticeDeadlinesCount += 1;
+      } else if (ev.formalNoticeStatus === 'DEADLINE_REACHED') {
+        expiredNoticeDeadlinesCount += 1;
       }
     }
 
@@ -561,20 +766,33 @@ export function computeCalendarSummary(events: PaymentCalendarEvent[]): PaymentC
     }
   }
 
+  totalPrincipalDueAmount = Number(totalPrincipalDueAmount.toFixed(2));
+  totalLateChargesAmount = Number(totalLateChargesAmount.toFixed(2));
+  totalDueAmountWithCharges = Number(totalDueAmountWithCharges.toFixed(2));
+
   return {
     totalBillsCount: events.length,
     dueBillsCount,
     paidBillsCount,
-    totalDueAmount,
+    totalDueAmount: totalDueAmountWithCharges,
+    totalPrincipalDueAmount,
+    totalLateChargesAmount,
+    totalDueAmountWithCharges,
+    totalOutstandingWithChargesInr: totalDueAmountWithCharges,
     totalPaidAmount,
     nextUpcomingDueDate,
+    activeFormalNoticesCount,
+    activeFormalNoticeCount: activeFormalNoticesCount,
+    approachingNoticeDeadlinesCount,
+    expiredNoticeDeadlinesCount,
     eventsByConnectionNo,
   };
 }
 
 /**
  * Builds a valid Google Calendar Web URL for manual template creation.
- * Does not write directly to the user's personal calendar; opens in a secure browser tab.
+ * Includes the 9-field overdue breakdown and Formal Notice milestone if issued.
+ * Never claims an official physical disconnection date.
  */
 export function buildGoogleCalendarUrl(
   event: PaymentCalendarEvent,
@@ -589,21 +807,44 @@ export function buildGoogleCalendarUrl(
   const startStamp = `${compactDate}T090000`;
   const endStamp = `${compactDate}T180000`;
 
-  const title = `UGVCL Electricity Bill Due: ${event.billNo} (₹${event.outstandingBalance.toLocaleString('en-IN')})`;
-  const details = [
+  const cycleLabel =
+    event.billingCycleType === 'BI_MONTHLY'
+      ? `Billing Cycle: Bi-Monthly (${event.billingPeriodLabel || event.billMonth})`
+      : `Billing Cycle: Monthly (${event.billMonth})`;
+
+  const effectiveTotalPayable = event.totalOutstandingWithCharges ?? event.outstandingBalance;
+  const title = `UGVCL Electricity Bill Due: ${event.billNo} (₹${effectiveTotalPayable.toLocaleString('en-IN')})`;
+  const detailLines = [
     `Uttar Gujarat Vij Company Limited (UGVCL)`,
     `Bill Number: ${event.billNo}`,
     `Consumer Number: ${event.consumerNo}`,
     `Consumer Name: ${event.consumerName}`,
-    `Billing Period: ${event.billMonth}`,
-    `Outstanding Payable: ₹${event.outstandingBalance.toLocaleString('en-IN')}`,
-    `Payment Status: ${event.status}`,
-    `Due Date: ${event.dueDate}`,
+    cycleLabel,
+    `Original Bill Amount: ₹${event.totalAmount.toLocaleString('en-IN')}`,
+    `Payments Settled: ₹${event.paidAmount.toLocaleString('en-IN')}`,
+    `Remaining Principal: ₹${(event.remainingPrincipal ?? event.outstandingBalance).toLocaleString('en-IN')}`,
+    `Accrued Late Charges (DPS): ₹${(event.accruedLateCharges ?? 0).toFixed(2)}`,
+    `Total Current Outstanding: ₹${effectiveTotalPayable.toLocaleString('en-IN')}`,
+    `Payment Status: ${event.status} (${event.daysOverdue || 0} days overdue)`,
+    `Original Due Date: ${event.dueDate}`,
+  ];
+
+  if (event.formalNoticeId && event.formalNoticePaymentDeadline) {
+    detailLines.push(
+      `DEMO Section 56 Formal Notice: ${event.formalNoticeId} (Issued: ${event.formalNoticeIssueDate || 'N/A'}, 15-Day Payment Deadline: ${event.formalNoticePaymentDeadline})`
+    );
+    detailLines.push(
+      `Notice Safeguard: Simulated DEMO milestone — expiry triggers Authorized Review only (never automatic physical disconnection).`
+    );
+  }
+
+  detailLines.push(
     `Sub-Division Office: ${event.subdivision}`,
     `Official UGVCL Portal: https://www.ugvcl.com`,
-    `* VidyutFlow 2.0 Demonstration ERP Platform Notification`,
-  ].join('\n');
+    `* VidyutFlow 2.0 Demonstration ERP Platform Notification`
+  );
 
+  const details = detailLines.join('\n');
   const location = `UGVCL ${event.subdivision} Sub-Division Office, North Gujarat`;
 
   const query = new URLSearchParams({
@@ -656,7 +897,7 @@ export function foldIcsLine(line: string): string {
 
 /**
  * Generates an RFC 5545 compliant `.ics` calendar file content string
- * for an electricity bill due date event.
+ * for an electricity bill due date or formal notice milestone event.
  */
 export function generateIcsCalendarEvent(
   event: PaymentCalendarEvent,
@@ -673,23 +914,46 @@ export function generateIcsCalendarEvent(
     : new Date(Date.UTC(2026, 9, 23));
   const compactNextDay = `${nextDayDate.getUTCFullYear()}${String(nextDayDate.getUTCMonth() + 1).padStart(2, '0')}${String(nextDayDate.getUTCDate()).padStart(2, '0')}`;
 
-  const summary = `UGVCL Electricity Bill Due: ${event.billNo} (INR ${event.outstandingBalance})`;
-  const description = [
+  const cycleLabel =
+    event.billingCycleType === 'BI_MONTHLY'
+      ? `Billing Cycle: Bi-Monthly (${event.billingPeriodLabel || event.billMonth})`
+      : `Billing Cycle: Monthly (${event.billMonth})`;
+
+  const effectiveTotalPayable = event.totalOutstandingWithCharges ?? event.outstandingBalance;
+  const summary = `UGVCL Electricity Bill Due: ${event.billNo} (INR ${effectiveTotalPayable})`;
+  const descriptionLines = [
     `Uttar Gujarat Vij Company Limited (UGVCL)`,
     `Bill Number: ${event.billNo}`,
     `Consumer Number: ${event.consumerNo}`,
     `Consumer Name: ${event.consumerName}`,
-    `Billing Month: ${event.billMonth}`,
+    cycleLabel,
     `Total Bill: INR ${event.totalAmount}`,
     `Previously Paid: INR ${event.paidAmount}`,
-    `Outstanding Balance: INR ${event.outstandingBalance}`,
+    `Remaining Principal: INR ${event.remainingPrincipal ?? event.outstandingBalance}`,
+    `Accrued Late Charges (DPS): INR ${(event.accruedLateCharges ?? 0).toFixed(2)}`,
+    `Total Current Outstanding: INR ${effectiveTotalPayable}`,
+    `Days Overdue: ${event.daysOverdue ?? 0}`,
     `Status: ${event.status}`,
     `Due Date: ${event.dueDate}`,
+    `Milestone Classification: ${event.milestoneType}`,
+  ];
+
+  if (event.formalNoticeId && event.formalNoticePaymentDeadline) {
+    descriptionLines.push(
+      `DEMO Formal Notice ID: ${event.formalNoticeId} (Issued: ${event.formalNoticeIssueDate || 'N/A'}, 15-Day Payment Deadline: ${event.formalNoticePaymentDeadline})`
+    );
+    descriptionLines.push(
+      `Statutory Safeguard: DEMO notice only — simulated Section 56 workflow (no automatic physical disconnection).`
+    );
+  }
+
+  descriptionLines.push(
     `Sub-Division: ${event.subdivision}`,
     `Official UGVCL Portal: https://www.ugvcl.com`,
-    `CIN: ${UGVCL_CORPORATE_IDENTITY.cin}`,
-  ].join('\n');
+    `CIN: ${UGVCL_CORPORATE_IDENTITY.cin}`
+  );
 
+  const description = descriptionLines.join('\n');
   const location = `UGVCL ${event.subdivision} Sub-Division Office, North Gujarat`;
 
   const lines: string[] = [
@@ -706,6 +970,13 @@ export function generateIcsCalendarEvent(
     foldIcsLine(`SUMMARY:${escapeIcsText(summary)}`),
     foldIcsLine(`DESCRIPTION:${escapeIcsText(description)}`),
     foldIcsLine(`LOCATION:${escapeIcsText(location)}`),
+    ...(event.formalNoticeId
+      ? [
+          `X-UGVCL-FORMAL-NOTICE-ID:${event.formalNoticeId}`,
+          `X-UGVCL-FORMAL-NOTICE-DEADLINE:${event.formalNoticePaymentDeadline || ''}`,
+          'X-UGVCL-FORMAL-NOTICE-DISCLOSURE:DEMO notice only - simulated Section 56 workflow',
+        ]
+      : []),
     'STATUS:CONFIRMED',
     'TRANSP:OPAQUE',
     'CLASS:PUBLIC',

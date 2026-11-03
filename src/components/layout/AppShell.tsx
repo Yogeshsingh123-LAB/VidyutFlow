@@ -1,20 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopNav } from './TopNav';
 import { MobileNav } from './MobileNav';
 import { ToastContainer } from '../common/ToastContainer';
-import { CommandPalette } from '../common/CommandPalette';
-import { NotificationDrawer } from '../common/NotificationDrawer';
-import { CaseDetailDrawer } from '../common/CaseDetailDrawer';
-import { WorkflowVisualizerModal } from '../common/WorkflowVisualizerModal';
-import { RoleWelcomeModal } from '../common/RoleWelcomeModal';
-import { AIAssistantDrawer } from '../common/AIAssistantDrawer';
-import { CriticalIncidentModal } from '../common/CriticalIncidentModal';
-import { HumanApprovalModal } from '../common/HumanApprovalModal';
-import { IncidentActionModal } from '../common/IncidentActionModal';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 import { AlertTriangle, RefreshCw, Database } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
+
+// Dynamic lazy imports for modal drawers and secondary utilities to optimize main bundle
+const CommandPalette = lazy(() =>
+  import('../common/CommandPalette').then(m => ({ default: m.CommandPalette }))
+);
+const NotificationDrawer = lazy(() =>
+  import('../common/NotificationDrawer').then(m => ({ default: m.NotificationDrawer }))
+);
+const CaseDetailDrawer = lazy(() =>
+  import('../common/CaseDetailDrawer').then(m => ({ default: m.CaseDetailDrawer }))
+);
+const WorkflowVisualizerModal = lazy(() =>
+  import('../common/WorkflowVisualizerModal').then(m => ({ default: m.WorkflowVisualizerModal }))
+);
+const RoleWelcomeModal = lazy(() =>
+  import('../common/RoleWelcomeModal').then(m => ({ default: m.RoleWelcomeModal }))
+);
+const AIAssistantDrawer = lazy(() =>
+  import('../common/AIAssistantDrawer').then(m => ({ default: m.AIAssistantDrawer }))
+);
+const CriticalIncidentModal = lazy(() =>
+  import('../common/CriticalIncidentModal').then(m => ({ default: m.CriticalIncidentModal }))
+);
+const HumanApprovalModal = lazy(() =>
+  import('../common/HumanApprovalModal').then(m => ({ default: m.HumanApprovalModal }))
+);
+const IncidentActionModal = lazy(() =>
+  import('../common/IncidentActionModal').then(m => ({ default: m.IncidentActionModal }))
+);
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -111,26 +132,33 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         </div>
       </div>
 
-      {/* Overlays & Drawers */}
+      {/* Lightweight Toasts */}
       <ToastContainer />
-      <CommandPalette />
-      <NotificationDrawer />
-      <CaseDetailDrawer />
-      <WorkflowVisualizerModal />
-      <RoleWelcomeModal />
-      <AIAssistantDrawer />
-      <CriticalIncidentModal />
-      <HumanApprovalModal
-        recommendation={activeApprovalRecommendation}
-        onClose={closeApprovalModal}
-        onApprove={approveRecommendation}
-        onReject={rejectRecommendation}
-      />
-      <IncidentActionModal
-        isOpen={Boolean(activeIncidentModalId)}
-        incidentId={activeIncidentModalId}
-        onClose={closeIncidentModal}
-      />
+
+      {/* Code-split Overlays & Drawers wrapped in ErrorBoundary and Suspense */}
+      <ErrorBoundary scope="drawer">
+        <Suspense fallback={null}>
+          <CommandPalette />
+          <NotificationDrawer />
+          <CaseDetailDrawer />
+          <WorkflowVisualizerModal />
+          <RoleWelcomeModal />
+          <AIAssistantDrawer />
+          <CriticalIncidentModal />
+          <HumanApprovalModal
+            recommendation={activeApprovalRecommendation}
+            onClose={closeApprovalModal}
+            onApprove={approveRecommendation}
+            onReject={rejectRecommendation}
+          />
+          <IncidentActionModal
+            isOpen={Boolean(activeIncidentModalId)}
+            incidentId={activeIncidentModalId}
+            onClose={closeIncidentModal}
+          />
+        </Suspense>
+      </ErrorBoundary>
     </div>
   );
 };
+

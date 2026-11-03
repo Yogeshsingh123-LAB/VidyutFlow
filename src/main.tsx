@@ -10,7 +10,19 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import {setupFieldServiceWorker} from './utils/serviceWorkerRegistration';
+import {registerVidyutFlowServiceWorker} from './utils/pwaServiceWorker';
 
 setupFieldServiceWorker();
 
 createRoot(document.getElementById('root')!).render(<App />);
+
+if (typeof window !== 'undefined') {
+  const initServiceWorker = () => {
+    void registerVidyutFlowServiceWorker();
+  };
+  if (document.readyState === 'complete') {
+    initServiceWorker();
+  } else {
+    window.addEventListener('load', initServiceWorker, {once: true});
+  }
+}

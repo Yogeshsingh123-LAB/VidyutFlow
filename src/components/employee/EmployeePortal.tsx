@@ -144,7 +144,16 @@ export const EmployeePortal: React.FC = () => {
     dataMode,
     backendStatus,
     isBrowserOffline,
-    isOfflineSimulated
+    isOfflineSimulated,
+    businessReferenceDate,
+    formalNotices,
+    lateChargeWaivers,
+    paymentReversals,
+    issueFormalNoticeDemo,
+    placeNoticeOnHoldDemo,
+    withdrawFormalNoticeDemo,
+    waiveLateChargeDemo,
+    reversePaymentDemo
   } = useApp();
 
   const employeeCanonicalMetrics = React.useMemo(

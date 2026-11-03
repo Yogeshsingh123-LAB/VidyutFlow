@@ -11,7 +11,8 @@ import {
   CreditCard,
   FileText,
   Filter,
-  Zap,
+  Scale,
+  ShieldAlert,
 } from 'lucide-react';
 import { ElectricityBill, ElectricityConnection, PaymentTransaction } from '../../types';
 import { Language } from '../../i18n/types';
@@ -23,7 +24,17 @@ import {
   computeCalendarSummary,
   buildGoogleCalendarUrl,
   triggerIcsDownload,
+  parseDateToYearMonthDay,
 } from '../../utils/paymentCalendarEngine';
+import {
+  FormalNoticeRecord,
+  getFormalNoticeTranslations,
+  INITIAL_FORMAL_NOTICES,
+} from '../../utils/formalNoticeEngine';
+import {
+  LateChargeWaiverRecord,
+  PaymentReversalRecord,
+} from '../../utils/lateChargeEngine';
 import { localizeBillStatus } from '../../i18n/consumerContentTranslations';
 
 interface SmartPaymentCalendarProps {
@@ -31,6 +42,10 @@ interface SmartPaymentCalendarProps {
   connections: ElectricityConnection[];
   payments: PaymentTransaction[];
   language: Language;
+  referenceDate?: string;
+  formalNotices?: FormalNoticeRecord[];
+  waivers?: LateChargeWaiverRecord[];
+  reversals?: PaymentReversalRecord[];
   selectedConnectionNo?: string | null;
   onSelectConnection?: (consumerNo: string) => void;
   onViewBill?: (bill: ElectricityBill) => void;
@@ -42,14 +57,25 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
   connections,
   payments,
   language,
+  referenceDate = '28-Oct-2026',
+  formalNotices = INITIAL_FORMAL_NOTICES,
+  waivers = [],
+  reversals = [],
   selectedConnectionNo,
   onSelectConnection,
   onViewBill,
   onPayBill,
 }) => {
   const loc = CALENDAR_LOCALIZATION[language] || CALENDAR_LOCALIZATION.en;
+  const fnT = getFormalNoticeTranslations(language);
 
-  // Active view month & year (default to October 2026 based on canonical billing records)
+  const parsedRefDate = useMemo(
+    () => parseDateToYearMonthDay(referenceDate),
+    [referenceDate]
+  );
+  const referenceIsoDate = parsedRefDate?.isoDate || '2026-10-28';
+
+  // Active view month & year (default to October 2026 based on canonical billing records so overdue due dates are immediately visible)
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date(2026, 9, 15)); // Oct 2026
   const [connectionFilter, setConnectionFilter] = useState<string>(
     selectedConnectionNo || 'ALL'
@@ -60,17 +86,24 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
 
-  // Update connection filter when selectedConnectionNo prop changes
   React.useEffect(() => {
     if (selectedConnectionNo) {
       setConnectionFilter(selectedConnectionNo);
     }
   }, [selectedConnectionNo]);
 
-  // Derive all calendar events from canonical bills & payments
+  // Derive all calendar events from canonical bills, payments, referenceDate, and formalNotices
   const allEvents = useMemo(() => {
-    return derivePaymentCalendarEvents(bills, connections, payments);
-  }, [bills, connections, payments]);
+    return derivePaymentCalendarEvents({
+      bills,
+      connections,
+      payments,
+      referenceDate,
+      formalNotices,
+      waivers,
+      reversals,
+    });
+  }, [bills, connections, payments, referenceDate, formalNotices, waivers, reversals]);
 
   // Filter events according to connection and status filters
   const filteredEvents = useMemo(() => {
@@ -93,14 +126,24 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
     return computeCalendarSummary(filteredEvents);
   }, [filteredEvents]);
 
-  // Build month grid for current month/year
+  // Build month grid for current month/year using active referenceDate ISO
   const monthGrid = useMemo(() => {
-    return buildMonthCalendarGrid(currentYear, currentMonth, filteredEvents);
-  }, [currentYear, currentMonth, filteredEvents]);
+    return buildMonthCalendarGrid(
+      currentYear,
+      currentMonth,
+      filteredEvents,
+      referenceIsoDate
+    );
+  }, [currentYear, currentMonth, filteredEvents, referenceIsoDate]);
 
-  // Selected date events
+  // Selected date events (including due date OR formal notice issue/deadline date)
   const selectedDateEvents = useMemo(() => {
-    return filteredEvents.filter((evt) => evt.dueDateIso === selectedDateIso);
+    return filteredEvents.filter(
+      (evt) =>
+        evt.dueDateIso === selectedDateIso ||
+        evt.formalNoticeIssueDateIso === selectedDateIso ||
+        evt.formalNoticePaymentDeadlineIso === selectedDateIso
+    );
   }, [filteredEvents, selectedDateIso]);
 
   const handlePrevMonth = () => {
@@ -112,15 +155,21 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
   };
 
   const handleToday = () => {
-    const today = new Date();
-    setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1));
-    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
-      today.getDate()
-    ).padStart(2, '0')}`;
-    setSelectedDateIso(iso);
+    if (parsedRefDate) {
+      setCurrentDate(new Date(parsedRefDate.year, parsedRefDate.month, 1));
+      setSelectedDateIso(parsedRefDate.isoDate);
+    } else {
+      setCurrentDate(new Date(2026, 9, 1));
+      setSelectedDateIso('2026-10-22');
+    }
   };
 
   const monthLabel = `${loc.monthsFull[currentMonth]} ${currentYear}`;
+  const formatInr = (val: number) =>
+    `₹${val.toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
 
   return (
     <div
@@ -141,14 +190,14 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
                 {loc.calendarTitle}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {loc.calendarSubtitle}
+                {loc.calendarSubtitle} · Ref: {referenceDate}
               </p>
             </div>
           </div>
         </div>
 
-        {/* 3 Metric Summary Badges */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 text-xs">
+        {/* 4 Metric Summary Badges (including Late Charges & Formal Notice Milestone) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-xs">
           <div className="p-2.5 sm:p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60">
             <span className="text-[10px] uppercase font-bold text-blue-700 dark:text-blue-300 block">
               {loc.nextDueCardLabel}
@@ -158,12 +207,32 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
             </span>
           </div>
 
-          <div className="p-2.5 sm:p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/60">
-            <span className="text-[10px] uppercase font-bold text-amber-700 dark:text-amber-300 block">
+          <div className="p-2.5 sm:p-3 rounded-xl bg-rose-50/70 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/60">
+            <span className="text-[10px] uppercase font-bold text-rose-700 dark:text-rose-300 block">
               {loc.totalOutstandingCardLabel}
             </span>
-            <span className="text-xs sm:text-sm font-extrabold text-amber-900 dark:text-amber-100 font-mono mt-0.5 block">
-              ₹{summary.totalDueAmount.toLocaleString('en-IN')}
+            <span
+              data-testid="calendar-summary-total-outstanding"
+              className="text-xs sm:text-sm font-extrabold text-rose-900 dark:text-rose-100 font-mono mt-0.5 block"
+            >
+              {formatInr(summary.totalDueAmountWithCharges)}
+            </span>
+            {summary.totalLateChargesAmount > 0 && (
+              <span className="text-[10px] text-rose-600 dark:text-rose-300 font-mono block">
+                (incl. +{formatInr(summary.totalLateChargesAmount)} DPS)
+              </span>
+            )}
+          </div>
+
+          <div className="p-2.5 sm:p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/60">
+            <span className="text-[10px] uppercase font-bold text-amber-700 dark:text-amber-300 block">
+              {fnT.noticeIdLabel}
+            </span>
+            <span
+              data-testid="calendar-summary-active-notices"
+              className="text-xs sm:text-sm font-extrabold text-amber-900 dark:text-amber-100 font-mono mt-0.5 block"
+            >
+              {summary.activeFormalNoticesCount} Active
             </span>
           </div>
 
@@ -176,6 +245,37 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
             </span>
           </div>
         </div>
+      </div>
+
+      {/* Distinguished Milestones Legend (A–E) */}
+      <div
+        data-testid="calendar-milestone-legend"
+        className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0c162c] border border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-3 text-[11px]"
+      >
+        <span className="font-bold text-slate-700 dark:text-slate-300">
+          {language === 'gu'
+            ? 'કેલેન્ડર સીમાચિહ્નો (Milestones A–E):'
+            : language === 'hi'
+            ? 'कैलेंडर चरण (Milestones A–E):'
+            : language === 'mr'
+            ? 'कॅलेंडर टप्पे (Milestones A–E):'
+            : 'Calendar Milestones (A–E):'}
+        </span>
+        <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-medium">
+          {fnT.milestones.ORIGINAL_BILL_DUE_DATE}
+        </span>
+        <span className="px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 font-medium">
+          {fnT.milestones.LATE_CHARGE_ACCRUAL_DATE}
+        </span>
+        <span className="px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 font-medium">
+          {fnT.milestones.FORMAL_NOTICE_ISSUE_DATE}
+        </span>
+        <span className="px-2 py-0.5 rounded bg-orange-100 dark:bg-orange-950/60 text-orange-800 dark:text-orange-300 font-medium">
+          {fnT.milestones.FORMAL_NOTICE_PAYMENT_DEADLINE}
+        </span>
+        <span className="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-medium">
+          {fnT.milestones.AUTHORIZED_DISCONNECTION_REVIEW}
+        </span>
       </div>
 
       {/* Control Bar: Filters & Month Navigation */}
@@ -275,7 +375,6 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
 
       {/* Month Calendar Grid */}
       <div className="rounded-2xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
-        {/* Weekday Column Headers */}
         <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-900/60 text-center">
           {loc.weekdaysShort.map((day, idx) => (
             <div
@@ -287,11 +386,10 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
           ))}
         </div>
 
-        {/* Day Cells Grid */}
         <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 dark:divide-slate-800/80">
           {monthGrid.map((day) => {
             const isSelected = day.dateIso === selectedDateIso;
-            const hasEvents = day.events.length > 0;
+            const noticeList = day.noticeEvents || [];
 
             return (
               <button
@@ -299,7 +397,7 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
                 type="button"
                 onClick={() => setSelectedDateIso(day.dateIso)}
                 data-testid={`calendar-day-cell-${day.dateIso}`}
-                className={`min-h-[92px] sm:min-h-[110px] p-2 text-left flex flex-col justify-between transition-all cursor-pointer relative ${
+                className={`min-h-[96px] sm:min-h-[114px] p-2 text-left flex flex-col justify-between transition-all cursor-pointer relative ${
                   day.isCurrentMonth
                     ? 'bg-white dark:bg-[#101C35]'
                     : 'bg-slate-50/50 dark:bg-slate-900/30 opacity-40'
@@ -309,7 +407,6 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
                     : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
                 }`}
               >
-                {/* Day Number and Today Indicator */}
                 <div className="flex items-center justify-between">
                   <span
                     className={`inline-flex items-center justify-center text-xs font-bold font-mono rounded-full w-6 h-6 ${
@@ -323,12 +420,20 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
                     {day.dayNumber}
                   </span>
 
-                  {day.hasDueBills && (
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  )}
+                  <div className="flex items-center gap-1">
+                    {day.hasFormalNoticeMilestone && (
+                      <span
+                        title="Formal Notice Milestone"
+                        className="w-2 h-2 rounded-full bg-purple-600"
+                      />
+                    )}
+                    {day.hasDueBills && (
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                    )}
+                  </div>
                 </div>
 
-                {/* Event Pills inside Day Cell */}
+                {/* Event & Notice Milestone Badges inside Day Cell */}
                 <div className="space-y-1 mt-1">
                   {day.events.slice(0, 2).map((evt) => (
                     <div
@@ -340,19 +445,26 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
                           ? 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800'
                           : 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
                       }`}
-                      title={`${evt.billNo} · ₹${evt.outstandingBalance.toLocaleString('en-IN')}`}
+                      title={`${evt.billNo} · ${formatInr(
+                        evt.isDue ? evt.totalOutstandingWithCharges : evt.totalAmount
+                      )}`}
                     >
-                      {evt.isFullyPaid ? '✓' : '•'} ₹
-                      {(evt.isDue ? evt.outstandingBalance : evt.totalAmount).toLocaleString(
-                        'en-IN'
-                      )}
+                      {evt.isFullyPaid ? '✓' : '•'}{' '}
+                      {formatInr(evt.isDue ? evt.totalOutstandingWithCharges : evt.totalAmount)}
                     </div>
                   ))}
-                  {day.events.length > 2 && (
-                    <span className="text-[9px] text-slate-500 dark:text-slate-400 font-semibold block px-1">
-                      +{day.events.length - 2} more
-                    </span>
-                  )}
+                  {noticeList
+                    .filter((ne) => !day.events.some((de) => de.billNo === ne.billNo))
+                    .slice(0, 1)
+                    .map((ne) => (
+                      <div
+                        key={`ntc-${ne.id}-${day.dateIso}`}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono truncate border bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800"
+                        title={`${ne.formalNoticeId}`}
+                      >
+                        §56 {ne.formalNoticeId}
+                      </div>
+                    ))}
                 </div>
               </button>
             );
@@ -360,7 +472,7 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
         </div>
       </div>
 
-      {/* Selected Date Bill Details Panel */}
+      {/* Selected Date Bill Details & 9-Field Breakdown Panel */}
       <div
         className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-xs space-y-4"
         data-testid="calendar-selected-date-panel"
@@ -381,7 +493,7 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
         </div>
 
         {selectedDateEvents.length > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {selectedDateEvents.map((evt) => {
               const matchingBill = bills.find((b) => b.billNo === evt.billNo);
 
@@ -408,6 +520,11 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
                         >
                           {localizeBillStatus(evt.status, language)}
                         </span>
+                        {evt.daysOverdue > 0 && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-600 text-white">
+                            {evt.daysOverdue}d Overdue (₹{evt.dailyLateChargeAccrual.toFixed(3)}/day DPS)
+                          </span>
+                        )}
                       </div>
                       <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">
                         {evt.consumerName} ({evt.consumerNo}) · {evt.billMonth}
@@ -416,17 +533,104 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
 
                     <div className="text-left sm:text-right">
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                        {evt.isDue ? loc.dueLabel : loc.paidLabel}
+                        {evt.isDue ? fnT.nineFields.totalCurrentOutstanding : loc.paidLabel}
                       </span>
-                      <span className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white font-mono">
-                        ₹
-                        {(evt.isDue
-                          ? evt.outstandingBalance
-                          : evt.totalAmount
-                        ).toLocaleString('en-IN')}
+                      <span
+                        data-testid={`calendar-event-total-${evt.billNo}`}
+                        className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white font-mono"
+                      >
+                        {formatInr(
+                          evt.isDue ? evt.totalOutstandingWithCharges : evt.totalAmount
+                        )}
                       </span>
                     </div>
                   </div>
+
+                  {/* Canonical 9-Field Financial Summary inside Calendar Event */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 p-3 rounded-lg bg-white dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800 text-[11px]">
+                    <div>
+                      <span className="text-slate-400 block">1. {fnT.nineFields.originalBillAmount}</span>
+                      <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                        {formatInr(evt.totalAmount)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">2. {fnT.nineFields.paymentsSuccessfullySettled}</span>
+                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        {formatInr(evt.paidAmount)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">3. {fnT.nineFields.remainingPrincipal}</span>
+                      <span className="font-mono font-bold text-amber-700 dark:text-amber-300">
+                        {formatInr(evt.remainingPrincipal)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">4. {fnT.nineFields.accruedLatePaymentCharges}</span>
+                      <span className="font-mono font-bold text-rose-600 dark:text-rose-400">
+                        +{formatInr(evt.accruedLateCharges)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">5. {fnT.nineFields.chargesAlreadyPaidOrWaived}</span>
+                      <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                        {formatInr(evt.waivedOrSettledCharges)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">6. {fnT.nineFields.totalCurrentOutstanding}</span>
+                      <span className="font-mono font-extrabold text-rose-700 dark:text-rose-300">
+                        {formatInr(evt.totalOutstandingWithCharges)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">7. {fnT.nineFields.originalDueDate}</span>
+                      <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                        {evt.dueDate}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">8. {fnT.nineFields.daysOverdue}</span>
+                      <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                        {evt.daysOverdue}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">9. {fnT.nineFields.lastCalculationDate}</span>
+                      <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                        {evt.calculationReferenceDate}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Formal Notice Milestone Strip if applicable */}
+                  {evt.formalNoticeId && (
+                    <div
+                      data-testid={`calendar-notice-strip-${evt.formalNoticeId}`}
+                      className="p-2.5 rounded-lg bg-amber-50/90 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-xs flex flex-wrap items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Scale className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0" />
+                        <span>
+                          <strong>{evt.formalNoticeId}</strong> · Issued:{' '}
+                          <span className="font-mono">{evt.formalNoticeIssueDate || 'N/A'}</span> ·
+                          15-Day Deadline:{' '}
+                          <span className="font-mono font-bold text-rose-700 dark:text-rose-300">
+                            {evt.formalNoticePaymentDeadline || 'N/A'}
+                          </span>
+                        </span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded bg-amber-600 text-white text-[10px] font-bold">
+                        {evt.formalNoticeStatus
+                          ? fnT.statuses[evt.formalNoticeStatus]
+                          : 'Notice Active'}
+                        {evt.formalNoticeDaysRemaining !== null &&
+                          evt.formalNoticeDaysRemaining !== undefined &&
+                          ` (${fnT.daysRemainingLabel(evt.formalNoticeDaysRemaining)})`}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Actions for this Event */}
                   <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/80 dark:border-slate-800">
@@ -455,7 +659,7 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
                     )}
 
                     <a
-                      href={buildGoogleCalendarUrl(evt)}
+                      href={buildGoogleCalendarUrl(evt, language)}
                       target="_blank"
                       rel="noopener noreferrer"
                       data-testid={`calendar-add-gcal-${evt.billNo}`}
@@ -467,7 +671,7 @@ export const SmartPaymentCalendar: React.FC<SmartPaymentCalendarProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => triggerIcsDownload(evt)}
+                      onClick={() => triggerIcsDownload(evt, language)}
                       data-testid={`calendar-download-ics-${evt.billNo}`}
                       className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                     >

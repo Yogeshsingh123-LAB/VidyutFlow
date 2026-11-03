@@ -38,6 +38,10 @@ import {
   selectAdminCanonicalMetrics,
   getCanonicalAnalyticsTranslations
 } from '../../utils/canonicalAnalytics';
+import { STEP4C_CLOCK_AND_SYNC_I18N } from '../../utils/businessClockEngine';
+import { DEFAULT_LATE_CHARGE_POLICY, getLateChargeLocalization } from '../../utils/lateChargeEngine';
+import { deriveCanonical9FieldBillStatement, getFormalNoticeTranslations } from '../../utils/formalNoticeEngine';
+import { reconcileBillWithPayments } from '../../utils/billingEngine';
 import { AdminDemoBackupCenter } from './AdminDemoBackupCenter';
 import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 import { OrganizationalDirectoryWorkspace } from './OrganizationalDirectoryWorkspace';
@@ -58,6 +62,9 @@ import {
   RefreshCw,
   Search,
   Shield,
+  Calculator,
+  Percent,
+  FileCheck,
   Layers,
   Clock
 } from 'lucide-react';
@@ -120,9 +127,20 @@ export const AdminPortal: React.FC = () => {
     showToast,
     activeUser,
     recommendations,
-    openApprovalModal
+    openApprovalModal,
+    businessReferenceDate,
+    businessClockState,
+    businessClockMode,
+    resetBusinessClockToLiveIst,
+    stepBusinessDateByDays,
+    formalNotices,
+    lateChargeWaivers,
+    paymentReversals
   } = useApp();
   const { language, t } = useLanguage();
+  const lcDict = getLateChargeLocalization(language);
+  const fnDict = getFormalNoticeTranslations(language);
+  const step4cDict = STEP4C_CLOCK_AND_SYNC_I18N[language] || STEP4C_CLOCK_AND_SYNC_I18N.en;
   const ad = getAdminUiDictionary(language);
   const bkpDict = getDemoBackupUiDictionary(language);
   const caTranslations = getCanonicalAnalyticsTranslations(language);
@@ -132,6 +150,33 @@ export const AdminPortal: React.FC = () => {
   const [permissions, setPermissions] = useState<PermissionRow[]>(() =>
     safeLoadStorage(ADMIN_RBAC_PERMISSIONS_STORAGE_KEY, INITIAL_PERMISSIONS)
   );
+
+  const overdueAuditBills = useMemo(() => {
+    return bills
+      .map(bill => {
+        const conn = connections.find(c => c.consumerNo === bill.consumerNo);
+        const reconciled = reconcileBillWithPayments(
+          bill,
+          payments,
+          businessReferenceDate,
+          {
+            waivers: lateChargeWaivers,
+            reversals: paymentReversals,
+            tariffCategory: conn?.tariffCategory
+          }
+        );
+        const stmt = deriveCanonical9FieldBillStatement({
+          bill,
+          connection: conn,
+          payments,
+          waivers: lateChargeWaivers,
+          reversals: paymentReversals,
+          referenceDate: businessReferenceDate
+        });
+        return { bill, conn, reconciled, stmt };
+      })
+      .filter(item => item.reconciled.isOverdue && item.reconciled.outstandingBalance > 0);
+  }, [bills, connections, payments, lateChargeWaivers, paymentReversals, businessReferenceDate]);
 
   const adminCanonicalMetrics = useMemo(
     () =>
@@ -399,6 +444,287 @@ export const AdminPortal: React.FC = () => {
                 <span className="text-[11px] text-slate-500">
                   Staff: {adminCanonicalMetrics.staffDirectory.activeStaffCount} Active / {adminCanonicalMetrics.staffDirectory.lockedStaffCount} Locked
                 </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 4A: Late Payment Surcharge (DPS) Policy & Calculation Audit Panel */}
+          <div
+            data-testid="admin-late-charge-policy-panel"
+            className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 flex items-center justify-center text-amber-600 shrink-0">
+                  <Calculator className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
+                    <span>{language === 'gu' ? 'વિલંબિત ચુકવણી સરચાર્જ (DPS) નીતિ અને ઓડિટ' : language === 'hi' ? 'विलंबित भुगतान अधिभार (DPS) नीति एवं गणना ऑडिट' : language === 'mr' ? 'विलंबित देयक अधिभार (DPS) धोरण आणि हिशोब ऑडिट' : 'Late-Payment Surcharge (DPS) Policy & Calculation Audit'}</span>
+                    <span data-testid="admin-dps-policy-id" className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                      {DEFAULT_LATE_CHARGE_POLICY.policyId} v{DEFAULT_LATE_CHARGE_POLICY.version}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {language === 'gu' ? 'દૈનિક સાદા વ્યાજ ગણતરી મોડેલ (સંદર્ભ તારીખ આધારિત)' : language === 'hi' ? 'दैनिक साधारण ब्याज गणना मॉडल (व्यवसायिक संदर्भ तिथि आधारित)' : language === 'mr' ? 'दैनिक सरळव्याज हिशोब मॉडेल (संदर्भ दिनांक आधारित)' : 'Daily simple accrual policy with effective-dated category overrides'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <span
+                  data-testid="admin-business-clock-mode-badge"
+                  className={`text-[11px] font-bold px-2 py-1 rounded border flex items-center gap-1.5 ${
+                    businessClockMode === 'DEV_OVERRIDE'
+                      ? 'bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700'
+                      : 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>
+                    {businessClockMode === 'DEV_OVERRIDE'
+                      ? step4cDict.devOverrideBadge
+                      : step4cDict.liveAsiaKolkataBadge}
+                  </span>
+                </span>
+                <span className="text-[11px] font-mono px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                  {step4cDict.activeBusinessDateLabel}: <strong>{businessReferenceDate}</strong>
+                </span>
+                <button
+                  type="button"
+                  data-testid="admin-simulate-rollover-btn"
+                  onClick={() => stepBusinessDateByDays(1)}
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/70 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition-colors cursor-pointer"
+                >
+                  {step4cDict.stepForwardOneDayBtn}
+                </button>
+                {businessClockMode === 'DEV_OVERRIDE' && (
+                  <button
+                    type="button"
+                    data-testid="admin-reset-live-clock-btn"
+                    onClick={() => resetBusinessClockToLiveIst()}
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/70 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition-colors cursor-pointer"
+                  >
+                    {step4cDict.returnToLiveClockBtn} ({businessClockState.liveActualBusinessDateIst})
+                  </button>
+                )}
+                <span className="text-[11px] font-bold px-2 py-1 rounded bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                  DEMO TARIFF
+                </span>
+              </div>
+            </div>
+
+            {businessClockMode === 'DEV_OVERRIDE' && (
+              <div
+                data-testid="admin-dev-override-warning-banner"
+                className="p-2.5 rounded-lg bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/70 text-xs text-rose-800 dark:text-rose-300 flex items-center justify-between gap-2 flex-wrap"
+              >
+                <span>{step4cDict.devOverrideWarningBanner}</span>
+                <span className="font-mono text-[11px]">
+                  {step4cDict.actualLiveIstDateLabel}: {businessClockState.liveActualBusinessDateIst}
+                </span>
+              </div>
+            )}
+
+            {/* Unverified Tariff Disclaimer */}
+            <div className="p-3 rounded-lg bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-300 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">Tariff Verification Notice: </span>
+                <span>
+                  The 15.0% p.a. delayed payment surcharge is configured for demonstration and testing purposes. Its statutory applicability under current GERC / UGVCL tariff regulations has not been verified. This calculation must not be represented as an approved live statutory demand.
+                </span>
+              </div>
+            </div>
+
+            {/* Policy Parameters Bento */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px] mb-0.5">Base Annual Rate</span>
+                <span data-testid="admin-dps-annual-rate" className="text-sm font-bold font-mono text-slate-900 dark:text-white">
+                  {DEFAULT_LATE_CHARGE_POLICY.annualRatePercent}% p.a.
+                </span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">0.0411% / day (365d)</span>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px] mb-0.5">Accrual Method</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">
+                  {DEFAULT_LATE_CHARGE_POLICY.calculationMethod}
+                </span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">Non-compounding</span>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px] mb-0.5">Default Grace Period</span>
+                <span className="text-sm font-bold font-mono text-slate-900 dark:text-white">
+                  {DEFAULT_LATE_CHARGE_POLICY.gracePeriodDays} Days
+                </span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">Immediate post-due</span>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
+                <span className="text-slate-400 block text-[10px] mb-0.5">Effective Dates</span>
+                <span className="text-sm font-bold font-mono text-slate-900 dark:text-white">
+                  {DEFAULT_LATE_CHARGE_POLICY.effectiveFrom}
+                </span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">to {DEFAULT_LATE_CHARGE_POLICY.effectiveTo || 'Indefinite'}</span>
+              </div>
+            </div>
+
+            {/* Category Overrides Matrix */}
+            <div className="text-xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-2">
+                Category Policy Matrix
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {Object.entries(DEFAULT_LATE_CHARGE_POLICY.categoryOverrides || {}).map(([cat, rule]) => (
+                  <div key={cat} className="p-2.5 rounded-lg bg-slate-50/60 dark:bg-slate-900/30 border border-slate-200/60 dark:border-slate-800 text-[11px]">
+                    <div className="font-semibold text-slate-800 dark:text-slate-200">{cat}</div>
+                    <div className="text-slate-500 font-mono mt-0.5">
+                      Rate: <span className="font-bold text-slate-900 dark:text-white">{rule.annualRatePercent}% p.a.</span>
+                    </div>
+                    <div className="text-slate-500 font-mono">
+                      Grace: <span className="font-bold text-slate-900 dark:text-white">{rule.gracePeriodDays} days</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Active Overdue Audit Table */}
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <FileCheck className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Audited Overdue Bills Under Current Reference Date ({overdueAuditBills.length})</span>
+                </span>
+                <div className="flex items-center gap-3 text-xs font-mono">
+                  <span className="text-slate-500">
+                    Principal: <strong data-testid="admin-dps-overdue-principal" className="text-amber-600 dark:text-amber-400">
+                      ₹{overdueAuditBills.reduce((acc, curr) => acc + (curr.reconciled.lateChargeBreakdown?.remainingPrincipal || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </strong>
+                  </span>
+                  <span className="text-slate-500">
+                    DPS: <strong data-testid="admin-dps-overdue-charges" className="text-rose-600 dark:text-rose-400">
+                      ₹{overdueAuditBills.reduce((acc, curr) => acc + (curr.reconciled.lateChargeBreakdown?.netLateChargesPayable || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[780px]">
+                  <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="p-2.5 font-semibold">Bill No / Consumer</th>
+                      <th className="p-2.5 font-semibold text-right">1. Orig Bill</th>
+                      <th className="p-2.5 font-semibold text-right">2. Settled</th>
+                      <th className="p-2.5 font-semibold text-right">3. Principal</th>
+                      <th className="p-2.5 font-semibold text-right">4. Accrued DPS</th>
+                      <th className="p-2.5 font-semibold text-right">5. Waived/Paid DPS</th>
+                      <th className="p-2.5 font-semibold text-right">6. Total Payable</th>
+                      <th className="p-2.5 font-semibold">7. Due Date</th>
+                      <th className="p-2.5 font-semibold text-center">8. Overdue</th>
+                      <th className="p-2.5 font-semibold">9. Calc Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                    {overdueAuditBills.map(({ bill, conn, stmt }) => (
+                      <tr key={bill.billNo} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                        <td className="p-2.5 font-mono">
+                          <div className="font-bold text-slate-900 dark:text-white">{bill.billNo}</div>
+                          <span className="text-[10px] text-slate-400">{bill.consumerNo} · {conn?.consumerName}</span>
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums">
+                          ₹{stmt.originalBillAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-emerald-600 tabular-nums">
+                          ₹{stmt.paymentsSuccessfullySettled.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-slate-900 dark:text-white tabular-nums">
+                          ₹{stmt.remainingPrincipal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-2.5 text-right font-mono font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+                          +₹{stmt.accruedLatePaymentCharges.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-emerald-600 tabular-nums">
+                          ₹{stmt.chargesAlreadyPaidOrWaived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-2.5 text-right font-mono font-extrabold text-blue-600 dark:text-blue-400 tabular-nums">
+                          ₹{stmt.totalCurrentOutstanding.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-2.5 font-mono text-slate-600 dark:text-slate-400">{stmt.originalDueDate}</td>
+                        <td className="p-2.5 text-center">
+                          <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                            {stmt.daysOverdue}d
+                          </span>
+                        </td>
+                        <td className="p-2.5 font-mono text-slate-500">{stmt.lastCalculationDate}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Step 4B: Section 56 Formal Notice Tracking & Audit Table */}
+            <div
+              data-testid="admin-formal-notice-tracking"
+              className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800"
+            >
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-amber-600" />
+                  <span>{fnDict.sectionTitle} — Notice Tracking & Statutory Audit ({formalNotices.length})</span>
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                  15 Clear Days · Never Auto-Disconnects on Expiry
+                </span>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[740px]">
+                  <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="p-2.5 font-semibold">Notice ID / Bill</th>
+                      <th className="p-2.5 font-semibold">Consumer & Subdiv</th>
+                      <th className="p-2.5 font-semibold">Status</th>
+                      <th className="p-2.5 font-semibold">Issued / Deadline</th>
+                      <th className="p-2.5 font-semibold text-center">Countdown</th>
+                      <th className="p-2.5 font-semibold text-right">Frozen Snapshot</th>
+                      <th className="p-2.5 font-semibold text-right">Live Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                    {formalNotices.map(notice => (
+                      <tr key={notice.noticeId} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                        <td className="p-2.5 font-mono">
+                          <div className="font-bold text-slate-900 dark:text-white">{notice.noticeId}</div>
+                          <span className="text-[10px] text-slate-400">{notice.billNo}</span>
+                        </td>
+                        <td className="p-2.5">
+                          <div className="font-semibold text-slate-800 dark:text-slate-200">{notice.consumerName} ({notice.consumerNo})</div>
+                          <span className="text-[10px] text-slate-400">{notice.subdivision}</span>
+                        </td>
+                        <td className="p-2.5">
+                          <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                            {fnDict.statuses[notice.status]}
+                          </span>
+                        </td>
+                        <td className="p-2.5 font-mono text-[11px] text-slate-600 dark:text-slate-400">
+                          {notice.issueDate || '—'} → {notice.paymentDeadlineDate || '—'}
+                        </td>
+                        <td className="p-2.5 text-center font-mono font-bold text-rose-600">
+                          {notice.daysRemaining !== null ? `${notice.daysRemaining}d` : '—'}
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums">
+                          ₹{notice.snapshotAtIssuance.totalOutstandingAtIssuance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-2.5 text-right font-mono font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                          ₹{notice.currentBalanceView.totalCurrentOutstanding.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

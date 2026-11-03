@@ -126,9 +126,13 @@ export default defineConfig(() => {
             if (
               norm.includes('node_modules/react/') ||
               norm.includes('node_modules/react-dom/') ||
-              norm.includes('node_modules/scheduler/')
+              norm.includes('node_modules/scheduler/') ||
+              norm.includes('node_modules/react')
             ) {
               return 'vendor-react';
+            }
+            if (norm.includes('node_modules/qrcode')) {
+              return 'vendor-qrcode';
             }
             if (norm.includes('src/i18n/translations/gu.ts')) return 'i18n-gu';
             if (norm.includes('src/i18n/translations/hi.ts')) return 'i18n-hi';
@@ -142,6 +146,25 @@ export default defineConfig(() => {
             if (norm.includes('assistantContentTranslations')) return 'i18n-assistant';
             if (norm.includes('utilityAiEngine')) return 'ai-engine';
             if (
+              norm.includes('src/utils/billingEngine') ||
+              norm.includes('src/utils/lateChargeEngine') ||
+              norm.includes('src/utils/paymentCalendarEngine')
+            ) {
+              return 'app-billing';
+            }
+            if (
+              norm.includes('src/utils/formalNoticeEngine') ||
+              norm.includes('src/utils/businessClockEngine')
+            ) {
+              return 'app-notices-clock';
+            }
+            if (
+              norm.includes('src/utils/canonicalAnalytics') ||
+              norm.includes('src/utils/exportEngine')
+            ) {
+              return 'app-analytics-export';
+            }
+            if (
               norm.includes('src/utils/aiRecommendationEngine') ||
               norm.includes('src/utils/anomalyDetector') ||
               norm.includes('src/utils/authClient') ||
@@ -153,6 +176,9 @@ export default defineConfig(() => {
               norm.includes('src/utils/avatarUtils') ||
               norm.includes('src/utils/audioAlerts') ||
               norm.includes('src/utils/liveData') ||
+              norm.includes('src/utils/slaEngine') ||
+              norm.includes('src/utils/fieldNotificationEngine') ||
+              norm.includes('src/utils/typographyTokens') ||
               norm.includes('src/services/erpAdapter') ||
               norm.includes('src/services/apiClient') ||
               norm.includes('src/services/repositories') ||

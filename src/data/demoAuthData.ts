@@ -1,4 +1,5 @@
 import { UserRole, FieldEngineerRecord } from '../types';
+import { safeStorageGet, safeStorageSet, safeStorageRemove } from '../utils/safeStorage';
 
 export interface DemoAccount {
   role: UserRole;
@@ -543,37 +544,25 @@ const STORAGE_CUSTOM_USERS_KEY = 'vidyutflow_custom_users';
 const STORAGE_SESSION_KEY = 'vidyutflow_demo_session';
 
 export function getCustomDemoUsers(): DemoUser[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_CUSTOM_USERS_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as DemoUser[];
-  } catch {
-    return [];
-  }
+  return safeStorageGet<DemoUser[]>(STORAGE_CUSTOM_USERS_KEY, []);
 }
 
 export function saveCustomDemoUser(user: DemoUser): void {
   const existing = getCustomDemoUsers();
   const filtered = existing.filter(u => u.email.toLowerCase() !== user.email.toLowerCase());
   filtered.push(user);
-  localStorage.setItem(STORAGE_CUSTOM_USERS_KEY, JSON.stringify(filtered));
+  safeStorageSet(STORAGE_CUSTOM_USERS_KEY, filtered);
 }
 
 export function getStoredDemoSession(): DemoSession | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_SESSION_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as DemoSession;
-  } catch {
-    return null;
-  }
+  return safeStorageGet<DemoSession | null>(STORAGE_SESSION_KEY, null);
 }
 
 export function setStoredDemoSession(session: DemoSession | null): void {
   if (!session) {
-    localStorage.removeItem(STORAGE_SESSION_KEY);
+    safeStorageRemove(STORAGE_SESSION_KEY);
   } else {
-    localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(session));
+    safeStorageSet(STORAGE_SESSION_KEY, session);
   }
 }
 

@@ -25,6 +25,7 @@ import {
   localizeSubdivision
 } from '../../i18n/consumerContentTranslations';
 import { localizeFieldEngineerStatus } from '../../i18n/employeeContentTranslations';
+import { localizeFieldNotification } from '../../utils/fieldNotificationEngine';
 import { UserRole, IncidentSeverity, AppNotification } from '../../types';
 import {
   formatErpDateTime,
@@ -1010,7 +1011,8 @@ export const NotificationDrawer: React.FC = () => {
                             : undefined;
                           const statusBadge = getNotificationStatusBadge(item);
                           const rawLocalizedNotif = localizeConsumerNotification(item, language);
-                          const localizedNotif = localizeIncidentNotification(rawLocalizedNotif, language);
+                          const incidentLocalizedNotif = localizeIncidentNotification(rawLocalizedNotif, language);
+    const localizedNotif = localizeFieldNotification(incidentLocalizedNotif, language);
                           const isSelected = selectedIds.includes(item.id);
                           const rawSubdivision = item.subdivision || linkedApp?.subdivision;
                           const displaySubdivision = rawSubdivision

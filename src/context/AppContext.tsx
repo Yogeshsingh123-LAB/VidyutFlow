@@ -3,8 +3,6 @@ import {
   syncBackendSsoSession,
   registerBackendConsumerSession,
   clearBackendSession,
-  logoutBackendCookieSession,
-  notifyPortalIdentityChanged,
 } from '../utils/backendSession';
 import { clearOfflineFieldQueue } from '../utils/offlineFieldSync';
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
@@ -15,6 +13,9 @@ import {
   ElectricityBill,
   PaymentTransaction,
   WorkOrder,
+  WorkOrderCompletionReport,
+  WorkOrderVerificationReview,
+  ComplaintFeedback,
   AppNotification,
   ElectricityConnection,
   AuditLogItem,
@@ -25,11 +26,7 @@ import {
   IncidentSeverity,
   IncidentStatus,
   EmergencyHazardClassification,
-  AIActionRecommendation,
-  WorkOrderCompletionReport,
-  WorkOrderVerificationReview,
-  ComplaintFeedback,
-  LoadChangeDirection
+  AIActionRecommendation
 } from '../types';
 import {
   validateApprovalPermission,
@@ -82,10 +79,10 @@ import {
   isDevAuthModeSwitchEnabled,
   resolveEffectiveAuthMode,
   loginWithServerApi,
-  loginWithSimulatedSsoApi,
   signupWithServerApi,
   verifyServerSessionApi,
-  logoutServerSessionApi
+  logoutServerSessionApi,
+  loginWithSimulatedSsoApi
 } from '../utils/authClient';
 import {
   detectAnomalies,
@@ -176,6 +173,7 @@ import {
   ApplyPaymentToBillResult,
   SimulatedPaymentOutcome,
   selectConsumerAccountBillingSummary,
+  reconcileBillWithPayments,
   applyPaymentToBill,
   generateDeterministicDemoBillForConnection,
   generateDeterministicBiMonthlyBillForConnection,
@@ -184,9 +182,32 @@ import {
   createPaymentConfirmedNotification,
   normalizeBillingIdentifier
 } from '../utils/billingEngine';
+import type { LateChargeWaiverRecord, PaymentReversalRecord } from '../utils/lateChargeEngine';
+import {
+  FormalNoticeRecord,
+  INITIAL_FORMAL_NOTICES,
+  deriveCanonical9FieldBillStatement,
+  reconcileFormalNoticeWithStatement,
+  evaluateStep4BOverdueAndNoticeNotifications,
+  filterEmployeeStep4BBillingNotifications,
+  createDraftFormalNotice,
+  submitFormalNoticeForApproval,
+  approveFormalNotice,
+  issueAndServeFormalNotice,
+  placeFormalNoticeOnHold,
+  withdrawFormalNotice
+} from '../utils/formalNoticeEngine';
+import {
+  BusinessClockController,
+  BusinessClockState,
+  BusinessClockMode,
+  CrossTabFinancialSyncManager,
+  formatPaymentTimestampForBusinessDate,
+  canActorReceiveFinancialSyncEvent
+} from '../utils/businessClockEngine';
 import type { RestoredLiveRuntimeState } from '../utils/demoBackupEngine';
 
-export type { ActiveUserIdentity, AuthMode, OperatingDataMode, FieldOfflineQueueItem, FieldOfflineReplaySummary, ConsumerAccountBillingSummary, ApplyPaymentToBillResult, SimulatedPaymentOutcome, RestoredLiveRuntimeState };
+export type { ActiveUserIdentity, AuthMode, OperatingDataMode, FieldOfflineQueueItem, FieldOfflineReplaySummary, ConsumerAccountBillingSummary, ApplyPaymentToBillResult, SimulatedPaymentOutcome, RestoredLiveRuntimeState, FormalNoticeRecord, LateChargeWaiverRecord, PaymentReversalRecord, BusinessClockState, BusinessClockMode };
 export { getInitialsFromName };
 
 export interface BackendSyncStatus {
@@ -942,6 +963,33 @@ interface AppContextType {
   consumerBillingSummary: ConsumerAccountBillingSummary;
   userApplications: NewConnectionApplication[];
   userBills: ElectricityBill[];
+  businessReferenceDate: string;
+  setBusinessReferenceDate: (dateStr: string) => void;
+  formalNotices: FormalNoticeRecord[];
+  lateChargeWaivers: LateChargeWaiverRecord[];
+  paymentReversals: PaymentReversalRecord[];
+  businessClockState: BusinessClockState;
+  businessClockMode: BusinessClockMode;
+  resetBusinessClockToLiveIst: () => void;
+  stepBusinessDateByDays: (deltaDays: number) => void;
+  recheckBusinessClockNow: () => void;
+  approveFormalNoticeDemo: (noticeId: string, remarks?: string) => boolean;
+  issueFormalNoticeDemo: (noticeId: string, serviceChannel?: FormalNoticeRecord['serviceChannel']) => boolean;
+  placeNoticeOnHoldDemo: (noticeId: string, holdReason: string) => boolean;
+  withdrawFormalNoticeDemo: (noticeId: string, withdrawalReason: string) => boolean;
+  waiveLateChargeDemo: (billNo: string, waivedAmount: number, reason: string) => boolean;
+  reversePaymentDemo: (txId: string, billNo: string, reason: string) => boolean;
+  // Phase 13 Field Completion Evidence & Complaint Feedback
+  submitWorkOrderCompletionEvidence: (woId: string, report: WorkOrderCompletionReport) => boolean;
+  reviewWorkOrderCompletion: (woId: string, review: WorkOrderVerificationReview) => boolean;
+  submitComplaintFeedback: (complaintId: string, feedback: ComplaintFeedback) => boolean;
+  reopenComplaint: (complaintId: string, reason: string) => ComplaintRecord | null;
+  loginViaSimulatedSso: (
+    email: string,
+    targetRole: UserRole,
+    providerId?: string
+  ) => Promise<{ success: boolean; error?: string }>;
+
   userPayments: PaymentTransaction[];
   userComplaints: ComplaintRecord[];
   userNotifications: AppNotification[];
@@ -998,16 +1046,6 @@ interface AppContextType {
   backendStatus: BackendSyncStatus;
   syncWithBackend: () => Promise<{ success: boolean; error?: string; requestId?: string }>;
   repositories: ErpRepositoryBundle;
-  // Phase 13 Field Completion Evidence & Complaint Feedback
-  submitWorkOrderCompletionEvidence: (woId: string, report: WorkOrderCompletionReport) => boolean;
-  reviewWorkOrderCompletion: (woId: string, review: WorkOrderVerificationReview) => boolean;
-  submitComplaintFeedback: (complaintId: string, feedback: ComplaintFeedback) => boolean;
-  reopenComplaint: (complaintId: string, reason: string) => ComplaintRecord | null;
-  loginViaSimulatedSso: (
-    email: string,
-    targetRole: UserRole,
-    providerId?: string
-  ) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -1528,6 +1566,124 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 
   const [isOfflineSimulated, setIsOfflineSimulated] = useState<boolean>(false);
+
+  const businessClockRef = React.useRef<BusinessClockController | null>(null);
+  if (!businessClockRef.current) {
+    businessClockRef.current = new BusinessClockController();
+  }
+  const crossTabSyncRef = React.useRef<CrossTabFinancialSyncManager | null>(null);
+  if (!crossTabSyncRef.current) {
+    crossTabSyncRef.current = new CrossTabFinancialSyncManager();
+  }
+
+  const [businessClockState, setBusinessClockState] = useState<BusinessClockState>(() =>
+    businessClockRef.current!.getState()
+  );
+  const [businessReferenceDate, setBusinessReferenceDateState] = useState<string>(
+    () => businessClockRef.current!.getState().businessDate
+  );
+  const businessClockMode: BusinessClockMode = businessClockState.mode;
+
+  const setBusinessReferenceDate = React.useCallback((dateStr: string) => {
+    const controller = businessClockRef.current;
+    if (!controller) return;
+    const res = controller.setDeveloperOverrideDate(
+      dateStr,
+      'Admin / Developer Simulation Override'
+    );
+    setBusinessClockState(res.state);
+    setBusinessReferenceDateState(res.state.businessDate);
+    crossTabSyncRef.current?.publish({
+      eventType: 'CLOCK_MODE_CHANGED',
+      businessReferenceDate: res.state.businessDate,
+      payload: {
+        mode: res.state.mode,
+        businessDate: res.state.businessDate,
+        overrideDate: res.state.overrideDate,
+      },
+    });
+  }, []);
+
+  const resetBusinessClockToLiveIst = React.useCallback(() => {
+    const controller = businessClockRef.current;
+    if (!controller) return;
+    const res = controller.setDeveloperOverrideDate(null);
+    setBusinessClockState(res.state);
+    setBusinessReferenceDateState(res.state.businessDate);
+    crossTabSyncRef.current?.publish({
+      eventType: 'CLOCK_MODE_CHANGED',
+      businessReferenceDate: res.state.businessDate,
+      payload: {
+        mode: res.state.mode,
+        businessDate: res.state.businessDate,
+        overrideDate: null,
+      },
+    });
+  }, []);
+
+  const stepBusinessDateByDays = React.useCallback((deltaDays: number) => {
+    const controller = businessClockRef.current;
+    if (!controller) return;
+    const res = controller.stepBusinessDateByDays(
+      deltaDays,
+      `Admin Step Simulation (${deltaDays >= 0 ? '+' : ''}${deltaDays}d)`
+    );
+    setBusinessClockState(res.state);
+    setBusinessReferenceDateState(res.state.businessDate);
+    crossTabSyncRef.current?.publish({
+      eventType: 'BUSINESS_DATE_ROLLOVER',
+      businessReferenceDate: res.state.businessDate,
+      payload: {
+        mode: res.state.mode,
+        businessDate: res.state.businessDate,
+        deltaDays,
+      },
+    });
+  }, []);
+
+  const recheckBusinessClockNow = React.useCallback(() => {
+    const controller = businessClockRef.current;
+    if (!controller) return;
+    const res = controller.evaluateNow('MANUAL_RECHECK');
+    setBusinessClockState(res.state);
+    setBusinessReferenceDateState(res.state.businessDate);
+  }, []);
+
+  useEffect(() => {
+    const controller = businessClockRef.current;
+    if (!controller) return;
+    controller.start();
+    const unsub = controller.subscribe((nextState, rolloverEvent) => {
+      setBusinessClockState(nextState);
+      setBusinessReferenceDateState(nextState.businessDate);
+      if (rolloverEvent) {
+        crossTabSyncRef.current?.publish({
+          eventType: 'BUSINESS_DATE_ROLLOVER',
+          businessReferenceDate: nextState.businessDate,
+          payload: {
+            previousBusinessDate: rolloverEvent.previousBusinessDate,
+            currentBusinessDate: rolloverEvent.currentBusinessDate,
+            triggerReason: rolloverEvent.triggerReason,
+            mode: rolloverEvent.mode,
+          },
+        });
+      }
+    });
+    return () => {
+      unsub();
+      controller.stop();
+    };
+  }, []);
+
+  const [formalNotices, setFormalNotices] = useState<FormalNoticeRecord[]>(() =>
+    loadStorage<FormalNoticeRecord[]>('vidyutflow_formal_notices', INITIAL_FORMAL_NOTICES)
+  );
+  const [lateChargeWaivers, setLateChargeWaivers] = useState<LateChargeWaiverRecord[]>(() =>
+    loadStorage<LateChargeWaiverRecord[]>('vidyutflow_late_charge_waivers', [])
+  );
+  const [paymentReversals, setPaymentReversals] = useState<PaymentReversalRecord[]>(() =>
+    loadStorage<PaymentReversalRecord[]>('vidyutflow_payment_reversals', [])
+  );
   const [isBrowserOffline, setIsBrowserOffline] = useState<boolean>(
     () => typeof navigator !== 'undefined' && navigator.onLine === false
   );
@@ -1591,6 +1747,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { saveStorage('vidyutone_auditlogs', auditLogs); }, [auditLogs]);
   useEffect(() => { saveStorage('vidyutflow_incidents', incidents); }, [incidents]);
   useEffect(() => { saveStorage('vidyut_ai_recommendations', recommendations); }, [recommendations]);
+  useEffect(() => { saveStorage('vidyutflow_formal_notices', formalNotices); }, [formalNotices]);
+  useEffect(() => { saveStorage('vidyutflow_late_charge_waivers', lateChargeWaivers); }, [lateChargeWaivers]);
+  useEffect(() => { saveStorage('vidyutflow_payment_reversals', paymentReversals); }, [paymentReversals]);
 
   useEffect(() => {
     fieldOfflineQueueRef.current = fieldOfflineQueue;
@@ -1758,7 +1917,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         legacyIdentifierMap
       },
       selectedConnectionNo: explicitSelectedNo,
-      referenceDate: '15-Oct-2026'
+      referenceDate: businessReferenceDate,
+      waivers: lateChargeWaivers,
+      reversals: paymentReversals
     });
   }, [
     userConnections,
@@ -1767,7 +1928,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     consumerScopeUserId,
     demoSession,
     selectedConsumerConnMap,
-    legacyIdentifierMap
+    legacyIdentifierMap,
+    businessReferenceDate,
+    lateChargeWaivers,
+    paymentReversals
   ]);
 
   const selectedConsumerConnectionNo = consumerBillingSummary.selectedConnectionNo;
@@ -2011,13 +2175,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     );
 
+    const step4bBillingNotifs = filterEmployeeStep4BBillingNotifications(
+      notifications,
+      effectiveSubdivisionScope,
+      dismissedSet,
+      readSet
+    );
+
     const seenIds = new Set<string>();
     const combined: AppNotification[] = [];
     for (const item of [
       ...appNotifs,
       ...incidentDecisionNotifs,
       ...complaintAndWorkOrderNotifs,
-      ...slaProactiveNotifs
+      ...slaProactiveNotifs,
+      ...step4bBillingNotifs
     ]) {
       if (!seenIds.has(item.id)) {
         seenIds.add(item.id);
@@ -2192,7 +2364,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       existingNotifications: notifications,
       emittedReminderKeys: Array.from(emittedBillingReminderKeysRef.current),
       accountId: demoSession.user.id,
-      referenceDate: '15-Oct-2026',
+      referenceDate: businessReferenceDate,
       language: 'en'
     });
 
@@ -2210,7 +2382,125 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return upsertNotificationList(cleaned, evalResult.newNotifications);
       });
     }
-  }, [demoSession, userConnections, bills, payments]);
+  }, [demoSession, userConnections, bills, payments, businessReferenceDate]);
+
+  // Step 4B: Reconcile Formal Notices with canonical 9-field balance statements & evaluate 11-stage overdue/notice notifications
+  const emittedStep4BNotifKeysRef = React.useRef<Set<string>>(
+    new Set(loadStorage<string[]>('vidyutflow_step4b_notif_keys', []))
+  );
+
+  useEffect(() => {
+    setFormalNotices(prevNotices => {
+      let changed = false;
+      const updated = prevNotices.map(notice => {
+        const bill = bills.find(b => b.billNo === notice.billNo);
+        if (!bill) return notice;
+        const conn = connections.find(c => c.consumerNo === bill.consumerNo);
+        const stmt = deriveCanonical9FieldBillStatement({
+          bill,
+          connection: conn,
+          payments,
+          waivers: lateChargeWaivers,
+          reversals: paymentReversals,
+          referenceDate: businessReferenceDate
+        });
+        const reconciled = reconcileFormalNoticeWithStatement(notice, stmt, businessReferenceDate);
+        if (
+          reconciled.status !== notice.status ||
+          reconciled.daysRemaining !== notice.daysRemaining ||
+          reconciled.currentBalanceView.totalCurrentOutstanding !== notice.currentBalanceView.totalCurrentOutstanding ||
+          reconciled.currentBalanceView.daysOverdue !== notice.currentBalanceView.daysOverdue ||
+          reconciled.disconnectionReviewStatus !== notice.disconnectionReviewStatus
+        ) {
+          changed = true;
+          return reconciled;
+        }
+        return notice;
+      });
+      return changed ? updated : prevNotices;
+    });
+
+    const step4bResult = evaluateStep4BOverdueAndNoticeNotifications({
+      connections,
+      bills,
+      payments,
+      formalNotices,
+      waivers: lateChargeWaivers,
+      reversals: paymentReversals,
+      existingNotifications: notifications,
+      emittedEventKeys: Array.from(emittedStep4BNotifKeysRef.current),
+      referenceDate: businessReferenceDate,
+      language: 'en'
+    });
+
+    if (step4bResult.newEventKeys.length > 0) {
+      emittedStep4BNotifKeysRef.current = new Set(step4bResult.updatedEmittedEventKeys);
+      saveStorage('vidyutflow_step4b_notif_keys', step4bResult.updatedEmittedEventKeys);
+    }
+
+    if (step4bResult.newNotifications.length > 0 || step4bResult.suppressedNotificationIds.length > 0) {
+      const suppressSet = new Set(step4bResult.suppressedNotificationIds);
+      setNotifications(prev => {
+        const cleaned = suppressSet.size > 0
+          ? prev.map(n => (suppressSet.has(n.id) ? { ...n, read: true } : n))
+          : prev;
+        return upsertNotificationList(cleaned, step4bResult.newNotifications);
+      });
+    }
+  }, [connections, bills, payments, formalNotices, lateChargeWaivers, paymentReversals, businessReferenceDate]);
+
+  // Step 4C: Browser-Local Cross-Tab Real-Time Financial Synchronization
+  useEffect(() => {
+    const syncManager = crossTabSyncRef.current;
+    if (!syncManager) return;
+    syncManager.start();
+    const unsub = syncManager.onEvent(envelope => {
+      const allowed = canActorReceiveFinancialSyncEvent(envelope, {
+        role:
+          effectiveRole === 'consumer' ||
+          effectiveRole === 'employee' ||
+          effectiveRole === 'management' ||
+          effectiveRole === 'admin'
+            ? effectiveRole
+            : null,
+        ownedConsumerNos: userConnections.map(c => c.consumerNo),
+      });
+      if (!allowed) return;
+
+      if (
+        envelope.eventType === 'BUSINESS_DATE_ROLLOVER' ||
+        envelope.eventType === 'CLOCK_MODE_CHANGED'
+      ) {
+        if (envelope.businessReferenceDate) {
+          setBusinessReferenceDateState(envelope.businessReferenceDate);
+        }
+        if (businessClockRef.current) {
+          setBusinessClockState(businessClockRef.current.getState());
+        }
+        return;
+      }
+
+      // Reload canonical financial state from shared localStorage without touching local tab UI view or language
+      setBills(loadStorage('vidyutone_bills', INITIAL_BILLS));
+      setPayments(loadStorage('vidyutone_payments', INITIAL_PAYMENTS));
+      setFormalNotices(
+        loadStorage<FormalNoticeRecord[]>('vidyutflow_formal_notices', INITIAL_FORMAL_NOTICES)
+      );
+      setLateChargeWaivers(
+        loadStorage<LateChargeWaiverRecord[]>('vidyutflow_late_charge_waivers', [])
+      );
+      setPaymentReversals(
+        loadStorage<PaymentReversalRecord[]>('vidyutflow_payment_reversals', [])
+      );
+      setNotifications(loadStorage('vidyutone_notifications', INITIAL_NOTIFICATIONS));
+      setInboxStateMap(loadStorage('vidyutflow_notification_inbox_state', {}));
+    });
+
+    return () => {
+      unsub();
+      syncManager.stop();
+    };
+  }, [effectiveRole, userConnections]);
 
   // Synchronize deterministic anomaly detection across ERP datasets (Phase 2)
   useEffect(() => {
@@ -5034,7 +5324,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logoutDemoSession = async (): Promise<void> => {
-    clearBackendSession();
     pendingConsumerTabRef.current = null;
     demoSessionRef.current = null;
     hasEnteredPlatformRef.current = false;
@@ -5158,34 +5447,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         status: 'Unpaid',
         slabBreakdown: [],
       };
+      const dummyReconciled = reconcileBillWithPayments(dummyBill, [], businessReferenceDate);
       return {
         success: false,
         outcome: 'FAILED',
         reason,
         updatedBill: dummyBill,
-        reconciledBill: {
-          ...dummyBill,
-          rawStatus: dummyBill.status,
-          effectiveStatus: 'Unpaid',
-          paidAmount: dummyBill.paidAmount || 0,
-          outstandingBalance: dummyBill.remainingBalance ?? dummyBill.totalAmount,
-          remainingBalance: dummyBill.remainingBalance ?? dummyBill.totalAmount,
-          isDue: true,
-          isOverdue: false,
-          isPartiallyPaid: false,
-          isPaid: false,
-          appliedPayments: [],
-          unappliedPaymentAttempts: [],
-          hasConflict: false,
-          billingCycleType: dummyBill.billingCycleType || 'MONTHLY',
-          periodStartDate: dummyBill.periodStartDate || '01-Sep-2026',
-          periodEndDate: dummyBill.periodEndDate || '30-Sep-2026',
-          billingPeriodLabel: dummyBill.billingPeriodLabel || '01-Sep-2026 to 30-Sep-2026'
-        },
+        reconciledBill: dummyReconciled,
         paymentTransaction: null,
         previouslySettledAmount: dummyBill.paidAmount || 0,
         paidAmountApplied: 0,
+        lateChargesSettledInPayment: 0,
         remainingBalance: dummyBill.remainingBalance ?? dummyBill.totalAmount,
+        remainingTotalWithCharges: dummyReconciled.totalOutstandingWithCharges,
         isFullyPaid: false,
         settlementClassification: 'NONE'
       };
@@ -5216,7 +5490,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         : 'TXN-RTGS';
     const txId = `${txPrefix}-${Math.floor(1000000000 + Math.random() * 9000000000)}`;
     const now = new Date();
-    const formattedDate = `${now.getDate().toString().padStart(2, '0')}-Oct-2026 ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const formattedDate = formatPaymentTimestampForBusinessDate(businessReferenceDate, now);
 
     const settlementResult = applyPaymentToBill({
       bill: targetBill,
@@ -5227,7 +5501,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       txId,
       bankReference: `UGVCL/DEMO/${Math.floor(1000000000 + Math.random() * 9000000000)}`,
       accountId: demoSession?.user.id || targetBill.accountId,
-      referenceDate: '15-Oct-2026',
+      referenceDate: businessReferenceDate,
+      waivers: lateChargeWaivers,
+      reversals: paymentReversals,
+      includeLateCharges: true,
       simulatedOutcome: options?.simulatedOutcome || 'SUCCESS',
       simulatedFailureReason: options?.simulatedFailureReason
     });
@@ -5242,6 +5519,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           activeUser.name,
           'WARNING'
         );
+        crossTabSyncRef.current?.publish({
+          eventType: 'PAYMENT_FAILED_OR_PENDING',
+          businessReferenceDate,
+          consumerNo: targetBill.consumerNo,
+          billNo: targetBill.billNo,
+          payload: {
+            outcome: 'FAILED',
+            txId: settlementResult.paymentTransaction.txId,
+            billNo: targetBill.billNo,
+          },
+        });
       }
       showToast(settlementResult.reason, 'error');
       return settlementResult;
@@ -5257,6 +5545,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           activeUser.name,
           'WARNING'
         );
+        crossTabSyncRef.current?.publish({
+          eventType: 'PAYMENT_FAILED_OR_PENDING',
+          businessReferenceDate,
+          consumerNo: targetBill.consumerNo,
+          billNo: targetBill.billNo,
+          payload: {
+            outcome: 'PENDING',
+            txId: settlementResult.paymentTransaction.txId,
+            billNo: targetBill.billNo,
+          },
+        });
       }
       showToast(settlementResult.reason, 'warning');
       return settlementResult;
@@ -5311,6 +5610,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `BILL#${targetBill.billNo}`,
       `₹${paidAmountApplied.toLocaleString()} paid via ${paymentMethod} (Ref: ${txId}). Remaining balance: ₹${remainingBalance.toLocaleString()}`
     );
+
+    crossTabSyncRef.current?.publish({
+      eventType: 'PAYMENT_RECORDED',
+      businessReferenceDate,
+      consumerNo: targetBill.consumerNo,
+      billNo: targetBill.billNo,
+      payload: {
+        txId: paymentTransaction.txId,
+        billNo: targetBill.billNo,
+        paidAmountApplied,
+        remainingBalance,
+        isFullyPaid,
+      },
+    });
 
     showToast(
       isFullyPaid
@@ -5497,12 +5810,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const effectiveSolarInterest = Boolean(
       data.solarInterest || effectiveRequestType === 'SOLAR_NET_METERING'
     );
-    const effectiveLoadDirection: LoadChangeDirection | undefined =
+    const effectiveLoadDirection: 'EXTENSION' | 'REDUCTION' | undefined =
       effectiveRequestType === 'LOAD_CHANGE'
-        ? data.loadChangeDirection ||
-          (verifiedCurrentLoadKw !== undefined && kw < verifiedCurrentLoadKw
-            ? 'REDUCTION'
-            : 'EXTENSION')
+        ? (data.loadChangeDirection === 'EXTENSION' || data.loadChangeDirection === 'REDUCTION'
+            ? data.loadChangeDirection
+            : (verifiedCurrentLoadKw !== undefined && kw < verifiedCurrentLoadKw
+                ? 'REDUCTION'
+                : 'EXTENSION'))
         : undefined;
 
     const initialNoteText =
@@ -7170,8 +7484,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetDemoData = () => {
-    clearBackendSession();
-    clearOfflineFieldQueue();
     try {
       localStorage.removeItem('vidyutone_consumers');
       localStorage.removeItem('vidyutone_connections');
@@ -7191,11 +7503,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.removeItem('vidyutflow_dismissed_modals');
       localStorage.removeItem('vidyutflow_field_offline_queue');
       localStorage.removeItem('vidyutflow_sla_emitted_event_keys');
+      localStorage.removeItem('vidyutflow_formal_notices');
+      localStorage.removeItem('vidyutflow_late_charge_waivers');
+      localStorage.removeItem('vidyutflow_payment_reversals');
+      localStorage.removeItem('vidyutflow_step4b_notif_keys');
     } catch (e) {}
 
     dismissedCriticalModalIdsRef.current.clear();
     executedRecommendationIdsRef.current.clear();
     emittedSlaEventKeysRef.current.clear();
+    emittedStep4BNotifKeysRef.current.clear();
 
     const initialDetected = detectAnomalies({
       complaints: INITIAL_COMPLAINTS,
@@ -7229,6 +7546,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setFieldEngineers(CANONICAL_FIELD_ENGINEERS);
     setBills(INITIAL_BILLS);
     setPayments(INITIAL_PAYMENTS);
+    setFormalNotices(INITIAL_FORMAL_NOTICES);
+    setLateChargeWaivers([]);
+    setPaymentReversals([]);
     setNotifications(INITIAL_NOTIFICATIONS);
     setInboxStateMap({});
     setAuditLogs(AUDIT_LOGS);
@@ -7238,8 +7558,187 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveApprovalRecommendation(null);
     setActiveIncidentModalId(null);
 
+    clearBackendSession();
+    clearOfflineFieldQueue();
     showToast('Demo dataset reset to initial state!', 'success');
   };
+
+  // Step 4B Formal Notice, Waiver, and Reversal Demo Actions
+  const approveFormalNoticeDemo = React.useCallback(
+    (noticeId: string, remarks?: string): boolean => {
+      if (effectiveRole !== 'employee' && effectiveRole !== 'admin' && effectiveRole !== 'management') {
+        showToast('Access Denied: Only authorized billing officers can approve formal notices.', 'error');
+        return false;
+      }
+      const target = formalNotices.find(n => n.noticeId === noticeId);
+      if (!target) return false;
+      const updated = approveFormalNotice(target, activeUser.name, effectiveRole.toUpperCase(), remarks);
+      setFormalNotices(prev => prev.map(n => (n.noticeId === noticeId ? updated : n)));
+      addAuditEvent('FORMAL_NOTICE_APPROVED', `NOTICE#${noticeId}`, `Formal notice approved for Bill ${target.billNo} by ${activeUser.name}`, activeUser.name);
+      crossTabSyncRef.current?.publish({
+        eventType: 'FORMAL_NOTICE_UPDATED',
+        businessReferenceDate,
+        consumerNo: target.consumerNo,
+        billNo: target.billNo,
+        payload: { noticeId, status: updated.status },
+      });
+      showToast(`Formal notice ${noticeId} approved.`, 'success');
+      return true;
+    },
+    [effectiveRole, formalNotices, activeUser.name, businessReferenceDate]
+  );
+
+  const issueFormalNoticeDemo = React.useCallback(
+    (noticeId: string, serviceChannel: FormalNoticeRecord['serviceChannel'] = 'PORTAL_AND_SMS_DEMO'): boolean => {
+      if (effectiveRole !== 'employee' && effectiveRole !== 'admin') {
+        showToast('Access Denied: Only authorized subdivision officers can issue & serve formal notices.', 'error');
+        return false;
+      }
+      const target = formalNotices.find(n => n.noticeId === noticeId);
+      if (!target) return false;
+      const bill = bills.find(b => b.billNo === target.billNo);
+      if (!bill) return false;
+      const conn = connections.find(c => c.consumerNo === bill.consumerNo);
+      const stmt = deriveCanonical9FieldBillStatement({
+        bill,
+        connection: conn,
+        payments,
+        waivers: lateChargeWaivers,
+        reversals: paymentReversals,
+        referenceDate: businessReferenceDate
+      });
+      const updated = issueAndServeFormalNotice({
+        notice: target,
+        statement: stmt,
+        issueDate: businessReferenceDate,
+        serviceDate: businessReferenceDate,
+        serviceChannel,
+        serviceEvidenceRef: `SRV-DEMO-${noticeId}-${Date.now().toString().slice(-4)}`,
+        actorName: activeUser.name,
+        actorRole: effectiveRole.toUpperCase()
+      });
+      setFormalNotices(prev => prev.map(n => (n.noticeId === noticeId ? updated : n)));
+      addAuditEvent('FORMAL_NOTICE_ISSUED_AND_SERVED', `NOTICE#${noticeId}`, `Section 56 DEMO Formal Notice issued & served for ${target.billNo}. Deadline: ${updated.paymentDeadlineDate}`, activeUser.name);
+      crossTabSyncRef.current?.publish({
+        eventType: 'FORMAL_NOTICE_UPDATED',
+        businessReferenceDate,
+        consumerNo: target.consumerNo,
+        billNo: target.billNo,
+        payload: { noticeId, status: updated.status, paymentDeadlineDate: updated.paymentDeadlineDate },
+      });
+      showToast(`Formal notice ${noticeId} issued & served (Deadline: ${updated.paymentDeadlineDate}).`, 'success');
+      return true;
+    },
+    [effectiveRole, formalNotices, bills, connections, payments, lateChargeWaivers, paymentReversals, businessReferenceDate, activeUser.name]
+  );
+
+  const placeNoticeOnHoldDemo = React.useCallback(
+    (noticeId: string, holdReason: string): boolean => {
+      if (effectiveRole !== 'employee' && effectiveRole !== 'admin' && effectiveRole !== 'management') {
+        showToast('Access Denied: Unauthorized to place formal notice on hold.', 'error');
+        return false;
+      }
+      const target = formalNotices.find(n => n.noticeId === noticeId);
+      if (!target) return false;
+      const updated = placeFormalNoticeOnHold(target, holdReason, activeUser.name, effectiveRole.toUpperCase());
+      setFormalNotices(prev => prev.map(n => (n.noticeId === noticeId ? updated : n)));
+      addAuditEvent('FORMAL_NOTICE_PLACED_ON_HOLD', `NOTICE#${noticeId}`, `Placed on hold: ${holdReason}`, activeUser.name);
+      crossTabSyncRef.current?.publish({
+        eventType: 'FORMAL_NOTICE_UPDATED',
+        businessReferenceDate,
+        consumerNo: target.consumerNo,
+        billNo: target.billNo,
+        payload: { noticeId, status: updated.status },
+      });
+      showToast(`Formal notice ${noticeId} placed on billing-dispute hold.`, 'info');
+      return true;
+    },
+    [effectiveRole, formalNotices, activeUser.name, businessReferenceDate]
+  );
+
+  const withdrawFormalNoticeDemo = React.useCallback(
+    (noticeId: string, withdrawalReason: string): boolean => {
+      if (effectiveRole !== 'employee' && effectiveRole !== 'admin' && effectiveRole !== 'management') {
+        showToast('Access Denied: Unauthorized to withdraw formal notice.', 'error');
+        return false;
+      }
+      const target = formalNotices.find(n => n.noticeId === noticeId);
+      if (!target) return false;
+      const updated = withdrawFormalNotice(target, withdrawalReason, activeUser.name, effectiveRole.toUpperCase());
+      setFormalNotices(prev => prev.map(n => (n.noticeId === noticeId ? updated : n)));
+      addAuditEvent('FORMAL_NOTICE_WITHDRAWN', `NOTICE#${noticeId}`, `Withdrawn: ${withdrawalReason}`, activeUser.name);
+      crossTabSyncRef.current?.publish({
+        eventType: 'FORMAL_NOTICE_UPDATED',
+        businessReferenceDate,
+        consumerNo: target.consumerNo,
+        billNo: target.billNo,
+        payload: { noticeId, status: updated.status },
+      });
+      showToast(`Formal notice ${noticeId} withdrawn.`, 'info');
+      return true;
+    },
+    [effectiveRole, formalNotices, activeUser.name, businessReferenceDate]
+  );
+
+  const waiveLateChargeDemo = React.useCallback(
+    (billNo: string, waivedAmount: number, reason: string): boolean => {
+      if (effectiveRole !== 'employee' && effectiveRole !== 'admin' && effectiveRole !== 'management') {
+        showToast('Access Denied: Unauthorized to waive late charges.', 'error');
+        return false;
+      }
+      const targetBill = bills.find(b => b.billNo === billNo);
+      const waiver: LateChargeWaiverRecord = {
+        id: `WVR-UG-${Date.now().toString().slice(-5)}`,
+        billNo,
+        waivedAmount,
+        reason,
+        approvedBy: activeUser.name,
+        approvedAt: `${businessReferenceDate} 12:00`
+      };
+      setLateChargeWaivers(prev => [...prev, waiver]);
+      addAuditEvent('LATE_CHARGE_WAIVER_APPLIED', `BILL#${billNo}`, `Waived ₹${waivedAmount.toFixed(2)} DPS: ${reason}`, activeUser.name);
+      crossTabSyncRef.current?.publish({
+        eventType: 'LATE_CHARGE_WAIVER_APPLIED',
+        businessReferenceDate,
+        consumerNo: targetBill?.consumerNo,
+        billNo,
+        payload: { waiverId: waiver.id, billNo, waivedAmount },
+      });
+      showToast(`Waived ₹${waivedAmount.toFixed(2)} in late-payment charges for ${billNo}.`, 'success');
+      return true;
+    },
+    [effectiveRole, activeUser.name, businessReferenceDate, bills]
+  );
+
+  const reversePaymentDemo = React.useCallback(
+    (txId: string, billNo: string, reason: string): boolean => {
+      if (effectiveRole !== 'employee' && effectiveRole !== 'admin') {
+        showToast('Access Denied: Unauthorized to reverse payment transactions.', 'error');
+        return false;
+      }
+      const targetBill = bills.find(b => b.billNo === billNo);
+      const reversal: PaymentReversalRecord = {
+        id: `REV-UG-${Date.now().toString().slice(-5)}`,
+        txId,
+        billNo,
+        reversedAt: `${businessReferenceDate} 14:00`,
+        reason,
+        authorizedBy: activeUser.name
+      };
+      setPaymentReversals(prev => [...prev, reversal]);
+      addAuditEvent('PAYMENT_REVERSAL_RECORDED', `TXN#${txId}`, `Reversed payment ${txId} on Bill ${billNo}: ${reason}`, activeUser.name, 'WARNING');
+      crossTabSyncRef.current?.publish({
+        eventType: 'PAYMENT_REVERSED',
+        businessReferenceDate,
+        consumerNo: targetBill?.consumerNo,
+        billNo,
+        payload: { reversalId: reversal.id, txId, billNo },
+      });
+      showToast(`Payment ${txId} reversed for Bill ${billNo}. Balance recalculated.`, 'warning');
+      return true;
+    },
+    [effectiveRole, activeUser.name, businessReferenceDate, bills]
+  );
 
   const applyRestoredDemoBackupState = React.useCallback((restoredState: RestoredLiveRuntimeState) => {
     const reconciled = reconcileApplicationWorkOrderLinks(
@@ -7355,8 +7854,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [dataMode, currentRole]);
 
-
-  // ---------------------------------------------------------------------------
   // Work Order Completion Evidence & Verification Governance (Phase 13)
   // ---------------------------------------------------------------------------
   const submitWorkOrderCompletionEvidence = (woId: string, report: WorkOrderCompletionReport): boolean => {
@@ -7681,6 +8178,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return loginAsCanonicalDemoAccount(fallbackIdentity.id, targetRole);
   };
 
+
   return (
     <AppContext.Provider
       value={{
@@ -7825,6 +8323,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         backendStatus,
         syncWithBackend,
         repositories,
+        // Step 4A, 4B & 4C: Centralized Business Clock, Formal Notices, Waivers & Reversals
+        businessReferenceDate,
+        setBusinessReferenceDate,
+        businessClockState,
+        businessClockMode,
+        resetBusinessClockToLiveIst,
+        stepBusinessDateByDays,
+        recheckBusinessClockNow,
+        formalNotices,
+        lateChargeWaivers,
+        paymentReversals,
+        approveFormalNoticeDemo,
+        issueFormalNoticeDemo,
+        placeNoticeOnHoldDemo,
+        withdrawFormalNoticeDemo,
+        waiveLateChargeDemo,
+        reversePaymentDemo,
         submitWorkOrderCompletionEvidence,
         reviewWorkOrderCompletion,
         submitComplaintFeedback,

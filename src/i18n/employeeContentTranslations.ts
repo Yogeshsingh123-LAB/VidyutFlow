@@ -1990,6 +1990,13 @@ export function localizeWorkOrderMaterial(material: string, lang: LanguageCode):
 
 export function localizeAssignedActorName(actor: string | undefined, lang: LanguageCode): string {
   if (!actor || lang === 'en') return actor || '';
+  if (actor === 'Unassigned') {
+    return lang === 'gu'
+      ? 'સોંપણી બાકી'
+      : lang === 'hi'
+      ? 'असाइन नहीं किया गया'
+      : 'नियुक्त नाही';
+  }
   return actor
     .replace('(JE Field)', lang === 'gu' ? '(JE ફિલ્ડ)' : lang === 'hi' ? '(JE फील्ड)' : '(JE फील्ड)')
     .replace('(Field JE)', lang === 'gu' ? '(ફિલ્ડ JE)' : lang === 'hi' ? '(फील्ड JE)' : '(फील्ड JE)')
@@ -2913,5 +2920,74 @@ export function localizeToastMessage(message: string, lang: LanguageCode): strin
       : `शिफारस ${m[1]} ऑपरेटरद्वारे फेटाळली. कृती रद्द.`;
   }
 
+  m = message.match(
+    /^Inspection report for\s+(\S+)\s+queued locally \(Offline Queue\)\.\s*Canonical ERP state will update after DEMO replay\.$/
+  );
+  if (m) {
+    return lang === 'gu'
+      ? `${m[1]} માટેનો નિરીક્ષણ અહેવાલ સ્થાનિક રીતે કતારબદ્ધ થયો (ઓફલાઇન કતાર). DEMO રિપ્લે પછી સત્તાવાર ERP સ્ટેટ અપડેટ થશે.`
+      : lang === 'hi'
+      ? `${m[1]} के लिए निरीक्षण रिपोर्ट स्थानीय रूप से कतारबद्ध की गई (ऑफलाइन कतार)। DEMO रिप्ले के बाद आधिकारिक ERP स्टेट अपडेट होगा।`
+      : `${m[1]} साठीचा तपासणी अहवाल स्थानिक रांगेत जतन केला (ऑफलाईन रांग). DEMO रिप्लेनंतर अधिकृत ERP स्टेट अद्ययावत होईल.`;
+  }
+
+  m = message.match(
+    /^Work Order\s+#?(\S+)\s+status change to\s+"([^"]+)"\s+queued locally \(Offline Queue\)\.$/
+  );
+  if (m) {
+    return lang === 'gu'
+      ? `વર્ક ઓર્ડર #${m[1]} ની સ્થિતિ "${m[2]}" માં બદલવાની ક્રિયા સ્થાનિક રીતે કતારબદ્ધ થઈ (ઓફલાઇન કતાર).`
+      : lang === 'hi'
+      ? `वर्क ऑर्डर #${m[1]} की स्थिति "${m[2]}" में बदलने की कार्रवाई स्थानीय रूप से कतारबद्ध की गई (ऑफलाइन कतार)।`
+      : `वर्क ऑर्डर #${m[1]} ची स्थिती "${m[2]}" मध्ये बदलण्याची कृती स्थानिक रांगेत जतन केली (ऑफलाईन रांग).`;
+  }
+
+  m = message.match(
+    /^DEMO Replay Complete:\s+(\d+)\s+queued action\(s\) applied to local ERP state\.$/
+  );
+  if (m) {
+    return lang === 'gu'
+      ? `DEMO રિપ્લે પૂર્ણ: ${m[1]} કતારબદ્ધ ક્રિયા(ઓ) સ્થાનિક ERP સ્ટેટમાં લાગુ કરવામાં આવી.`
+      : lang === 'hi'
+      ? `DEMO रिप्ले पूर्ण: ${m[1]} कतारबद्ध कार्रवाई(यां) स्थानीय ERP स्टेट में लागू की गईं।`
+      : `DEMO रिप्ले पूर्ण: ${m[1]} रांगेतील कृती स्थानिक ERP स्टेटमध्ये लागू केल्या.`;
+  }
+
+  m = message.match(
+    /^DEMO Replay:\s+(\d+)\s+applied,\s+(\d+)\s+failed\/conflicted\.\s*Review failed items in Offline Queue\.$/
+  );
+  if (m) {
+    return lang === 'gu'
+      ? `DEMO રિપ્લે: ${m[1]} લાગુ, ${m[2]} નિષ્ફળ/વિરોધાભાસી. ઓફલાઇન કતારમાં નિષ્ફળ ક્રિયાઓની સમીક્ષા કરો.`
+      : lang === 'hi'
+      ? `DEMO रिप्ले: ${m[1]} लागू, ${m[2]} विफल/टकराव। ऑफलाइन कतार में विफल मदों की समीक्षा करें।`
+      : `DEMO रिप्ले: ${m[1]} लागू, ${m[2]} अयशस्वी/विसंगत. ऑफलाईन रांगेतील अयशस्वी बाबींचे पुनरावलोकन करा.`;
+  }
+
+  if (message === 'No pending offline actions to replay.') {
+    return lang === 'gu'
+      ? 'રિપ્લે કરવા માટે કોઈ બાકી ઓફલાઇન ક્રિયા નથી.'
+      : lang === 'hi'
+      ? 'रिप्ले करने के लिए कोई लंबित ऑफलाइन कार्रवाई नहीं है।'
+      : 'रिप्ले करण्यासाठी कोणतीही प्रलंबित ऑफलाईन कृती नाही.';
+  }
+
+  if (message === 'Cannot replay queued actions while browser network is offline.') {
+    return lang === 'gu'
+      ? 'બ્રાઉઝર નેટવર્ક ઓફલાઇન હોય ત્યારે કતારબદ્ધ ક્રિયાઓ રિપ્લે કરી શકાતી નથી.'
+      : lang === 'hi'
+      ? 'ब्राउज़र नेटवर्क ऑफलाइन होने पर कतारबद्ध कार्रवाइयों को रिप्ले नहीं किया जा सकता।'
+      : 'ब्राउझर नेटवर्क ऑफलाईन असताना रांगेतील कृती रिप्ले करता येत नाहीत.';
+  }
+
+  if (message === 'Online mode restored. Pending offline actions can now be replayed.') {
+    return lang === 'gu'
+      ? 'ઓનલાઇન મોડ પુનઃસ્થાપિત થયો. બાકી ઓફલાઇન ક્રિયાઓ હવે રિપ્લે કરી શકાય છે.'
+      : lang === 'hi'
+      ? 'ऑनलाइन मोड बहाल किया गया। लंबित ऑफलाइन कार्रवाइयां अब रिप्ले की जा सकती हैं।'
+      : 'ऑनलाईन मोड पूर्ववत झाला. प्रलंबित ऑफलाईन कृती आता रिप्ले केल्या जाऊ शकतात.';
+  }
+
   return message;
 }
+

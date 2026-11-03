@@ -391,6 +391,7 @@ export interface EnterprisePaymentModalProps {
   connection: ElectricityConnection | null;
   existingPayments: PaymentTransaction[];
   language: Language;
+  referenceDate?: string;
   onClose: () => void;
   onExecutePayment: (params: {
     billNo: string;
@@ -414,6 +415,7 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
   connection,
   existingPayments,
   language,
+  referenceDate = '28-Oct-2026',
   onClose,
   onExecutePayment,
   onViewReceipt,
@@ -476,8 +478,16 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
         billTotalAmount: 0,
         previouslyPaidAmount: 0,
         currentOutstandingAmount: 0,
+        remainingPrincipal: 0,
+        accruedLateCharges: 0,
+        waivedOrSettledCharges: 0,
+        totalOutstandingWithCharges: 0,
+        originalDueDate: '—',
+        daysOverdue: 0,
+        calculationReferenceDate: referenceDate,
         selectedPaymentAmount: 0,
         remainingBalanceAfterPayment: 0,
+        remainingTotalWithChargesAfterPayment: 0,
         isFullSettlement: false,
         validationError: 'No bill selected.',
       };
@@ -487,8 +497,10 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
       existingPayments,
       mode: paymentMode,
       customAmountInput: customAmountStr,
+      referenceDate,
+      includeLateCharges: true,
     });
-  }, [activeBill, existingPayments, paymentMode, customAmountStr]);
+  }, [activeBill, existingPayments, paymentMode, customAmountStr, referenceDate]);
 
   if (!isOpen || !activeBill) return null;
 
@@ -648,11 +660,11 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
                   </span>
                 </div>
 
-                {/* Primary Financial Highlight Strip */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                {/* Primary Financial Highlight Strip (Canonical 9-Field Breakdown) */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
                   <div className="p-3">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
-                      {pm.billTotalLabel}
+                      1. {pm.billTotalLabel}
                     </span>
                     <span
                       className="text-sm font-extrabold font-mono text-slate-800 dark:text-slate-100"
@@ -663,7 +675,7 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
                   </div>
                   <div className="p-3">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
-                      {pm.previouslyPaidLabel}
+                      2. {pm.previouslyPaidLabel}
                     </span>
                     <span
                       className="text-sm font-extrabold font-mono text-emerald-700 dark:text-emerald-400"
@@ -674,29 +686,57 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
                   </div>
                   <div className="p-3">
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
-                      {pm.currentOutstandingLabel}
+                      3. Remaining Principal
                     </span>
                     <span
                       className="text-sm font-extrabold font-mono text-amber-700 dark:text-amber-400"
-                      data-testid="summary-outstanding-balance"
+                      data-testid="summary-remaining-principal"
                     >
-                      ₹{amountValidation.currentOutstandingAmount.toLocaleString('en-IN')}
+                      ₹{amountValidation.remainingPrincipal.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <div className="p-3">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-rose-500 block">
+                      4. Accrued Late Charges (DPS)
+                    </span>
+                    <span
+                      className="text-sm font-extrabold font-mono text-rose-600 dark:text-rose-400"
+                      data-testid="summary-accrued-late-charges"
+                    >
+                      +₹{amountValidation.accruedLateCharges.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="p-3">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
+                      5. Waived / Settled Charges
+                    </span>
+                    <span
+                      className="text-sm font-extrabold font-mono text-slate-700 dark:text-slate-300"
+                      data-testid="summary-waived-charges"
+                    >
+                      ₹{amountValidation.waivedOrSettledCharges.toFixed(2)}
                     </span>
                   </div>
                   <div className="p-3 bg-blue-50/60 dark:bg-blue-950/30">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 block">
-                      {pm.selectedPaymentAmountLabel}
+                      6. {pm.currentOutstandingLabel}
                     </span>
                     <span
                       className="text-base font-extrabold font-mono text-blue-700 dark:text-blue-400"
+                      data-testid="summary-outstanding-balance"
+                    >
+                      ₹{amountValidation.totalOutstandingWithCharges.toLocaleString('en-IN')}
+                    </span>
+                    <span
+                      className="text-[11px] font-mono text-blue-600 dark:text-blue-300 block"
                       data-testid="summary-selected-payment-amount"
                     >
-                      ₹{amountValidation.selectedPaymentAmount.toLocaleString('en-IN')}
+                      {pm.selectedPaymentAmountLabel}: ₹{amountValidation.selectedPaymentAmount.toLocaleString('en-IN')}
                     </span>
                   </div>
                 </div>
 
-                {/* Consumer & Connection Metadata Grid */}
+                {/* Consumer & Connection Metadata Grid + Fields 7, 8, 9 */}
                 <div className="p-3.5 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                   <div>
                     <span className="text-[11px] text-slate-400 block">
@@ -733,35 +773,35 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-400 block">
-                      {pm.billingPeriodLabel}
+                      {pm.billingPeriodLabel} · {pm.subdivisionLabel}
                     </span>
                     <span
                       className="font-semibold text-slate-800 dark:text-slate-200"
                       data-testid="summary-billing-period"
                     >
-                      {billingPeriodDisplay}
+                      {billingPeriodDisplay} (<span data-testid="summary-subdivision">{subdivisionDisplay}</span>)
                     </span>
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-400 block">
-                      {pm.subdivisionLabel}
-                    </span>
-                    <span
-                      className="font-semibold text-slate-800 dark:text-slate-200"
-                      data-testid="summary-subdivision"
-                    >
-                      {subdivisionDisplay}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-400 block">
-                      {pm.dueDateLabel}
+                      7. {pm.dueDateLabel} & 8. Days Overdue
                     </span>
                     <span
                       className="font-mono font-semibold text-slate-800 dark:text-slate-200"
                       data-testid="summary-due-date"
                     >
-                      {activeBill.dueDate}
+                      {activeBill.dueDate} ({amountValidation.daysOverdue}d overdue)
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-400 block">
+                      9. Last Calculation Date
+                    </span>
+                    <span
+                      className="font-mono font-semibold text-slate-800 dark:text-slate-200"
+                      data-testid="summary-calculation-date"
+                    >
+                      {amountValidation.calculationReferenceDate}
                     </span>
                   </div>
                 </div>
