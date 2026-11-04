@@ -47,6 +47,7 @@ import {
   LateChargeWaiverRecord,
   PaymentReversalRecord,
   LateChargePolicy,
+  calculateOverdueDays,
 } from './lateChargeEngine';
 
 // ============================================================================
@@ -1559,13 +1560,15 @@ export function selectEmployeeWorkloadAndSlaMetrics(params: {
   });
 
   const referenceDateStr = referenceDate || '28-Oct-2026';
-  const reconciledLedger = bills.map(b =>
-    reconcileBillWithPayments(b, payments, referenceDateStr, {
-      waivers,
-      reversals,
-      policy,
-    })
-  );
+  const reconciledLedger = bills
+    .map(b =>
+      reconcileBillWithPayments(b, payments, referenceDateStr, {
+        waivers,
+        reversals,
+        policy,
+      })
+    )
+    .filter(r => !r.isScheduledNotIssued && r.effectiveStatus !== 'Scheduled');
   let paidBillsCount = 0;
   let unpaidBillsCount = 0;
   let partiallyPaidBillsCount = 0;
@@ -1693,15 +1696,17 @@ export function selectManagementCanonicalMetrics(params: {
     i => i.status !== 'RESOLVED' && i.status !== 'CLOSED'
   ).length;
 
-  // Reconcile live ERP billing and payment ledger
+  // Reconcile live ERP billing and payment ledger (issued bills only)
   const refDateStr = referenceDate || '28-Oct-2026';
-  const reconciledLedger = bills.map(b =>
-    reconcileBillWithPayments(b, payments, refDateStr, {
-      waivers,
-      reversals,
-      policy,
-    })
-  );
+  const reconciledLedger = bills
+    .map(b =>
+      reconcileBillWithPayments(b, payments, refDateStr, {
+        waivers,
+        reversals,
+        policy,
+      })
+    )
+    .filter(r => !r.isScheduledNotIssued && r.effectiveStatus !== 'Scheduled');
   const billNoSet = new Set(reconciledLedger.map(r => r.billNo));
   const liveBilledActiveInr = reconciledLedger.reduce(
     (sum, r) => sum + Math.max(0, Number(r.totalAmount) || 0),
@@ -1977,13 +1982,15 @@ export function selectAdminCanonicalMetrics(params: {
   ).length;
 
   const adminRefDate = referenceDate || '15-Oct-2026';
-  const reconciledBills = bills.map(b =>
-    reconcileBillWithPayments(b, payments, adminRefDate, {
-      waivers,
-      reversals,
-      policy,
-    })
-  );
+  const reconciledBills = bills
+    .map(b =>
+      reconcileBillWithPayments(b, payments, adminRefDate, {
+        waivers,
+        reversals,
+        policy,
+      })
+    )
+    .filter(r => !r.isScheduledNotIssued && r.effectiveStatus !== 'Scheduled');
   const billNoSet = new Set(reconciledBills.map(r => r.billNo));
   const unpaidBills = reconciledBills.filter(r => r.effectiveStatus !== 'Paid').length;
   const paidBills = reconciledBills.filter(r => r.effectiveStatus === 'Paid').length;
@@ -2277,3 +2284,295 @@ export function getCanonicalAnalyticsTranslations(
 ): CanonicalAnalyticsTranslations {
   return CANONICAL_ANALYTICS_TRANSLATIONS[language] || CANONICAL_ANALYTICS_TRANSLATIONS.en;
 }
+
+// ============================================================================
+// EXECUTIVE DELINQUENCY AGING ENGINE (STEP 4D)
+// ============================================================================
+
+export type DelinquencyAgingBucketKey =
+  | 'NOT_YET_DUE'
+  | '1_30_DAYS'
+  | '31_60_DAYS'
+  | '61_90_DAYS'
+  | 'OVER_90_DAYS';
+
+export interface DelinquencyAgingDrillDownRecord {
+  billNo: string;
+  consumerNo: string;
+  consumerName: string;
+  subdivision: string;
+  tariffCategory: string;
+  dueDate: string;
+  daysOverdue: number;
+  unpaidPrincipalInr: number;
+  principalOutstanding?: number;
+  unpaidDpsInr: number;
+  accruedLateCharges?: number;
+  totalOutstandingInr: number;
+  totalCurrentOutstanding?: number;
+  status: 'Unpaid' | 'Overdue' | 'Partially Paid';
+  bucketKey: DelinquencyAgingBucketKey;
+}
+
+export interface DelinquencyAgingBucketSummary {
+  bucketKey: DelinquencyAgingBucketKey;
+  bucketLabel: string;
+  rangeDays: string;
+  billsCount: number;
+  consumersCount: number;
+  unpaidPrincipalInr: number;
+  unpaidDpsInr: number;
+  totalOverdueBalanceInr: number;
+  percentageOfTotalDelinquency: number;
+  shareOfTotalOverduePct: number;
+  drillDownRecords: DelinquencyAgingDrillDownRecord[];
+  records: DelinquencyAgingDrillDownRecord[];
+}
+
+export interface ExecutiveDelinquencyAgingResult {
+  referenceDate: string;
+  totalEvaluatedBillsCount: number;
+  totalSettledBillsExcludedCount: number;
+  settledBillsExcludedCount: number;
+  totalDelinquentBillsCount: number;
+  totalDelinquentConsumersCount: number;
+  totalOverduePrincipalInr: number;
+  totalOverdueDpsInr: number;
+  totalAccruedLateChargesInr: number;
+  totalOverdueBalanceInr: number;
+  totalOverdueAmountInr: number;
+  totalNotYetDuePrincipalInr: number;
+  buckets: Record<DelinquencyAgingBucketKey, DelinquencyAgingBucketSummary>;
+  allDrillDownRecords: DelinquencyAgingDrillDownRecord[];
+}
+
+export interface ComputeExecutiveDelinquencyAgingParams {
+  bills: ElectricityBill[];
+  connections?: ElectricityConnection[];
+  payments?: PaymentTransaction[];
+  waivers?: LateChargeWaiverRecord[];
+  reversals?: PaymentReversalRecord[];
+  referenceDate?: string;
+  language?: LanguageCode;
+}
+
+export function computeExecutiveDelinquencyAging(
+  params: ComputeExecutiveDelinquencyAgingParams
+): ExecutiveDelinquencyAgingResult {
+  const {
+    bills = [],
+    connections = [],
+    payments = [],
+    waivers = [],
+    reversals = [],
+    referenceDate = '04-Nov-2026',
+    language = 'en',
+  } = params;
+
+  const bucketLabels: Record<LanguageCode, Record<DelinquencyAgingBucketKey, { label: string; range: string }>> = {
+    en: {
+      NOT_YET_DUE: { label: 'Not Yet Due', range: 'Current / Future Due' },
+      '1_30_DAYS': { label: '1–30 Days Overdue', range: '1 to 30 Days' },
+      '31_60_DAYS': { label: '31–60 Days Overdue', range: '31 to 60 Days' },
+      '61_90_DAYS': { label: '61–90 Days Overdue', range: '61 to 90 Days' },
+      OVER_90_DAYS: { label: 'Over 90 Days Overdue', range: '91+ Days' },
+    },
+    gu: {
+      NOT_YET_DUE: { label: 'હજુ બાકી નથી', range: 'ચાલુ / ભવિષ્યની છેલ્લી તારીખ' },
+      '1_30_DAYS': { label: '૧–૩૦ દિવસ મુદતવીતી', range: '૧ થી ૩૦ દિવસ' },
+      '31_60_DAYS': { label: '૩૧–૬૦ દિવસ મુદતવીતી', range: '૩૧ થી ૬૦ દિવસ' },
+      '61_90_DAYS': { label: '૬૧–૯૦ દિવસ મુદતવીતી', range: '૬૧ થી ૯૦ દિવસ' },
+      OVER_90_DAYS: { label: '૯૦+ દિવસથી વધુ મુદતવીતી', range: '૯૧+ દિવસ' },
+    },
+    hi: {
+      NOT_YET_DUE: { label: 'अभी देय नहीं', range: 'वर्तमान / भविष्य की देय तिथि' },
+      '1_30_DAYS': { label: '1–30 दिन अतिदेय', range: '1 से 30 दिन' },
+      '31_60_DAYS': { label: '31–60 दिन अतिदेय', range: '31 से 60 दिन' },
+      '61_90_DAYS': { label: '61–90 दिन अतिदेय', range: '61 से 90 दिन' },
+      OVER_90_DAYS: { label: '90 दिन से अधिक अतिदेय', range: '91+ दिन' },
+    },
+    mr: {
+      NOT_YET_DUE: { label: 'अद्याप देय नाही', range: 'चालू / भविष्यातील देय तारीख' },
+      '1_30_DAYS': { label: '१–३० दिवस थकीत', range: '१ ते ३० दिवस' },
+      '31_60_DAYS': { label: '३१–६० दिवस थकीत', range: '३१ ते ६० दिवस' },
+      '61_90_DAYS': { label: '६१–९० दिवस थकीत', range: '६१ ते ९० दिवस' },
+      OVER_90_DAYS: { label: '९० दिवसांपेक्षा जास्त थकीत', range: '९१+ दिवस' },
+    },
+  };
+
+  const localizedBuckets = bucketLabels[language] || bucketLabels.en;
+
+  const recordsByBucket: Record<DelinquencyAgingBucketKey, DelinquencyAgingDrillDownRecord[]> = {
+    NOT_YET_DUE: [],
+    '1_30_DAYS': [],
+    '31_60_DAYS': [],
+    '61_90_DAYS': [],
+    OVER_90_DAYS: [],
+  };
+
+  let totalSettledBillsExcludedCount = 0;
+  const allDrillDownRecords: DelinquencyAgingDrillDownRecord[] = [];
+
+  for (const bill of bills) {
+    const conn = connections.find((c) => c.consumerNo === bill.consumerNo);
+    const reconciled = reconcileBillWithPayments(bill, payments, referenceDate, {
+      waivers,
+      reversals,
+    });
+
+    // Exclude future scheduled cycles (SCHEDULED_NOT_ISSUED) from delinquency aging
+    if (reconciled.isScheduledNotIssued || reconciled.effectiveStatus === 'Scheduled') {
+      continue;
+    }
+
+    // Exclude settled bills (outstanding <= 0.009 or isPaid)
+    if (reconciled.isPaid || reconciled.outstandingBalance <= 0.009) {
+      totalSettledBillsExcludedCount += 1;
+      continue;
+    }
+
+    const principal = Math.max(
+      0,
+      reconciled.lateChargeBreakdown?.remainingPrincipal ?? reconciled.outstandingBalance
+    );
+    const dps = Math.max(0, reconciled.lateChargeBreakdown?.netLateChargesPayable ?? 0);
+    const totalOutstanding = Math.max(
+      0,
+      reconciled.lateChargeBreakdown?.totalOutstandingPayable ?? (principal + dps)
+    );
+
+    // If completely zero balance, exclude
+    if (totalOutstanding <= 0.009) {
+      totalSettledBillsExcludedCount += 1;
+      continue;
+    }
+
+    // Days overdue
+    const rawOverdue = calculateOverdueDays(bill.dueDate, referenceDate);
+    const daysOverdue = rawOverdue.isOverdue && principal > 0 ? rawOverdue.daysOverdue : 0;
+
+    let bucketKey: DelinquencyAgingBucketKey;
+    if (daysOverdue <= 0) {
+      bucketKey = 'NOT_YET_DUE';
+    } else if (daysOverdue <= 30) {
+      bucketKey = '1_30_DAYS';
+    } else if (daysOverdue <= 60) {
+      bucketKey = '31_60_DAYS';
+    } else if (daysOverdue <= 90) {
+      bucketKey = '61_90_DAYS';
+    } else {
+      bucketKey = 'OVER_90_DAYS';
+    }
+
+    const drillRecord: DelinquencyAgingDrillDownRecord = {
+      billNo: bill.billNo,
+      consumerNo: bill.consumerNo,
+      consumerName: conn?.consumerName || 'Registered Consumer',
+      subdivision: conn?.subdivision || 'Mehsana City North',
+      tariffCategory: conn?.tariffCategory || 'Residential (RGPU)',
+      dueDate: bill.dueDate,
+      daysOverdue,
+      unpaidPrincipalInr: principal,
+      principalOutstanding: principal,
+      unpaidDpsInr: dps,
+      accruedLateCharges: dps,
+      totalOutstandingInr: totalOutstanding,
+      totalCurrentOutstanding: totalOutstanding,
+      status: reconciled.effectiveStatus as 'Unpaid' | 'Overdue' | 'Partially Paid',
+      bucketKey,
+    };
+
+    recordsByBucket[bucketKey].push(drillRecord);
+    allDrillDownRecords.push(drillRecord);
+  }
+
+  // Calculate totals across overdue buckets (excluding NOT_YET_DUE for delinquency total)
+  let totalOverduePrincipalInr = 0;
+  let totalOverdueDpsInr = 0;
+  let totalOverdueBalanceInr = 0;
+  const delinquentConsumersSet = new Set<string>();
+  let totalDelinquentBillsCount = 0;
+
+  const overdueBucketKeys: DelinquencyAgingBucketKey[] = [
+    '1_30_DAYS',
+    '31_60_DAYS',
+    '61_90_DAYS',
+    'OVER_90_DAYS',
+  ];
+
+  for (const bKey of ['1_30_DAYS', '31_60_DAYS', '61_90_DAYS', 'OVER_90_DAYS'] as DelinquencyAgingBucketKey[]) {
+    const list = recordsByBucket[bKey];
+    totalDelinquentBillsCount += list.length;
+    for (const r of list) {
+      totalOverduePrincipalInr += r.unpaidPrincipalInr;
+      totalOverdueDpsInr += r.unpaidDpsInr;
+      totalOverdueBalanceInr += r.totalOutstandingInr;
+      delinquentConsumersSet.add(r.consumerNo);
+    }
+  }
+
+  totalOverduePrincipalInr = Number(totalOverduePrincipalInr.toFixed(2));
+  totalOverdueDpsInr = Number(totalOverdueDpsInr.toFixed(2));
+  totalOverdueBalanceInr = Number(totalOverdueBalanceInr.toFixed(2));
+
+  const notYetDueList = recordsByBucket.NOT_YET_DUE;
+  const totalNotYetDuePrincipalInr = Number(
+    notYetDueList.reduce((s, r) => s + r.unpaidPrincipalInr, 0).toFixed(2)
+  );
+
+  const buckets: Record<DelinquencyAgingBucketKey, DelinquencyAgingBucketSummary> = {} as any;
+  const allBucketKeys: DelinquencyAgingBucketKey[] = [
+    'NOT_YET_DUE',
+    '1_30_DAYS',
+    '31_60_DAYS',
+    '61_90_DAYS',
+    'OVER_90_DAYS',
+  ];
+
+  for (const bKey of allBucketKeys) {
+    const list = recordsByBucket[bKey];
+    const consumers = new Set(list.map((r) => r.consumerNo)).size;
+    const principal = Number(list.reduce((s, r) => s + r.unpaidPrincipalInr, 0).toFixed(2));
+    const dps = Number(list.reduce((s, r) => s + r.unpaidDpsInr, 0).toFixed(2));
+    const total = Number(list.reduce((s, r) => s + r.totalOutstandingInr, 0).toFixed(2));
+    const percentageOfTotalDelinquency =
+      bKey === 'NOT_YET_DUE'
+        ? 0
+        : totalOverdueBalanceInr > 0
+        ? Number(((total / totalOverdueBalanceInr) * 100).toFixed(1))
+        : 0;
+
+    buckets[bKey] = {
+      bucketKey: bKey,
+      bucketLabel: localizedBuckets[bKey].label,
+      rangeDays: localizedBuckets[bKey].range,
+      billsCount: list.length,
+      consumersCount: consumers,
+      unpaidPrincipalInr: principal,
+      unpaidDpsInr: dps,
+      totalOverdueBalanceInr: total,
+      percentageOfTotalDelinquency,
+      shareOfTotalOverduePct: percentageOfTotalDelinquency,
+      drillDownRecords: list,
+      records: list,
+    };
+  }
+
+  return {
+    referenceDate,
+    totalEvaluatedBillsCount: bills.length,
+    totalSettledBillsExcludedCount,
+    settledBillsExcludedCount: totalSettledBillsExcludedCount,
+    totalDelinquentBillsCount,
+    totalDelinquentConsumersCount: delinquentConsumersSet.size,
+    totalOverduePrincipalInr,
+    totalOverdueDpsInr,
+    totalAccruedLateChargesInr: totalOverdueDpsInr,
+    totalOverdueBalanceInr,
+    totalOverdueAmountInr: totalOverdueBalanceInr,
+    totalNotYetDuePrincipalInr,
+    buckets,
+    allDrillDownRecords,
+  };
+}
+

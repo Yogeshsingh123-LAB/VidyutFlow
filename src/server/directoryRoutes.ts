@@ -334,7 +334,7 @@ function readJson(req: IncomingMessage): Promise<Record<string, any>> {
 }
 
 export async function handleDirectoryRoute(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
-  const rawUrl = req.url || '/';
+  const rawUrl = (req as IncomingMessage & { originalUrl?: string }).originalUrl || req.url || '/';
   const parsed = new URL(rawUrl, 'http://localhost');
   const pathname = parsed.pathname;
 

@@ -62,6 +62,8 @@ import {
   resolveBillCycleMetadata,
   buildBiMonthlyBillingPeriod,
   parseBillMonthToPeriodDescriptor,
+  isBillScheduledNotIssued,
+  parseVidyutDateToUtcMs,
 } from './billingEngine';
 import { CONSUMPTION_HISTORY } from '../data/mockData';
 import {
@@ -270,6 +272,15 @@ export interface UgvclBillParticulars {
   totalBillAmount: number;
   paidAmount: number;
   outstandingBalance: number;
+  remainingPrincipal: number;
+  accruedLateCharges: number;
+  waivedOrSettledLateCharges: number;
+  currentTotalOutstanding: number;
+  daysOverdue: number;
+  paidDate?: string;
+  calculationReferenceDate: string;
+  calculationTimestampIst: string;
+  calculationAsOfLabel: string;
   slabBreakdown: Array<{
     slab: string;
     units: number;
@@ -307,6 +318,7 @@ export interface GeneratedOfficialDocument {
   statusBannerNote: string;
   lifecycleClassification?: ApplicationLifecycleClassification;
   settlementClassification?: 'FULL_SETTLEMENT' | 'PARTIAL_SETTLEMENT';
+  settlement11Fields?: any;
   reconciliationVerified?: boolean;
   recordedTimestamp: string;
   generatedAtDisplay: string;
@@ -1362,14 +1374,18 @@ export function classifyApplicationLifecycleStage(
 }
 
 export interface GenerateElectricityBillInput {
-  role: UserRole;
-  actor: ExportActorIdentity;
+  role?: UserRole;
+  actor?: ExportActorIdentity;
   bill?: ElectricityBill | null;
   connection?: ElectricityConnection | null;
   payments?: PaymentTransaction[];
   allBills?: ElectricityBill[];
   language?: Language;
   dataSource?: string;
+  referenceDate?: string;
+  calculationTimestampIst?: string;
+  waivers?: LateChargeWaiverRecord[];
+  reversals?: PaymentReversalRecord[];
 }
 
 export function localizeSlabDescription(slab: string, language: Language): string {
@@ -1933,7 +1949,14 @@ export function buildSixBiMonthlyPeriodComparisonChart(input: {
   // Deduplicate all bills for this connection (including targetBill)
   const billMap = new Map<string, ElectricityBill>();
   for (const b of input.allBills || []) {
-    if (b && b.consumerNo === consumerNo && b.billNo) {
+    if (
+      b &&
+      b.consumerNo === consumerNo &&
+      b.billNo &&
+      b.lifecycleStatus !== 'SCHEDULED_NOT_ISSUED' &&
+      !b.isScheduledNotIssued &&
+      b.status !== 'Scheduled'
+    ) {
       billMap.set(b.billNo, b);
     }
   }
@@ -2206,18 +2229,70 @@ export function generateElectricityBillDocument(
     };
   }
 
+  const isExplicitlyScheduled =
+    rawBill.lifecycleStatus === 'SCHEDULED_NOT_ISSUED' ||
+    Boolean(rawBill.isScheduledNotIssued) ||
+    rawBill.status === 'Scheduled' ||
+    (input.referenceDate !== undefined && isBillScheduledNotIssued(rawBill, input.referenceDate));
+
+  if (isExplicitlyScheduled) {
+    const scheduledStatusLabel =
+      language === 'gu'
+        ? 'નિર્ધારિત — હજુ બિલ જારી થયેલ નથી'
+        : language === 'hi'
+        ? 'निर्धारित — अभी बिल जारी नहीं हुआ है'
+        : language === 'mr'
+        ? 'नियोजित — अद्याप बिल जारी झालेले नाही'
+        : 'Scheduled — Not Yet Issued';
+    const scheduledReason =
+      language === 'gu'
+        ? 'આગામી દ્વિ-માસિક બિલિંગ ચક્ર હજુ જારી થયેલ નથી. મીટર રીડિંગ અને બિલ જારી થયા પછી જ સત્તાવાર વીજ બિલ PDF ઉપલબ્ધ થશે.'
+        : language === 'hi'
+        ? 'आगामी द्वि-मासिक बिलिंग चक्र अभी जारी नहीं किया गया है। मीटर रीडिंग और बिल जारी होने के बाद ही आधिकारिक विद्युत बिल PDF उपलब्ध होगा।'
+        : language === 'mr'
+        ? 'आगामी द्वि-मासिक बिलिंग चक्र अद्याप जारी करण्यात आलेले नाही. मीटर रीडिंग आणि बिल जारी झाल्यानंतरच अधिकृत वीज बिल PDF उपलब्ध होईल.'
+        : 'Scheduled future billing cycle has not yet been issued. Official payable electricity bill PDF is available only after meter reading and bill issuance.';
+    return {
+      documentType: 'electricity_bill',
+      displayMode: 'unavailable',
+      eligible: false,
+      authorized: true,
+      referenceId: refId,
+      filename: buildDocumentFilename('electricity_bill', refId),
+      title: extra.electricityBillTitle,
+      subtitle: `${UGVCL_COMPANY_NAME_EN} (${UGVCL_COMPANY_NAME_GU})`,
+      statusLabel: scheduledStatusLabel,
+      statusTone: 'amber',
+      statusBannerNote: scheduledReason,
+      recordedTimestamp: rawBill.billDate || '—',
+      generatedAtDisplay: input.referenceDate || '04-Nov-2026',
+      dataSource,
+      dataSourceBadge: `${ui.dataSource}: ${dataSource}`,
+      demoDisclosureBanner: extra.demoElectricityBillDisclosure,
+      footerNote: extra.demoElectricityBillDisclosure,
+      language,
+      fontFamilyCss: FONT_STACKS[language],
+      isIndic: typoProfile.isIndic,
+      sections: [],
+      ineligibleReason: scheduledReason,
+    };
+  }
+
   const targetRecord = {
     ...(rawConn || {}),
     ...rawBill,
     subdivision: rawConn?.subdivision || (rawBill as unknown as Record<string, unknown>).subdivision,
   } as Record<string, unknown>;
 
-  const isAuthorized = authorizeDocumentAccess(
-    input.role,
-    input.actor,
-    'electricity_bill',
-    targetRecord
-  );
+  const isAuthorized =
+    !input.role
+      ? true
+      : authorizeDocumentAccess(
+          input.role,
+          input.actor || { id: 'demo_consumer', role: input.role, name: 'Consumer' },
+          'electricity_bill',
+          targetRecord
+        );
 
   if (!isAuthorized) {
     return {
@@ -2246,11 +2321,44 @@ export function generateElectricityBillDocument(
     };
   }
 
+  const effectiveRefDate = input.referenceDate || '15-Oct-2026';
+  const effectiveTimestampIst =
+    input.calculationTimestampIst || `${effectiveRefDate} 10:30 IST`;
+
   const reconciled = reconcileBillWithPayments(
     rawBill,
     input.payments || [],
-    '15-Oct-2026'
+    effectiveRefDate,
+    {
+      waivers: input.waivers,
+      reversals: input.reversals,
+      tariffCategory: rawConn?.tariffCategory,
+    }
   );
+  const remainingPrincipalInr = reconciled.isPaid ? 0 : reconciled.outstandingBalance;
+  const accruedLateChargesInr = reconciled.isPaid
+    ? 0
+    : reconciled.lateChargeBreakdown?.netLateChargesPayable || 0;
+  const waivedOrSettledLateChargesInr = Number(
+    (
+      (reconciled.lateChargeBreakdown?.lateChargesWaived || 0) +
+      (reconciled.lateChargeBreakdown?.lateChargesSettled || 0)
+    ).toFixed(2)
+  );
+  const currentTotalOutstandingInr = reconciled.isPaid
+    ? 0
+    : reconciled.totalOutstandingWithCharges;
+  const activeDaysOverdue = reconciled.isPaid
+    ? 0
+    : reconciled.lateChargeBreakdown?.daysOverdue || 0;
+  const calculationAsOfLabel =
+    language === 'gu'
+      ? `${effectiveTimestampIst} મુજબ બાકી રકમની ગણતરી`
+      : language === 'hi'
+      ? `${effectiveTimestampIst} के अनुसार बकाया गणना`
+      : language === 'mr'
+      ? `${effectiveTimestampIst} नुसार थकबाकी गणना`
+      : `Outstanding calculated as of ${effectiveTimestampIst}`;
 
   // Section A — UGVCL Identity
   const sectionAFields: DocumentFieldItem[] = [
@@ -2462,11 +2570,52 @@ export function generateElectricityBillDocument(
       highlight: reconciled.paidAmount > 0 ? 'emerald' : 'default',
     },
     {
+      key: 'remainingPrincipal',
+      label:
+        language === 'gu'
+          ? 'બાકી મૂળ રકમ (Remaining Principal)'
+          : language === 'hi'
+          ? 'शेष मूल राशि (Remaining Principal)'
+          : language === 'mr'
+          ? 'उर्वरित मुद्दल रक्कम (Remaining Principal)'
+          : 'Remaining Principal',
+      value: `₹${remainingPrincipalInr.toLocaleString('en-IN', { minimumFractionDigits: remainingPrincipalInr % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`,
+      isMono: true,
+      highlight: remainingPrincipalInr === 0 ? 'emerald' : 'amber',
+    },
+    {
+      key: 'accruedLatePaymentCharges',
+      label:
+        language === 'gu'
+          ? 'વિલંબિત ચુકવણી સરચાર્જ (Accrued DPS)'
+          : language === 'hi'
+          ? 'विलंबित भुगतान अधिभार (Accrued DPS)'
+          : language === 'mr'
+          ? 'विलंब देयक अधिभार (Accrued DPS)'
+          : 'Accrued Late Payment Charges (DPS)',
+      value: `₹${accruedLateChargesInr.toLocaleString('en-IN', { minimumFractionDigits: accruedLateChargesInr > 0 ? 2 : 0, maximumFractionDigits: 2 })}`,
+      isMono: true,
+      highlight: accruedLateChargesInr > 0 ? 'rose' : 'default',
+    },
+    {
       key: 'remainingAmountPayable',
       label: extra.remainingAmountPayableLabel,
-      value: `₹${reconciled.outstandingBalance.toLocaleString('en-IN')}`,
+      value: `₹${currentTotalOutstandingInr.toLocaleString('en-IN', { minimumFractionDigits: currentTotalOutstandingInr % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`,
       isMono: true,
-      highlight: reconciled.outstandingBalance === 0 ? 'emerald' : 'amber',
+      highlight: currentTotalOutstandingInr === 0 ? 'emerald' : 'amber',
+    },
+    {
+      key: 'calculationAsOf',
+      label:
+        language === 'gu'
+          ? 'ગણતરી સમય (IST)'
+          : language === 'hi'
+          ? 'गणना समय (IST)'
+          : language === 'mr'
+          ? 'गणना वेळ (IST)'
+          : 'Calculation Timestamp (IST)',
+      value: calculationAsOfLabel,
+      isMono: true,
     },
   ];
 
@@ -2715,25 +2864,64 @@ export function generateElectricityBillDocument(
         amount: `₹${reconciled.paidAmount.toLocaleString('en-IN')}`,
       },
       {
+        component:
+          language === 'gu'
+            ? 'બાકી મૂળ રકમ (Remaining Principal)'
+            : language === 'hi'
+            ? 'शेष मूल राशि (Remaining Principal)'
+            : language === 'mr'
+            ? 'उर्वरित मुद्दल रक्कम (Remaining Principal)'
+            : 'Remaining Principal',
+        amount: `₹${remainingPrincipalInr.toLocaleString('en-IN', { minimumFractionDigits: remainingPrincipalInr % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`,
+      },
+      ...(accruedLateChargesInr > 0
+        ? [
+            {
+              component:
+                language === 'gu'
+                  ? `વિલંબિત ચુકવણી સરચાર્જ (DPS — ${activeDaysOverdue} દિવસ)`
+                  : language === 'hi'
+                  ? `विलंबित भुगतान अधिभार (DPS — ${activeDaysOverdue} दिन)`
+                  : language === 'mr'
+                  ? `विलंब देयक अधिभार (DPS — ${activeDaysOverdue} दिवस)`
+                  : `Accrued Late Payment Surcharge (DPS — ${activeDaysOverdue} days overdue)`,
+              amount: `+₹${accruedLateChargesInr.toFixed(2)}`,
+            },
+          ]
+        : []),
+      {
         component: extra.remainingAmountPayableLabel,
-        amount: `₹${reconciled.outstandingBalance.toLocaleString('en-IN')}`,
+        amount: `₹${currentTotalOutstandingInr.toLocaleString('en-IN', { minimumFractionDigits: currentTotalOutstandingInr % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`,
       },
     ],
-    footerNote: reconciliationVerified
-      ? extra.reconciliationVerifiedText
-      : extra.reconciliationMismatchWarning,
+    footerNote: `${reconciliationVerified ? extra.reconciliationVerifiedText : extra.reconciliationMismatchWarning} · ${calculationAsOfLabel}`,
   });
 
-  // Previous 3 Billing Cycles Statement Table
-  const connectionAllBills = (input.allBills || []).filter(
-    (b) =>
-      b &&
-      b.consumerNo === rawBill.consumerNo &&
-      b.billNo !== rawBill.billNo
-  );
+  // Previous 3 Billing Cycles Statement Table (Strictly chronologically prior issued bills only)
+  const targetBillIssueMs =
+    parseVidyutDateToUtcMs(rawBill.billDate) ?? new Date(rawBill.billDate || 0).getTime();
+  const connectionAllBills = (input.allBills || []).filter((b) => {
+    if (!b || b.consumerNo !== rawBill.consumerNo || b.billNo === rawBill.billNo) {
+      return false;
+    }
+    if (
+      b.lifecycleStatus === 'SCHEDULED_NOT_ISSUED' ||
+      b.isScheduledNotIssued ||
+      b.status === 'Scheduled' ||
+      isBillScheduledNotIssued(b, effectiveRefDate)
+    ) {
+      return false;
+    }
+    const candidateMs =
+      parseVidyutDateToUtcMs(b.billDate) ?? new Date(b.billDate || 0).getTime();
+    if (Number.isFinite(targetBillIssueMs) && Number.isFinite(candidateMs)) {
+      return candidateMs < targetBillIssueMs;
+    }
+    return true;
+  });
   connectionAllBills.sort((a, b) => {
-    const timeA = new Date(a.billDate || 0).getTime();
-    const timeB = new Date(b.billDate || 0).getTime();
+    const timeA = parseVidyutDateToUtcMs(a.billDate) ?? new Date(a.billDate || 0).getTime();
+    const timeB = parseVidyutDateToUtcMs(b.billDate) ?? new Date(b.billDate || 0).getTime();
     return timeB - timeA;
   });
   const previousThreeBills = connectionAllBills.slice(0, 3);
@@ -2971,11 +3159,51 @@ export function generateElectricityBillDocument(
       highlight: statusTone,
     },
     {
+      key: 'remainingPrincipal',
+      label:
+        language === 'gu'
+          ? 'બાકી મૂળ રકમ'
+          : language === 'hi'
+          ? 'शेष मूल राशि'
+          : language === 'mr'
+          ? 'उर्वरित मुद्दल'
+          : 'Remaining Principal',
+      value: `₹${remainingPrincipalInr.toLocaleString('en-IN', { minimumFractionDigits: remainingPrincipalInr % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`,
+      isMono: true,
+    },
+    {
+      key: 'accruedLateCharges',
+      label:
+        language === 'gu'
+          ? 'વિલંબિત ચુકવણી સરચાર્જ (DPS)'
+          : language === 'hi'
+          ? 'विलंबित भुगतान अधिभार (DPS)'
+          : language === 'mr'
+          ? 'विलंब देयक अधिभार (DPS)'
+          : 'Accrued Late Charges (DPS)',
+      value: `₹${accruedLateChargesInr.toFixed(2)}`,
+      isMono: true,
+      highlight: accruedLateChargesInr > 0 ? 'rose' : 'default',
+    },
+    {
       key: 'outstandingBalance',
       label: extra.remainingAmountPayableLabel,
-      value: `₹${reconciled.outstandingBalance.toLocaleString('en-IN')}`,
+      value: `₹${currentTotalOutstandingInr.toLocaleString('en-IN', { minimumFractionDigits: currentTotalOutstandingInr % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`,
       isMono: true,
-      highlight: reconciled.outstandingBalance === 0 ? 'emerald' : 'amber',
+      highlight: currentTotalOutstandingInr === 0 ? 'emerald' : 'amber',
+    },
+    {
+      key: 'calculationAsOf',
+      label:
+        language === 'gu'
+          ? 'ગણતરી સંદર્ભ'
+          : language === 'hi'
+          ? 'गणना संदर्भ'
+          : language === 'mr'
+          ? 'गणना संदर्भ'
+          : 'Calculation Reference',
+      value: calculationAsOfLabel,
+      isMono: true,
     },
   ];
   if (reconciled.paidDate) {
@@ -3234,7 +3462,16 @@ export function generateElectricityBillDocument(
     arrears: 0,
     totalBillAmount: rawBill.totalAmount,
     paidAmount: reconciled.paidAmount,
-    outstandingBalance: reconciled.outstandingBalance,
+    outstandingBalance: currentTotalOutstandingInr,
+    remainingPrincipal: remainingPrincipalInr,
+    accruedLateCharges: accruedLateChargesInr,
+    waivedOrSettledLateCharges: waivedOrSettledLateChargesInr,
+    currentTotalOutstanding: currentTotalOutstandingInr,
+    daysOverdue: activeDaysOverdue,
+    paidDate: reconciled.paidDate,
+    calculationReferenceDate: effectiveRefDate,
+    calculationTimestampIst: effectiveTimestampIst,
+    calculationAsOfLabel,
     slabBreakdown: slabs,
     slabArithmeticReconciled,
     slabIntegrityWarning,
@@ -3257,10 +3494,10 @@ export function generateElectricityBillDocument(
     subtitle: `${UGVCL_COMPANY_NAME_EN} (${UGVCL_COMPANY_NAME_GU})`,
     statusLabel: localizeBillStatus(reconciled.effectiveStatus, language),
     statusTone,
-    statusBannerNote: `${ui.billReference}: ${rawBill.billNo} · ${extra.currentBillAmountLabel}: ₹${reconciled.totalAmount.toLocaleString('en-IN')} · ${extra.remainingAmountPayableLabel}: ₹${reconciled.outstandingBalance.toLocaleString('en-IN')}`,
+    statusBannerNote: `${ui.billReference}: ${rawBill.billNo} · ${extra.currentBillAmountLabel}: ₹${reconciled.totalAmount.toLocaleString('en-IN')} · ${extra.remainingAmountPayableLabel}: ₹${currentTotalOutstandingInr.toLocaleString('en-IN', { minimumFractionDigits: currentTotalOutstandingInr % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })} · ${calculationAsOfLabel}`,
     reconciliationVerified,
     recordedTimestamp: rawBill.billDate,
-    generatedAtDisplay: rawBill.generatedAt || rawBill.billDate || '15-Oct-2026',
+    generatedAtDisplay: effectiveRefDate,
     dataSource,
     dataSourceBadge: `${ui.dataSource}: ${dataSource}`,
     demoDisclosureBanner: extra.demoElectricityBillDisclosure,
@@ -3304,8 +3541,8 @@ export function generateElectricityBillDocument(
       },
       {
         label: extra.remainingAmountPayableLabel,
-        value: `₹${reconciled.outstandingBalance.toLocaleString('en-IN')}`,
-        tone: reconciled.outstandingBalance === 0 ? 'emerald' : 'amber',
+        value: `₹${currentTotalOutstandingInr.toLocaleString('en-IN', { minimumFractionDigits: currentTotalOutstandingInr % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}`,
+        tone: currentTotalOutstandingInr === 0 ? 'emerald' : 'amber',
       },
       {
         label: extra.dueDateLabel,
@@ -3328,15 +3565,143 @@ export function generateElectricityBillDocument(
 }
 
 export interface GeneratePaymentReceiptInput {
-  role: UserRole;
-  actor: ExportActorIdentity;
+  role?: UserRole;
+  actor?: ExportActorIdentity;
   bill?: ElectricityBill | null;
   payment?: PaymentTransaction | null;
   connection?: ElectricityConnection | null;
   allPayments?: PaymentTransaction[];
   language?: Language;
   dataSource?: string;
+  referenceDate?: string;
 }
+
+export const SETTLEMENT_RECEIPT_11_FIELD_LABELS: Record<Language, {
+  sectionTitle: string;
+  field1_originalPrincipal: string;
+  originalPrincipal: string;
+  field2_previouslySettledPrincipal: string;
+  previouslySettled: string;
+  field3_principalPaidInThisTx: string;
+  principalPaidThisTx: string;
+  field4_accruedDpsPrior: string;
+  accruedDpsPrior: string;
+  field5_dpsPaidInThisTx: string;
+  dpsPaidThisTx: string;
+  field6_lateChargesWaived: string;
+  dpsWaived: string;
+  field7_paymentReversals: string;
+  reversals: string;
+  field8_remainingUnpaidPrincipal: string;
+  remainingPrincipal: string;
+  field9_remainingUnpaidDps: string;
+  remainingDps: string;
+  field10_netTotalCurrentOutstanding: string;
+  netOutstanding: string;
+  field11_settlementClassification: string;
+  settlementClass: string;
+}> = {
+  en: {
+    sectionTitle: 'Overdue-to-Settlement Financial Trail (11-Field Audit Reconciled)',
+    field1_originalPrincipal: '1. Original Principal Amount (Bill Total)',
+    originalPrincipal: '1. Original Principal Amount (Bill Total)',
+    field2_previouslySettledPrincipal: '2. Previously Settled Principal',
+    previouslySettled: '2. Previously Settled Principal',
+    field3_principalPaidInThisTx: '3. Principal Paid in this Transaction',
+    principalPaidThisTx: '3. Principal Paid in this Transaction',
+    field4_accruedDpsPrior: '4. Accrued DPS Assessed Prior to Payment',
+    accruedDpsPrior: '4. Accrued DPS Assessed Prior to Payment',
+    field5_dpsPaidInThisTx: '5. DPS / Late Charges Paid in this Tx',
+    dpsPaidThisTx: '5. DPS / Late Charges Paid in this Tx',
+    field6_lateChargesWaived: '6. Late Charges Waived (Approved Waivers)',
+    dpsWaived: '6. Late Charges Waived (Approved Waivers)',
+    field7_paymentReversals: '7. Payment Reversals Applied',
+    reversals: '7. Payment Reversals Applied',
+    field8_remainingUnpaidPrincipal: '8. Remaining Unpaid Principal',
+    remainingPrincipal: '8. Remaining Unpaid Principal',
+    field9_remainingUnpaidDps: '9. Remaining Unpaid DPS',
+    remainingDps: '9. Remaining Unpaid DPS',
+    field10_netTotalCurrentOutstanding: '10. Net Total Current Outstanding',
+    netOutstanding: '10. Net Total Current Outstanding',
+    field11_settlementClassification: '11. Settlement Classification & Metadata',
+    settlementClass: '11. Settlement Classification & Metadata',
+  },
+  gu: {
+    sectionTitle: 'મુદતવીતીથી પતાવટ નાણાકીય ટ્રેઇલ (૧૧-ક્ષેત્ર ઓડિટ સમાધાન)',
+    field1_originalPrincipal: '૧. મૂળ મુદ્દલ રકમ (કુલ બિલ)',
+    originalPrincipal: '૧. મૂળ મુદ્દલ રકમ (કુલ બિલ)',
+    field2_previouslySettledPrincipal: '૨. અગાઉ ચૂકવેલ મુદ્દલ',
+    previouslySettled: '૨. અગાઉ ચૂકવેલ મુદ્દલ',
+    field3_principalPaidInThisTx: '૩. આ વ્યવહારમાં ચૂકવેલ મુદ્દલ',
+    principalPaidThisTx: '૩. આ વ્યવહારમાં ચૂકવેલ મુદ્દલ',
+    field4_accruedDpsPrior: '૪. ચુકવણી પહેલાં આકારણી થયેલ સંચિત DPS',
+    accruedDpsPrior: '૪. ચુકવણી પહેલાં આકારણી થયેલ સંચિત DPS',
+    field5_dpsPaidInThisTx: '૫. આ વ્યવહારમાં ચૂકવેલ DPS / લેટ ચાર્જ',
+    dpsPaidThisTx: '૫. આ વ્યવહારમાં ચૂકવેલ DPS / લેટ ચાર્જ',
+    field6_lateChargesWaived: '૬. માફ કરેલ લેટ ચાર્જ (મંજૂર માફી)',
+    dpsWaived: '૬. માફ કરેલ લેટ ચાર્જ (મંજૂર માફી)',
+    field7_paymentReversals: '૭. લાગુ કરેલ ચુકવણી રિવર્સલ',
+    reversals: '૭. લાગુ કરેલ ચુકવણી રિવર્સલ',
+    field8_remainingUnpaidPrincipal: '૮. બાકી અવેતન મુદ્દલ',
+    remainingPrincipal: '૮. બાકી અવેતન મુદ્દલ',
+    field9_remainingUnpaidDps: '૯. બાકી અવેતન DPS',
+    remainingDps: '૯. બાકી અવેતન DPS',
+    field10_netTotalCurrentOutstanding: '૧૦. ચોખ્ખી કુલ વર્તમાન બાકી રકમ',
+    netOutstanding: '૧૦. ચોખ્ખી કુલ વર્તમાન બાકી રકમ',
+    field11_settlementClassification: '૧૧. પતાવટ વર્ગીકરણ અને મેટાડેટા',
+    settlementClass: '૧૧. પતાવટ વર્ગીકરણ અને મેટાડેટા',
+  },
+  hi: {
+    sectionTitle: 'अतिदेय से निपटान वित्तीय विवरण (11-क्षेत्रीय ऑडिट समाधान)',
+    field1_originalPrincipal: '1. मूल मूलधन राशि (कुल बिल)',
+    originalPrincipal: '1. मूल मूलधन राशि (कुल बिल)',
+    field2_previouslySettledPrincipal: '2. पूर्व में निपटाया गया मूलधन',
+    previouslySettled: '2. पूर्व में निपटाया गया मूलधन',
+    field3_principalPaidInThisTx: '3. इस लेनदेन में चुकाया गया मूलधन',
+    principalPaidThisTx: '3. इस लेनदेन में चुकाया गया मूलधन',
+    field4_accruedDpsPrior: '4. भुगतान पूर्व आकलित संचित DPS',
+    accruedDpsPrior: '4. भुगतान पूर्व आकलित संचित DPS',
+    field5_dpsPaidInThisTx: '5. इस लेनदेन में चुकाया गया DPS / विलंब शुल्क',
+    dpsPaidThisTx: '5. इस लेनदेन में चुकाया गया DPS / विलंब शुल्क',
+    field6_lateChargesWaived: '6. माफ किया गया विलंब शुल्क (स्वीकृत छूट)',
+    dpsWaived: '6. माफ किया गया विलंब शुल्क (स्वीकृत छूट)',
+    field7_paymentReversals: '7. लागू किए गए भुगतान प्रतिवर्तन (Reversals)',
+    reversals: '7. लागू किए गए भुगतान प्रतिवर्तन (Reversals)',
+    field8_remainingUnpaidPrincipal: '8. शेष अदत्त मूलधन',
+    remainingPrincipal: '8. शेष अदत्त मूलधन',
+    field9_remainingUnpaidDps: '9. शेष अदत्त DPS',
+    remainingDps: '9. शेष अदत्त DPS',
+    field10_netTotalCurrentOutstanding: '10. शुद्ध कुल वर्तमान बकाया',
+    netOutstanding: '10. शुद्ध कुल वर्तमान बकाया',
+    field11_settlementClassification: '11. निपटान वर्गीकरण एवं मेटाडेटा',
+    settlementClass: '11. निपटान वर्गीकरण एवं मेटाडेटा',
+  },
+  mr: {
+    sectionTitle: 'थकीत ते समझोता आर्थिक तपशील (११-क्षेत्रीय ऑडिट जुळवणी)',
+    field1_originalPrincipal: '१. मूळ मुद्दल रक्कम (एकूण बिल)',
+    originalPrincipal: '१. मूळ मुद्दल रक्कम (एकूण बिल)',
+    field2_previouslySettledPrincipal: '२. पूर्वी जमा केलेले मुद्दल',
+    previouslySettled: '२. पूर्वी जमा केलेले मुद्दल',
+    field3_principalPaidInThisTx: '३. या व्यवहारात भरलेले मुद्दल',
+    principalPaidThisTx: '३. या व्यवहारात भरलेले मुद्दल',
+    field4_accruedDpsPrior: '४. भरण्यापूर्वी आकारलेला संचित DPS',
+    accruedDpsPrior: '४. भरण्यापूर्वी आकारलेला संचित DPS',
+    field5_dpsPaidInThisTx: '५. या व्यवहारात भरलेला DPS / विलंब आकार',
+    dpsPaidThisTx: '५. या व्यवहारात भरलेला DPS / विलंब आकार',
+    field6_lateChargesWaived: '६. माफ केलेला विलंब आकार (मंजूर सूट)',
+    dpsWaived: '६. माफ केलेला विलंब आकार (मंजूर सूट)',
+    field7_paymentReversals: '७. लागू केलेले पेमेंट रिव्हर्सल',
+    reversals: '७. लागू केलेले पेमेंट रिव्हर्सल',
+    field8_remainingUnpaidPrincipal: '८. शिल्लक अदत्त मुद्दल',
+    remainingPrincipal: '८. शिल्लक अदत्त मुद्दल',
+    field9_remainingUnpaidDps: '९. शिल्लक अदत्त DPS',
+    remainingDps: '९. शिल्लक अदत्त DPS',
+    field10_netTotalCurrentOutstanding: '१०. निव्वळ एकूण चालू थकबाकी',
+    netOutstanding: '१०. निव्वळ एकूण चालू थकबाकी',
+    field11_settlementClassification: '१૧. समझोता वर्गीकरण आणि मेटाडेटा',
+    settlementClass: '१૧. समझोता वर्गीकरण आणि मेटाडेटा',
+  },
+};
 
 /**
  * Generates a verified Payment Receipt document model (Part 5) or rejects unpaid/pending/failed records.
@@ -3364,12 +3729,15 @@ export function generatePaymentReceiptDocument(
     rawPayment?.billNo ||
     'UNSPECIFIED';
 
-  const isAuthorized = authorizeDocumentAccess(
-    input.role,
-    input.actor,
-    'payment_receipt',
-    targetRecord
-  );
+  const isAuthorized =
+    !input.role
+      ? true
+      : authorizeDocumentAccess(
+          input.role,
+          input.actor || { id: 'demo_consumer', role: input.role, name: 'Consumer' },
+          'payment_receipt',
+          targetRecord
+        );
 
   if (!isAuthorized) {
     return {
@@ -3693,8 +4061,95 @@ export function generatePaymentReceiptDocument(
     });
   }
 
-  // Settlement Ledger Section (Part 5 mandatory fields 12, 13, 14, 15, 17)
-  const settlementFields: DocumentFieldItem[] = [
+  const trailLabels =
+    SETTLEMENT_RECEIPT_11_FIELD_LABELS[language] || SETTLEMENT_RECEIPT_11_FIELD_LABELS.en;
+
+  // Full 11-Field Overdue-to-Settlement Financial Trail (Step 4D)
+  const settlement11Fields: DocumentFieldItem[] = [
+    {
+      key: 'field1_originalPrincipal',
+      label: trailLabels.field1_originalPrincipal,
+      value: `₹${settlement.originalPrincipalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+      isMono: true,
+    },
+    {
+      key: 'field2_previouslySettledPrincipal',
+      label: trailLabels.field2_previouslySettledPrincipal,
+      value: `₹${settlement.previouslySettledPrincipal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+      isMono: true,
+    },
+    {
+      key: 'field3_principalPaidInThisTx',
+      label: trailLabels.field3_principalPaidInThisTx,
+      value: `₹${settlement.principalPaidInThisTransaction.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+      isMono: true,
+      highlight: 'emerald',
+    },
+    {
+      key: 'field4_accruedDpsPrior',
+      label: trailLabels.field4_accruedDpsPrior,
+      value: `+₹${settlement.accruedLateChargesPriorToPayment.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+      isMono: true,
+      highlight: settlement.accruedLateChargesPriorToPayment > 0 ? 'rose' : undefined,
+    },
+    {
+      key: 'field5_dpsPaidInThisTx',
+      label: trailLabels.field5_dpsPaidInThisTx,
+      value: `₹${settlement.lateChargesPaidInThisTransaction.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+      isMono: true,
+      highlight: settlement.lateChargesPaidInThisTransaction > 0 ? 'emerald' : undefined,
+    },
+    {
+      key: 'field6_lateChargesWaived',
+      label: trailLabels.field6_lateChargesWaived,
+      value: `₹${settlement.lateChargesWaived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+      isMono: true,
+      highlight: settlement.lateChargesWaived > 0 ? 'blue' : undefined,
+    },
+    {
+      key: 'field7_paymentReversals',
+      label: trailLabels.field7_paymentReversals,
+      value: `₹${settlement.paymentReversalsAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+      isMono: true,
+      highlight: settlement.hasReversals ? 'amber' : undefined,
+    },
+    {
+      key: 'field8_remainingUnpaidPrincipal',
+      label: trailLabels.field8_remainingUnpaidPrincipal,
+      value: `₹${settlement.remainingUnpaidPrincipal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+      isMono: true,
+      highlight: settlement.remainingUnpaidPrincipal === 0 ? 'emerald' : 'amber',
+    },
+    {
+      key: 'field9_remainingUnpaidDps',
+      label: trailLabels.field9_remainingUnpaidDps,
+      value: `₹${settlement.remainingUnpaidLateCharges.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+      isMono: true,
+      highlight: settlement.remainingUnpaidLateCharges === 0 ? 'emerald' : 'rose',
+    },
+    {
+      key: 'field10_netTotalCurrentOutstanding',
+      label: trailLabels.field10_netTotalCurrentOutstanding,
+      value: `₹${settlement.netTotalCurrentOutstanding.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+      isMono: true,
+      highlight: settlement.netTotalCurrentOutstanding === 0 ? 'emerald' : 'rose',
+    },
+    {
+      key: 'field11_settlementClassification',
+      label: trailLabels.field11_settlementClassification,
+      value: `${settlementBadgeText} · Ref: ${settlement.transactionReference} · Method: ${settlement.paymentMethod} · Date: ${settlement.paymentTimestamp}`,
+      highlight: isPartialSettlement ? 'amber' : 'emerald',
+    },
+  ];
+
+  const financialFields: DocumentFieldItem[] = [
+    {
+      key: 'amountPaid',
+      label: ui.amountPaid,
+      value: `₹${amountPaidNum.toLocaleString('en-IN')}`,
+      isMono: true,
+      highlight: 'emerald',
+    },
     {
       key: 'totalBillAmount',
       label: extra.totalBillAmountLabel,
@@ -3708,23 +4163,14 @@ export function generatePaymentReceiptDocument(
       isMono: true,
     },
     {
-      key: 'amountPaid',
-      label: extra.amountPaidInThisTxLabel,
-      value: `₹${amountPaidNum.toLocaleString('en-IN')}`,
-      isMono: true,
-      highlight: 'emerald',
-    },
-    {
       key: 'remainingBalanceAfterPayment',
       label: extra.remainingBalanceAfterPaymentLabel,
       value: `₹${settlement.remainingBalanceAfterTransaction.toLocaleString('en-IN')}`,
       isMono: true,
-      highlight:
-        settlement.remainingBalanceAfterTransaction === 0 ? 'emerald' : 'amber',
+      highlight: settlement.remainingBalanceAfterTransaction === 0 ? 'emerald' : 'amber',
     },
+    ...settlement11Fields,
   ];
-
-  const financialFields: DocumentFieldItem[] = [...settlementFields];
   if (rawBill) {
     financialFields.push(
       {
@@ -3785,6 +4231,12 @@ export function generatePaymentReceiptDocument(
   }
 
   sections.push({
+    id: 'settlement-breakdown',
+    title: trailLabels.sectionTitle,
+    fields: settlement11Fields,
+  });
+
+  sections.push({
     id: 'financial-breakdown',
     title: ui.sectionFinancialBreakdown,
     fields: financialFields,
@@ -3793,30 +4245,58 @@ export function generatePaymentReceiptDocument(
   const tables: PdfDocumentTable[] = [
     {
       id: 'receipt-settlement-table',
-      title: extra.sectionSettlementSummary,
+      title: trailLabels.sectionTitle,
       columns: [
         { key: 'item', header: extra.chargeColComponent, align: 'left', widthRatio: 2.6 },
         { key: 'amount', header: extra.chargeColAmount, align: 'right', widthRatio: 1.4 },
       ],
       rows: [
         {
-          item: extra.totalBillAmountLabel,
-          amount: `₹${settlement.billTotalAmount.toLocaleString('en-IN')}`,
+          item: trailLabels.field1_originalPrincipal,
+          amount: `₹${settlement.originalPrincipalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
         },
         {
-          item: extra.previouslySettledAmountLabel,
-          amount: `₹${settlement.previouslySettledAmount.toLocaleString('en-IN')}`,
+          item: trailLabels.field2_previouslySettledPrincipal,
+          amount: `₹${settlement.previouslySettledPrincipal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
         },
         {
-          item: extra.amountPaidInThisTxLabel,
-          amount: `₹${amountPaidNum.toLocaleString('en-IN')}`,
+          item: trailLabels.field3_principalPaidInThisTx,
+          amount: `₹${settlement.principalPaidInThisTransaction.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
         },
         {
-          item: extra.remainingBalanceAfterPaymentLabel,
-          amount: `₹${settlement.remainingBalanceAfterTransaction.toLocaleString('en-IN')}`,
+          item: trailLabels.field4_accruedDpsPrior,
+          amount: `₹${settlement.accruedLateChargesPriorToPayment.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        },
+        {
+          item: trailLabels.field5_dpsPaidInThisTx,
+          amount: `₹${settlement.lateChargesPaidInThisTransaction.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        },
+        {
+          item: trailLabels.field6_lateChargesWaived,
+          amount: `₹${settlement.lateChargesWaived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        },
+        {
+          item: trailLabels.field7_paymentReversals,
+          amount: `₹${settlement.paymentReversalsAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        },
+        {
+          item: trailLabels.field8_remainingUnpaidPrincipal,
+          amount: `₹${settlement.remainingUnpaidPrincipal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        },
+        {
+          item: trailLabels.field9_remainingUnpaidDps,
+          amount: `₹${settlement.remainingUnpaidLateCharges.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        },
+        {
+          item: trailLabels.field10_netTotalCurrentOutstanding,
+          amount: `₹${settlement.netTotalCurrentOutstanding.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        },
+        {
+          item: trailLabels.field11_settlementClassification,
+          amount: settlementBadgeText,
         },
       ],
-      footerNote: settlementBadgeText,
+      footerNote: `${settlementBadgeText} — ${settlement.resultingBillStatusAfterTransaction === 'Paid' ? 'Bill Fully Settled' : 'Partial Payment Acknowledged'}`,
     },
   ];
 
@@ -3836,7 +4316,8 @@ export function generatePaymentReceiptDocument(
       : localizeBillStatus('Paid', language),
     statusTone: isPartialSettlement ? 'amber' : 'emerald',
     statusBannerNote: `${extra.amountPaidInThisTxLabel}: ₹${amountPaidNum.toLocaleString('en-IN')} · ${extra.remainingBalanceAfterPaymentLabel}: ₹${settlement.remainingBalanceAfterTransaction.toLocaleString('en-IN')} · ${ui.paymentDate}: ${recordedPaidDate}`,
-    settlementClassification: settlement.settlementClassification,
+    settlementClassification: isPartialSettlement ? 'PARTIAL_SETTLEMENT' : 'FULL_SETTLEMENT',
+    settlement11Fields: settlement,
     recordedTimestamp: recordedPaidDate,
     generatedAtDisplay: recordedPaidDate,
     dataSource,

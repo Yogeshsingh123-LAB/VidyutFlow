@@ -1,6 +1,7 @@
 import {
   AppNotification,
   BillAuditMetadata,
+  BillLifecycleStatus,
   BillingCycleType,
   ElectricityBill,
   ElectricityConnection,
@@ -25,7 +26,7 @@ import {
 // CANONICAL BILLING & RECONCILIATION TYPES
 // ============================================================================
 
-export type CanonicalBillStatus = 'Paid' | 'Unpaid' | 'Overdue' | 'Partially Paid';
+export type CanonicalBillStatus = 'Paid' | 'Unpaid' | 'Overdue' | 'Partially Paid' | 'Scheduled';
 
 export type DashboardBillBadgeState =
   | 'NO_ACTIVE_CONNECTION'
@@ -50,6 +51,12 @@ export interface ReconciledElectricityBill extends ElectricityBill {
   effectiveStatus: CanonicalBillStatus;
   /** Reconciled canonical status alias */
   derivedStatus: CanonicalBillStatus;
+  /** Canonical bill lifecycle state (SCHEDULED_NOT_ISSUED, ISSUED_UNPAID, DUE_TODAY, OVERDUE, PARTIALLY_PAID, PAID) */
+  lifecycleStatus: BillLifecycleStatus;
+  /** True if and only if the bill cycle is a future scheduled cycle not yet officially issued */
+  isScheduledNotIssued: boolean;
+  /** True if and only if the bill has been officially issued */
+  isIssued: boolean;
   /** Total amount settled via verified Successful payments or Paid status */
   paidAmount: number;
   /** Remaining payable balance: max(0, totalAmount - paidAmount) */
@@ -60,13 +67,13 @@ export interface ReconciledElectricityBill extends ElectricityBill {
   totalAccruedLateCharges: number;
   /** Total outstanding payable including remaining principal and net accrued late charges */
   totalOutstandingWithCharges: number;
-  /** True if and only if outstandingBalance > 0 */
+  /** True if and only if bill is issued and outstandingBalance > 0 */
   isDue: boolean;
-  /** True if outstandingBalance > 0 and dueDate < referenceDate (or raw status is Overdue) */
+  /** True if bill is issued, outstandingBalance > 0, and dueDate < referenceDate */
   isOverdue: boolean;
-  /** True if 0 < paidAmount < totalAmount */
+  /** True if bill is issued and 0 < paidAmount < totalAmount */
   isPartiallyPaid: boolean;
-  /** True if outstandingBalance === 0 */
+  /** True if bill is issued and outstandingBalance === 0 */
   isPaid: boolean;
   /** Successful payment transactions applied to this bill */
   appliedPayments: PaymentTransaction[];
@@ -94,19 +101,23 @@ export interface ConnectionBillingSummary {
   connection: ElectricityConnection | null;
   consumerNo: string;
   connectionId: string;
-  /** All bills belonging to this connection (Paid, Unpaid, Overdue, Partially Paid), newest first */
+  /** All ISSUED bills belonging to this connection (Paid, Unpaid, Overdue, Partially Paid), newest first */
   visibleBills: ReconciledElectricityBill[];
-  /** Bills with outstandingBalance > 0 */
+  /** Issued bills with outstandingBalance > 0 */
   dueBills: ReconciledElectricityBill[];
-  /** Bills with outstandingBalance === 0 */
+  /** Issued bills with outstandingBalance === 0 */
   paidBills: ReconciledElectricityBill[];
+  /** Upcoming scheduled bi-monthly cycles that are SCHEDULED_NOT_ISSUED (excluded from payable counts/totals) */
+  scheduledBills: ReconciledElectricityBill[];
+  /** Count of scheduled future cycles (SCHEDULED_NOT_ISSUED) */
+  scheduledBillCount: number;
   /** Count of due bills (Unpaid, Overdue, Partially Paid) for this connection */
   dueBillCount: number;
   /** Count of paid bills for this connection */
   paidBillCount: number;
-  /** Total count of generated bills for this connection */
+  /** Total count of issued bills for this connection */
   totalBillCount: number;
-  /** Total outstanding payable balance across all due bills for this connection */
+  /** Total outstanding payable balance across all issued due bills for this connection */
   totalOutstandingAmount: number;
   /** Step 4A/4B alias: Total outstanding principal in INR */
   totalOutstandingPrincipalInr: number;
@@ -551,6 +562,51 @@ export function isBillPastDueDate(
   return days !== null && days < 0;
 }
 
+/**
+ * Determines whether a bill record represents a future scheduled cycle that has NOT yet been
+ * officially issued (`SCHEDULED_NOT_ISSUED`) as of `referenceDateStr`.
+ *
+ * A cycle is `SCHEDULED_NOT_ISSUED` when:
+ * 1. `bill.lifecycleStatus === 'SCHEDULED_NOT_ISSUED'` or `bill.isScheduledNotIssued === true` or `bill.status === 'Scheduled'`, OR
+ * 2. Its official `billDate` is strictly in the future relative to `referenceDateStr` (`billDate > referenceDateStr`),
+ *    it has no recorded payment/settlement, and it was not explicitly forced to an issued state (`lifecycleStatus: 'ISSUED_UNPAID'`).
+ */
+export function isBillScheduledNotIssued(
+  bill: ElectricityBill | null | undefined,
+  referenceDateStr: string = '04-Nov-2026'
+): boolean {
+  if (!bill) return false;
+  if (
+    bill.lifecycleStatus === 'SCHEDULED_NOT_ISSUED' ||
+    bill.isScheduledNotIssued === true ||
+    bill.status === 'Scheduled'
+  ) {
+    return true;
+  }
+  if (
+    bill.lifecycleStatus === 'ISSUED_UNPAID' ||
+    bill.lifecycleStatus === 'DUE_TODAY' ||
+    bill.lifecycleStatus === 'OVERDUE' ||
+    bill.lifecycleStatus === 'PARTIALLY_PAID' ||
+    bill.lifecycleStatus === 'PAID'
+  ) {
+    return false;
+  }
+  if (
+    bill.status === 'Paid' ||
+    Boolean(bill.paidDate) ||
+    (typeof bill.paidAmount === 'number' && bill.paidAmount > 0)
+  ) {
+    return false;
+  }
+  const billDateMs = parseVidyutDateToUtcMs(bill.billDate);
+  const refDateMs = parseVidyutDateToUtcMs(referenceDateStr);
+  if (billDateMs !== null && refDateMs !== null && billDateMs > refDateMs) {
+    return true;
+  }
+  return false;
+}
+
 // ============================================================================
 // CONNECTION OWNERSHIP & LEGACY IDENTIFIER RESOLUTION
 // ============================================================================
@@ -811,6 +867,57 @@ export function reconcileBillWithPayments(
     paidAmount = 0;
   }
 
+  const cycleMeta = resolveBillCycleMetadata(bill);
+
+  // Check if this bill is a future scheduled cycle (SCHEDULED_NOT_ISSUED)
+  if (isBillScheduledNotIssued(bill, referenceDate) && appliedPayments.length === 0) {
+    const zeroLateChargeBreakdown: OverdueFinancialBreakdown = calculateLatePaymentCharges({
+      bill: { ...bill, totalAmount: 0, status: 'Unpaid' },
+      payments: [],
+      referenceDate,
+      policy: options?.policy || DEFAULT_LATE_CHARGE_POLICY,
+      tariffCategory: options?.tariffCategory,
+    });
+
+    return {
+      ...bill,
+      unitsConsumed: 0,
+      energyCharges: 0,
+      fixedCharges: 0,
+      fuelPriceAdjustment: 0,
+      electricityDuty: 0,
+      rebateOrSubsidy: 0,
+      totalAmount: 0,
+      rawStatus: bill.status,
+      status: 'Scheduled',
+      effectiveStatus: 'Scheduled',
+      derivedStatus: 'Scheduled',
+      lifecycleStatus: 'SCHEDULED_NOT_ISSUED',
+      isScheduledNotIssued: true,
+      isIssued: false,
+      paidAmount: 0,
+      outstandingBalance: 0,
+      remainingBalance: 0,
+      totalAccruedLateCharges: 0,
+      totalOutstandingWithCharges: 0,
+      isDue: false,
+      isOverdue: false,
+      isPartiallyPaid: false,
+      isPaid: false,
+      paidDate: undefined,
+      transactionRef: undefined,
+      appliedPayments: [],
+      unappliedPaymentAttempts: [],
+      hasConflict: false,
+      conflictReason: undefined,
+      billingCycleType: cycleMeta.billingCycleType,
+      periodStartDate: cycleMeta.periodStartDate,
+      periodEndDate: cycleMeta.periodEndDate,
+      billingPeriodLabel: cycleMeta.billingPeriodLabel,
+      lateChargeBreakdown: zeroLateChargeBreakdown,
+    };
+  }
+
   const outstandingBalance = Math.max(0, Number((totalAmount - paidAmount).toFixed(2)));
   const isPaid = totalAmount === 0 || outstandingBalance === 0;
   const isPartiallyPaid = !isPaid && paidAmount > 0 && outstandingBalance > 0;
@@ -829,12 +936,25 @@ export function reconcileBillWithPayments(
     effectiveStatus = 'Unpaid';
   }
 
+  const daysUntilDueVal = calculateDaysUntilDue(bill.dueDate, referenceDate);
+  let lifecycleStatus: BillLifecycleStatus;
+  if (isPaid) {
+    lifecycleStatus = 'PAID';
+  } else if (isPartiallyPaid) {
+    lifecycleStatus = 'PARTIALLY_PAID';
+  } else if (isOverdue) {
+    lifecycleStatus = 'OVERDUE';
+  } else if (daysUntilDueVal === 0) {
+    lifecycleStatus = 'DUE_TODAY';
+  } else {
+    lifecycleStatus = 'ISSUED_UNPAID';
+  }
+
   const latestAppliedPayment = appliedPayments[0];
   const resolvedPaidDate = isPaid
     ? bill.paidDate || latestAppliedPayment?.date
     : bill.paidDate || latestAppliedPayment?.date;
   const resolvedTxRef = bill.transactionRef || latestAppliedPayment?.txId;
-  const cycleMeta = resolveBillCycleMetadata(bill);
   const lateChargeBreakdown = calculateLatePaymentCharges({
     bill,
     payments: appliedPayments,
@@ -857,6 +977,9 @@ export function reconcileBillWithPayments(
     status: effectiveStatus,
     effectiveStatus,
     derivedStatus: effectiveStatus,
+    lifecycleStatus,
+    isScheduledNotIssued: false,
+    isIssued: true,
     paidAmount,
     outstandingBalance,
     remainingBalance: outstandingBalance,
@@ -2008,6 +2131,9 @@ export interface GenerateDeterministicDemoBillInput {
   enforceStrictOverlapCheck?: boolean;
   createdByRole?: UserRole;
   createdByActor?: string;
+  referenceDate?: string;
+  lifecycleStatus?: BillLifecycleStatus;
+  asScheduledCycle?: boolean;
 }
 
 export interface GenerateDeterministicDemoBillResult {
@@ -2024,6 +2150,9 @@ export interface GenerateDeterministicDemoBillResult {
  * - Never generates a bill for non-Active connections or unenergized applications.
  * - Never creates duplicate bills for the same connection and billing period on refresh/re-render.
  * - Supports both legacy 1-month ('MONTHLY') and 2-month ('BI_MONTHLY') billing cycles.
+ * - If a future cycle has not yet reached its official issue date (`billDate > referenceDate`) and no explicit
+ *   meter readings / simulated units were supplied, it is created as `SCHEDULED_NOT_ISSUED` with `totalAmount: 0`
+ *   instead of copying `₹5,858` into future unissued cycles.
  */
 export function generateDeterministicDemoBillForConnection(
   input: GenerateDeterministicDemoBillInput
@@ -2096,6 +2225,100 @@ export function generateDeterministicDemoBillForConnection(
     }
   }
 
+  const safeConnCode = connection.consumerNo.replace(/[^A-Za-z0-9]/g, '').slice(-5) || '00001';
+  const monthCode = normMonth
+    .replace(/[^A-Z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  const cyclePrefix = effectiveCycleType === 'BI_MONTHLY' ? 'BILL-UG-BM' : 'BILL-UG-DEMO';
+  const deterministicBillNo = `${cyclePrefix}-${monthCode}-${safeConnCode}`;
+
+  const defaultBillDate =
+    input.billDate || parsedPeriod?.billDate || '05-Oct-2026';
+  const defaultDueDate =
+    input.dueDate || parsedPeriod?.dueDate || '20-Oct-2026';
+
+  const hasExplicitConsumptionInput =
+    input.previousReadingKwh !== undefined ||
+    input.currentReadingKwh !== undefined ||
+    input.meterResetOrReplacement !== undefined && input.meterResetOrReplacement !== null ||
+    input.simulatedUnitsKwh !== undefined;
+
+  const refDateStr = input.referenceDate || '04-Nov-2026';
+  const billDateMs = parseVidyutDateToUtcMs(defaultBillDate);
+  const refDateMs = parseVidyutDateToUtcMs(refDateStr);
+  const isFutureUnissuedCycle =
+    input.asScheduledCycle === true ||
+    input.lifecycleStatus === 'SCHEDULED_NOT_ISSUED' ||
+    (input.referenceDate !== undefined &&
+      !hasExplicitConsumptionInput &&
+      input.lifecycleStatus !== 'ISSUED_UNPAID' &&
+      billDateMs !== null &&
+      refDateMs !== null &&
+      billDateMs > refDateMs);
+
+  if (isFutureUnissuedCycle) {
+    const scheduledBill: ElectricityBill = {
+      billNo: deterministicBillNo,
+      consumerNo: connection.consumerNo,
+      connectionId: connection.connectionId,
+      billMonth: targetMonth,
+      billDate: defaultBillDate,
+      dueDate: defaultDueDate,
+      unitsConsumed: 0,
+      energyCharges: 0,
+      fixedCharges: 0,
+      fuelPriceAdjustment: 0,
+      electricityDuty: 0,
+      rebateOrSubsidy: 0,
+      otherAdjustmentsInr: 0,
+      totalAmount: 0,
+      status: 'Scheduled',
+      lifecycleStatus: 'SCHEDULED_NOT_ISSUED',
+      isScheduledNotIssued: true,
+      slabBreakdown: [],
+      accountId: connection.accountId,
+      paidAmount: 0,
+      remainingBalance: 0,
+      outstandingBalance: 0,
+      isSimulatedDemoBill: false,
+      generatedAt: defaultBillDate,
+      billingCycleType: effectiveCycleType,
+      periodStartDate,
+      periodEndDate,
+      billingPeriodLabel: `${periodStartDate} to ${periodEndDate}`,
+      readingProvenance: 'RECORDED',
+      meterMultiplier: input.meterMultiplier || 1,
+      tariffConfigVersion:
+        effectiveCycleType === 'BI_MONTHLY'
+          ? 'UGVCL-DEMO-TARIFF-2026-V2-BIMONTHLY-CONFIGURABLE'
+          : 'UGVCL-DEMO-TARIFF-2026-V1-MONTHLY',
+      tariffCyclePolicyMode:
+        input.policyMode ||
+        (effectiveCycleType === 'BI_MONTHLY'
+          ? 'BI_MONTHLY_PROPORTIONAL_2X_DEMO'
+          : 'MONTHLY_STANDARD'),
+      isPartialPeriod: parsedPeriod?.isPartialPeriod || false,
+      billedDaysCount: parsedPeriod?.billedDaysCount,
+      standardCycleDaysCount: parsedPeriod?.standardCycleDaysCount,
+      auditMetadata: {
+        createdByRole: input.createdByRole || 'admin',
+        createdByActor: input.createdByActor || 'UGVCL Automated Bi-Monthly Billing Scheduler',
+        calculationNotes: `Scheduled future ${effectiveCycleType} billing cycle (${periodStartDate} to ${periodEndDate}). Expected issue date: ${defaultBillDate}. Not yet issued or payable.`,
+        isDemoTariffAssumption: effectiveCycleType === 'BI_MONTHLY',
+      },
+    };
+
+    return {
+      created: true,
+      bill: scheduledBill,
+      updatedBills: [scheduledBill, ...existingBills],
+      reason: `Registered scheduled future ${effectiveCycleType} cycle ${scheduledBill.billNo} (${targetMonth}: ${periodStartDate} to ${periodEndDate}, issue date ${defaultBillDate}) as SCHEDULED_NOT_ISSUED.`,
+      conflictType: 'NONE',
+    };
+  }
+
   // If explicit previous/current readings or meter replacement record are provided, validate them strictly
   let unitsConsumed = 0;
   let prevReading = connection.previousReadingKwh || 0;
@@ -2165,20 +2388,6 @@ export function generateDeterministicDemoBillForConnection(
     }
   );
 
-  const safeConnCode = connection.consumerNo.replace(/[^A-Za-z0-9]/g, '').slice(-5) || '00001';
-  const monthCode = normMonth
-    .replace(/[^A-Z0-9]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-
-  const cyclePrefix = effectiveCycleType === 'BI_MONTHLY' ? 'BILL-UG-BM' : 'BILL-UG-DEMO';
-  const deterministicBillNo = `${cyclePrefix}-${monthCode}-${safeConnCode}`;
-
-  const defaultBillDate =
-    input.billDate || parsedPeriod?.billDate || '05-Oct-2026';
-  const defaultDueDate =
-    input.dueDate || parsedPeriod?.dueDate || '20-Oct-2026';
-
   const newBill: ElectricityBill = {
     billNo: deterministicBillNo,
     consumerNo: connection.consumerNo,
@@ -2195,6 +2404,8 @@ export function generateDeterministicDemoBillForConnection(
     otherAdjustmentsInr: tariffCalc.otherAdjustmentsInr,
     totalAmount: tariffCalc.totalAmount,
     status: 'Unpaid',
+    lifecycleStatus: input.lifecycleStatus || 'ISSUED_UNPAID',
+    isScheduledNotIssued: false,
     slabBreakdown: tariffCalc.slabBreakdown,
     accountId: connection.accountId,
     paidAmount: 0,
@@ -2251,6 +2462,9 @@ export interface GenerateDeterministicBiMonthlyBillInput {
   otherAdjustmentsInr?: number;
   createdByRole?: UserRole;
   createdByActor?: string;
+  referenceDate?: string;
+  lifecycleStatus?: BillLifecycleStatus;
+  asScheduledCycle?: boolean;
 }
 
 /**
@@ -2306,6 +2520,9 @@ export function generateDeterministicBiMonthlyBillForConnection(
     enforceStrictOverlapCheck: true,
     createdByRole: input.createdByRole,
     createdByActor: input.createdByActor,
+    referenceDate: input.referenceDate,
+    lifecycleStatus: input.lifecycleStatus,
+    asScheduledCycle: input.asScheduledCycle,
   });
 }
 
@@ -2344,6 +2561,108 @@ export function sortPaymentsNewestFirst(payments: PaymentTransaction[]): Payment
  * - A connection with 0 generated bills has latestBill = null, dueBillCount = 0, and dashboardBadgeState = 'NO_BILL_GENERATED' (NEVER 'PAID').
  * - A bill with 0 remaining balance is never counted in dueBillCount.
  */
+/**
+ * Builds the deterministic consecutive 2-calendar-month upcoming schedule (`SCHEDULED_NOT_ISSUED`)
+ * for an active connection without mutating historical bills or fabricating ₹5,858 payable debt.
+ * For `04281-99231` (latest issued period ending `30-Sep-2026`), on `04-Nov-2026`, this produces:
+ * 1. `October–November 2026` (`01-Oct-2026 to 30-Nov-2026`, issue `05-Dec-2026`, due `20-Dec-2026`)
+ * 2. `December 2026–January 2027` (`01-Dec-2026 to 31-Jan-2027`, issue `05-Feb-2027`, due `20-Feb-2027`)
+ * 3. `February–March 2027` (`01-Feb-2027 to 31-Mar-2027`, issue `05-Apr-2027`, due `20-Apr-2027`)
+ */
+export function buildUpcomingBiMonthlyScheduleForConnection(
+  connection: ElectricityConnection | null | undefined,
+  existingIssuedBills: ElectricityBill[] = [],
+  referenceDate: string = '04-Nov-2026',
+  cycleCount: number = 3
+): ReconciledElectricityBill[] {
+  if (!connection || !isConnectionBillingEligible(connection).eligible) {
+    return [];
+  }
+
+  const issuedForConn = existingIssuedBills.filter(
+    (b) => matchesBillToConnection(b, connection) && !isBillScheduledNotIssued(b, referenceDate)
+  );
+
+  let startYear = 2026;
+  let startMonth1To12 = 10; // Default after Sep 2026 -> Oct–Nov 2026
+
+  let maxEndMs = -1;
+  for (const b of issuedForConn) {
+    const meta = resolveBillCycleMetadata(b, connection);
+    if (meta.endUtcMs > maxEndMs) {
+      maxEndMs = meta.endUtcMs;
+      const d = new Date(meta.endUtcMs);
+      const endYear = d.getUTCFullYear();
+      const endMonth = d.getUTCMonth() + 1;
+      startMonth1To12 = endMonth === 12 ? 1 : endMonth + 1;
+      startYear = endMonth === 12 ? endYear + 1 : endYear;
+    }
+  }
+
+  const refMs = parseVidyutDateToUtcMs(referenceDate);
+  const scheduled: ReconciledElectricityBill[] = [];
+  let cursorYear = startYear;
+  let cursorMonth = startMonth1To12;
+
+  for (let i = 0; i < cycleCount + 2 && scheduled.length < cycleCount; i++) {
+    const desc = buildBiMonthlyBillingPeriod(cursorYear, cursorMonth, {
+      connectedDate: connection.connectedDate,
+    });
+    const issueMs = parseVidyutDateToUtcMs(desc.billDate);
+
+    if (refMs === null || issueMs === null || issueMs > refMs) {
+      const safeConnCode = connection.consumerNo.replace(/[^A-Za-z0-9]/g, '').slice(-5) || '00001';
+      const monthCode = desc.billMonth
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+      const rawScheduled: ElectricityBill = {
+        billNo: `BILL-UG-BM-${monthCode}-${safeConnCode}`,
+        consumerNo: connection.consumerNo,
+        connectionId: connection.connectionId,
+        billMonth: desc.billMonth,
+        billDate: desc.billDate,
+        dueDate: desc.dueDate,
+        unitsConsumed: 0,
+        energyCharges: 0,
+        fixedCharges: 0,
+        fuelPriceAdjustment: 0,
+        electricityDuty: 0,
+        rebateOrSubsidy: 0,
+        totalAmount: 0,
+        status: 'Scheduled',
+        lifecycleStatus: 'SCHEDULED_NOT_ISSUED',
+        isScheduledNotIssued: true,
+        slabBreakdown: [],
+        accountId: connection.accountId,
+        paidAmount: 0,
+        remainingBalance: 0,
+        outstandingBalance: 0,
+        billingCycleType: 'BI_MONTHLY',
+        periodStartDate: desc.periodStartDate,
+        periodEndDate: desc.periodEndDate,
+        billingPeriodLabel: desc.billingPeriodLabel,
+        standardCycleDaysCount: desc.standardCycleDaysCount,
+        billedDaysCount: desc.billedDaysCount,
+        isPartialPeriod: desc.isPartialPeriod,
+      };
+      scheduled.push(reconcileBillWithPayments(rawScheduled, [], referenceDate));
+    }
+
+    // Advance by 2 calendar months
+    const nextMonth = cursorMonth + 2;
+    if (nextMonth > 12) {
+      cursorYear += 1;
+      cursorMonth = nextMonth - 12;
+    } else {
+      cursorMonth = nextMonth;
+    }
+  }
+
+  return scheduled;
+}
+
 export function selectConnectionBillingSummary(
   connection: ElectricityConnection | null | undefined,
   allBills: ElectricityBill[],
@@ -2368,6 +2687,8 @@ export function selectConnectionBillingSummary(
       visibleBills: [],
       dueBills: [],
       paidBills: [],
+      scheduledBills: [],
+      scheduledBillCount: 0,
       dueBillCount: 0,
       paidBillCount: 0,
       totalBillCount: 0,
@@ -2405,7 +2726,7 @@ export function selectConnectionBillingSummary(
   }
 
   // Reconcile every bill against all payments, waivers, and reversals
-  const reconciledBills = sortBillsNewestFirst(
+  const allReconciledForConnection = sortBillsNewestFirst(
     uniqueRawBills.map((bill) =>
       reconcileBillWithPayments(bill, allPayments, referenceDate, {
         waivers: options?.waivers,
@@ -2415,6 +2736,30 @@ export function selectConnectionBillingSummary(
       })
     )
   );
+
+  // Separate officially issued bills from SCHEDULED_NOT_ISSUED future cycles
+  const reconciledBills = allReconciledForConnection.filter((b) => !b.isScheduledNotIssued);
+  const storedScheduledBills = allReconciledForConnection.filter((b) => b.isScheduledNotIssued);
+
+  // Merge deterministic upcoming 2-month scheduled cycles (chronological order: Oct–Nov 2026, Dec 2026–Jan 2027, Feb–Mar 2027)
+  const derivedUpcomingScheduled = buildUpcomingBiMonthlyScheduleForConnection(
+    connection,
+    reconciledBills,
+    referenceDate,
+    3
+  );
+  const scheduledMap = new Map<string, ReconciledElectricityBill>();
+  for (const sb of [...storedScheduledBills, ...derivedUpcomingScheduled]) {
+    const periodKey = `${sb.periodStartDate}_${sb.periodEndDate}`;
+    if (!scheduledMap.has(periodKey)) {
+      scheduledMap.set(periodKey, sb);
+    }
+  }
+  const scheduledBills = Array.from(scheduledMap.values()).sort((a, b) => {
+    const aMs = parseVidyutDateToUtcMs(a.billDate) ?? 0;
+    const bMs = parseVidyutDateToUtcMs(b.billDate) ?? 0;
+    return aMs - bMs;
+  });
 
   const dueBills = reconciledBills.filter((b) => b.isDue && b.outstandingBalance > 0);
   const paidBills = reconciledBills.filter((b) => b.isPaid && b.outstandingBalance === 0);
@@ -2483,6 +2828,8 @@ export function selectConnectionBillingSummary(
     visibleBills: reconciledBills,
     dueBills,
     paidBills,
+    scheduledBills,
+    scheduledBillCount: scheduledBills.length,
     dueBillCount: dueBills.length,
     paidBillCount: paidBills.length,
     totalBillCount: reconciledBills.length,
@@ -2789,6 +3136,22 @@ export function validatePaymentAmountSelection(params: {
     calculationReferenceDate: lc.referenceDate,
   };
 
+  if (reconciled.isScheduledNotIssued) {
+    return {
+      isValid: false,
+      valid: false,
+      mode: params.mode,
+      ...baseNineFields,
+      currentOutstandingAmount: 0,
+      selectedPaymentAmount: 0,
+      resolvedAmountToPay: 0,
+      remainingBalanceAfterPayment: 0,
+      remainingTotalWithChargesAfterPayment: 0,
+      isFullSettlement: false,
+      validationError: `Bill ${params.bill.billNo} is Scheduled — Not Yet Issued (expected issue date ${params.bill.billDate}) and cannot be paid before issuance.`,
+    };
+  }
+
   if (reconciled.isPaid || maxPayableCeiling <= 0) {
     return {
       isValid: false,
@@ -2909,26 +3272,78 @@ export function validatePaymentAmountSelection(params: {
 export interface TransactionSettlementBreakdown {
   billNo: string;
   txId: string;
+  // (1) Original Principal Amount (Bill Total)
+  originalPrincipalAmount: number;
   billTotalAmount: number;
+  // (2) Previously Settled Principal before this transaction
+  previouslySettledPrincipal: number;
   previouslySettledAmount: number;
+  // (3) Principal Paid in this Transaction
+  principalPaidInThisTransaction: number;
   amountPaidInThisTransaction: number;
-  cumulativeSettledAfterTransaction: number;
+  // (4) Accrued Delayed Payment Surcharge (DPS) assessed prior to this payment
+  accruedLateChargesPriorToPayment: number;
+  // (5) DPS / Late Charges Paid in this transaction
+  lateChargesPaidInThisTransaction: number;
+  // (6) Late Charges Waived (approved waivers)
+  lateChargesWaived: number;
+  // (7) Payment Reversals applied (if any)
+  paymentReversalsAmount: number;
+  hasReversals: boolean;
+  // (8) Remaining Unpaid Principal after this transaction
+  remainingUnpaidPrincipal: number;
   remainingBalanceAfterTransaction: number;
-  settlementClassification: 'FULL_SETTLEMENT' | 'PARTIAL_SETTLEMENT';
+  // (9) Remaining Unpaid DPS after this transaction
+  remainingUnpaidLateCharges: number;
+  // (10) Net Total Current Outstanding Balance after this transaction
+  netTotalCurrentOutstanding: number;
+  totalOutstandingAfterTransaction: number;
+  // (11) Settlement Classification & Metadata
+  settlementClassification: 'FULL_SETTLEMENT' | 'PARTIAL_SETTLEMENT' | 'FULL_PRINCIPAL_SETTLEMENT';
   resultingBillStatusAfterTransaction: 'Paid' | 'Partially Paid';
   transactionIndex: number;
   totalSuccessfulTransactionsForBill: number;
+  cumulativeSettledAfterTransaction: number;
+  receiptNumber: string;
+  transactionReference: string;
+  paymentMethod: string;
+  paymentTimestamp: string;
 }
 
 /**
  * Computes the exact historical settlement breakdown for a specific PaymentTransaction on a bill.
+ * Provides the full 11-field financial trail reconciling original principal, DPS, waivers, reversals, and balances.
  */
-export function computeTransactionSettlementBreakdown(params: {
-  bill: ElectricityBill | null | undefined;
-  payment: PaymentTransaction;
-  allPayments?: PaymentTransaction[];
-}): TransactionSettlementBreakdown {
-  const { bill, payment, allPayments = [] } = params;
+export function computeTransactionSettlementBreakdown(
+  paramsOrBill:
+    | {
+        bill: ElectricityBill | null | undefined;
+        payment: PaymentTransaction;
+        allPayments?: PaymentTransaction[];
+        waivers?: LateChargeWaiverRecord[];
+        reversals?: PaymentReversalRecord[];
+      }
+    | ElectricityBill
+    | null
+    | undefined,
+  argPayment?: PaymentTransaction,
+  argAllPayments?: PaymentTransaction[],
+  argRefDate?: string
+): TransactionSettlementBreakdown {
+  const isPositional =
+    paramsOrBill === null ||
+    paramsOrBill === undefined ||
+    ('billNo' in paramsOrBill && !('payment' in (paramsOrBill as any)));
+
+  const bill = isPositional
+    ? (paramsOrBill as ElectricityBill | null | undefined)
+    : (paramsOrBill as any).bill;
+  const payment: PaymentTransaction = isPositional
+    ? argPayment!
+    : (paramsOrBill as any).payment;
+  const allPayments = isPositional
+    ? argAllPayments || []
+    : (paramsOrBill as any).allPayments || [];
   const txAmount = Math.max(0, Number((payment.amount ?? 0).toFixed(2)));
   const billNo = bill?.billNo || payment.billNo;
   const normBillNo = normalizeBillingIdentifier(billNo);
@@ -3007,18 +3422,65 @@ export function computeTransactionSettlementBreakdown(params: {
   );
   const isFullSettlement = remainingBalanceAfterTransaction === 0;
 
+  // Accrued DPS, waivers, reversals
+  const rawBreakdown = bill?.lateChargeBreakdown;
+  const accruedDPS = rawBreakdown?.lateChargesAccrued ?? 0;
+  const waivedDPS = rawBreakdown?.lateChargesWaived ?? 0;
+  const reversalsAmount = (rawBreakdown?.auditTrail?.reversalsApplied || []).reduce(
+    (sum: number, r: any) => sum + (r.amount || 0),
+    0
+  );
+
+  const remainingDPSAfter = isFullSettlement
+    ? 0
+    : Math.max(0, Number((accruedDPS - waivedDPS).toFixed(2)));
+
+  const netTotalOutstandingAfter = Math.max(
+    0,
+    Number((remainingBalanceAfterTransaction + remainingDPSAfter).toFixed(2))
+  );
+
+  const receiptNumber = `RCP-${(payment.txId || 'TXN').replace(/[^a-zA-Z0-9-]/g, '')}`;
+
   return {
     billNo,
     txId: payment.txId,
+    // (1)
+    originalPrincipalAmount: billTotalAmount,
     billTotalAmount,
+    // (2)
+    previouslySettledPrincipal: previouslySettled,
     previouslySettledAmount: previouslySettled,
+    // (3)
+    principalPaidInThisTransaction: txAmount,
     amountPaidInThisTransaction: txAmount,
-    cumulativeSettledAfterTransaction,
+    // (4)
+    accruedLateChargesPriorToPayment: accruedDPS,
+    // (5)
+    lateChargesPaidInThisTransaction: isFullSettlement ? Math.min(accruedDPS, txAmount) : 0,
+    // (6)
+    lateChargesWaived: waivedDPS,
+    // (7)
+    paymentReversalsAmount: reversalsAmount,
+    hasReversals: reversalsAmount > 0,
+    // (8)
+    remainingUnpaidPrincipal: remainingBalanceAfterTransaction,
     remainingBalanceAfterTransaction,
-    settlementClassification: isFullSettlement ? 'FULL_SETTLEMENT' : 'PARTIAL_SETTLEMENT',
+    // (9)
+    remainingUnpaidLateCharges: remainingDPSAfter,
+    // (10)
+    netTotalCurrentOutstanding: netTotalOutstandingAfter,
+    totalOutstandingAfterTransaction: netTotalOutstandingAfter,
+    // (11)
+    settlementClassification: isFullSettlement ? 'FULL_PRINCIPAL_SETTLEMENT' : 'PARTIAL_SETTLEMENT',
     resultingBillStatusAfterTransaction: isFullSettlement ? 'Paid' : 'Partially Paid',
     transactionIndex: foundIndex + 1,
     totalSuccessfulTransactionsForBill: Math.max(1, chronological.length),
+    cumulativeSettledAfterTransaction,
+    receiptNumber,
+    transactionReference: payment.bankReference || payment.txId,
+    paymentMethod: payment.paymentMethod || 'UPI / BHIM',
+    paymentTimestamp: payment.date || '15-Oct-2026',
   };
 }
 
@@ -3063,6 +3525,24 @@ export function applyPaymentToBill(input: ApplyPaymentToBillInput): ApplyPayment
       remainingBalance: priorReconciled.outstandingBalance,
       remainingTotalWithCharges: priorReconciled.totalOutstandingWithCharges,
       isFullyPaid: priorReconciled.isPaid,
+      settlementClassification: 'NONE',
+    };
+  }
+
+  if (priorReconciled.isScheduledNotIssued) {
+    return {
+      success: false,
+      outcome: 'FAILED',
+      reason: `Bill ${input.bill.billNo} is Scheduled — Not Yet Issued (expected issue date ${input.bill.billDate}). Payment settlement is not permitted before bill issuance.`,
+      updatedBill: input.bill,
+      reconciledBill: priorReconciled,
+      paymentTransaction: null,
+      previouslySettledAmount: 0,
+      paidAmountApplied: 0,
+      lateChargesSettledInPayment: 0,
+      remainingBalance: 0,
+      remainingTotalWithCharges: 0,
+      isFullyPaid: false,
       settlementClassification: 'NONE',
     };
   }
@@ -3828,3 +4308,680 @@ export function createPaymentConfirmedNotification(params: {
     eventKey: dedupeKey,
   };
 }
+
+// ============================================================================
+// PHASE 9 STEP 4D: BI-MONTHLY SCHEDULE, 15-FIELD CANONICAL MODEL,
+// BILL CARD COUNTDOWN BADGES & 10-ITEM PAYMENT/NOTICE TIMELINES
+// ============================================================================
+
+export interface Canonical15FieldBillBreakdown {
+  billNo: string;
+  consumerNo: string;
+  connectionId: string;
+  billingCycleType: BillingCycleType;
+  billingPeriodLabel: string;
+  // 15 Required Canonical Financial & Lifecycle Fields (Part D):
+  field1_originalBillPrincipalInr: number;
+  field2_energyChargesInr: number;
+  field3_fixedDemandChargesInr: number;
+  field4_taxesDutiesElectricityDutyInr: number;
+  field5_fuelAdjustmentAndRebateNetInr: number;
+  field6_originalTotalBillAmountInr: number;
+  field7_paymentsSuccessfullySettledInr: number;
+  field8_remainingPrincipalInr: number;
+  field9_accruedLatePaymentChargesDpsInr: number;
+  field10_latePaymentChargesPaidOrWaivedInr: number;
+  field11_currentTotalOutstandingInr: number;
+  field12_billIssueDate: string;
+  field13_originalDueDate: string;
+  field14_daysUntilDueOrDaysOverdue: number; // positive = days until due, 0 = due today or paid, negative = -daysOverdue
+  field15_calculationReferenceTimestampIst: string;
+  // Additional convenience fields
+  daysUntilDue: number | null;
+  daysOverdue: number;
+  historicalDaysPaidLate: number;
+  effectiveStatus: CanonicalBillStatus;
+  isPaid: boolean;
+  isOverdue: boolean;
+  isPartiallyPaid: boolean;
+  paidDate?: string;
+}
+
+/**
+ * Derives the single canonical 15-field real-time billing breakdown (Part D & Part E)
+ * from a bill, its recorded payments, waivers, reversals, and the Asia/Kolkata reference date.
+ */
+export function deriveCanonical15FieldBillBreakdown(params: {
+  bill: ElectricityBill;
+  payments?: PaymentTransaction[];
+  referenceDate?: string;
+  calculationTimestampIst?: string;
+  waivers?: LateChargeWaiverRecord[];
+  reversals?: PaymentReversalRecord[];
+  policy?: LateChargePolicy;
+  tariffCategory?: ElectricityConnection['tariffCategory'];
+}): Canonical15FieldBillBreakdown {
+  const refDate = params.referenceDate || '04-Nov-2026';
+  const reconciled = reconcileBillWithPayments(
+    params.bill,
+    params.payments || [],
+    refDate,
+    {
+      waivers: params.waivers,
+      reversals: params.reversals,
+      policy: params.policy,
+      tariffCategory: params.tariffCategory,
+    }
+  );
+
+  const energyCharges = reconciled.isScheduledNotIssued
+    ? 0
+    : Number((Number(params.bill.energyCharges || 0)).toFixed(2));
+  const fixedCharges = reconciled.isScheduledNotIssued
+    ? 0
+    : Number((Number(params.bill.fixedCharges || 0)).toFixed(2));
+  const electricityDuty = reconciled.isScheduledNotIssued
+    ? 0
+    : Number((Number(params.bill.electricityDuty || 0)).toFixed(2));
+  const fpppa = reconciled.isScheduledNotIssued
+    ? 0
+    : Number((Number(params.bill.fuelPriceAdjustment || 0)).toFixed(2));
+  const otherAdj = reconciled.isScheduledNotIssued
+    ? 0
+    : Number((Number(params.bill.otherAdjustmentsInr || 0)).toFixed(2));
+  const rebate = reconciled.isScheduledNotIssued
+    ? 0
+    : Number((Number(params.bill.rebateOrSubsidy || 0)).toFixed(2));
+  const fuelAndRebateNet = reconciled.isScheduledNotIssued
+    ? 0
+    : Number((fpppa + otherAdj - rebate).toFixed(2));
+  const originalTotal = reconciled.isScheduledNotIssued
+    ? 0
+    : Number((Number(params.bill.totalAmount || 0)).toFixed(2));
+
+  const lc = reconciled.lateChargeBreakdown;
+  const remainingPrincipal =
+    reconciled.isScheduledNotIssued || reconciled.isPaid ? 0 : reconciled.outstandingBalance;
+  const accruedDps =
+    reconciled.isScheduledNotIssued || reconciled.isPaid ? 0 : lc.netLateChargesPayable;
+  const chargesPaidOrWaived = reconciled.isScheduledNotIssued
+    ? 0
+    : Number(((lc.lateChargesWaived || 0) + (lc.lateChargesSettled || 0)).toFixed(2));
+  const currentTotalOutstanding =
+    reconciled.isScheduledNotIssued || reconciled.isPaid
+      ? 0
+      : reconciled.totalOutstandingWithCharges;
+
+  const rawDaysUntilDue = reconciled.isScheduledNotIssued
+    ? null
+    : calculateDaysUntilDue(params.bill.dueDate, refDate);
+  const activeDaysOverdue =
+    reconciled.isScheduledNotIssued || reconciled.isPaid ? 0 : lc.daysOverdue;
+
+  let historicalDaysPaidLate = 0;
+  if (reconciled.isPaid && reconciled.paidDate) {
+    const dueMs = parseVidyutDateToUtcMs(params.bill.dueDate);
+    const paidMs = parseVidyutDateToUtcMs(reconciled.paidDate);
+    if (dueMs !== null && paidMs !== null && paidMs > dueMs) {
+      historicalDaysPaidLate = Math.round((paidMs - dueMs) / (24 * 60 * 60 * 1000));
+    }
+  }
+
+  const daysUntilDueOrDaysOverdue =
+    reconciled.isScheduledNotIssued || reconciled.isPaid
+      ? 0
+      : activeDaysOverdue > 0
+      ? -activeDaysOverdue
+      : rawDaysUntilDue ?? 0;
+
+  const timestampIst =
+    params.calculationTimestampIst || `${refDate} 00:00 IST`;
+
+  return {
+    billNo: params.bill.billNo,
+    consumerNo: params.bill.consumerNo,
+    connectionId: params.bill.connectionId || params.bill.consumerNo,
+    billingCycleType: reconciled.billingCycleType,
+    billingPeriodLabel: reconciled.billingPeriodLabel,
+    field1_originalBillPrincipalInr: originalTotal,
+    field2_energyChargesInr: energyCharges,
+    field3_fixedDemandChargesInr: fixedCharges,
+    field4_taxesDutiesElectricityDutyInr: electricityDuty,
+    field5_fuelAdjustmentAndRebateNetInr: fuelAndRebateNet,
+    field6_originalTotalBillAmountInr: originalTotal,
+    field7_paymentsSuccessfullySettledInr: reconciled.paidAmount,
+    field8_remainingPrincipalInr: remainingPrincipal,
+    field9_accruedLatePaymentChargesDpsInr: accruedDps,
+    field10_latePaymentChargesPaidOrWaivedInr: chargesPaidOrWaived,
+    field11_currentTotalOutstandingInr: currentTotalOutstanding,
+    field12_billIssueDate: params.bill.billDate,
+    field13_originalDueDate: params.bill.dueDate,
+    field14_daysUntilDueOrDaysOverdue: daysUntilDueOrDaysOverdue,
+    field15_calculationReferenceTimestampIst: timestampIst,
+    daysUntilDue: reconciled.isScheduledNotIssued || reconciled.isPaid ? null : rawDaysUntilDue,
+    daysOverdue: activeDaysOverdue,
+    historicalDaysPaidLate,
+    effectiveStatus: reconciled.effectiveStatus,
+    isPaid: reconciled.isPaid,
+    isOverdue: reconciled.isOverdue,
+    isPartiallyPaid: reconciled.isPartiallyPaid,
+    paidDate: reconciled.paidDate,
+  };
+}
+
+export interface BillCardStatusAndCountdownView {
+  statusCode:
+    | 'SCHEDULED_NOT_ISSUED'
+    | 'PAID'
+    | 'PARTIALLY_PAID'
+    | 'OVERDUE'
+    | 'DUE_TODAY'
+    | 'UNPAID';
+  primaryBadgeText: string;
+  secondaryCountdownText: string;
+  combinedStatusLabel: string;
+  historicalLateSettlementNote?: string;
+  activeDaysOverdue: number;
+  daysUntilDue: number | null;
+  currentPayableInr: number;
+  canPayNow: boolean;
+}
+
+/**
+ * Formats the Part B canonical Bill Card status & countdown text across en, gu, hi, mr:
+ * - Scheduled future cycle (`SCHEDULED_NOT_ISSUED`): "Scheduled — Not Yet Issued" (never "Unpaid — Due in X days")
+ * - Unpaid future due date (`ISSUED_UNPAID`): "UNPAID — Due in X days"
+ * - Unpaid due today (`DUE_TODAY`): "DUE TODAY — Payment due today"
+ * - Unpaid past due date (`OVERDUE`): "OVERDUE — X days overdue"
+ * - Partially settled (`PARTIALLY_PAID`): "PARTIALLY PAID — ₹X remaining" (plus due/overdue countdown)
+ * - Fully settled (`PAID`): "PAID — Settled on DD-MMM-YYYY" (with optional historical "Paid X days late" note, NEVER active overdue)
+ */
+export function formatCanonicalBillStatusAndCountdown(
+  bill: ReconciledBillSummary,
+  referenceDate: string = '04-Nov-2026',
+  language: Language = 'en'
+): BillCardStatusAndCountdownView {
+  if (
+    bill.isScheduledNotIssued ||
+    bill.lifecycleStatus === 'SCHEDULED_NOT_ISSUED' ||
+    bill.effectiveStatus === 'Scheduled' ||
+    isBillScheduledNotIssued(bill, referenceDate)
+  ) {
+    const primaryBadgeText =
+      language === 'gu'
+        ? 'નિર્ધારિત — હજુ જારી થયું નથી (Scheduled — Not Yet Issued)'
+        : language === 'hi'
+        ? 'निर्धारित — अभी जारी नहीं हुआ (Scheduled — Not Yet Issued)'
+        : language === 'mr'
+        ? 'नियोजित — अद्याप जारी नाही (Scheduled — Not Yet Issued)'
+        : 'Scheduled — Not Yet Issued';
+
+    const secondaryCountdownText =
+      language === 'gu'
+        ? `સંભવિત બિલ તારીખ: ${bill.billDate}`
+        : language === 'hi'
+        ? `अपेक्षित बिल तिथि: ${bill.billDate}`
+        : language === 'mr'
+        ? `अपेक्षित बिल दिनांक: ${bill.billDate}`
+        : `Expected Issue Date: ${bill.billDate}`;
+
+    return {
+      statusCode: 'SCHEDULED_NOT_ISSUED',
+      primaryBadgeText,
+      secondaryCountdownText,
+      combinedStatusLabel: 'Scheduled — Not Yet Issued',
+      activeDaysOverdue: 0,
+      daysUntilDue: null,
+      currentPayableInr: 0,
+      canPayNow: false,
+    };
+  }
+
+  const daysUntil = calculateDaysUntilDue(bill.dueDate, referenceDate);
+  const activeOverdueDays = bill.isPaid
+    ? 0
+    : Math.max(
+        bill.lateChargeBreakdown?.daysOverdue ?? 0,
+        daysUntil !== null && daysUntil < 0 ? Math.abs(daysUntil) : 0
+      );
+
+  if (bill.isPaid || bill.outstandingBalance <= 0) {
+    const settledDate = bill.paidDate || referenceDate;
+    let historicalLateDays = 0;
+    const dueMs = parseVidyutDateToUtcMs(bill.dueDate);
+    const paidMs = parseVidyutDateToUtcMs(settledDate);
+    if (dueMs !== null && paidMs !== null && paidMs > dueMs) {
+      historicalLateDays = Math.round((paidMs - dueMs) / (24 * 60 * 60 * 1000));
+    }
+
+    const primaryBadgeText =
+      language === 'gu'
+        ? 'ચૂકવાયેલ (PAID)'
+        : language === 'hi'
+        ? 'भुगतान किया गया (PAID)'
+        : language === 'mr'
+        ? 'भरलेले (PAID)'
+        : 'PAID';
+
+    const secondaryCountdownText =
+      language === 'gu'
+        ? `${settledDate} ના રોજ ચૂકવાયેલ`
+        : language === 'hi'
+        ? `${settledDate} को निपटान किया गया`
+        : language === 'mr'
+        ? `${settledDate} रोजी पूर्ण केले`
+        : `Settled on ${settledDate}`;
+
+    const historicalLateSettlementNote =
+      historicalLateDays > 0
+        ? language === 'gu'
+          ? `(${historicalLateDays} દિવસ મોડું ચૂકવાયેલ — હાલમાં કોઈ બાકી રકમ નથી)`
+          : language === 'hi'
+          ? `(${historicalLateDays} दिन देरी से भुगतान — कोई सक्रिय बकाया नहीं)`
+          : language === 'mr'
+          ? `(${historicalLateDays} दिवस उशिरा भरणा — कोणतीही सक्रिय थकबाकी नाही)`
+          : `Paid ${historicalLateDays} ${historicalLateDays === 1 ? 'day' : 'days'} late`
+        : undefined;
+
+    return {
+      statusCode: 'PAID',
+      primaryBadgeText,
+      secondaryCountdownText,
+      combinedStatusLabel: `PAID — Settled on ${settledDate}`,
+      historicalLateSettlementNote,
+      activeDaysOverdue: 0,
+      daysUntilDue: null,
+      currentPayableInr: 0,
+      canPayNow: false,
+    };
+  }
+
+  const currentPayable = Number(
+    (bill.totalOutstandingWithCharges || bill.outstandingBalance || 0).toFixed(2)
+  );
+  const formattedRemaining = `₹${currentPayable.toLocaleString('en-IN', {
+    minimumFractionDigits: currentPayable % 1 !== 0 ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
+
+  if (bill.isPartiallyPaid) {
+    const dueSuffix =
+      activeOverdueDays > 0
+        ? language === 'gu'
+          ? `${activeOverdueDays} દિવસ મુદતવીતી`
+          : language === 'hi'
+          ? `${activeOverdueDays} दिन अतिदेय`
+          : language === 'mr'
+          ? `${activeOverdueDays} दिवस थकीत`
+          : `${activeOverdueDays} ${activeOverdueDays === 1 ? 'day' : 'days'} overdue`
+        : daysUntil === 0
+        ? language === 'gu'
+          ? 'આજે ચુકવણીની છેલ્લી તારીખ'
+          : language === 'hi'
+          ? 'आज भुगतान देय है'
+          : language === 'mr'
+          ? 'आज देय तारीख आहे'
+          : 'Payment due today'
+        : daysUntil !== null && daysUntil > 0
+        ? language === 'gu'
+          ? `${daysUntil} દિવસમાં ચૂકવવાપાત્ર`
+          : language === 'hi'
+          ? `${daysUntil} दिनों में देय`
+          : language === 'mr'
+          ? `${daysUntil} दिवसांत देय`
+          : `Due in ${daysUntil} ${daysUntil === 1 ? 'day' : 'days'}`
+        : '';
+
+    return {
+      statusCode: 'PARTIALLY_PAID',
+      primaryBadgeText:
+        language === 'gu'
+          ? 'આંશિક ચૂકવાયેલ'
+          : language === 'hi'
+          ? 'आंशिक भुगतान'
+          : language === 'mr'
+          ? 'अंशतः भरलेले'
+          : 'PARTIALLY PAID',
+      secondaryCountdownText: `${formattedRemaining} remaining${dueSuffix ? ` · ${dueSuffix}` : ''}`,
+      combinedStatusLabel: `PARTIALLY PAID — ${formattedRemaining} remaining${dueSuffix ? ` (${dueSuffix})` : ''}`,
+      activeDaysOverdue: activeOverdueDays,
+      daysUntilDue: daysUntil,
+      currentPayableInr: currentPayable,
+      canPayNow: true,
+    };
+  }
+
+  if (activeOverdueDays > 0 || bill.isOverdue) {
+    const safeDays = Math.max(1, activeOverdueDays);
+    const secondaryCountdownText =
+      language === 'gu'
+        ? `${safeDays} દિવસ મુદતવીતી (Overdue)`
+        : language === 'hi'
+        ? `${safeDays} दिन अतिदेय (Overdue)`
+        : language === 'mr'
+        ? `${safeDays} दिवस थकीत (Overdue)`
+        : `${safeDays} ${safeDays === 1 ? 'day' : 'days'} overdue`;
+
+    return {
+      statusCode: 'OVERDUE',
+      primaryBadgeText:
+        language === 'gu'
+          ? 'મુદતવીતી (OVERDUE)'
+          : language === 'hi'
+          ? 'अतिदेय (OVERDUE)'
+          : language === 'mr'
+          ? 'थकीत (OVERDUE)'
+          : 'OVERDUE',
+      secondaryCountdownText,
+      combinedStatusLabel: `OVERDUE — ${safeDays} ${safeDays === 1 ? 'day' : 'days'} overdue`,
+      activeDaysOverdue: safeDays,
+      daysUntilDue: daysUntil,
+      currentPayableInr: currentPayable,
+      canPayNow: true,
+    };
+  }
+
+  if (daysUntil === 0) {
+    return {
+      statusCode: 'DUE_TODAY',
+      primaryBadgeText:
+        language === 'gu'
+          ? 'આજે ચૂકવવાપાત્ર (DUE TODAY)'
+          : language === 'hi'
+          ? 'आज देय (DUE TODAY)'
+          : language === 'mr'
+          ? 'आज देय (DUE TODAY)'
+          : 'DUE TODAY',
+      secondaryCountdownText:
+        language === 'gu'
+          ? 'આજે ચુકવણીની છેલ્લી તારીખ'
+          : language === 'hi'
+          ? 'आज भुगतान देय है'
+          : language === 'mr'
+          ? 'आज पेमेंट देय आहे'
+          : 'Payment due today',
+      combinedStatusLabel: 'DUE TODAY — Payment due today',
+      activeDaysOverdue: 0,
+      daysUntilDue: 0,
+      currentPayableInr: currentPayable,
+      canPayNow: true,
+    };
+  }
+
+  const futureDays = Math.max(1, daysUntil ?? 1);
+  return {
+    statusCode: 'UNPAID',
+    primaryBadgeText:
+      language === 'gu'
+        ? 'બાકી (UNPAID)'
+        : language === 'hi'
+        ? 'अदत्त (UNPAID)'
+        : language === 'mr'
+        ? 'अदत्त (UNPAID)'
+        : 'UNPAID',
+    secondaryCountdownText:
+      language === 'gu'
+        ? `${futureDays} દિવસમાં ચૂકવવાપાત્ર`
+        : language === 'hi'
+        ? `${futureDays} दिनों में देय`
+        : language === 'mr'
+        ? `${futureDays} दिवसांत देय`
+        : `Due in ${futureDays} ${futureDays === 1 ? 'day' : 'days'}`,
+    combinedStatusLabel: `UNPAID — Due in ${futureDays} ${futureDays === 1 ? 'day' : 'days'}`,
+    activeDaysOverdue: 0,
+    daysUntilDue: futureDays,
+    currentPayableInr: currentPayable,
+    canPayNow: true,
+  };
+}
+
+export type ConsumerTimelineNoticeStatus =
+  | 'NOT_ISSUED'
+  | 'ELIGIBLE_FOR_NOTICE'
+  | 'ISSUED'
+  | 'SERVED'
+  | 'DEADLINE_APPROACHING'
+  | 'DEADLINE_REACHED'
+  | 'RESOLVED';
+
+export interface BillPaymentAndNoticeTimelineView {
+  billNo: string;
+  consumerNo: string;
+  item1_billingPeriod: string;
+  item2_billIssueDate: string;
+  item3_originalDueDate: string;
+  item4_dueOrOverdueCountdownLabel: string;
+  item5_dpsGracePeriodStatusLabel: string;
+  item6_formalNoticeStatus: ConsumerTimelineNoticeStatus;
+  item6_formalNoticeStatusBadge: string;
+  item7_noticeIssueAndServiceDateLabel: string;
+  item8_noticePaymentCureDeadlineLabel: string;
+  item9_noticePeriodDaysRemainingOrElapsedLabel: string;
+  item10_authorizedDisconnectionReviewStatusLabel: string;
+  noticeDeadlineSummaryBanner?: string;
+}
+
+/**
+ * Derives the Part G 10-item Payment, Notice & Disconnection-Review Timeline for an unsettled bill.
+ * Never fabricates a disconnection countdown when no formal notice has been issued and served.
+ */
+export function deriveBillPaymentAndNoticeTimeline(params: {
+  bill: ReconciledBillSummary;
+  referenceDate?: string;
+  formalNotice?: {
+    noticeId?: string;
+    status?: string;
+    issueDate?: string;
+    serviceDate?: string;
+    paymentDeadlineDate?: string;
+    daysRemainingUntilDeadline?: number | null;
+    disconnectionReviewStatus?: string;
+    holdOrDispute?: { isOnHold?: boolean; holdReason?: string };
+  } | null;
+  language?: Language;
+}): BillPaymentAndNoticeTimelineView {
+  const { bill, formalNotice, language = 'en' } = params;
+  const refDate = params.referenceDate || '04-Nov-2026';
+  const countdown = formatCanonicalBillStatusAndCountdown(bill, refDate, language);
+  const lc = bill.lateChargeBreakdown;
+
+  const billingPeriod = `${bill.billMonth} (${bill.billingPeriodLabel})`;
+
+  if (bill.isScheduledNotIssued || countdown.statusCode === 'SCHEDULED_NOT_ISSUED') {
+    return {
+      billNo: bill.billNo,
+      consumerNo: bill.consumerNo,
+      item1_billingPeriod: billingPeriod,
+      item2_billIssueDate: `Scheduled: ${bill.billDate}`,
+      item3_originalDueDate: `Expected: ${bill.dueDate}`,
+      item4_dueOrOverdueCountdownLabel: 'Scheduled — Not Yet Issued',
+      item5_dpsGracePeriodStatusLabel: 'Not applicable — Cycle not yet issued (₹0.00 DPS)',
+      item6_formalNoticeStatus: 'NOT_ISSUED',
+      item6_formalNoticeStatusBadge: 'NOT APPLICABLE (SCHEDULED)',
+      item7_noticeIssueAndServiceDateLabel: 'No formal Section 56(1) notice issued',
+      item8_noticePaymentCureDeadlineLabel: 'Not applicable (Bill not yet issued)',
+      item9_noticePeriodDaysRemainingOrElapsedLabel: 'No active notice cure countdown',
+      item10_authorizedDisconnectionReviewStatusLabel: 'Not eligible — Scheduled future billing cycle',
+      noticeDeadlineSummaryBanner: undefined,
+    };
+  }
+
+  const dpsStatus = bill.isPaid
+    ? 'Settled — No active DPS accrual'
+    : lc && lc.daysOverdue > 0
+    ? `Accruing DPS @ ${lc.effectiveAnnualRatePercent}% p.a. (₹${lc.dailyChargeRate.toFixed(2)}/day · Net DPS: ₹${lc.netLateChargesPayable.toFixed(2)})`
+    : 'Within due date / grace window — ₹0.00 DPS accrued';
+
+  let noticeStatus: ConsumerTimelineNoticeStatus = 'NOT_ISSUED';
+  if (bill.isPaid) {
+    noticeStatus = 'RESOLVED';
+  } else if (formalNotice && formalNotice.status) {
+    const raw = formalNotice.status;
+    if (raw === 'RESOLVED' || raw === 'WITHDRAWN') {
+      noticeStatus = 'RESOLVED';
+    } else if (raw === 'DEADLINE_REACHED') {
+      noticeStatus = 'DEADLINE_REACHED';
+    } else if (raw === 'DEADLINE_APPROACHING') {
+      noticeStatus = 'DEADLINE_APPROACHING';
+    } else if (raw === 'SERVED') {
+      noticeStatus = 'SERVED';
+    } else if (raw === 'ISSUED' || raw === 'SERVICE_PENDING' || raw === 'APPROVED') {
+      noticeStatus = 'ISSUED';
+    } else if (raw === 'ELIGIBLE_FOR_REVIEW' || raw === 'DRAFT' || raw === 'PENDING_APPROVAL') {
+      noticeStatus = 'ELIGIBLE_FOR_NOTICE';
+    }
+  } else if (countdown.activeDaysOverdue >= 5 && bill.outstandingBalance >= 500) {
+    noticeStatus = 'ELIGIBLE_FOR_NOTICE';
+  }
+
+  const hasIssuedOrServedNotice =
+    formalNotice &&
+    (noticeStatus === 'ISSUED' ||
+      noticeStatus === 'SERVED' ||
+      noticeStatus === 'DEADLINE_APPROACHING' ||
+      noticeStatus === 'DEADLINE_REACHED');
+
+  const issueAndServiceLabel = hasIssuedOrServedNotice
+    ? `Issued: ${formalNotice?.issueDate || 'Recorded'} · Verified Service: ${formalNotice?.serviceDate || 'Pending acknowledgment'}`
+    : noticeStatus === 'ELIGIBLE_FOR_NOTICE'
+    ? 'Eligible for Section 56(1) notice review (Not yet issued)'
+    : 'No formal Section 56(1) notice issued';
+
+  const cureDeadlineLabel =
+    hasIssuedOrServedNotice && formalNotice?.paymentDeadlineDate
+      ? `${formalNotice.paymentDeadlineDate} (15 clear days statutory cure window)`
+      : 'Not applicable (No active formal notice served)';
+
+  let noticeDaysLabel = 'No active notice cure countdown';
+  let noticeDeadlineSummaryBanner: string | undefined = undefined;
+
+  if (hasIssuedOrServedNotice && formalNotice?.paymentDeadlineDate) {
+    const remDays =
+      typeof formalNotice.daysRemainingUntilDeadline === 'number'
+        ? formalNotice.daysRemainingUntilDeadline
+        : calculateDaysUntilDue(formalNotice.paymentDeadlineDate, refDate);
+
+    if (remDays !== null) {
+      if (remDays > 0) {
+        noticeDaysLabel = `Formal notice payment deadline: ${remDays} ${remDays === 1 ? 'day' : 'days'} remaining`;
+        noticeDeadlineSummaryBanner = noticeDaysLabel;
+      } else if (remDays === 0) {
+        noticeDaysLabel = 'Formal notice payment deadline: 0 days remaining (Due today)';
+        noticeDeadlineSummaryBanner = noticeDaysLabel;
+      } else {
+        const elapsed = Math.abs(remDays);
+        noticeDaysLabel = `Notice deadline passed (${elapsed} ${elapsed === 1 ? 'day' : 'days'} elapsed) — authorized review pending`;
+        noticeDeadlineSummaryBanner = 'Notice deadline passed — authorized review pending';
+      }
+    }
+  }
+
+  let reviewStatusLabel = 'Not eligible — No formal notice deadline reached';
+  if (bill.isPaid) {
+    reviewStatusLabel = 'Resolved by settlement — Supply protected';
+  } else if (formalNotice?.holdOrDispute?.isOnHold) {
+    reviewStatusLabel = `Protected on hold (${formalNotice.holdOrDispute.holdReason || 'Active dispute/review'})`;
+  } else if (noticeStatus === 'DEADLINE_REACHED') {
+    reviewStatusLabel = 'Notice deadline passed — authorized review pending (Never auto-disconnected)';
+  } else if (hasIssuedOrServedNotice) {
+    reviewStatusLabel = 'Protected during statutory 15-day notice cure period';
+  } else if (noticeStatus === 'ELIGIBLE_FOR_NOTICE') {
+    reviewStatusLabel = 'Awaiting subdivision SDO notice review — Supply active';
+  }
+
+  return {
+    billNo: bill.billNo,
+    consumerNo: bill.consumerNo,
+    item1_billingPeriod: billingPeriod,
+    item2_billIssueDate: bill.billDate,
+    item3_originalDueDate: bill.dueDate,
+    item4_dueOrOverdueCountdownLabel: countdown.combinedStatusLabel,
+    item5_dpsGracePeriodStatusLabel: dpsStatus,
+    item6_formalNoticeStatus: noticeStatus,
+    item6_formalNoticeStatusBadge: noticeStatus.replace(/_/g, ' '),
+    item7_noticeIssueAndServiceDateLabel: issueAndServiceLabel,
+    item8_noticePaymentCureDeadlineLabel: cureDeadlineLabel,
+    item9_noticePeriodDaysRemainingOrElapsedLabel: noticeDaysLabel,
+    item10_authorizedDisconnectionReviewStatusLabel: reviewStatusLabel,
+    noticeDeadlineSummaryBanner,
+  };
+}
+
+/**
+ * Ensures DEMO consumer connections are configured for automatic BI_MONTHLY (2-month) billing
+ * schedule metadata and provides a deterministic, idempotent scheduled bi-monthly bill generator
+ * without mutating historical settled bills or creating duplicate bills on refresh (Part A).
+ */
+export function ensureConsumerBiMonthlyBillingSchedule(params: {
+  connections: ElectricityConnection[];
+  existingBills: ElectricityBill[];
+  targetConsumerNo?: string;
+  referenceDate?: string;
+  generateScheduledCycleIfMissing?: {
+    startYear: number;
+    startMonth1To12: number;
+    simulatedUnitsKwh?: number;
+    previousReadingKwh?: number;
+    currentReadingKwh?: number;
+  };
+}): {
+  configuredConnections: ElectricityConnection[];
+  bills: ElectricityBill[];
+  newlyScheduledBill: ElectricityBill | null;
+  skippedDuplicateReason?: string;
+} {
+  const configuredConnections = (params.connections || []).map((conn) => ({
+    ...conn,
+    billingCycleType: conn.billingCycleType || ('BI_MONTHLY' as BillingCycleType),
+  }));
+
+  if (!params.generateScheduledCycleIfMissing) {
+    return {
+      configuredConnections,
+      bills: params.existingBills || [],
+      newlyScheduledBill: null,
+    };
+  }
+
+  const targetConsumerNo = params.targetConsumerNo || '04281-99231';
+  const targetConn = configuredConnections.find((c) => c.consumerNo === targetConsumerNo);
+  if (!targetConn) {
+    return {
+      configuredConnections,
+      bills: params.existingBills || [],
+      newlyScheduledBill: null,
+      skippedDuplicateReason: `Connection ${targetConsumerNo} not found.`,
+    };
+  }
+
+  const genResult = generateDeterministicBiMonthlyBillForConnection({
+    connection: targetConn,
+    existingBills: params.existingBills || [],
+    startYear: params.generateScheduledCycleIfMissing.startYear,
+    startMonth1To12: params.generateScheduledCycleIfMissing.startMonth1To12,
+    simulatedUnitsKwh: params.generateScheduledCycleIfMissing.simulatedUnitsKwh,
+    previousReadingKwh: params.generateScheduledCycleIfMissing.previousReadingKwh,
+    currentReadingKwh: params.generateScheduledCycleIfMissing.currentReadingKwh,
+    referenceDate: params.referenceDate || '04-Nov-2026',
+    policyMode: 'BI_MONTHLY_PROPORTIONAL_2X_DEMO',
+    createdByRole: 'admin',
+    createdByActor: 'UGVCL Automated Bi-Monthly Billing Scheduler',
+  });
+
+  if (!genResult.created || !genResult.bill) {
+    return {
+      configuredConnections,
+      bills: params.existingBills || [],
+      newlyScheduledBill: null,
+      skippedDuplicateReason: genResult.reason,
+    };
+  }
+
+  return {
+    configuredConnections,
+    bills: genResult.updatedBills,
+    newlyScheduledBill: genResult.bill,
+  };
+}
+
+

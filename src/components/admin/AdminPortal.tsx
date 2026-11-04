@@ -46,6 +46,7 @@ import { reconcileBillWithPayments } from '../../utils/billingEngine';
 import { AdminDemoBackupCenter } from './AdminDemoBackupCenter';
 import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 import { OrganizationalDirectoryWorkspace } from './OrganizationalDirectoryWorkspace';
+import { ExecutiveDelinquencyAgingSection } from '../management/ExecutiveDelinquencyAgingSection';
 import {
   Activity,
   Users,
@@ -732,6 +733,19 @@ export const AdminPortal: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* Step 4D: Executive Delinquency Aging Portfolio View */}
+            <div data-testid="admin-delinquency-aging-section" className="pt-3 border-t border-slate-100 dark:border-slate-800">
+              <ExecutiveDelinquencyAgingSection
+                bills={bills}
+                connections={connections}
+                payments={payments}
+                waivers={lateChargeWaivers}
+                reversals={paymentReversals}
+                referenceDate={businessReferenceDate}
+                language={language}
+              />
             </div>
           </div>
 

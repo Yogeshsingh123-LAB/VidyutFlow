@@ -89,7 +89,7 @@ export function isConsumerProfileRoutePath(pathname: string): boolean {
 }
 
 export async function handleConsumerProfileRoute(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
-  const url = req.url || '';
+  const url = (req as IncomingMessage & { originalUrl?: string }).originalUrl || req.url || '';
   if (!url.startsWith('/api/v1/consumer') && !url.startsWith('/api/consumer')) {
     return false;
   }

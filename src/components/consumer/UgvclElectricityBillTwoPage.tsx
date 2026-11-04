@@ -1281,12 +1281,38 @@ export const UgvclElectricityBillTwoPage: React.FC<UgvclElectricityBillTwoPagePr
                     </td>
                   </tr>
                 )}
+                <tr className="bg-slate-50 text-slate-800 font-semibold text-xs">
+                  <td className="p-1.5 border-r border-slate-300 font-sans">
+                    Remaining Principal
+                  </td>
+                  <td className="p-1.5 text-right" data-testid="document-field-remainingPrincipal">
+                    ₹{(p.remainingPrincipal ?? p.totalBillAmount - p.paidAmount).toFixed(2)}
+                  </td>
+                </tr>
+                {(p.accruedLateCharges ?? 0) > 0 && (
+                  <tr className="bg-rose-50 text-rose-900 font-bold text-xs">
+                    <td className="p-1.5 border-r border-slate-300 font-sans">
+                      Accrued Late Payment Charges (DPS{p.daysOverdue ? ` · ${p.daysOverdue}d overdue` : ''})
+                    </td>
+                    <td className="p-1.5 text-right" data-testid="document-field-accruedLateCharges">
+                      +₹{(p.accruedLateCharges ?? 0).toFixed(2)}
+                    </td>
+                  </tr>
+                )}
                 <tr className="bg-amber-100 text-slate-950 font-black text-xs border-t-2 border-slate-900">
                   <td className="p-2 border-r border-slate-900 font-sans uppercase">
-                    {l.netAmountPayablePrefix} {p.dueDate}
+                    <div>{l.netAmountPayablePrefix} {p.dueDate}</div>
+                    {p.calculationAsOfLabel && (
+                      <div
+                        className="text-[9px] font-mono font-normal text-slate-700 normal-case mt-0.5"
+                        data-testid="document-field-calculationAsOf"
+                      >
+                        {p.calculationAsOfLabel}
+                      </div>
+                    )}
                   </td>
                   <td className="p-2 text-right text-base text-rose-800" data-testid="document-field-outstandingBalance">
-                    ₹{p.outstandingBalance.toFixed(2)}
+                    ₹{(p.currentTotalOutstanding ?? p.outstandingBalance).toFixed(2)}
                   </td>
                 </tr>
               </tbody>
@@ -1385,11 +1411,19 @@ export const UgvclElectricityBillTwoPage: React.FC<UgvclElectricityBillTwoPagePr
                   className="text-base font-black font-mono text-slate-950"
                   data-testid="document-field-slipAmountPayable"
                 >
-                  ₹{p.outstandingBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹{(p.currentTotalOutstanding ?? p.outstandingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <span className="text-[9px] block text-slate-500 font-sans mt-0.5">
                   {isPaid ? l.slipFullyPaidNote : l.slipPayBeforeDueNote}
                 </span>
+                {p.calculationAsOfLabel && (
+                  <span
+                    className="text-[8px] block text-slate-600 font-mono mt-0.5"
+                    data-testid="document-field-slipCalculationAsOf"
+                  >
+                    {p.calculationAsOfLabel}
+                  </span>
+                )}
               </div>
 
               {/* Machine-Readable Code 128 Barcode */}
@@ -1502,10 +1536,10 @@ export const UgvclElectricityBillTwoPage: React.FC<UgvclElectricityBillTwoPagePr
                 <table className="w-full text-[11px] border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-300 text-[10px] font-bold text-slate-700 uppercase">
-                      <th className="p-1.5 text-left border-r border-slate-300">{l.sec1ColCategory}</th>
-                      <th className="p-1.5 text-left border-r border-slate-300">{l.sec1ColSlabs}</th>
-                      <th className="p-1.5 text-right border-r border-slate-300">{l.sec1ColRate}</th>
-                      <th className="p-1.5 text-right">{l.sec1ColFixed}</th>
+                      <th className="p-1.5 text-left border-r border-slate-300 w-[24%]">{l.sec1ColCategory}</th>
+                      <th className="p-1.5 text-left border-r border-slate-300 w-[38%]">{l.sec1ColSlabs}</th>
+                      <th className="p-1.5 text-right border-r border-slate-300 w-[16%] whitespace-nowrap">{l.sec1ColRate}</th>
+                      <th className="p-1.5 text-right w-[22%] whitespace-nowrap">{l.sec1ColFixed}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 font-mono text-[10px]">
@@ -1513,51 +1547,51 @@ export const UgvclElectricityBillTwoPage: React.FC<UgvclElectricityBillTwoPagePr
                       <td rowSpan={4} className="p-1.5 border-r border-slate-300 font-sans font-bold bg-slate-50/50 align-top">
                         {l.sec1CatRgp}
                       </td>
-                      <td className="p-1 border-r border-slate-300 font-sans">{l.sec1SlabFirst50}</td>
-                      <td className="p-1 text-right border-r border-slate-300">₹3.05</td>
-                      <td rowSpan={2} className="p-1 text-right align-middle font-sans">{l.sec1Fixed1Ph25}</td>
+                      <td className="p-1.5 border-r border-slate-300 font-sans">{l.sec1SlabFirst50}</td>
+                      <td className="p-1.5 text-right border-r border-slate-300 whitespace-nowrap font-semibold">₹3.05</td>
+                      <td rowSpan={2} className="p-1.5 text-right align-middle font-sans whitespace-nowrap">{l.sec1Fixed1Ph25}</td>
                     </tr>
                     <tr>
-                      <td className="p-1 border-r border-slate-300 font-sans">{l.sec1SlabNext50}</td>
-                      <td className="p-1 text-right border-r border-slate-300">₹3.50</td>
+                      <td className="p-1.5 border-r border-slate-300 font-sans">{l.sec1SlabNext50}</td>
+                      <td className="p-1.5 text-right border-r border-slate-300 whitespace-nowrap font-semibold">₹3.50</td>
                     </tr>
                     <tr>
-                      <td className="p-1 border-r border-slate-300 font-sans">{l.sec1SlabNext150}</td>
-                      <td className="p-1 text-right border-r border-slate-300">₹4.15</td>
-                      <td rowSpan={2} className="p-1 text-right align-middle font-sans">{l.sec1Fixed3Ph65}</td>
+                      <td className="p-1.5 border-r border-slate-300 font-sans">{l.sec1SlabNext150}</td>
+                      <td className="p-1.5 text-right border-r border-slate-300 whitespace-nowrap font-semibold">₹4.15</td>
+                      <td rowSpan={2} className="p-1.5 text-right align-middle font-sans whitespace-nowrap">{l.sec1Fixed3Ph65}</td>
                     </tr>
                     <tr>
-                      <td className="p-1 border-r border-slate-300 font-sans">{l.sec1SlabAbove250}</td>
-                      <td className="p-1 text-right border-r border-slate-300">₹5.20</td>
+                      <td className="p-1.5 border-r border-slate-300 font-sans">{l.sec1SlabAbove250}</td>
+                      <td className="p-1.5 text-right border-r border-slate-300 whitespace-nowrap font-semibold">₹5.20</td>
                     </tr>
                     <tr className="border-t border-slate-300">
                       <td rowSpan={2} className="p-1.5 border-r border-slate-300 font-sans font-bold bg-slate-50/50 align-top">
                         {l.sec1CatGlp}
                       </td>
-                      <td className="p-1 border-r border-slate-300 font-sans">{l.sec1SlabFirst200}</td>
-                      <td className="p-1 text-right border-r border-slate-300">₹4.10</td>
-                      <td className="p-1 text-right font-sans">{l.sec1Fixed1Ph30}</td>
+                      <td className="p-1.5 border-r border-slate-300 font-sans">{l.sec1SlabFirst200}</td>
+                      <td className="p-1.5 text-right border-r border-slate-300 whitespace-nowrap font-semibold">₹4.10</td>
+                      <td className="p-1.5 text-right font-sans whitespace-nowrap">{l.sec1Fixed1Ph30}</td>
                     </tr>
                     <tr>
-                      <td className="p-1 border-r border-slate-300 font-sans">{l.sec1SlabRemaining}</td>
-                      <td className="p-1 text-right border-r border-slate-300">₹4.80</td>
-                      <td className="p-1 text-right font-sans">{l.sec1Fixed3Ph70}</td>
+                      <td className="p-1.5 border-r border-slate-300 font-sans">{l.sec1SlabRemaining}</td>
+                      <td className="p-1.5 text-right border-r border-slate-300 whitespace-nowrap font-semibold">₹4.80</td>
+                      <td className="p-1.5 text-right font-sans whitespace-nowrap">{l.sec1Fixed3Ph70}</td>
                     </tr>
                     <tr className="border-t border-slate-300">
                       <td className="p-1.5 border-r border-slate-300 font-sans font-bold bg-slate-50/50">
                         {l.sec1CatNonRgp}
                       </td>
-                      <td className="p-1 border-r border-slate-300 font-sans">{l.sec1SlabLoad5Kw}</td>
-                      <td className="p-1 text-right border-r border-slate-300">₹4.50</td>
-                      <td className="p-1 text-right font-sans">{l.sec1Fixed70Kw}</td>
+                      <td className="p-1.5 border-r border-slate-300 font-sans">{l.sec1SlabLoad5Kw}</td>
+                      <td className="p-1.5 text-right border-r border-slate-300 whitespace-nowrap font-semibold">₹4.50</td>
+                      <td className="p-1.5 text-right font-sans whitespace-nowrap">{l.sec1Fixed70Kw}</td>
                     </tr>
                     <tr>
                       <td className="p-1.5 border-r border-slate-300 font-sans font-bold bg-slate-50/50">
                         {l.sec1CatAg}
                       </td>
-                      <td className="p-1 border-r border-slate-300 font-sans">{l.sec1SlabMetered}</td>
-                      <td className="p-1 text-right border-r border-slate-300">₹3.30</td>
-                      <td className="p-1 text-right font-sans">{l.sec1Fixed10Hp}</td>
+                      <td className="p-1.5 border-r border-slate-300 font-sans">{l.sec1SlabMetered}</td>
+                      <td className="p-1.5 text-right border-r border-slate-300 whitespace-nowrap font-semibold">₹3.30</td>
+                      <td className="p-1.5 text-right font-sans whitespace-nowrap">{l.sec1Fixed10Hp}</td>
                     </tr>
                   </tbody>
                 </table>

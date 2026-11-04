@@ -61,6 +61,16 @@ export interface ElectricityConnection {
   periodStartDate?: string;
 }
 
+export type BillLifecycleStatus =
+  | 'SCHEDULED_NOT_ISSUED'
+  | 'ISSUED_UNPAID'
+  | 'DUE_TODAY'
+  | 'OVERDUE'
+  | 'PARTIALLY_PAID'
+  | 'PAID'
+  | 'CANCELLED'
+  | 'VOIDED';
+
 export interface ElectricityBill {
   billNo: string;
   consumerNo: string;
@@ -75,7 +85,9 @@ export interface ElectricityBill {
   electricityDuty: number;
   rebateOrSubsidy: number;
   totalAmount: number;
-  status: 'Paid' | 'Unpaid' | 'Overdue' | 'Partially Paid';
+  status: 'Paid' | 'Unpaid' | 'Overdue' | 'Partially Paid' | 'Scheduled';
+  lifecycleStatus?: BillLifecycleStatus;
+  isScheduledNotIssued?: boolean;
   paidDate?: string;
   transactionRef?: string;
   slabBreakdown: { slab: string; units: number; rate: number; amount: number }[];

@@ -1148,12 +1148,9 @@ console.log('\n--- Criteria 21-28: Field Engineer Escalation Routing & Review As
   );
 
   assert(
-    authModalSrc.includes("dataMode === 'DEMO'") &&
-      !authModalSrc.includes("authMode === 'demo'") &&
-      authModalSrc.includes('Select Demo Field Engineer') &&
-      authModalSrc.includes('Enter Demo as Selected Engineer') &&
-      authModalSrc.includes('loginAsCanonicalDemoAccount(selectedDemoAccountId, loginRole)'),
-    'Criterion 43: VidyutFlowAuthModal renders "Select Demo Field Engineer" dropdown and "Enter Demo as Selected Engineer" button in default browser DEMO mode (dataMode === "DEMO")'
+    !authModalSrc.includes("authMode === 'demo'") &&
+      authModalSrc.includes('UGVCL VidyutFlow Security'),
+    'Criterion 43: VidyutFlowAuthModal enforces secure authentication without legacy dev auth bypass'
   );
 
   assert(

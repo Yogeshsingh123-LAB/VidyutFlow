@@ -138,6 +138,10 @@ export function deriveCanonical9FieldBillStatement(
     (lc.lateChargesWaived + lc.lateChargesSettled).toFixed(2)
   );
 
+  const isScheduled = Boolean(
+    reconciled.isScheduledNotIssued || reconciled.effectiveStatus === 'Scheduled'
+  );
+
   return {
     billNo: bill.billNo,
     consumerNo: bill.consumerNo,
@@ -153,31 +157,31 @@ export function deriveCanonical9FieldBillStatement(
     billMonth: bill.billMonth,
     billingCycleType: bill.billingCycleType || 'BI_MONTHLY',
     // 1..9 Canonical Fields:
-    originalBillAmount: lc.originalBillAmount,
-    paymentsSuccessfullySettled: lc.successfulPayments,
-    remainingPrincipal: lc.remainingPrincipal,
-    accruedLatePaymentCharges: lc.netLateChargesPayable,
-    grossAccruedLateCharges: lc.lateChargesAccrued,
-    chargesAlreadyPaidOrWaived,
-    totalCurrentOutstanding: lc.totalOutstandingPayable,
+    originalBillAmount: isScheduled ? 0 : (lc.originalBillAmount ?? 0),
+    paymentsSuccessfullySettled: isScheduled ? 0 : (lc.successfulPayments ?? 0),
+    remainingPrincipal: isScheduled ? 0 : lc.remainingPrincipal,
+    accruedLatePaymentCharges: isScheduled ? 0 : lc.netLateChargesPayable,
+    grossAccruedLateCharges: isScheduled ? 0 : (lc.lateChargesAccrued ?? 0),
+    chargesAlreadyPaidOrWaived: isScheduled ? 0 : chargesAlreadyPaidOrWaived,
+    totalCurrentOutstanding: isScheduled ? 0 : lc.totalOutstandingPayable,
     originalDueDate: bill.dueDate,
-    daysOverdue: lc.daysOverdue,
+    daysOverdue: (isScheduled || lc.totalOutstandingPayable <= 0.009 || lc.remainingPrincipal <= 0) ? 0 : lc.daysOverdue,
     lastCalculationDate: lc.referenceDate,
     // Metadata & Aliases:
-    dailyLateChargeAccrual: lc.dailyChargeRate,
-    dailyLateChargeRate: lc.dailyChargeRate,
-    annualRatePercent: lc.effectiveAnnualRatePercent,
-    effectiveAnnualRatePercent: lc.effectiveAnnualRatePercent,
-    policyId: lc.policyId,
-    tariffPolicyCode: `${lc.policyId} (${lc.policyVersion})`,
+    dailyLateChargeAccrual: (isScheduled || lc.totalOutstandingPayable <= 0.009 || lc.remainingPrincipal <= 0) ? 0 : lc.dailyChargeRate,
+    dailyLateChargeRate: (isScheduled || lc.totalOutstandingPayable <= 0.009 || lc.remainingPrincipal <= 0) ? 0 : lc.dailyChargeRate,
+    annualRatePercent: isScheduled ? 0 : lc.effectiveAnnualRatePercent,
+    effectiveAnnualRatePercent: isScheduled ? 0 : lc.effectiveAnnualRatePercent,
+    policyId: lc.policyId || DEFAULT_LATE_CHARGE_POLICY.policyId,
+    tariffPolicyCode: `${lc.policyId || DEFAULT_LATE_CHARGE_POLICY.policyId} (${lc.policyVersion})`,
     policyVersion: lc.policyVersion,
-    isDemoPolicy: lc.isDemoPolicy,
-    isDemoSimulation: lc.isDemoPolicy,
-    policyDisclaimer: lc.policyDisclaimer,
-    derivedStatus: reconciled.derivedStatus,
-    effectiveStatus: reconciled.derivedStatus,
-    isOverdue: lc.daysOverdue > 0 && lc.totalOutstandingPayable > 0,
-    isFullySettled: lc.totalOutstandingPayable <= 0.009,
+    isDemoPolicy: Boolean(lc.isDemoPolicy ?? true),
+    isDemoSimulation: Boolean(lc.isDemoPolicy ?? true),
+    policyDisclaimer: lc.policyDisclaimer || DEFAULT_LATE_CHARGE_POLICY.notes,
+    derivedStatus: isScheduled ? 'Scheduled' : (lc.totalOutstandingPayable <= 0.009 || lc.remainingPrincipal <= 0) ? 'Paid' : reconciled.derivedStatus,
+    effectiveStatus: isScheduled ? 'Scheduled' : (lc.totalOutstandingPayable <= 0.009 || lc.remainingPrincipal <= 0) ? 'Paid' : reconciled.derivedStatus,
+    isOverdue: !isScheduled && (lc.totalOutstandingPayable > 0.009 && lc.remainingPrincipal > 0) && lc.daysOverdue > 0,
+    isFullySettled: !isScheduled && (lc.totalOutstandingPayable <= 0.009 || lc.remainingPrincipal <= 0),
   };
 }
 
@@ -1337,6 +1341,10 @@ export function evaluateStep4BOverdueAndNoticeNotifications(
       reversals,
       language,
     });
+
+    if (statement.effectiveStatus === 'Scheduled') {
+      continue;
+    }
 
     const rawNotice = noticeByBillNo.get(normalizeBillingIdentifier(bill.billNo));
     const reconciledNotice = rawNotice

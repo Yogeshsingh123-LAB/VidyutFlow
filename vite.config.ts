@@ -41,7 +41,7 @@ export default defineConfig(() => {
     },
     server: {
       host: '0.0.0.0',
-      port: Number(process.env.PORT) || 5173,
+      port: Number(process.env.PORT) || 3000,
       allowedHosts: true,
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
@@ -105,7 +105,7 @@ export default defineConfig(() => {
     },
     preview: {
       host: '0.0.0.0',
-      port: Number(process.env.PORT) || 5173,
+      port: Number(process.env.PORT) || 3000,
       allowedHosts: true
     },
     build: {
@@ -158,11 +158,11 @@ export default defineConfig(() => {
             ) {
               return 'app-notices-clock';
             }
-            if (
-              norm.includes('src/utils/canonicalAnalytics') ||
-              norm.includes('src/utils/exportEngine')
-            ) {
-              return 'app-analytics-export';
+            if (norm.includes('src/utils/canonicalAnalytics')) {
+              return 'app-analytics';
+            }
+            if (norm.includes('src/utils/exportEngine')) {
+              return 'app-export';
             }
             if (
               norm.includes('src/utils/aiRecommendationEngine') ||

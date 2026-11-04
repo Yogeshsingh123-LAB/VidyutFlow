@@ -174,6 +174,7 @@ export interface OverdueFinancialBreakdown {
   policyDisclaimer: string;
   status: 'Paid' | 'Unpaid' | 'Overdue' | 'Partially Paid';
   currentPaymentStatus: 'Paid' | 'Unpaid' | 'Overdue' | 'Partially Paid';
+  historicalDaysLate?: number;
   // Detailed Audit Trail
   auditTrail: {
     referenceDateUsed: string;
@@ -437,9 +438,12 @@ export function calculateLatePaymentCharges(
   );
 
   // Overdue and chargeable days
-  const { daysOverdue, isOverdue: rawIsOverdue } = calculateOverdueDays(dueDateStr, refDateStr);
-  const chargeableDays = Math.max(0, daysOverdue - gracePeriodDays);
-  const isOverdue = rawIsOverdue && remainingPrincipal > 0;
+  const { daysOverdue: rawDaysOverdue, isOverdue: rawIsOverdue } = calculateOverdueDays(dueDateStr, refDateStr);
+  const isSettled = remainingPrincipal <= 0;
+  const isOverdue = !isSettled && rawIsOverdue;
+  const daysOverdue = isSettled ? 0 : (isOverdue ? rawDaysOverdue : 0);
+  const historicalDaysLate = rawIsOverdue ? rawDaysOverdue : 0;
+  const chargeableDays = isSettled ? 0 : Math.max(0, rawDaysOverdue - gracePeriodDays);
 
   // Daily rate calculation
   const dailyRateFraction = (annualRatePercent / 100) / daysInYear;
@@ -593,6 +597,7 @@ export function calculateLatePaymentCharges(
     calculationReferenceDate: refDateStr,
     daysOverdue,
     isOverdue,
+    historicalDaysLate,
     gracePeriodDays,
     gracePeriodEndsOn,
     chargeableDays,

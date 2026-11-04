@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ManagementMeterIntegritySection } from './ManagementMeterIntegritySection';
+import { ExecutiveDelinquencyAgingSection } from './ExecutiveDelinquencyAgingSection';
 import { useApp } from '../../context/AppContext';
 import {
   EXECUTIVE_MONTHLY_METRICS,
@@ -95,6 +96,7 @@ export const ManagementPortal: React.FC = () => {
     applications,
     complaints,
     workOrders,
+    connections,
     bills,
     payments,
     incidents,
@@ -633,6 +635,19 @@ export const ManagementPortal: React.FC = () => {
                 15-Day Statutory Period · Zero Automatic Disconnection
               </span>
             </div>
+          </div>
+
+          {/* Step 4D: Executive Delinquency Aging Buckets & Portfolio Drill-Down */}
+          <div data-testid="mgmt-delinquency-aging-section">
+            <ExecutiveDelinquencyAgingSection
+              bills={bills}
+              connections={connections}
+              payments={payments}
+              waivers={lateChargeWaivers}
+              reversals={paymentReversals}
+              referenceDate={businessReferenceDate}
+              language={language}
+            />
           </div>
 
           

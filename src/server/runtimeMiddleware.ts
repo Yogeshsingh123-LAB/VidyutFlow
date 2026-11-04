@@ -7,6 +7,7 @@ import { AGENTIC_PERSONAS } from './agenticPersonas';
 import { getRoleToolDeclarations, executeAgenticTool } from './agenticTools';
 import { defaultAiCacheManager } from './aiCache';
 import { handleMeterReadingRoute, METER_READING_ROUTE_PREFIXES } from './meterReadingRoutes';
+import { handleDirectoryRoute } from './directoryRoutes';
 import { handleConsumerProfileRoute } from './consumerProfileRoutes';
 import { detectPromptInjection, redactSensitiveData } from '../utils/securityHardening';
 import { UserRole } from '../types';
@@ -677,5 +678,8 @@ export function attachVidyutServerMiddlewares(middlewares: {
   });
   middlewares.use('/api/consumer', (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => {
     void handleConsumerProfileRoute(req, res).then(handled => { if (!handled) next(); }).catch(next);
+  });
+  middlewares.use('/api/directory', (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => {
+    void handleDirectoryRoute(req, res).then(handled => { if (!handled) next(); }).catch(next);
   });
 }

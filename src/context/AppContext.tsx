@@ -182,7 +182,8 @@ import {
   resolveNextNonOverlappingBiMonthlyPeriod,
   evaluateGentleBillingReminders,
   createPaymentConfirmedNotification,
-  normalizeBillingIdentifier
+  normalizeBillingIdentifier,
+  parseVidyutDateToUtcMs
 } from '../utils/billingEngine';
 import type { LateChargeWaiverRecord, PaymentReversalRecord } from '../utils/lateChargeEngine';
 import {
@@ -1408,6 +1409,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     initialDecision.entered
   );
 
+  // Business Clock & Cross-Tab Sync Managers must be initialized before dataset useState hooks
+  const businessClockRef = React.useRef<BusinessClockController | null>(null);
+  if (!businessClockRef.current) {
+    businessClockRef.current = new BusinessClockController();
+  }
+  const crossTabSyncRef = React.useRef<CrossTabFinancialSyncManager | null>(null);
+  if (!crossTabSyncRef.current) {
+    crossTabSyncRef.current = new CrossTabFinancialSyncManager();
+  }
+
+  const [businessClockState, setBusinessClockState] = useState<BusinessClockState>(() =>
+    businessClockRef.current!.getState()
+  );
+  const [businessReferenceDate, setBusinessReferenceDateState] = useState<string>(
+    () => businessClockRef.current!.getState().businessDate
+  );
+  const businessClockMode: BusinessClockMode = businessClockState.mode;
+
   // Centralized dynamic datasets with localStorage persistence
   const [consumers, setConsumers] = useState<ConsumerProfile[]>(() =>
     loadStorage('vidyutone_consumers', INITIAL_CONSUMERS)
@@ -1478,9 +1497,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return Array.from(mergedMap.values());
   });
 
-  const [bills, setBills] = useState<ElectricityBill[]>(() =>
-    loadStorage('vidyutone_bills', INITIAL_BILLS)
-  );
+  const [bills, setBills] = useState<ElectricityBill[]>(() => {
+    const stored = loadStorage<ElectricityBill[]>('vidyutone_bills', INITIAL_BILLS);
+    const seedByBillNo = new Map<string, ElectricityBill>(
+      INITIAL_BILLS.map((b) => [b.billNo, b])
+    );
+    const currentRefMs =
+      parseVidyutDateToUtcMs(
+        businessClockRef.current?.getState().businessDate || '04-Nov-2026'
+      ) ?? Date.UTC(2026, 10, 4);
+
+    return stored
+      .filter((b) => Boolean(b && b.billNo))
+      .map((b) => {
+        const billMs = parseVidyutDateToUtcMs(b.billDate);
+        if (
+          billMs !== null &&
+          billMs > currentRefMs &&
+          b.status !== 'Paid' &&
+          !b.paidDate &&
+          (b.paidAmount || 0) === 0
+        ) {
+          return {
+            ...b,
+            status: 'Scheduled' as const,
+            lifecycleStatus: 'SCHEDULED_NOT_ISSUED' as const,
+            isScheduledNotIssued: true,
+            unitsConsumed: 0,
+            energyCharges: 0,
+            fixedCharges: 0,
+            fuelPriceAdjustment: 0,
+            electricityDuty: 0,
+            rebateOrSubsidy: 0,
+            otherAdjustmentsInr: 0,
+            totalAmount: 0,
+            remainingBalance: 0,
+            outstandingBalance: 0,
+            slabBreakdown: [],
+            previousReadingKwh: undefined,
+            currentReadingKwh: undefined,
+          };
+        }
+        const seed = seedByBillNo.get(b.billNo);
+        if (!seed) return b;
+        return {
+          ...seed,
+          ...b,
+          periodStartDate: b.periodStartDate || seed.periodStartDate,
+          periodEndDate: b.periodEndDate || seed.periodEndDate,
+          previousReadingDate: b.previousReadingDate || seed.previousReadingDate,
+          currentReadingDate: b.currentReadingDate || seed.currentReadingDate,
+          previousReadingKwh:
+            typeof b.previousReadingKwh === 'number'
+              ? b.previousReadingKwh
+              : seed.previousReadingKwh,
+          currentReadingKwh:
+            typeof b.currentReadingKwh === 'number'
+              ? b.currentReadingKwh
+              : seed.currentReadingKwh,
+          readingProvenance: b.readingProvenance || seed.readingProvenance,
+        };
+      });
+  });
 
   const [payments, setPayments] = useState<PaymentTransaction[]>(() =>
     loadStorage('vidyutone_payments', INITIAL_PAYMENTS)
@@ -1569,23 +1647,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 
   const [isOfflineSimulated, setIsOfflineSimulated] = useState<boolean>(false);
-
-  const businessClockRef = React.useRef<BusinessClockController | null>(null);
-  if (!businessClockRef.current) {
-    businessClockRef.current = new BusinessClockController();
-  }
-  const crossTabSyncRef = React.useRef<CrossTabFinancialSyncManager | null>(null);
-  if (!crossTabSyncRef.current) {
-    crossTabSyncRef.current = new CrossTabFinancialSyncManager();
-  }
-
-  const [businessClockState, setBusinessClockState] = useState<BusinessClockState>(() =>
-    businessClockRef.current!.getState()
-  );
-  const [businessReferenceDate, setBusinessReferenceDateState] = useState<string>(
-    () => businessClockRef.current!.getState().businessDate
-  );
-  const businessClockMode: BusinessClockMode = businessClockState.mode;
 
   const setBusinessReferenceDate = React.useCallback((dateStr: string) => {
     const controller = businessClockRef.current;
@@ -5738,7 +5799,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         startMonth1To12: 9,
         autoResolveNonOverlappingPeriod: true,
         createdByRole: effectiveRole,
-        createdByActor: activeUser.name || 'VidyutFlow Billing Engine'
+        createdByActor: activeUser.name || 'VidyutFlow Billing Engine',
+        referenceDate: businessReferenceDate
       });
 
       if (!biMonthlyGenResult.created || !biMonthlyGenResult.bill) {
@@ -5751,13 +5813,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       setBills(biMonthlyGenResult.updatedBills);
+      const isScheduled =
+        biMonthlyGenResult.bill.lifecycleStatus === 'SCHEDULED_NOT_ISSUED' ||
+        biMonthlyGenResult.bill.status === 'Scheduled';
       addAuditEvent(
         'DEMO_BIMONTHLY_BILL_GENERATED',
         `BILL#${biMonthlyGenResult.bill.billNo}`,
-        `Deterministic BI_MONTHLY DEMO cycle bill generated for connection ${targetConn.consumerNo} (${biMonthlyGenResult.bill.billMonth}, ${biMonthlyGenResult.bill.periodStartDate} to ${biMonthlyGenResult.bill.periodEndDate}): ₹${biMonthlyGenResult.bill.totalAmount.toLocaleString()}`
+        isScheduled
+          ? `Scheduled future BI_MONTHLY cycle registered for connection ${targetConn.consumerNo} (${biMonthlyGenResult.bill.billMonth}, Issue Date: ${biMonthlyGenResult.bill.billDate})`
+          : `Deterministic BI_MONTHLY DEMO cycle bill generated for connection ${targetConn.consumerNo} (${biMonthlyGenResult.bill.billMonth}, ${biMonthlyGenResult.bill.periodStartDate} to ${biMonthlyGenResult.bill.periodEndDate}): ₹${biMonthlyGenResult.bill.totalAmount.toLocaleString()}`
       );
       showToast(
-        `Bi-Monthly DEMO Bill ${biMonthlyGenResult.bill.billNo} (${biMonthlyGenResult.bill.billMonth}, ₹${biMonthlyGenResult.bill.totalAmount.toLocaleString('en-IN')}) generated for connection ${targetConn.consumerNo}.`,
+        isScheduled
+          ? `Upcoming Bi-Monthly Cycle (${biMonthlyGenResult.bill.billMonth}, Scheduled Issue Date: ${biMonthlyGenResult.bill.billDate}) added to schedule for connection ${targetConn.consumerNo}.`
+          : `Bi-Monthly DEMO Bill ${biMonthlyGenResult.bill.billNo} (${biMonthlyGenResult.bill.billMonth}, ₹${biMonthlyGenResult.bill.totalAmount.toLocaleString('en-IN')}) generated for connection ${targetConn.consumerNo}.`,
         'success'
       );
       return {
@@ -5770,7 +5839,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const genResult = generateDeterministicDemoBillForConnection({
       connection: targetConn,
       existingBills: bills,
-      billMonth
+      billMonth,
+      referenceDate: businessReferenceDate
     });
 
     if (!genResult.created || !genResult.bill) {

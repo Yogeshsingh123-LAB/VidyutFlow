@@ -380,14 +380,14 @@ const PDF_REVERSE_I18N: Record<'en' | 'gu' | 'hi' | 'mr', PdfReverseLocalizedCon
   en: {
     box1Title: '1. GERC APPROVED TARIFF SCHEDULE (APPLICABLE SLABS)',
     box1Lines: [
-      'Category               Consumption Slab       Energy Rate   Fixed Charge',
-      'RGPU (Residential)     0-50 (Bi-Mo: 0-100)    INR 3.05/u    1-Ph: INR 25/mo',
-      'RGPU (Residential)     51-100 (Bi-Mo:101-200) INR 3.50/u    3-Ph: INR 65/mo',
-      'RGPU (Residential)     101-250 (Bi-Mo:201-500)INR 4.15/u    Bi-Mo: 2x Fixed',
-      'RGPU (Residential)     Above 250 (Bi-Mo:>500) INR 5.20/u',
-      'GLP (Lighting)         First 200 / Rem.       INR 4.10/4.80 1-Ph: INR 30/mo',
-      'Non-RGP (Commercial)   Connected Load         INR 4.50/u    INR 70/kW/mo',
-      'LTP-AG (Agricultural)  Metered Supply         INR 0.80/u    INR 10/HP/mo',
+      'Category            | Consumption Slab         | Energy Rate   | Fixed Charge',
+      'RGPU (Residential)  | 0-50 (Bi-Mo: 0-100)      | INR 3.05/u    | 1-Ph: INR 25/mo',
+      'RGPU (Residential)  | 51-100 (Bi-Mo: 101-200)  | INR 3.50/u    | 3-Ph: INR 65/mo',
+      'RGPU (Residential)  | 101-250 (Bi-Mo: 201-500) | INR 4.15/u    | Bi-Mo: 2x Fixed',
+      'RGPU (Residential)  | Above 250 (Bi-Mo: >500)  | INR 5.20/u    | Per Sanctioned Load',
+      'GLP (Lighting)      | First 200 / Remaining    | INR 4.10/4.80 | 1-Ph: INR 30/mo',
+      'Non-RGP (Commercial)| Connected Load <= 5kW    | INR 4.50/u    | INR 70/kW/mo',
+      'LTP-AG (Agri.)      | Metered Supply           | INR 0.80/u    | INR 10/HP/mo',
     ],
     box2Title: '2. ENERGY CHARGE, FPPPA & DUTY CALCULATION PRINCIPLES',
     box2Lines: [
@@ -960,34 +960,64 @@ function renderTwoPageUgvclBillVectorStream(
     const chargeColW = contentWidth - slabColW - 6;
 
     ops.push('q');
-    // Left Box: Slab Breakdown
+    // Left Box: Slab Breakdown (Structured 4-Column Vector Table)
     ops.push(`${dt.tableHeaderBgRgb} rg`);
     ops.push(`${dt.marginX} ${cursorY - 15} ${slabColW} 15 re f`);
+    ops.push('0.94 0.96 0.99 rg');
+    ops.push(`${dt.marginX} ${cursorY - 28} ${slabColW} 13 re f`);
     ops.push(`${dt.borderPrimaryRgb} RG ${dt.borderWidthOuterPt} w`);
     ops.push(`${dt.marginX} ${midBottomY} ${slabColW} ${midBoxH} re S`);
+
+    // Column X coordinates for Slab Breakdown table (slabColW = ~251pt)
+    const slabC1X = dt.marginX + 5; // Slab Description (width 118pt)
+    const slabDiv1X = dt.marginX + 125;
+    const slabC2X = slabDiv1X + 4; // Units (width 34pt)
+    const slabDiv2X = dt.marginX + 163;
+    const slabC3X = slabDiv2X + 4; // Rate (width 38pt)
+    const slabDiv3X = dt.marginX + 203;
+    const slabC4X = slabDiv3X + 4; // Amount (width 48pt)
+
+    ops.push('0.78 0.83 0.90 RG 0.4 w');
+    ops.push(`${dt.marginX} ${cursorY - 28} m ${dt.marginX + slabColW} ${cursorY - 28} l S`);
+    ops.push(`${slabDiv1X} ${midBottomY + 26} m ${slabDiv1X} ${cursorY - 15} l S`);
+    ops.push(`${slabDiv2X} ${midBottomY + 26} m ${slabDiv2X} ${cursorY - 15} l S`);
+    ops.push(`${slabDiv3X} ${midBottomY + 26} m ${slabDiv3X} ${cursorY - 15} l S`);
+
     ops.push('0.06 0.14 0.28 rg');
     ops.push(
       `BT ${dt.fontFamilyBold} 7.5 Tf ${dt.marginX + 6} ${cursorY - 10} Td (GERC SLAB-WISE ENERGY BREAKDOWN) Tj ET`
     );
 
-    ops.push('0.30 0.36 0.44 rg');
-    ops.push(
-      `BT ${dt.fontFamilyBold} 6.5 Tf ${dt.marginX + 6} ${cursorY - 25} Td (Slab Description               Units    Rate      Amount) Tj ET`
-    );
+    ops.push('0.22 0.28 0.38 rg');
+    ops.push(`BT ${dt.fontFamilyBold} 6.2 Tf ${slabC1X} ${cursorY - 24} Td (Consumption Slab) Tj ET`);
+    ops.push(`BT ${dt.fontFamilyBold} 6.2 Tf ${slabC2X} ${cursorY - 24} Td (Units) Tj ET`);
+    ops.push(`BT ${dt.fontFamilyBold} 6.2 Tf ${slabC3X} ${cursorY - 24} Td (Rate) Tj ET`);
+    ops.push(`BT ${dt.fontFamilyBold} 6.2 Tf ${slabC4X} ${cursorY - 24} Td (Amount) Tj ET`);
+
     p.slabBreakdown.slice(0, 5).forEach((s, idx) => {
-      const y = cursorY - 38 - idx * 14;
-      const desc = s.slab.slice(0, 24).padEnd(25, ' ');
-      const uStr = String(s.units).padStart(5, ' ');
-      const rStr = s.rate.toFixed(2).padStart(6, ' ');
-      const aStr = s.amount.toFixed(2).padStart(8, ' ');
+      const y = cursorY - 39 - idx * 14;
+      const rowBotY = y - 4;
+      const cleanSlabDesc = s.slab.length > 24 ? s.slab.slice(0, 23) + '.' : s.slab;
+      ops.push('0.86 0.90 0.94 RG 0.3 w');
+      ops.push(`${dt.marginX} ${rowBotY} m ${dt.marginX + slabColW} ${rowBotY} l S`);
       ops.push('0.10 0.15 0.22 rg');
       ops.push(`% SLAB_ROW_UTF8 [${idx}]: ${s.slab} | ${s.units} kWh | ₹${s.rate.toFixed(2)} | ₹${s.amount.toFixed(2)} ${toUtf16BeHex(s.slab)}`);
       ops.push(
-        `BT ${dt.fontFamilyRegular} 6.8 Tf ${dt.marginX + 6} ${y} Td (${pdfEscapeAscii(
-          `${desc} ${uStr}   ${rStr}   INR ${aStr}`
-        )}) Tj ET`
+        `BT ${dt.fontFamilyRegular} 6.4 Tf ${slabC1X} ${y} Td (${pdfEscapeAscii(cleanSlabDesc)}) Tj ET`
+      );
+      ops.push(
+        `BT ${dt.fontFamilyRegular} 6.4 Tf ${slabC2X + 4} ${y} Td (${pdfEscapeAscii(String(s.units))}) Tj ET`
+      );
+      ops.push(
+        `BT ${dt.fontFamilyRegular} 6.4 Tf ${slabC3X} ${y} Td (${pdfEscapeAscii(s.rate.toFixed(2))}) Tj ET`
+      );
+      ops.push(
+        `BT ${dt.fontFamilyBold} 6.4 Tf ${slabC4X} ${y} Td (${pdfEscapeAscii(`INR ${s.amount.toFixed(2)}`)}) Tj ET`
       );
     });
+
+    ops.push('0.78 0.83 0.90 RG 0.4 w');
+    ops.push(`${dt.marginX} ${midBottomY + 26} m ${dt.marginX + slabColW} ${midBottomY + 26} l S`);
 
     if (p.slabIntegrityWarning) {
       ops.push('0.68 0.32 0.04 rg');
@@ -995,20 +1025,20 @@ function renderTwoPageUgvclBillVectorStream(
       const warn2 = p.slabIntegrityWarning.slice(56, 112);
       const warn3 = p.slabIntegrityWarning.slice(112, 168);
       ops.push(
-        `BT ${dt.fontFamilyBold} 6 Tf ${dt.marginX + 6} ${midBottomY + 28} Td (${pdfEscapeAscii(
+        `BT ${dt.fontFamilyBold} 6 Tf ${dt.marginX + 6} ${midBottomY + 18} Td (${pdfEscapeAscii(
           warn1
         )}) Tj ET`
       );
       if (warn2) {
         ops.push(
-          `BT ${dt.fontFamilyRegular} 6 Tf ${dt.marginX + 6} ${midBottomY + 19} Td (${pdfEscapeAscii(
+          `BT ${dt.fontFamilyRegular} 6 Tf ${dt.marginX + 6} ${midBottomY + 11} Td (${pdfEscapeAscii(
             warn2
           )}) Tj ET`
         );
       }
       if (warn3) {
         ops.push(
-          `BT ${dt.fontFamilyRegular} 6 Tf ${dt.marginX + 6} ${midBottomY + 10} Td (${pdfEscapeAscii(
+          `BT ${dt.fontFamilyRegular} 6 Tf ${dt.marginX + 6} ${midBottomY + 4} Td (${pdfEscapeAscii(
             warn3
           )}) Tj ET`
         );
@@ -1017,46 +1047,56 @@ function renderTwoPageUgvclBillVectorStream(
       const slabTotal = p.slabBreakdown.reduce((acc, r) => acc + r.amount, 0);
       ops.push('0.08 0.36 0.22 rg');
       ops.push(
-        `BT ${dt.fontFamilyBold} 7 Tf ${dt.marginX + 6} ${midBottomY + 12} Td (${pdfEscapeAscii(
+        `BT ${dt.fontFamilyBold} 7 Tf ${dt.marginX + 6} ${midBottomY + 10} Td (${pdfEscapeAscii(
           `Verified Slab Energy Total: INR ${slabTotal.toFixed(2)}`
         )}) Tj ET`
       );
     }
 
-    // Right Box: Itemized Bill Charges
+    // Right Box: Itemized Bill Charges (Structured 2-Column Vector Table)
     ops.push(`${dt.tableHeaderBgRgb} rg`);
     ops.push(`${chargeColX} ${cursorY - 15} ${chargeColW} 15 re f`);
     ops.push(`${dt.borderPrimaryRgb} RG ${dt.borderWidthOuterPt} w`);
     ops.push(`${chargeColX} ${midBottomY} ${chargeColW} ${midBoxH} re S`);
+    const chargeAmtDivX = chargeColX + chargeColW - 82;
+    ops.push('0.78 0.83 0.90 RG 0.4 w');
+    ops.push(`${chargeAmtDivX} ${midBottomY} m ${chargeAmtDivX} ${cursorY - 15} l S`);
     ops.push('0.06 0.14 0.28 rg');
     ops.push(
       `BT ${dt.fontFamilyBold} 7.5 Tf ${chargeColX + 6} ${cursorY - 10} Td (ITEMIZED BILL STATEMENT (INR)) Tj ET`
     );
+
+    const remPrincipal = p.remainingPrincipal ?? Math.max(0, p.totalBillAmount - p.paidAmount);
+    const accruedDps = p.accruedLateCharges ?? 0;
+    const currentPayable = p.currentTotalOutstanding ?? p.outstandingBalance;
 
     const chargeRows: Array<{ label: string; val: string; bold?: boolean }> = [
       { label: `1. Energy Charges (${p.billedUnits} kWh)`, val: `INR ${p.energyCharges.toFixed(2)}` },
       { label: `2. Fixed Charges (${p.sanctionedLoadKw} kW)`, val: `INR ${p.fixedCharges.toFixed(2)}` },
       { label: `3. Fuel Price Adj. (FPPPA)`, val: `INR ${p.fuelPriceAdjustment.toFixed(2)}` },
       { label: `4. Electricity Duty (Govt. ED)`, val: `INR ${p.electricityDuty.toFixed(2)}` },
-      { label: `5. Meter / Service Charges`, val: `INR ${p.meterRent.toFixed(2)}` },
-      { label: `6. Subtotal Current Charges`, val: `INR ${p.subtotalCurrentCharges.toFixed(2)}`, bold: true },
-      { label: `7. Rebate / Govt. Subsidy`, val: `-INR ${p.rebateOrSubsidy.toFixed(2)}` },
-      { label: `8. TOTAL CURRENT BILL AMOUNT`, val: `INR ${p.totalBillAmount.toFixed(2)}`, bold: true },
-      { label: `9. Payments Settled / Reconciled`, val: `-INR ${p.paidAmount.toFixed(2)}` },
-      { label: `10. NET AMOUNT PAYABLE`, val: `INR ${p.outstandingBalance.toFixed(2)}`, bold: true },
+      { label: `5. Subtotal Current Charges`, val: `INR ${p.subtotalCurrentCharges.toFixed(2)}`, bold: true },
+      { label: `6. Rebate / Govt. Subsidy`, val: `-INR ${p.rebateOrSubsidy.toFixed(2)}` },
+      { label: `7. ORIGINAL BILL AMOUNT`, val: `INR ${p.totalBillAmount.toFixed(2)}`, bold: true },
+      { label: `8. Payments Settled / Reconciled`, val: `-INR ${p.paidAmount.toFixed(2)}` },
+      { label: `9. Remaining Principal`, val: `INR ${remPrincipal.toFixed(2)}` },
+      { label: `10. Accrued Late Charges (DPS)`, val: `+INR ${accruedDps.toFixed(2)}` },
+      { label: `11. CURRENT TOTAL OUTSTANDING`, val: `INR ${currentPayable.toFixed(2)}`, bold: true },
     ];
 
     chargeRows.forEach((cr, idx) => {
-      const y = cursorY - 27 - idx * 13.5;
+      const y = cursorY - 26 - idx * 12.3;
+      ops.push('0.88 0.91 0.95 RG 0.25 w');
+      ops.push(`${chargeColX} ${y - 3.2} m ${chargeColX + chargeColW} ${y - 3.2} l S`);
       ops.push(cr.bold ? '0.06 0.12 0.24 rg' : '0.18 0.24 0.32 rg');
       ops.push(
-        `BT ${cr.bold ? dt.fontFamilyBold : dt.fontFamilyRegular} ${cr.bold ? '7.2' : '6.8'} Tf ${
-          chargeColX + 6
+        `BT ${cr.bold ? dt.fontFamilyBold : dt.fontFamilyRegular} ${cr.bold ? '6.8' : '6.5'} Tf ${
+          chargeColX + 5
         } ${y} Td (${pdfEscapeAscii(cr.label)}) Tj ET`
       );
       ops.push(
-        `BT ${cr.bold ? dt.fontFamilyBold : dt.fontFamilyRegular} ${cr.bold ? '7.2' : '6.8'} Tf ${
-          chargeColX + chargeColW - 72
+        `BT ${cr.bold ? dt.fontFamilyBold : dt.fontFamilyRegular} ${cr.bold ? '6.8' : '6.5'} Tf ${
+          chargeAmtDivX + 5
         } ${y} Td (${pdfEscapeAscii(cr.val)}) Tj ET`
       );
     });
@@ -1064,12 +1104,14 @@ function renderTwoPageUgvclBillVectorStream(
 
     cursorY = midBottomY - 6;
 
-    // 4. Previous Three Billing Periods Table (Height: 74pt)
+    // 4. Previous Three Billing Periods Table (Height: 74pt — Structured 6-Column Vector Table)
     const histBoxH = 74;
     const histBottomY = cursorY - histBoxH;
     ops.push('q');
     ops.push(`${dt.tableHeaderBgRgb} rg`);
     ops.push(`${dt.marginX} ${cursorY - 15} ${contentWidth} 15 re f`);
+    ops.push('0.94 0.96 0.99 rg');
+    ops.push(`${dt.marginX} ${cursorY - 28} ${contentWidth} 13 re f`);
     ops.push(`${dt.borderPrimaryRgb} RG ${dt.borderWidthOuterPt} w`);
     ops.push(`${dt.marginX} ${histBottomY} ${contentWidth} ${histBoxH} re S`);
     ops.push('0.06 0.14 0.28 rg');
@@ -1077,31 +1119,52 @@ function renderTwoPageUgvclBillVectorStream(
       `BT ${dt.fontFamilyBold} 7.5 Tf ${dt.marginX + 6} ${cursorY - 10} Td (PREVIOUS THREE BILLING PERIODS & PAYMENT RECONCILIATION) Tj ET`
     );
 
-    ops.push('0.28 0.34 0.42 rg');
-    ops.push(
-      `BT ${dt.fontFamilyBold} 6.5 Tf ${dt.marginX + 8} ${cursorY - 26} Td (Billing Period              Units (kWh)     Billed Amount       Paid Amount         Balance           Status) Tj ET`
-    );
+    const hCol1X = dt.marginX + 6; // Billing Period
+    const hDiv1X = dt.marginX + 145;
+    const hCol2X = hDiv1X + 6; // Units (kWh)
+    const hDiv2X = dt.marginX + 215;
+    const hCol3X = hDiv2X + 6; // Billed Amount
+    const hDiv3X = dt.marginX + 300;
+    const hCol4X = hDiv3X + 6; // Paid Amount
+    const hDiv4X = dt.marginX + 385;
+    const hCol5X = hDiv4X + 6; // Balance
+    const hDiv5X = dt.marginX + 455;
+    const hCol6X = hDiv5X + 6; // Status
+
+    ops.push('0.78 0.83 0.90 RG 0.4 w');
+    ops.push(`${dt.marginX} ${cursorY - 28} m ${dt.marginX + contentWidth} ${cursorY - 28} l S`);
+    if (p.previousPeriods.length > 0) {
+      [hDiv1X, hDiv2X, hDiv3X, hDiv4X, hDiv5X].forEach((divX) => {
+        ops.push(`${divX} ${histBottomY} m ${divX} ${cursorY - 15} l S`);
+      });
+    }
+
+    ops.push('0.22 0.28 0.38 rg');
+    ops.push(`BT ${dt.fontFamilyBold} 6.3 Tf ${hCol1X} ${cursorY - 24} Td (Billing Period) Tj ET`);
+    ops.push(`BT ${dt.fontFamilyBold} 6.3 Tf ${hCol2X} ${cursorY - 24} Td (Units (kWh)) Tj ET`);
+    ops.push(`BT ${dt.fontFamilyBold} 6.3 Tf ${hCol3X} ${cursorY - 24} Td (Billed Amount) Tj ET`);
+    ops.push(`BT ${dt.fontFamilyBold} 6.3 Tf ${hCol4X} ${cursorY - 24} Td (Paid Amount) Tj ET`);
+    ops.push(`BT ${dt.fontFamilyBold} 6.3 Tf ${hCol5X} ${cursorY - 24} Td (Balance) Tj ET`);
+    ops.push(`BT ${dt.fontFamilyBold} 6.3 Tf ${hCol6X} ${cursorY - 24} Td (Status) Tj ET`);
 
     if (p.previousPeriods.length > 0) {
       p.previousPeriods.slice(0, 3).forEach((hp, idx) => {
-        const y = cursorY - 38 - idx * 12;
+        const y = cursorY - 39 - idx * 12;
+        ops.push('0.86 0.90 0.94 RG 0.3 w');
+        ops.push(`${dt.marginX} ${y - 3.5} m ${dt.marginX + contentWidth} ${y - 3.5} l S`);
         ops.push(`% PREV_PERIOD_UTF8 [${idx}]: ${hp.month} | ${hp.units} kWh | ₹${hp.billAmount} | ${hp.status} ${toUtf16BeHex(`${hp.month} - ${hp.status}`)}`);
-        const rowLine = `${hp.month.padEnd(24, ' ')} ${String(hp.units).padStart(8, ' ')} kWh     INR ${hp.billAmount
-          .toFixed(2)
-          .padStart(9, ' ')}     INR ${hp.paidAmount.toFixed(2).padStart(9, ' ')}     INR ${hp.balance
-          .toFixed(2)
-          .padStart(8, ' ')}      ${hp.status}`;
         ops.push('0.12 0.18 0.26 rg');
-        ops.push(
-          `BT ${dt.fontFamilyRegular} 6.8 Tf ${dt.marginX + 8} ${y} Td (${pdfEscapeAscii(
-            rowLine
-          )}) Tj ET`
-        );
+        ops.push(`BT ${dt.fontFamilyRegular} 6.6 Tf ${hCol1X} ${y} Td (${pdfEscapeAscii(hp.month.slice(0, 26))}) Tj ET`);
+        ops.push(`BT ${dt.fontFamilyRegular} 6.6 Tf ${hCol2X} ${y} Td (${pdfEscapeAscii(`${hp.units} kWh`)}) Tj ET`);
+        ops.push(`BT ${dt.fontFamilyRegular} 6.6 Tf ${hCol3X} ${y} Td (${pdfEscapeAscii(`INR ${hp.billAmount.toFixed(2)}`)}) Tj ET`);
+        ops.push(`BT ${dt.fontFamilyRegular} 6.6 Tf ${hCol4X} ${y} Td (${pdfEscapeAscii(`INR ${hp.paidAmount.toFixed(2)}`)}) Tj ET`);
+        ops.push(`BT ${dt.fontFamilyRegular} 6.6 Tf ${hCol5X} ${y} Td (${pdfEscapeAscii(`INR ${hp.balance.toFixed(2)}`)}) Tj ET`);
+        ops.push(`BT ${dt.fontFamilyBold} 6.6 Tf ${hCol6X} ${y} Td (${pdfEscapeAscii(hp.status.slice(0, 14))}) Tj ET`);
       });
     } else {
       ops.push('0.38 0.44 0.52 rg');
       ops.push(
-        `BT ${dt.fontFamilyRegular} 7 Tf ${dt.marginX + 8} ${cursorY - 42} Td (No previous billing records found for this service connection.) Tj ET`
+        `BT ${dt.fontFamilyRegular} 7 Tf ${dt.marginX + 8} ${cursorY - 46} Td (No previous billing records found for this service connection.) Tj ET`
       );
     }
     ops.push('Q');
@@ -1130,12 +1193,18 @@ function renderTwoPageUgvclBillVectorStream(
     );
     ops.push(
       `BT ${dt.fontFamilyBold} 7.5 Tf ${dt.marginX + 8} ${cursorY - 37} Td (${pdfEscapeAscii(
-        `Due Date: ${p.dueDate}  |  Payable: INR ${p.outstandingBalance.toFixed(2)}`
+        `Due Date: ${p.dueDate}  |  Payable: INR ${(p.currentTotalOutstanding ?? p.outstandingBalance).toFixed(2)}`
+      )}) Tj ET`
+    );
+    ops.push('0.25 0.32 0.42 rg');
+    ops.push(
+      `BT ${dt.fontFamilyRegular} 6.3 Tf ${dt.marginX + 8} ${cursorY - 48} Td (${pdfEscapeAscii(
+        p.calculationAsOfLabel || `Outstanding calculated as of ${p.calculationTimestampIst || '04-Nov-2026 10:30 IST'}`
       )}) Tj ET`
     );
     ops.push('0.35 0.42 0.50 rg');
     ops.push(
-      `BT ${dt.fontFamilyRegular} 6.5 Tf ${dt.marginX + 8} ${cursorY - 50} Td (${pdfEscapeAscii(
+      `BT ${dt.fontFamilyRegular} 6.2 Tf ${dt.marginX + 8} ${cursorY - 58} Td (${pdfEscapeAscii(
         `DEMO Disclosure: Simulated utility bill record in VidyutFlow 2.0.`
       )}) Tj ET`
     );
@@ -1223,16 +1292,71 @@ function renderTwoPageUgvclBillVectorStream(
     };
 
     // Column 1 Boxes (Sections 1, 2, 3, 4)
-    yLeft = drawReverseBox(
-      col1X,
-      yLeft,
-      colW,
-      118,
-      revI18n.box1Title,
-      enRev.box1Title,
-      revI18n.box1Lines,
-      enRev.box1Lines
-    );
+    // Box 1: Structured 4-Column Vector Table for GERC Approved Tariff Schedule (Zero text overlap)
+    {
+      const box1H = 118;
+      const box1BotY = yLeft - box1H;
+      ops.push('q');
+      ops.push(`${dt.tableHeaderBgRgb} rg`);
+      ops.push(`${col1X} ${yLeft - 15} ${colW} 15 re f`);
+      ops.push('0.94 0.96 0.99 rg');
+      ops.push(`${col1X} ${yLeft - 27} ${colW} 12 re f`);
+      ops.push(`${dt.borderPrimaryRgb} RG ${dt.borderWidthOuterPt} w`);
+      ops.push(`${col1X} ${box1BotY} ${colW} ${box1H} re S`);
+      ops.push('0.06 0.14 0.28 rg');
+      ops.push(`% REVERSE_BOX_TITLE_UTF8: ${revI18n.box1Title} ${toUtf16BeHex(revI18n.box1Title)}`);
+      if (indicInfo.activeScript !== 'latin') {
+        ops.push(`BT ${indicInfo.activeFontResource} 7.2 Tf ${col1X + 6} ${yLeft - 10} Td ${toUtf16BeHex(revI18n.box1Title)} Tj ET`);
+      } else {
+        ops.push(`BT ${dt.fontFamilyBold} 7.2 Tf ${col1X + 6} ${yLeft - 10} Td (${pdfEscapeAscii(enRev.box1Title)}) Tj ET`);
+      }
+      // Preserve UTF-8/UTF-16BE metadata lines for automated binary inspection
+      revI18n.box1Lines.forEach((ln, idx) => {
+        ops.push(`% REVERSE_BOX_LINE_UTF8 [${idx}]: ${ln} ${toUtf16BeHex(ln)}`);
+      });
+
+      // 4-Column Coordinates inside colW (~257.64pt):
+      // Col 1: Category (x+4, width 62pt) | Col 2: Consumption Slab (x+68, width 88pt) | Col 3: Energy Rate (x+158, width 46pt) | Col 4: Fixed Charge (x+206, width 51pt)
+      const tDiv1X = col1X + 66;
+      const tDiv2X = col1X + 156;
+      const tDiv3X = col1X + 204;
+
+      ops.push('0.78 0.83 0.90 RG 0.35 w');
+      ops.push(`${col1X} ${yLeft - 27} m ${col1X + colW} ${yLeft - 27} l S`);
+      ops.push(`${tDiv1X} ${box1BotY} m ${tDiv1X} ${yLeft - 15} l S`);
+      ops.push(`${tDiv2X} ${box1BotY} m ${tDiv2X} ${yLeft - 15} l S`);
+      ops.push(`${tDiv3X} ${box1BotY} m ${tDiv3X} ${yLeft - 15} l S`);
+
+      ops.push('0.20 0.26 0.36 rg');
+      ops.push(`BT ${dt.fontFamilyBold} 5.6 Tf ${col1X + 4} ${yLeft - 23} Td (Category) Tj ET`);
+      ops.push(`BT ${dt.fontFamilyBold} 5.6 Tf ${tDiv1X + 3} ${yLeft - 23} Td (Consumption Slab) Tj ET`);
+      ops.push(`BT ${dt.fontFamilyBold} 5.6 Tf ${tDiv2X + 3} ${yLeft - 23} Td (Energy Rate) Tj ET`);
+      ops.push(`BT ${dt.fontFamilyBold} 5.6 Tf ${tDiv3X + 3} ${yLeft - 23} Td (Fixed Charge) Tj ET`);
+
+      const tariffRows: Array<[string, string, string, string]> = [
+        ['RGPU (Res.)', '0-50 (Bi-Mo: 0-100)', 'INR 3.05/u', '1-Ph: INR 25/mo'],
+        ['RGPU (Res.)', '51-100 (Bi-Mo: 101-200)', 'INR 3.50/u', '3-Ph: INR 65/mo'],
+        ['RGPU (Res.)', '101-250 (Bi-Mo: 201-500)', 'INR 4.15/u', 'Bi-Mo: 2x Fixed'],
+        ['RGPU (Res.)', 'Above 250 (Bi-Mo: >500)', 'INR 5.20/u', 'Per Load Norm'],
+        ['GLP (Light)', 'First 200 / Remaining', 'INR 4.10/4.80', '1-Ph: INR 30/mo'],
+        ['Non-RGP', 'Connected Load <= 5kW', 'INR 4.50/u', 'INR 70/kW/mo'],
+        ['LTP-AG (Agri)', 'Metered Supply', 'INR 0.80/u', 'INR 10/HP/mo'],
+      ];
+
+      tariffRows.forEach((tr, rIdx) => {
+        const rowY = yLeft - 36 - rIdx * 11.2;
+        ops.push('0.86 0.90 0.94 RG 0.25 w');
+        ops.push(`${col1X} ${rowY - 3} m ${col1X + colW} ${rowY - 3} l S`);
+        ops.push('0.12 0.18 0.26 rg');
+        ops.push(`BT ${dt.fontFamilyBold} 5.5 Tf ${col1X + 4} ${rowY} Td (${pdfEscapeAscii(tr[0])}) Tj ET`);
+        ops.push(`BT ${dt.fontFamilyRegular} 5.5 Tf ${tDiv1X + 3} ${rowY} Td (${pdfEscapeAscii(tr[1])}) Tj ET`);
+        ops.push(`BT ${dt.fontFamilyBold} 5.5 Tf ${tDiv2X + 3} ${rowY} Td (${pdfEscapeAscii(tr[2])}) Tj ET`);
+        ops.push(`BT ${dt.fontFamilyRegular} 5.4 Tf ${tDiv3X + 3} ${rowY} Td (${pdfEscapeAscii(tr[3])}) Tj ET`);
+      });
+
+      ops.push('Q');
+      yLeft = box1BotY - 6;
+    }
 
     yLeft = drawReverseBox(
       col1X,
@@ -1269,16 +1393,57 @@ function renderTwoPageUgvclBillVectorStream(
     );
 
     // Column 2 Boxes (Sections 5, 6, 7, 8+9)
-    yRight = drawReverseBox(
-      col2X,
-      yRight,
-      colW,
-      96,
-      revI18n.box5Title,
-      enRev.box5Title,
-      revI18n.box5Lines,
-      enRev.box5Lines
-    );
+    // Box 5: Structured 2-Column Vector Table for Government Electricity Duty (ED)
+    {
+      const box5H = 96;
+      const box5BotY = yRight - box5H;
+      const edDivX = col2X + 158;
+      ops.push('q');
+      ops.push(`${dt.tableHeaderBgRgb} rg`);
+      ops.push(`${col2X} ${yRight - 15} ${colW} 15 re f`);
+      ops.push('0.94 0.96 0.99 rg');
+      ops.push(`${col2X} ${yRight - 27} ${colW} 12 re f`);
+      ops.push(`${dt.borderPrimaryRgb} RG ${dt.borderWidthOuterPt} w`);
+      ops.push(`${col2X} ${box5BotY} ${colW} ${box5H} re S`);
+      ops.push('0.06 0.14 0.28 rg');
+      ops.push(`% REVERSE_BOX_TITLE_UTF8: ${revI18n.box5Title} ${toUtf16BeHex(revI18n.box5Title)}`);
+      if (indicInfo.activeScript !== 'latin') {
+        ops.push(`BT ${indicInfo.activeFontResource} 7.2 Tf ${col2X + 6} ${yRight - 10} Td ${toUtf16BeHex(revI18n.box5Title)} Tj ET`);
+      } else {
+        ops.push(`BT ${dt.fontFamilyBold} 7.2 Tf ${col2X + 6} ${yRight - 10} Td (${pdfEscapeAscii(enRev.box5Title)}) Tj ET`);
+      }
+      revI18n.box5Lines.forEach((ln, idx) => {
+        ops.push(`% REVERSE_BOX_LINE_UTF8 [${idx}]: ${ln} ${toUtf16BeHex(ln)}`);
+      });
+
+      ops.push('0.78 0.83 0.90 RG 0.35 w');
+      ops.push(`${col2X} ${yRight - 27} m ${col2X + colW} ${yRight - 27} l S`);
+      ops.push(`${edDivX} ${box5BotY} m ${edDivX} ${yRight - 15} l S`);
+
+      ops.push('0.20 0.26 0.36 rg');
+      ops.push(`BT ${dt.fontFamilyBold} 5.8 Tf ${col2X + 5} ${yRight - 23} Td (Consumer Category) Tj ET`);
+      ops.push(`BT ${dt.fontFamilyBold} 5.8 Tf ${edDivX + 4} ${yRight - 23} Td (Applicable ED Rate) Tj ET`);
+
+      const edRows: Array<[string, string]> = [
+        ['Residential & Educational Premises', '15.00% on Energy Chg.'],
+        ['Commercial Establishments & Offices', '25.00% on Energy Chg.'],
+        ['Industrial Units (LT / HT)', '10.00% on Energy Chg.'],
+        ['Religious Places & Hostels', '11.25% on Energy Chg.'],
+        ['Agricultural & Rural Water Supply', 'EXEMPT (Govt. Order)'],
+      ];
+
+      edRows.forEach((er, rIdx) => {
+        const rowY = yRight - 37 - rIdx * 12;
+        ops.push('0.86 0.90 0.94 RG 0.25 w');
+        ops.push(`${col2X} ${rowY - 3.2} m ${col2X + colW} ${rowY - 3.2} l S`);
+        ops.push('0.12 0.18 0.26 rg');
+        ops.push(`BT ${dt.fontFamilyRegular} 5.8 Tf ${col2X + 5} ${rowY} Td (${pdfEscapeAscii(er[0])}) Tj ET`);
+        ops.push(`BT ${dt.fontFamilyBold} 5.8 Tf ${edDivX + 4} ${rowY} Td (${pdfEscapeAscii(er[1])}) Tj ET`);
+      });
+
+      ops.push('Q');
+      yRight = box5BotY - 6;
+    }
 
     // Box 6: Six Bi-Monthly Period Consumption Comparison Chart with 2 Vector Bars per Period
     const chartBoxH = 114;

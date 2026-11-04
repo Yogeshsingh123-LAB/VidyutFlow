@@ -95,6 +95,10 @@ export interface PaymentCalendarEvent {
   isFormalNoticeDeadlineExpired?: boolean;
   isFormalNoticeResolved?: boolean;
   disconnectionReviewStatus?: FormalNoticeRecord['disconnectionReviewStatus'];
+  paidDate?: string;
+  paidDateIso?: string;
+  daysUntilDue?: number;
+  obligationPriorityRank?: 1 | 2 | 3 | 4; // 1 = Overdue, 2 = Due Today, 3 = Upcoming Unpaid, 4 = Paid
 }
 
 export interface CalendarMonthDay {
@@ -121,8 +125,12 @@ export interface PaymentCalendarSummary {
   totalLateChargesAmount: number;
   totalDueAmountWithCharges: number;
   totalOutstandingWithChargesInr: number;
+  totalOutstandingPayable: number;
   totalPaidAmount: number;
   nextUpcomingDueDate: string | null;
+  currentlyOverdueCount?: number;
+  currentlyOverdueAmount?: number;
+  settledBillsThisMonthCount?: number;
   activeFormalNoticesCount: number;
   activeFormalNoticeCount: number;
   approachingNoticeDeadlinesCount: number;
@@ -154,6 +162,10 @@ export interface CalendarLocalizationStrings {
   partiallyPaidLabel: string;
   overdueLabel: string;
   nextDueCardLabel: string;
+  noUpcomingDueDateLabel: string;
+  prioritizedObligationsTitle: string;
+  prioritizedObligationsSubtitle: string;
+  noOutstandingObligationsMessage: string;
   totalOutstandingCardLabel: string;
   paidBillsCardLabel: string;
   demoCalendarNotice: string;
@@ -199,6 +211,10 @@ export const CALENDAR_LOCALIZATION: Record<Language, CalendarLocalizationStrings
     partiallyPaidLabel: 'Partially Paid',
     overdueLabel: 'Overdue',
     nextDueCardLabel: 'Next Upcoming Due Date',
+    noUpcomingDueDateLabel: 'No upcoming unpaid due date',
+    prioritizedObligationsTitle: 'Prioritized Outstanding Obligations & Deadlines',
+    prioritizedObligationsSubtitle: 'Ordered by urgency: 1. Overdue bills · 2. Due today · 3. Upcoming unpaid bills',
+    noOutstandingObligationsMessage: 'All bills in the selected scope are settled. No active payment obligations.',
     totalOutstandingCardLabel: 'Total Outstanding Payable',
     paidBillsCardLabel: 'Settled Bills (This Month)',
     demoCalendarNotice: 'DEMO Calendar: Event schedules automatically synchronize with UGVCL billing records in real time.',
@@ -232,6 +248,10 @@ export const CALENDAR_LOCALIZATION: Record<Language, CalendarLocalizationStrings
     partiallyPaidLabel: 'અંશતઃ ચૂકવેલ',
     overdueLabel: 'મુદતવીતી',
     nextDueCardLabel: 'આગામી છેલ્લી તારીખ',
+    noUpcomingDueDateLabel: 'કોઈ આગામી બાકી ડ્યુ ડેટ નથી',
+    prioritizedObligationsTitle: 'અગ્રતા મુજબ બાકી બિલ અને ચુકવણી જવાબદારીઓ',
+    prioritizedObligationsSubtitle: 'તાકીદ મુજબ ક્રમ: 1. મુદતવીતી બિલ · 2. આજે ચૂકવવાપાત્ર · 3. આગામી બાકી બિલ',
+    noOutstandingObligationsMessage: 'પસંદ કરેલ જોડાણમાં તમામ બિલ ચૂકવાઈ ગયા છે.',
     totalOutstandingCardLabel: 'કુલ બાકી રકમ',
     paidBillsCardLabel: 'ચૂકવેલા બિલ (આ મહિને)',
     demoCalendarNotice: 'DEMO કેલેન્ડર: ઇવેન્ટ શેડ્યૂલ UGVCL બિલિંગ રેકોર્ડ્સ સાથે રીઅલ-ટાઇમમાં સિંક થાય છે.',
@@ -265,6 +285,10 @@ export const CALENDAR_LOCALIZATION: Record<Language, CalendarLocalizationStrings
     partiallyPaidLabel: 'आंशिक भुगतान',
     overdueLabel: 'अतिदेय (Overdue)',
     nextDueCardLabel: 'अगली आगामी देय तिथि',
+    noUpcomingDueDateLabel: 'कोई आगामी अदत्त देय तिथि नहीं',
+    prioritizedObligationsTitle: 'प्राथमिकता अनुसार बकाया बिल एवं भुगतान दायित्व',
+    prioritizedObligationsSubtitle: 'तातकालिकता क्रम: 1. अतिदेय बिल · 2. आज देय बिल · 3. आगामी अदत्त बिल',
+    noOutstandingObligationsMessage: 'चयनित दायरे में सभी बिलों का निपटान हो चुका है।',
     totalOutstandingCardLabel: 'कुल शेष देय राशि',
     paidBillsCardLabel: 'निपटाए गए बिल (इस माह)',
     demoCalendarNotice: 'DEMO कैलेंडर: बिलिंग कार्यक्रम UGVCL रिकॉर्ड के साथ वास्तविक समय में समन्वयित होता है।',
@@ -298,6 +322,10 @@ export const CALENDAR_LOCALIZATION: Record<Language, CalendarLocalizationStrings
     partiallyPaidLabel: 'अंशतः भरलेले',
     overdueLabel: 'मुदतबाह्य',
     nextDueCardLabel: 'पुढील देय तारीख',
+    noUpcomingDueDateLabel: 'कोणतीही पुढील अदत्त देय तारीख नाही',
+    prioritizedObligationsTitle: 'प्राधान्यानुसार थकीत बिले व देयक मुदती',
+    prioritizedObligationsSubtitle: 'तातडीनुसार क्रम: 1. थकीत बिले · 2. आज देय बिले · 3. पुढील अदत्त बिले',
+    noOutstandingObligationsMessage: 'निवडलेल्या जोडणीतील सर्व बिले पूर्णपणे भरलेली आहेत.',
     totalOutstandingCardLabel: 'एकूण शिल्लक देय रक्कम',
     paidBillsCardLabel: 'भरलेली बिले (या महिन्यात)',
     demoCalendarNotice: 'DEMO कॅलेंडर: इव्हेंट वेळापत्रक UGVCL नोंदींशी रिअल-टाइममध्ये समक्रमित होते.',
@@ -437,6 +465,9 @@ export function derivePaymentCalendarEvents(
       waivers,
       reversals,
     });
+    if (reconciled.isScheduledNotIssued || reconciled.effectiveStatus === 'Scheduled') {
+      continue;
+    }
     const statement = deriveCanonical9FieldBillStatement(bill, payments, {
       referenceDate,
       connection: conn,
@@ -530,14 +561,14 @@ export function derivePaymentCalendarEvents(
       accruedLateCharges: statement.accruedLatePaymentCharges,
       waivedOrSettledCharges: statement.chargesAlreadyPaidOrWaived,
       totalOutstandingWithCharges: statement.totalCurrentOutstanding,
-      daysOverdue: statement.daysOverdue,
-      dailyLateChargeAccrual: statement.dailyLateChargeAccrual,
+      daysOverdue: (reconciled.isPaid || statement.isFullySettled || statement.totalCurrentOutstanding <= 0.009) ? 0 : statement.daysOverdue,
+      dailyLateChargeAccrual: (reconciled.isPaid || statement.isFullySettled || statement.totalCurrentOutstanding <= 0.009) ? 0 : statement.dailyLateChargeAccrual,
       calculationReferenceDate: statement.lastCalculationDate,
-      status: reconciled.effectiveStatus,
-      isDue: reconciled.isDue,
-      isOverdue: reconciled.isOverdue,
-      isFullyPaid: reconciled.isPaid,
-      isPartiallyPaid: reconciled.isPartiallyPaid,
+      status: (reconciled.isPaid || statement.isFullySettled || statement.totalCurrentOutstanding <= 0.009) ? 'Paid' : reconciled.effectiveStatus,
+      isDue: (reconciled.isPaid || statement.isFullySettled || statement.totalCurrentOutstanding <= 0.009) ? false : reconciled.isDue,
+      isOverdue: (reconciled.isPaid || statement.isFullySettled || statement.totalCurrentOutstanding <= 0.009) ? false : reconciled.isOverdue,
+      isFullyPaid: Boolean(reconciled.isPaid || statement.isFullySettled || statement.totalCurrentOutstanding <= 0.009),
+      isPartiallyPaid: (!reconciled.isPaid && !statement.isFullySettled) && reconciled.isPartiallyPaid,
       isSimulatedDemoBill: Boolean(bill.isSimulatedDemoBill),
       billingCycleType: reconciled.billingCycleType,
       periodStartDate: reconciled.periodStartDate,
@@ -571,6 +602,17 @@ export function derivePaymentCalendarEvents(
       isFormalNoticeResolved:
         reconciledNotice?.status === 'RESOLVED' || reconciledNotice?.status === 'WITHDRAWN',
       disconnectionReviewStatus: reconciledNotice?.disconnectionReviewStatus,
+      paidDate: reconciled.paidDate,
+      paidDateIso: reconciled.paidDate ? parseDateToYearMonthDay(reconciled.paidDate)?.isoDate : undefined,
+      daysUntilDue,
+      obligationPriorityRank:
+        reconciled.isPaid || statement.isFullySettled || statement.totalCurrentOutstanding <= 0.009
+          ? 4
+          : reconciled.isOverdue || daysUntilDue < 0
+          ? 1
+          : daysUntilDue === 0
+          ? 2
+          : 3,
     });
   }
 
@@ -714,18 +756,47 @@ export function buildMonthCalendarGrid(
 /**
  * Summarizes payment calendar metrics for a filtered set of events.
  */
-export function computeCalendarSummary(events: PaymentCalendarEvent[]): PaymentCalendarSummary {
+export function computeCalendarSummary(
+  events: PaymentCalendarEvent[],
+  options?: { referenceDate?: string; todayIso?: string; formalNotices?: FormalNoticeRecord[] }
+): PaymentCalendarSummary {
   let dueBillsCount = 0;
   let paidBillsCount = 0;
+  let currentlyOverdueCount = 0;
+  let currentlyOverdueAmount = 0;
+  let settledBillsThisMonthCount = 0;
   let totalPrincipalDueAmount = 0;
   let totalLateChargesAmount = 0;
   let totalDueAmountWithCharges = 0;
   let totalPaidAmount = 0;
   let nextUpcomingDueDate: string | null = null;
+  let nextUpcomingDueDateIso: string | null = null;
   let activeFormalNoticesCount = 0;
   let approachingNoticeDeadlinesCount = 0;
   let expiredNoticeDeadlinesCount = 0;
   const eventsByConnectionNo: Record<string, PaymentCalendarEvent[]> = {};
+
+  if (options?.formalNotices && options.formalNotices.length > 0) {
+    for (const fn of options.formalNotices) {
+      if (
+        ['ISSUED', 'SERVED', 'DEADLINE_APPROACHING', 'DEADLINE_REACHED'].includes(fn.status)
+      ) {
+        activeFormalNoticesCount += 1;
+        if (fn.status === 'DEADLINE_APPROACHING') approachingNoticeDeadlinesCount += 1;
+        if (fn.status === 'DEADLINE_REACHED') expiredNoticeDeadlinesCount += 1;
+      }
+    }
+  }
+
+  const refParsed = options?.referenceDate
+    ? parseDateToYearMonthDay(options.referenceDate)
+    : null;
+  const todayIso =
+    options?.todayIso ||
+    (refParsed
+      ? `${refParsed.year}-${String(refParsed.month + 1).padStart(2, '0')}-${String(refParsed.day).padStart(2, '0')}`
+      : '2026-11-04');
+  const refYearMonth = todayIso.substring(0, 7);
 
   for (const ev of events) {
     if (!eventsByConnectionNo[ev.consumerNo]) {
@@ -733,14 +804,22 @@ export function computeCalendarSummary(events: PaymentCalendarEvent[]): PaymentC
     }
     eventsByConnectionNo[ev.consumerNo].push(ev);
 
-    if (ev.isDue) {
+    if (ev.isDue && !ev.isFullyPaid) {
       dueBillsCount += 1;
-      totalPrincipalDueAmount += ev.outstandingBalance;
+      totalPrincipalDueAmount += ev.outstandingBalance ?? ev.remainingPrincipal ?? 0;
       totalLateChargesAmount += ev.accruedLateCharges || 0;
-      totalDueAmountWithCharges += ev.totalOutstandingWithCharges ?? ev.outstandingBalance;
-      if (!nextUpcomingDueDate || ev.dueDateIso < nextUpcomingDueDate) {
-        nextUpcomingDueDate = ev.dueDate;
+      totalDueAmountWithCharges += ev.totalOutstandingWithCharges ?? ev.outstandingBalance ?? ev.remainingPrincipal ?? 0;
+      if (ev.dueDateIso >= todayIso) {
+        if (!nextUpcomingDueDateIso || ev.dueDateIso < nextUpcomingDueDateIso) {
+          nextUpcomingDueDateIso = ev.dueDateIso;
+          nextUpcomingDueDate = ev.dueDate || ev.dueDateIso;
+        }
       }
+    }
+
+    if (ev.isOverdue && !ev.isFullyPaid && ev.daysOverdue > 0) {
+      currentlyOverdueCount += 1;
+      currentlyOverdueAmount += ev.totalOutstandingWithCharges ?? ev.outstandingBalance;
     }
 
     if (
@@ -761,6 +840,12 @@ export function computeCalendarSummary(events: PaymentCalendarEvent[]): PaymentC
     if (ev.isFullyPaid) {
       paidBillsCount += 1;
       totalPaidAmount += ev.totalAmount;
+      // Part C: Settled Bills This Month uses actual settlement date (paidDateIso) in Asia/Kolkata calendar,
+      // never mixing bill issue/due months with settlement months.
+      const settledIso = ev.paidDateIso || '';
+      if (settledIso.startsWith(refYearMonth)) {
+        settledBillsThisMonthCount += 1;
+      }
     } else if (ev.isPartiallyPaid) {
       totalPaidAmount += ev.paidAmount;
     }
@@ -769,16 +854,21 @@ export function computeCalendarSummary(events: PaymentCalendarEvent[]): PaymentC
   totalPrincipalDueAmount = Number(totalPrincipalDueAmount.toFixed(2));
   totalLateChargesAmount = Number(totalLateChargesAmount.toFixed(2));
   totalDueAmountWithCharges = Number(totalDueAmountWithCharges.toFixed(2));
+  currentlyOverdueAmount = Number(currentlyOverdueAmount.toFixed(2));
 
   return {
     totalBillsCount: events.length,
     dueBillsCount,
     paidBillsCount,
+    currentlyOverdueCount,
+    currentlyOverdueAmount,
+    settledBillsThisMonthCount,
     totalDueAmount: totalDueAmountWithCharges,
     totalPrincipalDueAmount,
     totalLateChargesAmount,
     totalDueAmountWithCharges,
     totalOutstandingWithChargesInr: totalDueAmountWithCharges,
+    totalOutstandingPayable: totalDueAmountWithCharges,
     totalPaidAmount,
     nextUpcomingDueDate,
     activeFormalNoticesCount,
@@ -787,6 +877,33 @@ export function computeCalendarSummary(events: PaymentCalendarEvent[]): PaymentC
     expiredNoticeDeadlinesCount,
     eventsByConnectionNo,
   };
+}
+
+/**
+ * Sorts unsettled calendar obligations by Part C priority rules:
+ * 1. Overdue bills (ordered by earliest due date / highest urgency)
+ * 2. Bills due today
+ * 3. Upcoming unpaid bills (ordered by nearest due date)
+ * Calendar month grid dates remain chronological; this helper orders the associated obligation list.
+ */
+export function sortCalendarObligationsByPriority(
+  events: PaymentCalendarEvent[],
+  todayIso: string = '2026-11-04'
+): PaymentCalendarEvent[] {
+  const dueEvents = (events || []).filter((ev) => ev.isDue && !ev.isFullyPaid && (ev.totalOutstandingWithCharges ?? ev.outstandingBalance) > 0);
+  const getRank = (ev: PaymentCalendarEvent): 1 | 2 | 3 => {
+    if (ev.isOverdue || ev.dueDateIso < todayIso || (ev.daysOverdue ?? 0) > 0) return 1;
+    if (ev.dueDateIso === todayIso) return 2;
+    return 3;
+  };
+
+  return [...dueEvents].sort((a, b) => {
+    const rankA = getRank(a);
+    const rankB = getRank(b);
+    if (rankA !== rankB) return rankA - rankB;
+    if (a.dueDateIso !== b.dueDateIso) return a.dueDateIso.localeCompare(b.dueDateIso);
+    return (b.totalOutstandingWithCharges || 0) - (a.totalOutstandingWithCharges || 0);
+  });
 }
 
 /**

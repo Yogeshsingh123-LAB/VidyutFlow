@@ -132,7 +132,9 @@ import {
   BillingReminderType,
   ReconciledElectricityBill,
   getBillingUiTranslations,
-  buildLocalizedBillingReminderCopy
+  buildLocalizedBillingReminderCopy,
+  formatCanonicalBillStatusAndCountdown,
+  deriveBillPaymentAndNoticeTimeline,
 } from '../../utils/billingEngine';
 import {
   Zap,
@@ -343,13 +345,8 @@ export const ConsumerPortal: React.FC = () => {
   );
 
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
-  const [billingSubTab, setBillingSubTab] = useState<'list' | 'calendar'>('list');
-
-  useEffect(() => {
-    if (activeTab === 'calendar') {
-      setBillingSubTab('calendar');
-    }
-  }, [activeTab]);
+  const [billStatusFilter, setBillStatusFilter] = useState<'ALL' | 'UNPAID' | 'OVERDUE' | 'PAID' | 'PARTIALLY_PAID' | 'SCHEDULED'>('ALL');
+  const [expandedBillTimelines, setExpandedBillTimelines] = useState<Record<string, boolean>>({});
   const [selectedBillToPay, setSelectedBillToPay] = useState<string | null>(null);
   const [selectedPaymentGateway, setSelectedPaymentGateway] = useState<PaymentTransaction['paymentMethod']>('UPI / BHIM');
   const [paymentModeOption, setPaymentModeOption] = useState<'FULL' | 'PARTIAL'>('FULL');
@@ -577,6 +574,19 @@ export const ConsumerPortal: React.FC = () => {
   const selectedConnectionBillingSummary = consumerBillingSummary.selectedConnectionSummary;
   const selectedConnectionBills: ReconciledElectricityBill[] =
     selectedConnectionBillingSummary.visibleBills;
+  const selectedConnectionScheduledBills: ReconciledElectricityBill[] =
+    selectedConnectionBillingSummary.scheduledBills || [];
+  const filteredConnectionBills = useMemo(() => {
+    if (billStatusFilter === 'SCHEDULED') return [];
+    return selectedConnectionBills.filter(bill => {
+      if (billStatusFilter === 'ALL') return true;
+      if (billStatusFilter === 'UNPAID') return bill.isDue && !bill.isPaid;
+      if (billStatusFilter === 'OVERDUE') return !bill.isPaid && (bill.effectiveStatus === 'Overdue' || bill.isOverdue);
+      if (billStatusFilter === 'PAID') return bill.isPaid || bill.effectiveStatus === 'Paid';
+      if (billStatusFilter === 'PARTIALLY_PAID') return bill.isPartiallyPaid || bill.effectiveStatus === 'Partially Paid';
+      return true;
+    });
+  }, [selectedConnectionBills, billStatusFilter]);
   const selectedConnectionPayments: PaymentTransaction[] =
     selectedConnectionBillingSummary.paymentHistory;
   const currentBill: ReconciledElectricityBill | null =
@@ -625,6 +635,10 @@ export const ConsumerPortal: React.FC = () => {
       allBills: bills,
       language,
       dataSource: dataMode,
+      referenceDate: businessReferenceDate,
+      calculationTimestampIst: `${businessReferenceDate} 10:30 IST`,
+      waivers: lateChargeWaivers,
+      reversals: paymentReversals,
     });
     setActiveOfficialDocument(doc);
   };
@@ -642,6 +656,10 @@ export const ConsumerPortal: React.FC = () => {
       allBills: bills,
       language,
       dataSource: dataMode,
+      referenceDate: businessReferenceDate,
+      calculationTimestampIst: `${businessReferenceDate} 10:30 IST`,
+      waivers: lateChargeWaivers,
+      reversals: paymentReversals,
     });
     const res = triggerOfficialDocumentPdfDownload(doc);
     if (res.downloaded) {
@@ -1089,7 +1107,12 @@ export const ConsumerPortal: React.FC = () => {
           )}
 
           {/* Overdue Financial Breakdown & Daily Charges Banner (Step 4A & 4B) */}
-          {hasConnections && currentBill && (currentBill.isOverdue || currentBill.effectiveStatus === 'Overdue' || (currentBill.lateChargeBreakdown && currentBill.lateChargeBreakdown.daysOverdue > 0)) && currentBill.lateChargeBreakdown && (
+          {hasConnections &&
+            currentBill &&
+            !currentBill.isPaid &&
+            currentBill.outstandingBalance > 0.009 &&
+            (currentBill.isOverdue || currentBill.effectiveStatus === 'Overdue') &&
+            currentBill.lateChargeBreakdown && (
             <div className="space-y-1.5" data-testid="dashboard-overdue-breakdown-section">
               <OverdueBillBreakdownCard
                 breakdown={currentBill.lateChargeBreakdown}
@@ -1232,10 +1255,16 @@ export const ConsumerPortal: React.FC = () => {
                 ) : hasConnections && selectedConnection?.status === 'Active' ? (
                   <button
                     type="button"
-                    onClick={() => generateDemoBillForActiveConnection(selectedConnection.consumerNo)}
-                    className="min-h-[34px] px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/40 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors cursor-pointer"
+                    onClick={() => setActiveTab('bills')}
+                    className="min-h-[34px] px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/40 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors cursor-pointer"
                   >
-                    {bUi.generateDemoBillBtn}
+                    {language === 'gu'
+                      ? 'દ્વિ-માસિક બિલિંગ શેડ્યૂલ જુઓ'
+                      : language === 'hi'
+                      ? 'द्वि-मासिक बिलिंग अनुसूची देखें'
+                      : language === 'mr'
+                      ? 'द्वि-मासिक बिलिंग वेळापत्रक पहा'
+                      : 'View Bi-Monthly Billing Schedule'}
                   </button>
                 ) : (
                   <button
@@ -2668,14 +2697,13 @@ export const ConsumerPortal: React.FC = () => {
       )}
 
       {/* SUBVIEW 4: ELECTRICITY BILLS & PAYMENTS & SMART PAYMENT CALENDAR */}
-      {(activeTab === 'bills' || activeTab === 'quick-pay' || activeTab === 'calendar') && (
-        <div className="space-y-6">
+      {/* SUBVIEW 4A: DEDICATED ELECTRICITY BILLS & CURRENT BILLING */}
+      {(activeTab === 'bills' || activeTab === 'quick-pay') && (
+        <div className="space-y-6" data-testid="consumer-electricity-bills-view">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                {activeTab === 'calendar' || billingSubTab === 'calendar'
-                  ? (language === 'gu' ? 'સ્માર્ટ ચુકવણી કેલેન્ડર' : language === 'hi' ? 'स्मार्ट भुगतान कैलेंडर' : language === 'mr' ? 'स्मार्ट देयक दिनदर्शिका' : 'Smart Payment Calendar')
-                  : tc.billsTitle}
+                {tc.billsTitle}
               </h2>
               <p className="text-xs text-slate-500">
                 {selectedConnection ? (
@@ -2687,65 +2715,61 @@ export const ConsumerPortal: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
-              <div className="inline-flex items-center p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBillingSubTab('list');
-                    if (activeTab === 'calendar') setActiveTab('bills');
-                  }}
-                  data-testid="toggle-bill-list-view"
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    billingSubTab === 'list' && activeTab !== 'calendar'
-                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                  }`}
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>{language === 'gu' ? 'બિલ યાદી' : language === 'hi' ? 'बिल सूची' : language === 'mr' ? 'बिल यादी' : 'Bill List'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBillingSubTab('calendar');
-                    if (activeTab !== 'calendar') setActiveTab('calendar');
-                  }}
-                  data-testid="toggle-smart-payment-calendar"
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    billingSubTab === 'calendar' || activeTab === 'calendar'
-                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                  }`}
-                >
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>{language === 'gu' ? 'સ્માર્ટ ચુકવણી કેલેન્ડર' : language === 'hi' ? 'स्मार्ट भुगतान कैलेंडर' : language === 'mr' ? 'स्मार्ट देयक दिनदर्शिका' : 'Smart Payment Calendar'}</span>
-                </button>
-              </div>
-
-              {hasConnections && selectedConnection?.status === 'Active' && (
-                <button
-                  type="button"
-                  data-testid="generate-bimonthly-demo-bill-btn"
-                  onClick={() =>
-                    generateDemoBillForActiveConnection(
-                      selectedConnection.consumerNo,
-                      undefined,
-                      { billingCycleType: 'BI_MONTHLY' }
-                    )
-                  }
-                  className="px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/50 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Receipt className="w-3.5 h-3.5" />
-                  <span>{bUi.generateDemoBiMonthlyBillBtn}</span>
-                </button>
-              )}
+              <span
+                data-testid="bimonthly-automatic-schedule-badge"
+                className="px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-xs font-semibold inline-flex items-center gap-1.5"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>
+                  {language === 'gu'
+                    ? 'આપોઆપ દ્વિ-માસિક બિલિંગ ચક્ર (2-Month Cycle)'
+                    : language === 'hi'
+                    ? 'स्वचालित द्वि-मासिक बिलिंग चक्र (2-Month Cycle)'
+                    : language === 'mr'
+                    ? 'स्वयंचलित द्वि-मासिक बिलिंग चक्र (2-Month Cycle)'
+                    : 'Automatic Bi-Monthly (2-Month) Billing Schedule'}
+                </span>
+              </span>
 
               <ExportMenu
                 datasetKey="bills"
-                filteredRecords={selectedConnectionBills}
+                filteredRecords={filteredConnectionBills}
                 allAuthorizedRecords={consumerBillingSummary.allAccountReconciledBills}
               />
             </div>
+          </div>
+
+          {/* Useful Status Filter Bar */}
+          <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+            {[
+              { id: 'ALL' as const, label: language === 'gu' ? 'બધા બિલ' : language === 'hi' ? 'सभी बिल' : language === 'mr' ? 'सर्व बिले' : 'All Bills', count: selectedConnectionBills.length },
+              { id: 'UNPAID' as const, label: language === 'gu' ? 'બાકી અને ચાલુ' : language === 'hi' ? 'अदत्त एवं देय' : language === 'mr' ? 'थकीत आणि देय' : 'Unpaid & Due', count: selectedConnectionBills.filter(b => b.isDue && !b.isPaid).length },
+              { id: 'OVERDUE' as const, label: language === 'gu' ? 'મુદતવીતી' : language === 'hi' ? 'अतिदेय' : language === 'mr' ? 'मुदतबाह्य' : 'Overdue', count: selectedConnectionBills.filter(b => !b.isPaid && (b.effectiveStatus === 'Overdue' || b.isOverdue)).length },
+              { id: 'PAID' as const, label: language === 'gu' ? 'ચૂકવેલ' : language === 'hi' ? 'भुगतान पूर्ण' : language === 'mr' ? 'भरलेले' : 'Paid', count: selectedConnectionBills.filter(b => b.isPaid || b.effectiveStatus === 'Paid').length },
+              { id: 'PARTIALLY_PAID' as const, label: language === 'gu' ? 'અંશતઃ ચૂકવેલ' : language === 'hi' ? 'आंशिक भुगतान' : language === 'mr' ? 'अंशतः भरलेले' : 'Partially Paid', count: selectedConnectionBills.filter(b => b.isPartiallyPaid || b.effectiveStatus === 'Partially Paid').length },
+              { id: 'SCHEDULED' as const, label: language === 'gu' ? 'નિર્ધારિત (Scheduled)' : language === 'hi' ? 'निर्धारित (Scheduled)' : language === 'mr' ? 'नियोजित (Scheduled)' : 'Scheduled', count: selectedConnectionScheduledBills.length },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                data-testid={`bill-filter-${tab.id.toLowerCase()}`}
+                onClick={() => setBillStatusFilter(tab.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  billStatusFilter === tab.id
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  billStatusFilter === tab.id
+                    ? 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
+                    : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                }`}>
+                  {tab.count}
+                </span>
+              </button>
+            ))}
           </div>
 
           {hasConnections && consumerBillingSummary.otherConnectionsWithDueBills.length > 0 && (
@@ -2780,25 +2804,31 @@ export const ConsumerPortal: React.FC = () => {
             </div>
           )}
 
-          {(billingSubTab === 'calendar' || activeTab === 'calendar') ? (
-            <SmartPaymentCalendar
-              bills={consumerBillingSummary.allAccountReconciledBills}
-              connections={consumerConnections}
-              payments={consumerPayments}
-              formalNotices={formalNotices}
-              waivers={lateChargeWaivers}
-              reversals={paymentReversals}
-              referenceDate={businessReferenceDate}
-              language={language}
-              selectedConnectionNo={selectedConnection?.consumerNo}
-              onSelectConnection={(no) => setSelectedConnectionNo(no)}
-              onViewBill={(b) => handleViewElectricityBill(b)}
-              onPayBill={(bNo) => handlePayClick(bNo)}
-            />
-          ) : (
-            <div className="space-y-4">
-              {selectedConnectionBills.length > 0 ? (
-              selectedConnectionBills.map(bill => (
+          <div className="space-y-4">
+            {filteredConnectionBills.length > 0 ? (
+              filteredConnectionBills.map(bill => {
+                const statusCountdown = formatCanonicalBillStatusAndCountdown(
+                  bill,
+                  businessReferenceDate,
+                  language
+                );
+                const linkedFormalNotice =
+                  formalNotices.find(n => n.billNo === bill.billNo) || null;
+                const billTimeline = !bill.isPaid
+                  ? deriveBillPaymentAndNoticeTimeline({
+                      bill,
+                      referenceDate: businessReferenceDate,
+                      formalNotice: linkedFormalNotice,
+                      language,
+                    })
+                  : null;
+                const canonicalCurrentPayable = bill.isPaid
+                  ? 0
+                  : bill.lateChargeBreakdown?.totalOutstandingPayable ??
+                    bill.totalOutstandingWithCharges ??
+                    bill.outstandingBalance;
+
+                return (
                 <div
                   key={bill.billNo}
                   data-testid={`bill-card-${bill.billNo}`}
@@ -2811,6 +2841,7 @@ export const ConsumerPortal: React.FC = () => {
                           {bill.billNo}
                         </span>
                         <span
+                          data-testid={`bill-status-badge-${bill.billNo}`}
                           className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
                             bill.effectiveStatus === 'Paid'
                               ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
@@ -2821,6 +2852,26 @@ export const ConsumerPortal: React.FC = () => {
                         >
                           {localizeBillStatus(bill.effectiveStatus, language)}
                         </span>
+                        <span
+                          data-testid={`bill-countdown-badge-${bill.billNo}`}
+                          className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                            statusCountdown.statusCode === 'PAID'
+                              ? 'bg-emerald-50/80 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                              : statusCountdown.statusCode === 'OVERDUE'
+                              ? 'bg-rose-50/80 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                              : 'bg-amber-50/80 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                          }`}
+                        >
+                          {statusCountdown.combinedStatusLabel}
+                        </span>
+                        {statusCountdown.historicalLateSettlementNote && (
+                          <span
+                            data-testid={`bill-historical-late-note-${bill.billNo}`}
+                            className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                          >
+                            {statusCountdown.historicalLateSettlementNote}
+                          </span>
+                        )}
                         <span
                           className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
                             bill.billingCycleType === 'BI_MONTHLY'
@@ -2838,7 +2889,7 @@ export const ConsumerPortal: React.FC = () => {
                         )}
                       </div>
                       <span className="text-xs text-slate-500 block mt-0.5">
-                        {tc.monthLabel} {localizeBillMonth(bill.billMonth, language)}
+                        {tc.connectionLabel} {bill.consumerNo} · {tc.meterLabel} {selectedConnection?.meterNo || 'UG-SM-REGISTERED'} · {tc.monthLabel} {localizeBillMonth(bill.billMonth, language)}
                         {bill.periodStartDate && bill.periodEndDate
                           ? ` (${bill.periodStartDate} – ${bill.periodEndDate})`
                           : ''}{' '}
@@ -2846,9 +2897,56 @@ export const ConsumerPortal: React.FC = () => {
                       </span>
                       {bill.isPartiallyPaid && (
                         <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400 block mt-1">
-                          {bUi.paidAmountLabel}: ₹{bill.paidAmount.toLocaleString('en-IN')} · {bUi.remainingBalanceLabel}: ₹{bill.outstandingBalance.toLocaleString('en-IN')}
+                          {bUi.paidAmountLabel}: ₹{bill.paidAmount.toLocaleString('en-IN')} · {bUi.remainingBalanceLabel}: ₹{canonicalCurrentPayable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       )}
+
+                      {/* Itemized Financial Trail (Step 4D) */}
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 text-xs mt-2 font-mono">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block font-sans">
+                            {language === 'gu' ? 'મૂળ રકમ' : language === 'hi' ? 'मूल राशि' : language === 'mr' ? 'मूळ रक्कम' : 'Original Bill'}
+                          </span>
+                          <span className="font-semibold text-slate-900 dark:text-white">
+                            ₹{bill.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block font-sans">
+                            {language === 'gu' ? 'ચૂકવેલ' : language === 'hi' ? 'चुकाया गया' : language === 'mr' ? 'भरलेले' : 'Settled'}
+                          </span>
+                          <span className={`font-semibold ${bill.paidAmount > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'}`}>
+                            ₹{bill.paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block font-sans">
+                            {language === 'gu' ? 'બાકી મુદ્દલ' : language === 'hi' ? 'शेष मूलधन' : language === 'mr' ? 'शिल्लक मुद्दल' : 'Remaining Principal'}
+                          </span>
+                          <span className="font-semibold text-slate-900 dark:text-white">
+                            ₹{(bill.isPaid ? 0 : (bill.lateChargeBreakdown?.remainingPrincipal ?? bill.outstandingBalance)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block font-sans">
+                            {language === 'gu' ? 'વિલંબિત સરચાર્જ' : language === 'hi' ? 'विलंब अधिभार' : language === 'mr' ? 'विलंब अधिभार' : 'DPS Late Charges'}
+                          </span>
+                          <span className={`font-semibold ${!bill.isPaid && (bill.lateChargeBreakdown?.netLateChargesPayable ?? 0) > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500'}`}>
+                            +₹{(bill.isPaid ? 0 : (bill.lateChargeBreakdown?.netLateChargesPayable ?? 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block font-sans">
+                            {language === 'gu' ? 'કુલ બાકી' : language === 'hi' ? 'कुल बकाया' : language === 'mr' ? 'एकूण बाकी' : 'Current Outstanding'}
+                          </span>
+                          <span
+                            data-testid={`bill-current-outstanding-${bill.billNo}`}
+                            className={`font-extrabold ${bill.isPaid || canonicalCurrentPayable <= 0.009 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}
+                          >
+                            ₹{canonicalCurrentPayable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2.5 flex-wrap">
@@ -2856,8 +2954,11 @@ export const ConsumerPortal: React.FC = () => {
                         <span className="text-xs text-slate-400 block text-[11px]">
                           {bill.isPartiallyPaid ? bUi.remainingBalanceLabel : tc.payableAmountLabel}
                         </span>
-                        <span className="text-lg font-extrabold text-slate-900 dark:text-white font-mono">
-                          ₹{(bill.isPartiallyPaid ? bill.outstandingBalance : bill.totalAmount).toLocaleString('en-IN')}
+                        <span
+                          data-testid={`bill-header-payable-${bill.billNo}`}
+                          className="text-lg font-extrabold text-slate-900 dark:text-white font-mono"
+                        >
+                          ₹{canonicalCurrentPayable.toLocaleString('en-IN', { minimumFractionDigits: canonicalCurrentPayable % 1 !== 0 ? 2 : 0, maximumFractionDigits: 2 })}
                         </span>
                       </div>
 
@@ -2896,7 +2997,7 @@ export const ConsumerPortal: React.FC = () => {
                         <span>{language === 'gu' ? 'QR ચકાસણી' : language === 'hi' ? 'QR सत्यापन' : language === 'mr' ? 'QR पडताळणी' : 'Verify QR'}</span>
                       </button>
 
-                      {bill.isDue && (
+                      {!bill.isPaid && canonicalCurrentPayable > 0 && bill.isDue && (
                         <button
                           type="button"
                           onClick={() => handlePayClick(bill.billNo)}
@@ -2955,9 +3056,144 @@ export const ConsumerPortal: React.FC = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Part G: Compact & Expandable 10-Item Payment, Notice & Disconnection-Review Timeline for Unsettled Bills */}
+                  {billTimeline && (
+                    <div
+                      data-testid={`bill-timeline-section-${bill.billNo}`}
+                      className="p-3.5 rounded-lg bg-amber-50/40 dark:bg-slate-900/70 border border-amber-200/70 dark:border-slate-800 space-y-2.5 text-xs"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                          <span>Payment, Statutory Notice & Disconnection-Review Summary</span>
+                        </span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            data-testid={`bill-timeline-notice-status-${bill.billNo}`}
+                            className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-200/80 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                          >
+                            Notice Status: {billTimeline.item6_formalNoticeStatus}
+                          </span>
+                          <button
+                            type="button"
+                            data-testid={`toggle-full-bill-timeline-${bill.billNo}`}
+                            aria-expanded={Boolean(expandedBillTimelines[bill.billNo])}
+                            onClick={() =>
+                              setExpandedBillTimelines(prev => ({
+                                ...prev,
+                                [bill.billNo]: !prev[bill.billNo],
+                              }))
+                            }
+                            className="px-2.5 py-1 rounded-md border border-amber-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-amber-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                          >
+                            {expandedBillTimelines[bill.billNo]
+                              ? 'Hide Full Payment & Notice Timeline'
+                              : 'View Full Payment & Notice Timeline'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {billTimeline.noticeDeadlineSummaryBanner && (
+                        <div
+                          data-testid={`bill-timeline-notice-banner-${bill.billNo}`}
+                          className="px-2.5 py-1.5 rounded bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 font-semibold text-[11px]"
+                        >
+                          {billTimeline.noticeDeadlineSummaryBanner}
+                        </div>
+                      )}
+
+                      {/* Compact Summary Strip (Default View) */}
+                      <div
+                        data-testid={`bill-timeline-compact-${bill.billNo}`}
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-[11px]"
+                      >
+                        <div>
+                          <span className="text-slate-400 block">Payment Status</span>
+                          <span className="font-mono font-bold text-rose-700 dark:text-rose-300">
+                            {billTimeline.item4_dueOrOverdueCountdownLabel}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">Original Due Date</span>
+                          <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                            {billTimeline.item3_originalDueDate}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">Current Outstanding</span>
+                          <span className="font-mono font-extrabold text-rose-700 dark:text-rose-300">
+                            ₹{canonicalCurrentPayable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">DPS Status</span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">
+                            {billTimeline.item5_dpsGracePeriodStatusLabel}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">Active Notice Deadline</span>
+                          <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                            {billTimeline.item8_noticePaymentCureDeadlineLabel}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Expandable Full 10-Item Statutory Timeline */}
+                      {expandedBillTimelines[bill.billNo] && (
+                        <div
+                          data-testid={`bill-timeline-full-10-items-${bill.billNo}`}
+                          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-[11px] pt-2.5 border-t border-amber-200/60 dark:border-slate-800"
+                        >
+                          <div>
+                            <span className="text-slate-400 block">1. Billing Period</span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">{billTimeline.item1_billingPeriod}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block">2. Bill Issue Date</span>
+                            <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{billTimeline.item2_billIssueDate}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block">3. Original Due Date</span>
+                            <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{billTimeline.item3_originalDueDate}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block">4. Due / Overdue Countdown</span>
+                            <span className="font-mono font-bold text-rose-700 dark:text-rose-300">{billTimeline.item4_dueOrOverdueCountdownLabel}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block">5. DPS / Grace Status</span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">{billTimeline.item5_dpsGracePeriodStatusLabel}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block">6. Formal Notice Status</span>
+                            <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{billTimeline.item6_formalNoticeStatus}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block">7. Notice Issue & Service</span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">{billTimeline.item7_noticeIssueAndServiceDateLabel}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block">8. Notice Payment Deadline</span>
+                            <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{billTimeline.item8_noticePaymentCureDeadlineLabel}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block">9. Notice Cure Window</span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">{billTimeline.item9_noticePeriodDaysRemainingOrElapsedLabel}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block">10. Disconnection-Review Status</span>
+                            <span className="font-semibold text-emerald-700 dark:text-emerald-300">{billTimeline.item10_authorizedDisconnectionReviewStatusLabel}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              ))
-            ) : (
+                );
+              })
+            ) : billStatusFilter !== 'SCHEDULED' ? (
               <div
                 data-testid="bills-empty-state-card"
                 className="p-8 text-center rounded-xl bg-white dark:bg-[#101C35] border border-dashed border-slate-200 dark:border-slate-800 space-y-3"
@@ -2971,32 +3207,6 @@ export const ConsumerPortal: React.FC = () => {
                     ? bUi.noBillsForConnectionDesc
                     : tc.noBillsFoundUnlinkedDesc}
                 </p>
-                {hasConnections && selectedConnection?.status === 'Active' && (
-                  <div className="pt-1 flex flex-wrap items-center justify-center gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => generateDemoBillForActiveConnection(selectedConnection.consumerNo)}
-                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
-                    >
-                      <Receipt className="w-3.5 h-3.5" />
-                      <span>{bUi.generateDemoBillBtn}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        generateDemoBillForActiveConnection(
-                          selectedConnection.consumerNo,
-                          undefined,
-                          { billingCycleType: 'BI_MONTHLY' }
-                        )
-                      }
-                      className="px-4 py-2 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
-                    >
-                      <Receipt className="w-3.5 h-3.5" />
-                      <span>{bUi.generateDemoBiMonthlyBillBtn}</span>
-                    </button>
-                  </div>
-                )}
                 {!hasConnections && (
                   <button
                     type="button"
@@ -3008,15 +3218,133 @@ export const ConsumerPortal: React.FC = () => {
                   </button>
                 )}
               </div>
-            )}
+            ) : null}
+
+            {/* Read-Only Upcoming Billing Schedule Section (SCHEDULED_NOT_ISSUED Bi-Monthly Cycles) */}
+            {(billStatusFilter === 'ALL' || billStatusFilter === 'SCHEDULED') &&
+              selectedConnectionScheduledBills.length > 0 && (
+                <div
+                  data-testid="upcoming-bimonthly-schedule-section"
+                  className="p-5 rounded-xl bg-slate-50/90 dark:bg-[#0D172B] border border-slate-200/90 dark:border-slate-800 space-y-4"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200/70 dark:border-slate-800">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Calendar className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                          {language === 'gu'
+                            ? 'આગામી દ્વિ-માસિક બિલિંગ શેડ્યૂલ (માત્ર માહિતી માટે — હજુ બિલ જારી થયું નથી)'
+                            : language === 'hi'
+                            ? 'आगामी द्वि-मासिक बिलिंग अनुसूची (केवल सूचना — अभी बिल जारी नहीं हुआ है)'
+                            : language === 'mr'
+                            ? 'आगामी द्वि-मासिक बिलिंग वेळापत्रक (केवळ माहिती — अद्याप बिल जारी नाही)'
+                            : 'Upcoming Billing Schedule (Bi-Monthly 2-Calendar-Month Cycles — Read-Only)'}
+                        </h3>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        {language === 'gu'
+                          ? 'આ ભવિષ્યના બિલિંગ ચક્રો છે. સત્તાવાર બિલ જારી તારીખે મીટર રીડિંગ પછી જ રકમ નક્કી થશે અને ચૂકવવાપાત્ર બનશે.'
+                          : language === 'hi'
+                          ? 'ये आगामी निर्धारित बिलिंग चक्र हैं। आधिकारिक बिल जारी होने की तिथि पर मीटर रीडिंग के बाद ही देय राशि निर्धारित होगी।'
+                          : language === 'mr'
+                          ? 'ही आगामी नियोजित बिलिंग चक्रे आहेत. अधिकृत बिल जारी होण्याच्या तारखेला मीटर रीडिंगनंतरच देय रक्कम निश्चित केली जाईल.'
+                          : 'Future bi-monthly cycles are shown for planning only. Meter readings and payable amounts are finalized on each cycle’s official issue date.'}
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shrink-0">
+                      {selectedConnectionScheduledBills.length} Scheduled Cycles · ₹0.00 Payable Now
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                    {selectedConnectionScheduledBills.map(sched => {
+                      const schedStatus = formatCanonicalBillStatusAndCountdown(
+                        sched,
+                        businessReferenceDate,
+                        language
+                      );
+                      return (
+                        <div
+                          key={sched.billNo}
+                          data-testid={`scheduled-bill-card-${sched.billNo}`}
+                          className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 space-y-2.5"
+                        >
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span
+                              data-testid={`scheduled-cycle-badge-${sched.billNo}`}
+                              className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-slate-700"
+                            >
+                              {schedStatus.combinedStatusLabel}
+                            </span>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300">
+                              {localizeBillingCycleShortBadge(sched.billingCycleType, language)}
+                            </span>
+                          </div>
+
+                          <div>
+                            <div className="text-sm font-bold text-slate-900 dark:text-white">
+                              {localizeBillMonth(sched.billMonth, language)}
+                            </div>
+                            <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                              {sched.billingPeriodLabel}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+                            <div>
+                              <span className="text-[10px] text-slate-400 block uppercase font-semibold">
+                                Expected Issue Date
+                              </span>
+                              <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                                {sched.billDate}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-400 block uppercase font-semibold">
+                                Expected Due Date
+                              </span>
+                              <span className="font-mono font-semibold text-slate-600 dark:text-slate-400">
+                                {sched.dueDate}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="pt-1 text-[11px] text-slate-500 dark:text-slate-400 italic">
+                            Not yet issued — Meter reading & tariff assessment pending until {sched.billDate}.
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
           </div>
-        )}
-      </div>
-    )}
+        </div>
+      )}
+
+      {/* SUBVIEW 4B: DEDICATED SMART PAYMENT CALENDAR */}
+      {activeTab === 'calendar' && (
+        <div className="space-y-6" data-testid="consumer-payment-calendar-view">
+          <SmartPaymentCalendar
+            bills={consumerBillingSummary.allAccountReconciledBills}
+            connections={consumerConnections}
+            payments={consumerPayments}
+            formalNotices={formalNotices}
+            waivers={lateChargeWaivers}
+            reversals={paymentReversals}
+            referenceDate={businessReferenceDate}
+            language={language}
+            selectedConnectionNo={selectedConnection?.consumerNo}
+            onSelectConnection={(no) => setSelectedConnectionNo(no)}
+            onViewBill={(b) => handleViewElectricityBill(b)}
+            onPayBill={(bNo) => handlePayClick(bNo)}
+          />
+        </div>
+      )}
 
       {/* SUBVIEW 5: PAYMENT HISTORY */}
-      {activeTab === 'payments' && (
-        <div className="space-y-6 min-w-0">
+      {(activeTab === 'payments' || activeTab === 'history') && (
+        <div className="space-y-6 min-w-0" data-testid="consumer-payment-history-view">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
