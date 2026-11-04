@@ -305,6 +305,27 @@ export class ServerDataStore {
   /**
    * Returns the set of consumer connection numbers owned by a specific consumer `userId`.
    */
+  public getConsumerConnectionsForUser(userId: string): ElectricityConnection[] {
+    const owned = this.getOwnedConsumerNumbers(userId);
+    return deepClone(
+      this.connections.filter(c => c.accountId === userId || owned.has(c.consumerNo))
+    );
+  }
+
+  public linkConsumerConnection(userId: string, consumerNo: string): ElectricityConnection {
+    const conn = this.connections.find(c => c.consumerNo === consumerNo);
+    if (!conn) {
+      throw new AuthSecurityError(400, 'CONNECTION_NOT_FOUND', "Connection " + consumerNo + " not found.");
+    }
+    let set = this.accountLinkedConnections.get(userId);
+    if (!set) {
+      set = new Set();
+      this.accountLinkedConnections.set(userId, set);
+    }
+    set.add(consumerNo);
+    return deepClone(conn);
+  }
+
   public getOwnedConsumerNumbers(userId: string): ReadonlySet<string> {
     const set = new Set<string>(this.accountLinkedConnections.get(userId) || []);
     for (const conn of this.connections) {

@@ -220,9 +220,10 @@ export type FetchLike = typeof fetch;
  * Never falls back to client-side authentication if the server rejects or fails.
  */
 export async function loginWithServerApi(
-  email: string,
+  identifier: string,
   password: string,
   targetRole: UserRole,
+  mfaCodeOrFetch?: string | FetchLike,
   fetchImpl: FetchLike = fetch
 ): Promise<{
   success: boolean;
@@ -230,9 +231,18 @@ export async function loginWithServerApi(
   error?: string;
   statusCode?: number;
   code?: string;
+  mfaRequired?: boolean;
 }> {
+  let effectiveFetch = fetchImpl;
+  let effectiveMfaCode: string | undefined = undefined;
+  if (typeof mfaCodeOrFetch === 'function') {
+    effectiveFetch = mfaCodeOrFetch;
+  } else if (typeof mfaCodeOrFetch === 'string') {
+    effectiveMfaCode = mfaCodeOrFetch;
+  }
+
   try {
-    const response = await fetchImpl('/api/auth/login', {
+    const response = await effectiveFetch('/api/auth/login', {
       method: 'POST',
       credentials: 'same-origin',
       headers: {
@@ -240,9 +250,13 @@ export async function loginWithServerApi(
         'X-VidyutFlow-CSRF': '1'
       },
       body: JSON.stringify({
-        email: email.trim(),
+        email: identifier.trim(),
+        username: identifier.trim(),
+        employeeId: identifier.trim(),
         password,
-        targetRole
+        targetRole,
+        mfa_code: effectiveMfaCode?.trim() || undefined,
+        mfaCode: effectiveMfaCode?.trim() || undefined
       })
     });
 
@@ -525,6 +539,188 @@ export async function loginWithSimulatedSsoApi(
     return {
       success: false,
       error: 'Unable to reach /api/auth/sso server endpoint.'
+    };
+  }
+}
+
+/**
+ * Fetches an uncopyable, bot-resistant security CAPTCHA with tamper-proof HMAC nonce.
+ */
+export async function fetchCaptcha(
+  fetchImpl: FetchLike = fetch
+): Promise<{
+  success: boolean;
+  captchaToken?: string;
+  captchaSvg?: string;
+  expiresInSeconds?: number;
+  error?: string;
+}> {
+  try {
+    const response = await fetchImpl('/api/auth/captcha', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.captcha_token) {
+      return {
+        success: false,
+        error: data.detail || data.error || 'Failed to generate security CAPTCHA.'
+      };
+    }
+    return {
+      success: true,
+      captchaToken: data.captcha_token,
+      captchaSvg: data.captcha_svg,
+      expiresInSeconds: data.expires_in_seconds || 180
+    };
+  } catch {
+    return {
+      success: false,
+      error: 'Unable to reach the CAPTCHA service. Please check your network connection.'
+    };
+  }
+}
+
+export interface SendConsumerOtpParams {
+  mobileNumber: string;
+  captchaToken?: string;
+  captchaAnswer?: string;
+  consumerNo?: string;
+  discom?: string;
+}
+
+/**
+ * Initiates single-use OTP delivery for Consumer verification.
+ */
+export async function sendConsumerLoginOtp(
+  arg1: string | SendConsumerOtpParams,
+  arg2?: string,
+  arg3?: string,
+  arg4?: FetchLike
+): Promise<{
+  success: boolean;
+  status?: string;
+  consumerNo?: string;
+  maskedMobile?: string;
+  expiresInSeconds?: number;
+  cooldownSeconds?: number;
+  devSimulationOtp?: string;
+  message?: string;
+  error?: string;
+}> {
+  let mobileNumber = '';
+  let consumerNo: string | undefined;
+  let captchaToken: string | undefined;
+  let captchaAnswer: string | undefined;
+  let discom = 'UGVCL';
+  let fetchImpl: FetchLike = fetch;
+
+  if (typeof arg1 === 'object') {
+    mobileNumber = arg1.mobileNumber;
+    consumerNo = arg1.consumerNo;
+    captchaToken = arg1.captchaToken;
+    captchaAnswer = arg1.captchaAnswer;
+    discom = arg1.discom || 'UGVCL';
+    if (typeof arg2 === 'function') fetchImpl = arg2 as any;
+  } else {
+    // Positional signature: (consumerNo, mobileNumber, discom, fetchImpl)
+    if (arg2 !== undefined && typeof arg2 === 'string') {
+      consumerNo = arg1;
+      mobileNumber = arg2;
+      if (arg3 && typeof arg3 === 'string') discom = arg3;
+      if (typeof arg4 === 'function') fetchImpl = arg4;
+    } else {
+      mobileNumber = arg1;
+    }
+  }
+
+  try {
+    const payload: any = {
+      mobile_number: mobileNumber.trim(),
+      discom
+    };
+    if (consumerNo) payload.consumer_no = consumerNo.trim();
+    if (captchaToken) payload.captcha_token = captchaToken.trim();
+    if (captchaAnswer) payload.captcha_answer = captchaAnswer.trim();
+
+    const response = await fetchImpl('/api/auth/consumer/otp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-VidyutFlow-CSRF': '1' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) {
+      return {
+        success: false,
+        error: data.detail || data.error || 'Failed to send OTP. Please check your registered mobile and security captcha.'
+      };
+    }
+    return {
+      success: true,
+      status: data.status,
+      consumerNo: data.consumer_no,
+      maskedMobile: data.masked_mobile,
+      expiresInSeconds: data.expires_in_seconds,
+      cooldownSeconds: data.cooldown_seconds,
+      devSimulationOtp: data.dev_simulation_otp,
+      message: data.message
+    };
+  } catch {
+    return {
+      success: false,
+      error: 'Unable to connect to authentication server. Please verify your connection.'
+    };
+  }
+}
+
+/**
+ * Verifies Consumer OTP and establishes authenticated session.
+ */
+export async function verifyConsumerLoginOtp(
+  mobileOrConsumerNo: string,
+  otp: string,
+  fetchImpl: FetchLike = fetch
+): Promise<{
+  success: boolean;
+  session?: DemoSession;
+  error?: string;
+  code?: string;
+}> {
+  try {
+    const trimmed = mobileOrConsumerNo.trim();
+    const isMobile = /^\d{10}$/.test(trimmed.replace(/\D/g, ''));
+    const payload: any = {
+      otp: otp.trim()
+    };
+    if (isMobile) {
+      payload.mobile_number = trimmed;
+    } else {
+      payload.consumer_no = trimmed;
+    }
+
+    const response = await fetchImpl('/api/auth/consumer/otp/verify', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-VidyutFlow-CSRF': '1' },
+      body: JSON.stringify(payload)
+    });
+    const data = (await response.json().catch(() => ({}))) as ServerAuthApiPayload;
+    if (!response.ok || !data.authenticated) {
+      return {
+        success: false,
+        error: (data as any).detail || data.error || 'Invalid or expired verification code.',
+        code: data.code
+      };
+    }
+    const session = toClientSessionFromServerPayload(data);
+    if (!session) {
+      return { success: false, error: 'Malformed authentication response.' };
+    }
+    return { success: true, session };
+  } catch {
+    return {
+      success: false,
+      error: 'Unable to reach the verification server. Please try again.'
     };
   }
 }

@@ -600,44 +600,7 @@ export const EnterpriseAccountMenu: React.FC<EnterpriseAccountMenuProps> = ({
 
           {/* Optional Dev Mode Controls & Subtle Platform Attribution */}
           <div className="px-3 py-2 bg-slate-50/70 space-y-1.5">
-            {isDevAuthModeSwitchEnabled() && (
-              <div className="space-y-1.5 pb-1 border-b border-slate-200/60">
-                <div className="flex items-center justify-between text-[10px]">
-                  <span className="font-mono uppercase text-slate-400">Dev Auth Mode:</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      setAuthMode(authMode === 'server' ? 'demo' : 'server');
-                    }}
-                    className={`font-semibold px-2 py-0.5 rounded border cursor-pointer ${
-                      authMode === 'server'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : 'bg-amber-50 text-amber-700 border-amber-200'
-                    }`}
-                  >
-                    {authMode === 'server' ? 'Server (/api/auth)' : 'Client Demo'}
-                  </button>
-                </div>
-                <div className="flex items-center justify-between text-[10px]">
-                  <span className="font-mono uppercase text-slate-400">ERP Data Mode:</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      setDataMode(dataMode === 'DEMO' ? 'LIVE' : 'DEMO');
-                    }}
-                    className={`font-semibold px-2 py-0.5 rounded border cursor-pointer ${
-                      dataMode === 'LIVE'
-                        ? 'bg-purple-50 text-purple-700 border-purple-200'
-                        : 'bg-blue-50 text-blue-700 border-blue-200'
-                    }`}
-                  >
-                    {dataMode === 'LIVE' ? 'LIVE (/api/v1 DB)' : 'DEMO (Simulated)'}
-                  </button>
-                </div>
-              </div>
-            )}
+            
             <div className="text-[10px] text-slate-400 text-center leading-tight">
               VidyutFlow · Independent UGVCL-Inspired ERP Prototype
             </div>

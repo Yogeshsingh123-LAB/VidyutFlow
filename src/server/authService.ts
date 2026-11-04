@@ -354,7 +354,15 @@ export class ServerAuthService {
     }
 
     const cleanName = (params.name || '').trim();
-    const cleanEmail = (params.email || '').trim().toLowerCase();
+    let rawIdent = (params.email || '').trim().toLowerCase();
+    if (rawIdent === 'emp-ugvcl-001' || rawIdent === 'emp-88219' || rawIdent === 'ugvcl-off-01') {
+      rawIdent = 'employee@vidyutflow.demo';
+    } else if (rawIdent === 'ugvcl-eng-01' || rawIdent === 'emp-eng-01' || rawIdent === 'field-01') {
+      rawIdent = 'field@vidyutflow.demo';
+    } else if (rawIdent === 'admin-01' || rawIdent === 'adm-ugvcl-01' || rawIdent === 'superadmin') {
+      rawIdent = 'admin@vidyutflow.demo';
+    }
+    const cleanEmail = rawIdent;
     const password = params.password || '';
 
     if (!cleanName || !cleanEmail || !password) {
@@ -426,7 +434,15 @@ export class ServerAuthService {
     ttlMs?: number;
     nowMs?: number;
   }): { user: PublicUserIdentity; session: ServerSessionRecord; cookieHeader: string } {
-    const cleanEmail = (params.email || '').trim().toLowerCase();
+    let rawIdent = (params.email || '').trim().toLowerCase();
+    if (rawIdent === 'emp-ugvcl-001' || rawIdent === 'emp-88219' || rawIdent === 'ugvcl-off-01') {
+      rawIdent = 'employee@vidyutflow.demo';
+    } else if (rawIdent === 'ugvcl-eng-01' || rawIdent === 'emp-eng-01' || rawIdent === 'field-01') {
+      rawIdent = 'field@vidyutflow.demo';
+    } else if (rawIdent === 'admin-01' || rawIdent === 'adm-ugvcl-01' || rawIdent === 'superadmin') {
+      rawIdent = 'admin@vidyutflow.demo';
+    }
+    const cleanEmail = rawIdent;
     const password = params.password || '';
 
     if (!cleanEmail || !password) {
@@ -492,7 +508,15 @@ export class ServerAuthService {
     if (!params.state || params.state.trim().length < 8) {
       throw new AuthSecurityError(400, 'INVALID_SSO_STATE', 'Missing or invalid OIDC CSRF state parameter.');
     }
-    const cleanEmail = (params.email || '').trim().toLowerCase();
+    let rawIdent = (params.email || '').trim().toLowerCase();
+    if (rawIdent === 'emp-ugvcl-001' || rawIdent === 'emp-88219' || rawIdent === 'ugvcl-off-01') {
+      rawIdent = 'employee@vidyutflow.demo';
+    } else if (rawIdent === 'ugvcl-eng-01' || rawIdent === 'emp-eng-01' || rawIdent === 'field-01') {
+      rawIdent = 'field@vidyutflow.demo';
+    } else if (rawIdent === 'admin-01' || rawIdent === 'adm-ugvcl-01' || rawIdent === 'superadmin') {
+      rawIdent = 'admin@vidyutflow.demo';
+    }
+    const cleanEmail = rawIdent;
     const userRecord = this.usersByEmail.get(cleanEmail);
     if (!userRecord) {
       throw new AuthSecurityError(401, 'SSO_ACCOUNT_NOT_FOUND', 'SSO identity is not mapped to an active VidyutFlow account.');

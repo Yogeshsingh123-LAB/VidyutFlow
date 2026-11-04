@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useId } from 'react';
+import React, { useState, useEffect, useId, useRef, useCallback } from 'react';
 import {
   X,
   LogIn,
@@ -7,74 +7,73 @@ import {
   EyeOff,
   Briefcase,
   Wrench,
-  LineChart,
   ShieldCheck,
   Users,
   ArrowRight,
-  Info,
-  AlertTriangle,
   Lock,
   Mail,
   User,
   Phone,
   Home,
-  KeyRound,
-  ChevronDown
+  CheckCircle2,
+  AlertCircle,
+  HelpCircle,
+  RotateCcw,
+  KeyRound
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { isDevAuthModeSwitchEnabled } from '../../utils/authClient';
+import { sendConsumerLoginOtp, verifyConsumerLoginOtp, fetchCaptcha } from '../../utils/authClient';
 import { UserRole } from '../../types';
-import {
-  DEFAULT_DEMO_ACCOUNTS,
-  AUTH_DISCLAIMERS,
-  getCanonicalDemoAccountsByRole,
-  getDefaultCanonicalIdentityForRole,
-  getCanonicalIdentityById
-} from '../../data/demoAuthData';
 
 interface VidyutFlowAuthModalProps {
   initialRole?: UserRole;
   initialTab?: 'login' | 'signup';
 }
 
-interface RoleOptionConfig {
+type AccountType = 'consumer' | 'field' | 'employee' | 'admin';
+
+interface AccountTypeConfig {
+  type: AccountType;
   role: UserRole;
-  label: string;
-  subtext: string;
+  title: string;
+  badge: string;
+  description: string;
   icon: React.ReactNode;
 }
 
-const ROLE_OPTIONS: RoleOptionConfig[] = [
+const ACCOUNT_TYPES: AccountTypeConfig[] = [
   {
+    type: 'consumer',
     role: 'consumer',
-    label: 'Consumer Portal (Self-Service)',
-    subtext: 'Domestic billing, payment simulation & solar net-metering',
-    icon: <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+    title: 'Consumer',
+    badge: 'Citizen Portal',
+    description: 'Domestic billing, payment & solar net-metering',
+    icon: <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
   },
   {
-    role: 'employee',
-    label: 'Office Employee ERP (Revenue & Billing)',
-    subtext: 'Revenue audits, consumer complaints & connection triage',
-    icon: <Briefcase className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-  },
-  {
+    type: 'field',
     role: 'field',
-    label: 'Field Engineer App (Workorders & DTC)',
-    subtext: 'Substation inspections, 11kV radial feeders & DTC logs',
-    icon: <Wrench className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+    title: 'Field Engineer',
+    badge: 'Operations',
+    description: 'Substation workorders, 11kV radial feeders & DTC',
+    icon: <Wrench className="w-5 h-5 text-amber-600 dark:text-amber-400" />
   },
   {
-    role: 'management',
-    label: 'Management Cockpit (SCADA & AT&C)',
-    subtext: 'High-voltage grid telemetry, AT&C loss & APFC optimization',
-    icon: <LineChart className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+    type: 'employee',
+    role: 'employee',
+    title: 'Officer',
+    badge: 'ERP & Revenue',
+    description: 'Billing audits, service triage & sanction review',
+    icon: <Briefcase className="w-5 h-5 text-teal-600 dark:text-teal-400" />
   },
   {
+    type: 'admin',
     role: 'admin',
-    label: 'System Administrator (Governance & Audit)',
-    subtext: 'Cryptographic ledger, RBAC permissions & GERC tariff rules',
-    icon: <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+    title: 'Administrator',
+    badge: 'Governance',
+    description: 'Ledger integrity, user RBAC & GERC compliance',
+    icon: <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
   }
 ];
 
@@ -86,191 +85,270 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
     isRoleSwitcherModalOpen,
     setIsRoleSwitcherModalOpen,
     currentRole,
-    authMode,
-    setAuthMode,
-    dataMode,
     loginDemoUser,
-    loginViaSimulatedSso,
-    loginAsCanonicalDemoAccount,
-    signupDemoUser,
-    activeUser
+    loginConsumerOtp,
+    signupDemoUser
   } = useApp();
-  const { dict, language } = useLanguage();
+  const { language } = useLanguage();
 
-  // Active tab: Sign In vs New Consumer Sign Up
+  // Top tabs: Sign In vs New Consumer Sign Up
   const [activeTab, setActiveTab] = useState<'login' | 'signup'>(initialTab);
 
-  // Login form state
-  const [loginEmail, setLoginEmail] = useState<string>('');
-  const [loginPassword, setLoginPassword] = useState<string>('');
-  const [loginRole, setLoginRole] = useState<UserRole>(initialRole || currentRole || 'consumer');
-  const [selectedDemoAccountId, setSelectedDemoAccountId] = useState<string>(() => {
-    const initialTargetRole = initialRole || currentRole || 'consumer';
-    return getDefaultCanonicalIdentityForRole(initialTargetRole).id;
+  // Selected account type among the 4 user categories
+  const [selectedAccountType, setSelectedAccountType] = useState<AccountType>(() => {
+    if (initialRole === 'field') return 'field';
+    if (initialRole === 'employee' || initialRole === 'management') return 'employee';
+    if (initialRole === 'admin') return 'admin';
+    return 'consumer';
   });
-  const [showLoginPassword, setShowLoginPassword] = useState<boolean>(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Collapsible demo account credentials helper (collapsed by default)
-  const [isDemoCredentialsOpen, setIsDemoCredentialsOpen] = useState<boolean>(false);
+  // Consumer OTP & Security CAPTCHA State
+  const [consumerMobile, setConsumerMobile] = useState<string>('');
+  const [consumerOtp, setConsumerOtp] = useState<string>('');
+  const [isOtpSent, setIsOtpSent] = useState<boolean>(false);
+  const [maskedMobile, setMaskedMobile] = useState<string>('');
+  const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
+  const [isSendingOtp, setIsSendingOtp] = useState<boolean>(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState<boolean>(false);
+  const [devSimulationOtp, setDevSimulationOtp] = useState<string | null>(null);
 
-  // Signup form state (Consumer only)
+  // Bot-Resistant Security CAPTCHA State
+  const [captchaToken, setCaptchaToken] = useState<string>('');
+  const [captchaSvg, setCaptchaSvg] = useState<string>('');
+  const [captchaAnswer, setCaptchaAnswer] = useState<string>('');
+  const [isCaptchaLoading, setIsCaptchaLoading] = useState<boolean>(false);
+  const captchaInputId = useId();
+
+  const loadCaptcha = useCallback(async () => {
+    setIsCaptchaLoading(true);
+    try {
+      const res = await fetchCaptcha();
+      if (res.success && res.captchaToken && res.captchaSvg) {
+        setCaptchaToken(res.captchaToken);
+        setCaptchaSvg(res.captchaSvg);
+        setCaptchaAnswer('');
+      }
+    } finally {
+      setIsCaptchaLoading(false);
+    }
+  }, []);
+
+  // Automatically load security CAPTCHA when Consumer login tab is active
+  useEffect(() => {
+    if (activeTab === 'login' && selectedAccountType === 'consumer' && !isOtpSent && !captchaToken) {
+      loadCaptcha();
+    }
+  }, [activeTab, selectedAccountType, isOtpSent, captchaToken, loadCaptcha]);
+
+  // Staff State (Field Engineer, Officer, Admin)
+  const [staffIdentifier, setStaffIdentifier] = useState<string>('');
+  const [staffPassword, setStaffPassword] = useState<string>('');
+  const [staffMfaCode, setStaffMfaCode] = useState<string>('');
+  const [showStaffPassword, setShowStaffPassword] = useState<boolean>(false);
+  const [isSubmittingStaff, setIsSubmittingStaff] = useState<boolean>(false);
+
+  // Consumer Registration State
   const [signupName, setSignupName] = useState<string>('');
   const [signupEmail, setSignupEmail] = useState<string>('');
   const [signupMobile, setSignupMobile] = useState<string>('');
   const [signupPassword, setSignupPassword] = useState<string>('');
   const [signupConfirmPassword, setSignupConfirmPassword] = useState<string>('');
   const [showSignupPassword, setShowSignupPassword] = useState<boolean>(false);
-  const [signupError, setSignupError] = useState<string | null>(null);
+  const [isSubmittingSignup, setIsSubmittingSignup] = useState<boolean>(false);
 
-  // Auto-populate credentials when role changes
-  const applyRoleDefaults = (roleKey: UserRole, preferredAccountId?: string) => {
-    setLoginRole(roleKey);
-    const roleAccounts = getCanonicalDemoAccountsByRole(roleKey);
-    const matchedAccount =
-      (preferredAccountId ? roleAccounts.find(a => a.id === preferredAccountId) : undefined) ||
-      getDefaultCanonicalIdentityForRole(roleKey);
+  // Status feedback
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-    if (matchedAccount) {
-      setSelectedDemoAccountId(matchedAccount.id);
-      setLoginEmail(matchedAccount.email);
-      setLoginPassword(matchedAccount.password);
-    } else {
-      const acc = DEFAULT_DEMO_ACCOUNTS[roleKey];
-      if (acc) {
-        setLoginEmail(acc.email);
-        setLoginPassword(acc.password);
-      }
-    }
-    setLoginError(null);
-  };
-
-  // Pre-load default demo account when modal opens or role changes
-  useEffect(() => {
-    if (isRoleSwitcherModalOpen) {
-      const targetRole = currentRole || initialRole || 'consumer';
-      const preferredId = currentRole === targetRole ? activeUser?.id : undefined;
-      applyRoleDefaults(targetRole, preferredId);
-      setLoginError(null);
-      setSignupError(null);
-      setIsDemoCredentialsOpen(false); // Collapsed by default
-    }
-  }, [isRoleSwitcherModalOpen, currentRole, initialRole]);
-
-  // Sync initial tab when changed externally
-  useEffect(() => {
-    setActiveTab(initialTab);
-  }, [initialTab]);
-
-  const emailInputId = useId();
-  const passwordInputId = useId();
-  const roleSelectId = useId();
-  const demoAccountSelectId = useId();
+  // Form field unique IDs for accessibility
+  const consumerNoId = useId();
+  const consumerMobileId = useId();
+  const consumerOtpId = useId();
+  const staffIdentifierId = useId();
+  const staffPasswordId = useId();
+  const staffMfaId = useId();
   const signupNameId = useId();
   const signupEmailId = useId();
   const signupMobileId = useId();
   const signupPasswordId = useId();
   const signupConfirmPasswordId = useId();
 
+  // Cooldown countdown timer
+  const cooldownTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (cooldownSeconds > 0) {
+      cooldownTimerRef.current = setTimeout(() => {
+        setCooldownSeconds(prev => prev - 1);
+      }, 1000);
+    }
+    return () => {
+      if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
+    };
+  }, [cooldownSeconds]);
+
+  // Sync tab on modal open
+  useEffect(() => {
+    if (isRoleSwitcherModalOpen) {
+      setErrorMessage(null);
+      setSuccessMessage(null);
+      if (initialRole === 'field') setSelectedAccountType('field');
+      else if (initialRole === 'employee' || initialRole === 'management') setSelectedAccountType('employee');
+      else if (initialRole === 'admin') setSelectedAccountType('admin');
+      else setSelectedAccountType('consumer');
+    }
+  }, [isRoleSwitcherModalOpen, initialRole]);
+
   if (!isRoleSwitcherModalOpen) return null;
 
-  const availableRoleDemoAccounts = getCanonicalDemoAccountsByRole(loginRole);
-
-  // Handle dropdown change
-  const handleRoleDropdownChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newRole = e.target.value as UserRole;
-    applyRoleDefaults(newRole);
+  // Handle switching account type
+  const handleSelectAccountType = (type: AccountType) => {
+    setSelectedAccountType(type);
+    setErrorMessage(null);
+    setSuccessMessage(null);
   };
 
-  const handleDemoAccountDropdownChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const accountId = e.target.value;
-    setSelectedDemoAccountId(accountId);
-    const canonical = getCanonicalIdentityById(accountId);
-    if (canonical) {
-      setLoginEmail(canonical.email);
-      setLoginPassword(canonical.password);
-      setLoginError(null);
-    }
-  };
+  // --- Consumer: Send OTP (with Security CAPTCHA verification) ---
+  const handleSendConsumerOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
 
-  const handleEnterDemoAsSelectedAccount = async () => {
-    setLoginError(null);
-    const result = await loginAsCanonicalDemoAccount(selectedDemoAccountId, loginRole);
-    if (!result.success && result.error) {
-      setLoginError(result.error);
-    }
-  };
+    const cleanMobile = consumerMobile.replace(/\D/g, '');
 
-  // Submit Login
-  const handleLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError(null);
-
-    if (!loginEmail.trim()) {
-      setLoginError('Please enter your demonstration email address.');
+    if (cleanMobile.length < 10) {
+      setErrorMessage('Please enter your 10-digit registered mobile number.');
       return;
     }
-    if (!loginPassword) {
-      setLoginError('Please enter your demonstration password.');
+    if (!captchaAnswer.trim()) {
+      setErrorMessage('Please enter the security verification characters shown in the graphic image.');
       return;
     }
 
-    setIsSubmitting(true);
+    setIsSendingOtp(true);
     try {
-      const result = await loginDemoUser(
-        loginEmail,
-        loginPassword,
-        loginRole,
-        selectedDemoAccountId
-      );
+      const res = await sendConsumerLoginOtp({
+        mobileNumber: cleanMobile,
+        captchaToken,
+        captchaAnswer: captchaAnswer.trim(),
+        discom: 'UGVCL'
+      });
+      if (!res.success) {
+        setErrorMessage(res.error || 'Failed to dispatch verification OTP.');
+        loadCaptcha();
+        return;
+      }
+      setIsOtpSent(true);
+      setMaskedMobile(res.maskedMobile || `+91 XXXXX XX${cleanMobile.slice(-2)}`);
+      setCooldownSeconds(res.cooldownSeconds || 45);
+      setDevSimulationOtp(res.devSimulationOtp || null);
+      setSuccessMessage(res.message || `One-Time Password (OTP) dispatched to ${res.maskedMobile || 'your registered mobile'}.`);
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  // --- Consumer: Verify OTP & Sign In ---
+  const handleVerifyConsumerOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const cleanOtp = consumerOtp.trim();
+    if (!cleanOtp || cleanOtp.length !== 6) {
+      setErrorMessage('Please enter the 6-digit verification code sent to your registered mobile.');
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    try {
+      const cleanMobile = consumerMobile.replace(/\D/g, '');
+      const result = await loginConsumerOtp(cleanMobile, cleanOtp);
       if (!result.success && result.error) {
-        setLoginError(result.error);
+        setErrorMessage(result.error);
       }
     } finally {
-      setIsSubmitting(false);
+      setIsVerifyingOtp(false);
     }
   };
 
-  // Submit Signup
+  // --- Staff & Admin: Sign In ---
+  const handleStaffLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const cleanIdent = staffIdentifier.trim();
+    if (!cleanIdent) {
+      setErrorMessage('Please enter your Employee ID or official email address.');
+      return;
+    }
+    if (!staffPassword) {
+      setErrorMessage('Please enter your account password.');
+      return;
+    }
+
+    const currentConfig = ACCOUNT_TYPES.find(a => a.type === selectedAccountType) || ACCOUNT_TYPES[1];
+    setIsSubmittingStaff(true);
+    try {
+      const result = await loginDemoUser(
+        cleanIdent,
+        staffPassword,
+        currentConfig.role,
+        staffMfaCode.trim() || undefined
+      );
+      if (!result.success && result.error) {
+        setErrorMessage(result.error);
+      }
+    } finally {
+      setIsSubmittingStaff(false);
+    }
+  };
+
+  // --- New Consumer Sign Up ---
   const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSignupError(null);
+    setErrorMessage(null);
+    setSuccessMessage(null);
 
     if (!signupName.trim()) {
-      setSignupError('Please enter your full name.');
+      setErrorMessage('Please enter your full name as per identity proof.');
       return;
     }
-    if (!signupEmail.trim()) {
-      setSignupError('Please enter a valid email address.');
+    if (!signupEmail.trim() || !signupEmail.includes('@')) {
+      setErrorMessage('Please enter a valid email address.');
       return;
     }
-    if (!signupPassword) {
-      setSignupError('Please provide a password (minimum 6 characters).');
+    if (signupMobile.replace(/\D/g, '').length < 10) {
+      setErrorMessage('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    if (signupPassword.length < 8) {
+      setErrorMessage('Password must be at least 8 characters long.');
       return;
     }
     if (signupPassword !== signupConfirmPassword) {
-      setSignupError('Password confirmation does not match.');
+      setErrorMessage('Password confirmation does not match.');
       return;
     }
 
-    setIsSubmitting(true);
+    setIsSubmittingSignup(true);
     try {
       const result = await signupDemoUser(
         signupName,
         signupEmail,
         signupPassword,
-        signupMobile.trim() || undefined
+        signupMobile.trim()
       );
       if (!result.success && result.error) {
-        setSignupError(result.error);
+        setErrorMessage(result.error);
       }
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingSignup(false);
     }
   };
 
-  const selectedRoleConfig = ROLE_OPTIONS.find((r) => r.role === loginRole) || ROLE_OPTIONS[0];
+  const activeAccountConfig = ACCOUNT_TYPES.find(a => a.type === selectedAccountType) || ACCOUNT_TYPES[0];
 
   return (
     <div
@@ -282,14 +360,14 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
       }}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
     >
-      <div className="bg-white dark:bg-[#0E1A33] border border-slate-200 dark:border-slate-800 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-[600px] max-h-[90vh] overflow-y-auto flex flex-col text-left">
+      <div className="bg-white dark:bg-[#0E1A33] border border-slate-200 dark:border-slate-800 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-[620px] max-h-[92vh] overflow-y-auto flex flex-col text-left">
         
         {/* =============================================================== */}
-        {/* 1. REFINED INSTITUTIONAL HEADER (NO PINK VIDYUTFLOW BADGE)       */}
+        {/* OFFICIAL INSTITUTIONAL HEADER                                  */}
         {/* =============================================================== */}
         <div className="px-6 py-5 sm:px-8 sm:py-5.5 bg-[#0B172E] text-white flex items-center justify-between border-b border-blue-900/40">
           <div className="flex items-center gap-3.5 min-w-0">
-            {/* Authentic UGVCL Logo - Prominent, crisp container */}
+            {/* Crisp UGVCL Crest Container */}
             <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white p-1.5 shadow-xs border border-white/20 flex items-center justify-center shrink-0">
               <img
                 src="/assets/ugvcl-logo.png"
@@ -302,10 +380,10 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
                 id="auth-modal-title"
                 className="text-[17px] sm:text-[19px] font-bold text-white tracking-tight leading-snug truncate"
               >
-                Uttar Gujarat Vij Company Limited
+                Sign in to VidyutFlow
               </h2>
-              <span className="text-[13px] sm:text-[14px] font-gujarati text-slate-300 block font-normal leading-normal mt-0.5">
-                ઉત્તર ગુજરાત વીજ કંપની લિમિટેડ
+              <span className="text-[12px] sm:text-[13px] text-slate-300 block font-normal leading-normal mt-0.5">
+                Uttar Gujarat Vij Company Limited · Utility Access Portal
               </span>
             </div>
           </div>
@@ -314,8 +392,8 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
             <button
               type="button"
               onClick={() => setIsRoleSwitcherModalOpen(false)}
-              className="text-[13px] font-medium text-slate-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer"
-              title="Return to Homepage"
+              className="text-[13px] font-medium text-slate-300 hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Return to Public Portal"
             >
               <Home className="w-4 h-4" />
               <span className="hidden sm:inline">Home</span>
@@ -331,26 +409,19 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
           </div>
         </div>
 
-        {/* Independent Demonstration Disclosure Banner */}
-        <div className="px-6 sm:px-8 py-2.5 bg-slate-100/90 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 text-[13px] text-slate-600 dark:text-slate-300 flex items-center gap-2.5">
-          <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-          <span className="leading-snug">
-            Independent demonstration environment for UGVCL utility workflows. Not an official discom portal.
-          </span>
-        </div>
-
         {/* =============================================================== */}
-        {/* 2. AUTHENTICATION BODY: CLEAN SINGLE-COLUMN WITH BREATHING ROOM  */}
+        {/* BODY WORKSPACE                                                 */}
         {/* =============================================================== */}
         <div className="p-6 sm:p-8 space-y-6">
-          
-          {/* Centered Segmented Tab Control: Sign In | New Consumer Sign Up */}
+
+          {/* Segmented Top Control: Sign In | New Consumer Registration */}
           <div className="w-full max-w-md mx-auto p-1.5 bg-slate-100 dark:bg-slate-900 rounded-xl grid grid-cols-2 gap-1.5 border border-slate-200/90 dark:border-slate-800">
             <button
               type="button"
               onClick={() => {
                 setActiveTab('login');
-                setLoginError(null);
+                setErrorMessage(null);
+                setSuccessMessage(null);
               }}
               className={`h-10 text-[14px] font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 ${
                 activeTab === 'login'
@@ -365,7 +436,8 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
               type="button"
               onClick={() => {
                 setActiveTab('signup');
-                setSignupError(null);
+                setErrorMessage(null);
+                setSuccessMessage(null);
               }}
               className={`h-10 text-[14px] font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 ${
                 activeTab === 'signup'
@@ -378,508 +450,489 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
             </button>
           </div>
 
-          {/* ============================================================= */}
-          {/* TAB 1: SIGN IN FORM                                            */}
-          {/* ============================================================= */}
-          {activeTab === 'login' && (
-            <form onSubmit={handleLoginSubmit} className="space-y-5">
-              
-              {/* Single Role Dropdown */}
-              <div className="space-y-2">
-                <label
-                  htmlFor={roleSelectId}
-                  className="text-[14px] font-medium text-slate-700 dark:text-slate-300 block"
-                >
-                  Select Target Workspace / Portal
-                </label>
-                <div className="relative">
-                  <select
-                    id={roleSelectId}
-                    value={loginRole}
-                    onChange={handleRoleDropdownChange}
-                    className="w-full h-12 appearance-none pl-4 pr-11 text-[15px] font-medium rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 cursor-pointer transition-colors shadow-2xs"
-                  >
-                    {ROLE_OPTIONS.map((opt) => (
-                      <option key={opt.role} value={opt.role}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">
-                    <ChevronDown className="w-4 h-4" />
-                  </div>
-                </div>
-              </div>
+          {/* Structured Feedback Banners */}
+          {errorMessage && (
+            <div
+              role="alert"
+              className="p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/80 dark:bg-rose-950/30 text-rose-800 dark:text-rose-300 text-[13px] flex items-start gap-2.5 animate-in fade-in"
+            >
+              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+              <div className="leading-snug">{errorMessage}</div>
+            </div>
+          )}
 
-              {/* DEMO Mode Account Selector & Direct Simulated Session Entry */}
-              {dataMode === 'DEMO' ? (
-                <div
-                  data-testid="demo-account-selector-panel"
-                  className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/25 space-y-3"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <label
-                      htmlFor={demoAccountSelectId}
-                      className="text-[13px] font-bold text-blue-950 dark:text-blue-200 flex items-center gap-1.5"
-                    >
-                      <Wrench className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                      <span>
-                        {loginRole === 'field'
-                          ? 'Select Demo Field Engineer'
-                          : 'Select Demo Account'}
-                      </span>
-                    </label>
-                    <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200">
-                      DEMO SANDBOX
-                    </span>
-                  </div>
-
-                  <div className="relative">
-                    <select
-                      id={demoAccountSelectId}
-                      data-testid="select-demo-account-dropdown"
-                      aria-label={
-                        loginRole === 'field'
-                          ? 'Select Demo Field Engineer'
-                          : 'Select Demo Account'
-                      }
-                      value={selectedDemoAccountId}
-                      onChange={handleDemoAccountDropdownChange}
-                      className="w-full h-11 appearance-none pl-3.5 pr-10 text-[13px] font-medium rounded-xl bg-white dark:bg-slate-900 border border-blue-300 dark:border-blue-800 text-slate-900 dark:text-white hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer transition-colors"
-                    >
-                      {availableRoleDemoAccounts.map((acc) => (
-                        <option key={acc.id} value={acc.id}>
-                          {acc.name} — {acc.id} ({acc.designation} · {acc.subdivision})
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500">
-                      <ChevronDown className="w-4 h-4" />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    data-testid="enter-demo-selected-account-btn"
-                    onClick={handleEnterDemoAsSelectedAccount}
-                    className="w-full h-11 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-semibold text-[13px] shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <span>
-                      {loginRole === 'field'
-                        ? 'Enter Demo as Selected Engineer'
-                        : `Enter Demo as Selected ${selectedRoleConfig.label.split(' ')[0]} Account`}
-                    </span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-
-                  <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-normal">
-                    Creates an isolated simulated DEMO session using canonical user ID{' '}
-                    <strong className="font-mono text-slate-800 dark:text-slate-200">
-                      {selectedDemoAccountId}
-                    </strong>{' '}
-                    without requiring production credentials.
-                  </p>
-                </div>
-              ) : (
-                <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/30 text-[12px] text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
-                  <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <span>
-                    <strong>LIVE Operating Mode Active:</strong> Simulated DEMO quick-select is disabled. Please sign in below using verified server credentials.
-                  </span>
-                </div>
-              )}
-
-              {/* Visual Separation Between DEMO Selection and Credential Authentication */}
-              <div className="relative flex items-center py-0.5">
-                <div className="flex-grow border-t border-slate-200 dark:border-slate-800" />
-                <span className="shrink-0 mx-3 text-[11px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  {dataMode === 'DEMO'
-                    ? 'Or Sign In With Email & Password'
-                    : 'LIVE Server Credential Authentication'}
-                </span>
-                <div className="flex-grow border-t border-slate-200 dark:border-slate-800" />
-              </div>
-
-              {/* Collapsible Demo Account Credentials Helper (Collapsed by Default) */}
-              {dataMode === 'DEMO' && (
-                <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50/70 dark:bg-slate-900/40 transition-colors">
-                  <button
-                    type="button"
-                    onClick={() => setIsDemoCredentialsOpen(!isDemoCredentialsOpen)}
-                    className="w-full px-4 py-3 text-left flex items-center justify-between text-[13px] font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100/70 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <KeyRound className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">
-                        Use Demo Credentials
-                      </span>
-                      <span className="text-slate-500 dark:text-slate-400 font-normal hidden sm:inline">
-                        (Quick-fill test accounts)
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 font-medium shrink-0 ml-2">
-                      <span>{isDemoCredentialsOpen ? 'Hide' : 'Show Accounts'}</span>
-                      <ChevronDown
-                        className={`w-4 h-4 transition-transform duration-200 ${
-                          isDemoCredentialsOpen ? 'rotate-180' : ''
-                        }`}
-                      />
-                    </div>
-                  </button>
-
-                  {isDemoCredentialsOpen && (
-                    <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 space-y-2.5 bg-white dark:bg-[#0c162d]">
-                      <p className="text-[12px] text-slate-500 dark:text-slate-400 leading-normal px-1">
-                        Click any account below to autofill demonstration credentials (default password:{' '}
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">Demo@12345</span>):
-                      </p>
-
-                      {loginRole === 'field' && (
-                        <div className="p-2.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/50 space-y-1.5">
-                          <div className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 px-1">
-                            Canonical Field Engineer Accounts ({availableRoleDemoAccounts.length})
-                          </div>
-                          <div className="grid grid-cols-1 gap-1.5">
-                            {availableRoleDemoAccounts.map((eng) => {
-                              const isSelectedEng = selectedDemoAccountId === eng.id;
-                              return (
-                                <button
-                                  key={eng.id}
-                                  type="button"
-                                  onClick={() => applyRoleDefaults('field', eng.id)}
-                                  className={`w-full p-2 rounded-lg border text-left flex items-center justify-between transition-colors cursor-pointer ${
-                                    isSelectedEng
-                                      ? 'border-amber-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-white ring-1 ring-amber-500/30'
-                                      : 'border-amber-200/60 dark:border-slate-800 bg-white/70 dark:bg-slate-900/50 hover:bg-white text-slate-700 dark:text-slate-300'
-                                  }`}
-                                >
-                                  <div className="min-w-0">
-                                    <div className="text-[12px] font-semibold truncate">
-                                      {eng.name} — <span className="font-mono">{eng.id}</span>
-                                    </div>
-                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                                      {eng.email} · {eng.subdivision}
-                                    </div>
-                                  </div>
-                                  <span
-                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded shrink-0 ml-2 ${
-                                      isSelectedEng
-                                        ? 'bg-amber-600 text-white'
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                                    }`}
-                                  >
-                                    {isSelectedEng ? 'Selected' : 'Autofill'}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="space-y-1.5">
-                        {ROLE_OPTIONS.map((item) => {
-                          const canonicalAcc =
-                            item.role === loginRole
-                              ? getCanonicalIdentityById(selectedDemoAccountId) ||
-                                getDefaultCanonicalIdentityForRole(item.role)
-                              : getDefaultCanonicalIdentityForRole(item.role);
-                          const isCurrent = loginRole === item.role;
-                          return (
-                            <button
-                              key={item.role}
-                              type="button"
-                              onClick={() => applyRoleDefaults(item.role)}
-                              className={`w-full p-2.5 rounded-lg border text-left flex items-center justify-between transition-colors cursor-pointer ${
-                                isCurrent
-                                  ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 text-blue-950 dark:text-blue-100 ring-1 ring-blue-500/20'
-                                  : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="p-1 rounded bg-slate-100 dark:bg-slate-800 shrink-0">
-                                  {item.icon}
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="text-[13px] font-semibold truncate text-slate-900 dark:text-white">
-                                    {item.label}
-                                  </div>
-                                  <div className="text-[12px] text-slate-500 dark:text-slate-400 truncate">
-                                    {canonicalAcc.name} ({canonicalAcc.id}) · {canonicalAcc.email}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="shrink-0 text-right ml-2">
-                                <span
-                                  className={`text-[11px] font-semibold px-2 py-0.5 rounded ${
-                                    isCurrent
-                                      ? 'bg-blue-600 text-white'
-                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                                  }`}
-                                >
-                                  {isCurrent ? 'Active' : 'Autofill'}
-                                </span>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Email Input */}
-              <div className="space-y-2">
-                <label
-                  htmlFor={emailInputId}
-                  className="text-[14px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2"
-                >
-                  <Mail className="w-4 h-4 text-slate-400" />
-                  <span>
-                    {dataMode === 'LIVE' ? 'Official Email Address' : 'Demonstration Email Address'}
-                  </span>
-                </label>
-                <input
-                  id={emailInputId}
-                  type="email"
-                  value={loginEmail}
-                  onChange={(e) => {
-                    setLoginEmail(e.target.value);
-                    setLoginError(null);
-                  }}
-                  placeholder="e.g. consumer@vidyutflow.demo"
-                  className="w-full h-12 px-4 text-[15px] font-normal rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
-                  required
-                />
-              </div>
-
-              {/* Password Input (No password display next to label) */}
-              <div className="space-y-2">
-                <label
-                  htmlFor={passwordInputId}
-                  className="text-[14px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2"
-                >
-                  <Lock className="w-4 h-4 text-slate-400" />
-                  <span>Password</span>
-                </label>
-                <div className="relative">
-                  <input
-                    id={passwordInputId}
-                    type={showLoginPassword ? 'text' : 'password'}
-                    value={loginPassword}
-                    onChange={(e) => {
-                      setLoginPassword(e.target.value);
-                      setLoginError(null);
-                    }}
-                    placeholder="Enter demonstration password"
-                    className="w-full h-12 pl-4 pr-12 text-[15px] font-normal rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowLoginPassword(!showLoginPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg cursor-pointer transition-colors"
-                    aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Login Error Alert */}
-              {loginError && (
-                <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-[13px] text-rose-800 dark:text-rose-300 flex items-start gap-2.5">
-                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                  <span>{loginError}</span>
-                </div>
-              )}
-
-              {/* Primary Sign-In Button */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full h-12 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-[15px] shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 pt-0.5 mt-2"
-              >
-                {isSubmitting ? (
-                  <span>Authenticating Demo Session...</span>
-                ) : (
-                  <>
-                    <span>Sign In to {selectedRoleConfig.label.split(' (')[0]}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-
-              {/* Simulated OIDC / Gujarat Parichay SSO Button (Item #18) */}
-              {isDevAuthModeSwitchEnabled() && (
-                <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                    <span className="font-semibold">
-                      {language === 'gu'
-                        ? 'સિંગલ સાઇન-ઓન (OIDC / પરિચય)'
-                        : language === 'hi'
-                        ? 'सिंगल साइन-ऑन (OIDC / परिचय)'
-                        : language === 'mr'
-                        ? 'सिंगल साइन-ऑन (OIDC / परिचय)'
-                        : 'Enterprise / Citizen Single Sign-On'}
-                    </span>
-                    <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-bold text-[10px] uppercase tracking-wider">
-                      SIMULATED DEMO OIDC
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={async () => {
-                      setIsSubmitting(true);
-                      setLoginError(null);
-                      try {
-                        const provider =
-                          loginRole === 'consumer'
-                            ? 'parichay-gujarat-demo'
-                            : 'ugvcl-workforce-oidc-demo';
-                        const res = await loginViaSimulatedSso(loginEmail, loginRole, provider);
-                        if (!res.success) {
-                          setLoginError(res.error || 'Simulated SSO sign-in failed.');
-                        }
-                      } finally {
-                        setIsSubmitting(false);
-                      }
-                    }}
-                    className="w-full min-h-11 px-4 py-2.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/40 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/40 text-indigo-900 dark:text-indigo-200 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                    <span>
-                      {loginRole === 'consumer'
-                        ? language === 'gu'
-                          ? 'મેરીપહેચાન / ગુજરાત પરિચય SSO (સિમ્યુલેટેડ ડેમો)'
-                          : language === 'hi'
-                          ? 'मेरीपहचान / गुजरात परिचय SSO (सिम्युलेटेड डेमो)'
-                          : language === 'mr'
-                          ? 'मेरीपहचान / गुजरात परिचय SSO (सिम्युलेटेड डेमो)'
-                          : 'Sign in with MeriPehchaan / Gujarat Parichay SSO (Simulated Demo)'
-                        : language === 'gu'
-                        ? 'UGVCL વર્કફોર્સ OIDC SSO (સિમ્યુલેટેડ ડેમો)'
-                        : language === 'hi'
-                        ? 'UGVCL वर्कफ़ोर्स OIDC SSO (सिम्युलेटेड डेमो)'
-                        : language === 'mr'
-                        ? 'UGVCL वर्कफोर्स OIDC SSO (सिम्युलेटेड डेमो)'
-                        : 'Sign in with UGVCL Workforce OIDC SSO (Simulated Demo)'}
-                    </span>
-                  </button>
-                </div>
-              )}
-            </form>
+          {successMessage && (
+            <div
+              role="status"
+              className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/80 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 text-[13px] flex items-start gap-2.5 animate-in fade-in"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+              <div className="leading-snug">{successMessage}</div>
+            </div>
           )}
 
           {/* ============================================================= */}
-          {/* TAB 2: CONSUMER REGISTRATION FORM                             */}
+          {/* TAB 1: UNIFIED SIGN IN FORM                                    */}
+          {/* ============================================================= */}
+          {activeTab === 'login' && (
+            <div className="space-y-6">
+              
+              {/* Four Account Type Selection Cards */}
+              <div className="space-y-2">
+                <label className="text-[13px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 block">
+                  Select Account Type
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {ACCOUNT_TYPES.map((acc) => {
+                    const isSelected = selectedAccountType === acc.type;
+                    return (
+                      <button
+                        key={acc.type}
+                        type="button"
+                        onClick={() => handleSelectAccountType(acc.type)}
+                        className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer relative ${
+                          isSelected
+                            ? 'border-blue-600 dark:border-blue-500 bg-blue-50/60 dark:bg-blue-950/40 ring-2 ring-blue-600/20 shadow-xs'
+                            : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full mb-2">
+                          <div className={`p-1.5 rounded-lg ${isSelected ? 'bg-white dark:bg-blue-900/60 shadow-2xs' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                            {acc.icon}
+                          </div>
+                          {isSelected && (
+                            <span className="w-2 h-2 rounded-full bg-blue-600 dark:bg-blue-400 shrink-0" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-bold text-[13px] text-slate-900 dark:text-white leading-tight">
+                            {acc.title}
+                          </div>
+                          <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+                            {acc.badge}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Dynamic Authentication Form According to Account Type */}
+              {selectedAccountType === 'consumer' ? (
+                /* --- CONSUMER OTP AUTHENTICATION --- */
+                <div className="p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/30 space-y-4">
+                  <div className="border-b border-slate-200/80 dark:border-slate-800 pb-3">
+                    <h3 className="text-[15px] font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>Consumer Authentication via Registered Mobile</span>
+                    </h3>
+                    <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Verify account ownership using single-use OTP sent to your registered mobile number.
+                    </p>
+                  </div>
+
+                  {!isOtpSent ? (
+                    <form onSubmit={handleSendConsumerOtp} className="space-y-4">
+                      {/* Registered Mobile Number Input */}
+                      <div className="space-y-1.5">
+                        <label htmlFor={consumerMobileId} className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 block">
+                          Registered Mobile Number
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] font-semibold text-slate-400">
+                            +91
+                          </span>
+                          <input
+                            id={consumerMobileId}
+                            type="tel"
+                            required
+                            maxLength={10}
+                            value={consumerMobile}
+                            onChange={(e) => setConsumerMobile(e.target.value.replace(/\D/g, ''))}
+                            placeholder="98250 14820"
+                            className="w-full h-11 pl-12 pr-3.5 text-[14px] font-mono rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
+                          />
+                        </div>
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                          Enter your 10-digit mobile number registered with your electricity connection.
+                        </span>
+                      </div>
+
+                      {/* Anti-Bot Security CAPTCHA Verification */}
+                      <div className="space-y-2 pt-1 border-t border-slate-200/60 dark:border-slate-800/60">
+                        <div className="flex items-center justify-between">
+                          <label htmlFor={captchaInputId} className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 block">
+                            Security Verification
+                          </label>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400">Anti-bot protection</span>
+                        </div>
+
+                        <div className="flex items-center gap-2.5">
+                          {/* Uncopyable SVG CAPTCHA container */}
+                          <div
+                            className="relative select-none rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 flex items-center justify-center p-1"
+                            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+                            onContextMenu={(e) => e.preventDefault()}
+                            onDragStart={(e) => e.preventDefault()}
+                            onCopy={(e) => e.preventDefault()}
+                          >
+                            {captchaSvg ? (
+                              <div
+                                dangerouslySetInnerHTML={{ __html: captchaSvg }}
+                                className="pointer-events-none select-none"
+                              />
+                            ) : (
+                              <div className="w-[180px] h-[50px] flex items-center justify-center text-[12px] text-slate-400">
+                                {isCaptchaLoading ? 'Generating...' : 'Loading CAPTCHA...'}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Reload CAPTCHA Button */}
+                          <button
+                            type="button"
+                            onClick={loadCaptcha}
+                            disabled={isCaptchaLoading}
+                            title="Reload CAPTCHA"
+                            className="h-11 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50"
+                          >
+                            <RotateCcw className={`w-4 h-4 ${isCaptchaLoading ? 'animate-spin' : ''}`} />
+                          </button>
+                        </div>
+
+                        <input
+                          id={captchaInputId}
+                          type="text"
+                          required
+                          maxLength={6}
+                          autoComplete="off"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          value={captchaAnswer}
+                          onChange={(e) => setCaptchaAnswer(e.target.value.toUpperCase())}
+                          placeholder="Enter characters shown above"
+                          className="w-full h-11 px-3.5 text-[14px] font-mono tracking-widest uppercase rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
+                        />
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 block">
+                          Case-insensitive. Type the 5 characters shown in the graphic image above.
+                        </span>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isSendingOtp || consumerMobile.length < 10 || !captchaAnswer.trim()}
+                        className="w-full h-11 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-60 text-white font-semibold text-[14px] shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer mt-2"
+                      >
+                        {isSendingOtp ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <span>Send Verification OTP</span>
+                            <ArrowRight className="w-4 h-4" />
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  ) : (
+                    /* Step 2: OTP Verification Form */
+                    <form onSubmit={handleVerifyConsumerOtp} className="space-y-4 animate-in fade-in">
+                      <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 text-[12px] text-blue-900 dark:text-blue-200 flex items-center justify-between">
+                        <div>
+                          OTP dispatched to registered mobile <strong className="font-mono">{maskedMobile}</strong>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsOtpSent(false);
+                            setConsumerOtp('');
+                            setErrorMessage(null);
+                            loadCaptcha();
+                          }}
+                          className="text-[11px] text-blue-700 dark:text-blue-400 underline font-semibold ml-2 cursor-pointer"
+                        >
+                          Change Number
+                        </button>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label htmlFor={consumerOtpId} className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">
+                            Enter 6-Digit OTP
+                          </label>
+                          <span className="text-[11px] font-medium text-slate-500">
+                            Valid for 5 minutes
+                          </span>
+                        </div>
+                        <input
+                          id={consumerOtpId}
+                          type="text"
+                          required
+                          maxLength={6}
+                          autoFocus
+                          value={consumerOtp}
+                          onChange={(e) => setConsumerOtp(e.target.value.replace(/\D/g, ''))}
+                          placeholder="••••••"
+                          className="w-full h-12 text-center tracking-[0.5em] text-[20px] font-mono font-bold rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between text-[12px] pt-1">
+                        <span className="text-slate-500">Didn't receive code?</span>
+                        {cooldownSeconds > 0 ? (
+                          <span className="text-slate-400 font-medium">
+                            Resend in {cooldownSeconds}s
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleSendConsumerOtp()}
+                            className="text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Resend OTP</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isVerifyingOtp || consumerOtp.length !== 6}
+                        className="w-full h-11 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-60 text-white font-semibold text-[14px] shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        {isVerifyingOtp ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <ShieldCheck className="w-4 h-4" />
+                            <span>Verify & Access Consumer Portal</span>
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  )}
+
+                  <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-[12px] text-slate-500 dark:text-slate-400">
+                    <span>New applicant without a consumer number?</span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('signup')}
+                      className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+                    >
+                      Create Account
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* --- STAFF AUTHENTICATION (Field Engineer, Officer, Admin) --- */
+                <form onSubmit={handleStaffLogin} className="p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/30 space-y-4">
+                  <div className="border-b border-slate-200/80 dark:border-slate-800 pb-3">
+                    <h3 className="text-[15px] font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      {activeAccountConfig.icon}
+                      <span>{activeAccountConfig.title} Authentication</span>
+                    </h3>
+                    <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      {activeAccountConfig.description}. Authorized DISCOM credentials required.
+                    </p>
+                  </div>
+
+                  {/* Employee ID / Official Email */}
+                  <div className="space-y-1.5">
+                    <label htmlFor={staffIdentifierId} className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 block">
+                      {selectedAccountType === 'admin'
+                        ? 'Privileged Account ID / Email'
+                        : 'Employee ID / Official Email'}
+                    </label>
+                    <div className="relative">
+                      <input
+                        id={staffIdentifierId}
+                        type="text"
+                        required
+                        value={staffIdentifier}
+                        onChange={(e) => setStaffIdentifier(e.target.value)}
+                        placeholder={
+                          selectedAccountType === 'admin'
+                            ? 'e.g. adm-ugvcl-01 or admin@vidyutflow.demo'
+                            : selectedAccountType === 'field'
+                            ? 'e.g. ugvcl-eng-01 or field@vidyutflow.demo'
+                            : 'e.g. emp-ugvcl-001 or employee@vidyutflow.demo'
+                        }
+                        className="w-full h-11 pl-3.5 pr-10 text-[14px] rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
+                      />
+                      <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                        <User className="w-4 h-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Password */}
+                  <div className="space-y-1.5">
+                    <label htmlFor={staffPasswordId} className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 block">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        id={staffPasswordId}
+                        type={showStaffPassword ? 'text' : 'password'}
+                        required
+                        value={staffPassword}
+                        onChange={(e) => setStaffPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        className="w-full h-11 pl-3.5 pr-10 text-[14px] rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowStaffPassword(!showStaffPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
+                        aria-label={showStaffPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showStaffPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* MFA Verification Code */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label htmlFor={staffMfaId} className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">
+                        MFA Verification Code
+                      </label>
+                      <span className="text-[11px] text-slate-500 font-medium">
+                        TOTP / Security Token
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <input
+                        id={staffMfaId}
+                        type="text"
+                        maxLength={8}
+                        value={staffMfaCode}
+                        onChange={(e) => setStaffMfaCode(e.target.value.replace(/\s/g, ''))}
+                        placeholder="e.g. 123456 (if enabled)"
+                        className="w-full h-11 pl-3.5 pr-10 text-[14px] font-mono rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
+                      />
+                      <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                        <KeyRound className="w-4 h-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmittingStaff}
+                    className="w-full h-11 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-60 text-white font-semibold text-[14px] shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer mt-2"
+                  >
+                    {isSubmittingStaff ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <span>Sign In as {activeAccountConfig.title}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center leading-normal pt-1">
+                    Permissions and organizational jurisdiction are strictly determined from authoritative backend records.
+                  </p>
+                </form>
+              )}
+            </div>
+          )}
+
+          {/* ============================================================= */}
+          {/* TAB 2: NEW CONSUMER SIGN UP                                    */}
           {/* ============================================================= */}
           {activeTab === 'signup' && (
-            <form onSubmit={handleSignupSubmit} className="space-y-4.5">
-              
-              {/* Institutional Notice */}
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-[13px] text-slate-700 dark:text-slate-300 flex items-start gap-2.5">
-                <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                <span className="leading-relaxed">
-                  {AUTH_DISCLAIMERS.signupNotice}
-                </span>
+            <form onSubmit={handleSignupSubmit} className="space-y-4">
+              <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 text-[12px] text-blue-950 dark:text-blue-200">
+                <strong>Citizen Self-Service Registration:</strong> Register a consumer account to apply for a new connection, track service requests, and manage electricity accounts.
               </div>
 
               {/* Full Name */}
               <div className="space-y-1.5">
-                <label
-                  htmlFor={signupNameId}
-                  className="text-[14px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2"
-                >
-                  <User className="w-4 h-4 text-slate-400" />
-                  <span>Consumer Full Name *</span>
+                <label htmlFor={signupNameId} className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 block">
+                  Full Name (as per ID Proof)
                 </label>
-                <input
-                  id={signupNameId}
-                  type="text"
-                  value={signupName}
-                  onChange={(e) => {
-                    setSignupName(e.target.value);
-                    setSignupError(null);
-                  }}
-                  placeholder="e.g. Rameshchandra Patel"
-                  className="w-full h-12 px-4 text-[15px] font-normal rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    id={signupNameId}
+                    type="text"
+                    required
+                    value={signupName}
+                    onChange={(e) => setSignupName(e.target.value)}
+                    placeholder="e.g. Smt. Meenaben Patel"
+                    className="w-full h-11 pl-3.5 pr-10 text-[14px] rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
+                  />
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                    <User className="w-4 h-4" />
+                  </div>
+                </div>
               </div>
 
               {/* Email Address */}
               <div className="space-y-1.5">
-                <label
-                  htmlFor={signupEmailId}
-                  className="text-[14px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2"
-                >
-                  <Mail className="w-4 h-4 text-slate-400" />
-                  <span>Email Address *</span>
+                <label htmlFor={signupEmailId} className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 block">
+                  Email Address
                 </label>
-                <input
-                  id={signupEmailId}
-                  type="email"
-                  value={signupEmail}
-                  onChange={(e) => {
-                    setSignupEmail(e.target.value);
-                    setSignupError(null);
-                  }}
-                  placeholder="e.g. ramesh.patel@example.com"
-                  className="w-full h-12 px-4 text-[15px] font-normal rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    id={signupEmailId}
+                    type="email"
+                    required
+                    value={signupEmail}
+                    onChange={(e) => setSignupEmail(e.target.value)}
+                    placeholder="e.g. citizen@example.com"
+                    className="w-full h-11 pl-3.5 pr-10 text-[14px] rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
+                  />
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                </div>
               </div>
 
-              {/* Mobile Number (Optional) */}
+              {/* Mobile Number */}
               <div className="space-y-1.5">
-                <label
-                  htmlFor={signupMobileId}
-                  className="text-[14px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2"
-                >
-                  <Phone className="w-4 h-4 text-slate-400" />
-                  <span>Registered Mobile Number (Optional)</span>
+                <label htmlFor={signupMobileId} className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 block">
+                  Mobile Number
                 </label>
-                <input
-                  id={signupMobileId}
-                  type="tel"
-                  value={signupMobile}
-                  onChange={(e) => setSignupMobile(e.target.value)}
-                  placeholder="e.g. 9876543210 (10-digit Indian Mobile)"
-                  className="w-full h-12 px-4 text-[15px] font-normal rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
-                />
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] font-semibold text-slate-400">
+                    +91
+                  </span>
+                  <input
+                    id={signupMobileId}
+                    type="tel"
+                    required
+                    maxLength={10}
+                    value={signupMobile}
+                    onChange={(e) => setSignupMobile(e.target.value.replace(/\D/g, ''))}
+                    placeholder="98250 14820"
+                    className="w-full h-11 pl-12 pr-3.5 text-[14px] font-mono rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
+                  />
+                </div>
               </div>
 
-              {/* Password & Confirm Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Password & Confirm Password */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label
-                    htmlFor={signupPasswordId}
-                    className="text-[14px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2"
-                  >
-                    <Lock className="w-4 h-4 text-slate-400" />
-                    <span>Password *</span>
+                  <label htmlFor={signupPasswordId} className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 block">
+                    Password
                   </label>
                   <div className="relative">
                     <input
                       id={signupPasswordId}
                       type={showSignupPassword ? 'text' : 'password'}
-                      value={signupPassword}
-                      onChange={(e) => {
-                        setSignupPassword(e.target.value);
-                        setSignupError(null);
-                      }}
-                      placeholder="Min. 6 characters"
-                      className="w-full h-12 pl-4 pr-11 text-[15px] font-normal rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
                       required
+                      value={signupPassword}
+                      onChange={(e) => setSignupPassword(e.target.value)}
+                      placeholder="Min 8 characters"
+                      className="w-full h-11 pl-3.5 pr-10 text-[14px] rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
                     />
                     <button
                       type="button"
                       onClick={() => setShowSignupPassword(!showSignupPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                      aria-label="Toggle password visibility"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
                     >
                       {showSignupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -887,93 +940,54 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label
-                    htmlFor={signupConfirmPasswordId}
-                    className="text-[14px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2"
-                  >
-                    <Lock className="w-4 h-4 text-slate-400" />
-                    <span>Confirm Password *</span>
+                  <label htmlFor={signupConfirmPasswordId} className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 block">
+                    Confirm Password
                   </label>
                   <input
                     id={signupConfirmPasswordId}
-                    type={showSignupPassword ? 'text' : 'password'}
-                    value={signupConfirmPassword}
-                    onChange={(e) => {
-                      setSignupConfirmPassword(e.target.value);
-                      setSignupError(null);
-                    }}
-                    placeholder="Repeat password"
-                    className="w-full h-12 px-4 text-[15px] font-normal rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
+                    type="password"
                     required
+                    value={signupConfirmPassword}
+                    onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                    placeholder="Re-enter password"
+                    className="w-full h-11 px-3.5 text-[14px] rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors shadow-2xs"
                   />
                 </div>
               </div>
 
-              {/* Error Banner */}
-              {signupError && (
-                <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-[13px] text-rose-800 dark:text-rose-300 flex items-start gap-2.5">
-                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                  <span>{signupError}</span>
-                </div>
-              )}
-
-              {/* Local Storage Disclaimer */}
-              <p className="text-[13px] text-slate-500 dark:text-slate-400 leading-normal">
-                {AUTH_DISCLAIMERS.storageDisclaimer}
-              </p>
-
-              {/* Primary Signup Button */}
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full h-12 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-[15px] shadow-sm transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 mt-2"
+                disabled={isSubmittingSignup}
+                className="w-full h-11 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-60 text-white font-semibold text-[14px] shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer mt-2"
               >
-                <UserPlus className="w-4 h-4 stroke-[2.2]" />
-                <span>Register Demonstration Consumer Account</span>
+                {isSubmittingSignup ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <UserPlus className="w-4 h-4" />
+                    <span>Create Consumer Account</span>
+                  </>
+                )}
               </button>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('login')}
+                  className="text-[13px] text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+                >
+                  Already have an account? Sign In
+                </button>
+              </div>
             </form>
           )}
 
+          {/* Institutional Compliance Footer */}
+          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+            <span>UGVCL VidyutFlow Security · 256-Bit TLS</span>
+            <span>GERC Regulated Access</span>
+          </div>
         </div>
-
-        {/* =============================================================== */}
-        {/* 3. SIMPLIFIED INSTITUTIONAL FOOTER & DEV AUTH MODE SWITCH       */}
-        {/* =============================================================== */}
-        <div className="px-6 py-4 sm:px-8 sm:py-4 bg-slate-50 dark:bg-[#071329] border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-[13px] text-slate-500 dark:text-slate-400">
-          {isDevAuthModeSwitchEnabled() ? (
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">
-                Dev Auth Mode:
-              </span>
-              <button
-                type="button"
-                onClick={() => setAuthMode(authMode === 'server' ? 'demo' : 'server')}
-                className={`text-[11px] font-semibold px-2.5 py-1 rounded-md border transition-colors cursor-pointer ${
-                  authMode === 'server'
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                    : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
-                }`}
-                title="Development-only switch between Server Auth (/api/auth HttpOnly cookie + scrypt) and Client Demo Sandbox without resetting browser data"
-              >
-                {authMode === 'server'
-                  ? 'Server Auth (/api/auth · HttpOnly)'
-                  : 'Client Demo Mode (Sandbox)'}
-              </button>
-            </div>
-          ) : (
-            <span className="text-[12px] text-slate-500 dark:text-slate-400">
-              VidyutFlow · Independent UGVCL-Inspired ERP Prototype
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => setIsRoleSwitcherModalOpen(false)}
-            className="text-[13px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer shrink-0"
-          >
-            Close Dialog
-          </button>
-        </div>
-
       </div>
     </div>
   );

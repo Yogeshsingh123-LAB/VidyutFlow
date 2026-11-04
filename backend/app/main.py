@@ -7,7 +7,7 @@ from sqlalchemy import inspect as sa_inspect, text
 from sqlalchemy.exc import OperationalError
 from .db import Base, engine, SessionLocal, check_database_health
 from . import models  # noqa
-from .routers import auth, requests, assistant, system, notifications, erp, workflows, staff, evidence, directory
+from .routers import auth, requests, assistant, system, notifications, erp, workflows, staff, evidence, directory, consumer_profile
 from .routers.staff import ensure_subdivision_zones
 from .erp_adapter import record_erp_sync
 from .alerts import evaluate_and_dispatch_alerts
@@ -50,6 +50,34 @@ def seed():
             if not db.query(models.User).filter(models.User.email==email).first():
                 db.add(models.User(email=email, name=name, role=role, zone=zone, hashed_password=hash_password(pw)))
         db.commit()
+
+        # Seed verified contact and connection link for canonical demo consumer
+        meenaben = db.query(models.User).filter(models.User.email == "consumer@vidyutflow.demo").first()
+        if meenaben:
+            contact = db.query(models.UserContact).filter(models.UserContact.user_id == meenaben.id).first()
+            if not contact:
+                db.add(models.UserContact(
+                    user_id=meenaben.id,
+                    email=meenaben.email,
+                    email_verified=True,
+                    mobile_number="+91 98250 14820",
+                    mobile_verified=True
+                ))
+            conn = db.query(models.ConsumerConnectionLink).filter(models.ConsumerConnectionLink.consumer_no == "04281-99231").first()
+            if not conn:
+                db.add(models.ConsumerConnectionLink(
+                    user_id=meenaben.id,
+                    consumer_no="04281-99231",
+                    discom="UGVCL",
+                    connection_type="Residential (RGPU)",
+                    sanctioned_load_kw=6.0,
+                    official_address="14, Anand Nagar Society, Visnagar Road, Mehsana - 384002",
+                    subdivision="Mehsana City North",
+                    status="ACTIVE",
+                    is_primary=True,
+                    source="OFFICIAL_REGISTRY"
+                ))
+            db.commit()
     finally: db.close()
 
 def seed_requests():
@@ -300,3 +328,7 @@ app.include_router(staff.router)
 app.include_router(evidence.router)
 app.include_router(directory.router)
 app.include_router(directory.router, prefix="/api")
+
+app.include_router(consumer_profile.router)
+app.include_router(consumer_profile.router, prefix="/api")
+app.include_router(consumer_profile.router, prefix="/api/v1")

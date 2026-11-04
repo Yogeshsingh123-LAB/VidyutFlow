@@ -79,6 +79,8 @@ import {
   isDevAuthModeSwitchEnabled,
   resolveEffectiveAuthMode,
   loginWithServerApi,
+  verifyConsumerLoginOtp,
+  sendConsumerLoginOtp,
   signupWithServerApi,
   verifyServerSessionApi,
   logoutServerSessionApi,
@@ -996,7 +998,8 @@ interface AppContextType {
   employeeNotifications: AppNotification[];
   scopedNotifications: AppNotification[];
   linkConnectionDemo: (consumerNo: string) => { success: boolean; error?: string; connection?: ElectricityConnection };
-  loginDemoUser: (email: string, password: string, targetRole: UserRole, selectedUserId?: string) => Promise<{ success: boolean; error?: string }>;
+  loginDemoUser: (email: string, password: string, targetRole: UserRole, mfaCode?: string, selectedUserId?: string) => Promise<{ success: boolean; error?: string }>;
+  loginConsumerOtp: (consumerNo: string, otp: string) => Promise<{ success: boolean; error?: string }>;
   loginAsCanonicalDemoAccount: (accountId: string, targetRole?: UserRole) => Promise<{ success: boolean; error?: string }>;
   switchDemoUserAccount: (accountId: string) => { success: boolean; error?: string };
   canonicalDemoAccounts: CanonicalDemoIdentity[];
@@ -4973,10 +4976,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true };
   };
 
+  const loginConsumerOtp = async (
+    consumerNo: string,
+    otp: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    const result = await verifyConsumerLoginOtp(consumerNo, otp);
+    if (!result.success || !result.session) {
+      return {
+        success: false,
+        error: result.error || 'Consumer OTP verification failed.'
+      };
+    }
+    const verifiedSession = result.session;
+    const assignedRole: UserRole = 'consumer';
+    const targetTab = resolvePostLoginTab(assignedRole, pendingConsumerTabRef.current);
+    pendingConsumerTabRef.current = null;
+
+    clearTransientUserModals();
+    demoSessionRef.current = verifiedSession;
+    currentRoleRef.current = assignedRole;
+    activeTabRef.current = targetTab;
+    hasEnteredPlatformRef.current = true;
+    setStoredActivePortalRuntime({
+      session: verifiedSession,
+      role: assignedRole,
+      tab: targetTab,
+      entered: true,
+      authMode,
+    });
+    setDemoSession(verifiedSession);
+    setCurrentRoleState(assignedRole);
+    setActiveTabState(targetTab);
+    setHasEnteredPlatformState(true);
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', `/${assignedRole}/${targetTab}`);
+    }
+    setIsRoleSwitcherModalOpenState(false);
+    showToast(`Welcome back, ${verifiedSession.user.name}.`, 'success');
+    addAuditEvent(
+      'CONSUMER_OTP_LOGIN',
+      'Workspace:consumer',
+      `OTP authenticated consumer session for ${consumerNo}`,
+      verifiedSession.user.name,
+      'SUCCESS'
+    );
+    return { success: true };
+  };
+
   const loginDemoUser = async (
     email: string,
     password: string,
     targetRole: UserRole,
+    mfaCode?: string,
     selectedUserId?: string
   ): Promise<{ success: boolean; error?: string }> => {
     // -------------------------------------------------------------------------
@@ -4984,7 +5035,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Never falls back to client-side authentication if server login fails.
     // -------------------------------------------------------------------------
     if (authMode === 'server') {
-      const serverResult = await loginWithServerApi(email, password, targetRole);
+      const serverResult = await loginWithServerApi(email, password, targetRole, mfaCode);
       if (!serverResult.success || !serverResult.session) {
         return {
           success: false,
@@ -8274,6 +8325,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         scopedNotifications,
         linkConnectionDemo,
         loginDemoUser,
+        loginConsumerOtp,
         loginAsCanonicalDemoAccount,
         switchDemoUserAccount,
         canonicalDemoAccounts: CANONICAL_DEMO_IDENTITIES,

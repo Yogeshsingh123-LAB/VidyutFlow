@@ -7,6 +7,7 @@ import { createAuthApiHandler } from './authRoutes';
 import { createAiChatHandler, createHealthHandler } from './runtimeMiddleware';
 import { handleMeterReadingRoute, isMeterReadingRoutePath } from './meterReadingRoutes';
 import { handleDirectoryRoute } from './directoryRoutes';
+import { handleConsumerProfileRoute, isConsumerProfileRoutePath } from './consumerProfileRoutes';
 
 /**
  * Standalone Production HTTP Server for VidyutFlow (Item #7).
@@ -145,6 +146,11 @@ export function createProductionRequestHandler(options?: {
 
     if (pathname === '/api/directory' || pathname.startsWith('/api/directory/')) {
       void handleDirectoryRoute(req, res);
+      return;
+    }
+
+    if (isConsumerProfileRoutePath(pathname)) {
+      void handleConsumerProfileRoute(req, res);
       return;
     }
 

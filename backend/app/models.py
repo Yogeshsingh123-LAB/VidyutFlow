@@ -451,3 +451,135 @@ class OfficeDataSource(Base):
     verification_status: Mapped[str] = mapped_column(String, default="VERIFIED", index=True)
     discrepancy_notes: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+# ==============================================================================
+# CONSUMER PROFILE SYSTEM (Citizen Unified Account, Addresses & Connections)
+# ==============================================================================
+
+class ConsumerProfile(Base):
+    """Core profile data for citizen electricity consumers & applicants."""
+    __tablename__ = "consumer_profiles"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True)
+    full_name: Mapped[str] = mapped_column(String)
+    date_of_birth: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    profile_photo_url: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    profile_completion_percentage: Mapped[int] = mapped_column(Integer, default=40)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+    user = relationship("User")
+
+
+class UserContact(Base):
+    """Verified contact coordinates and OTP state for multi-channel communication."""
+    __tablename__ = "user_contacts"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True)
+    mobile_number: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    mobile_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    email: Mapped[str] = mapped_column(String, index=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=True)
+    mobile_otp_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    mobile_otp_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    mobile_otp_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    email_otp_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    email_otp_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    email_otp_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+    user = relationship("User")
+
+
+class ConsumerAddress(Base):
+    """Permitted premises & correspondence addresses managed by citizen."""
+    __tablename__ = "consumer_addresses"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    address_type: Mapped[str] = mapped_column(String, default="RESIDENTIAL")
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    house_flat_no: Mapped[str] = mapped_column(String)
+    street: Mapped[str] = mapped_column(String)
+    area: Mapped[str] = mapped_column(String)
+    city_village: Mapped[str] = mapped_column(String)
+    taluka: Mapped[str] = mapped_column(String)
+    district: Mapped[str] = mapped_column(String)
+    state: Mapped[str] = mapped_column(String, default="Gujarat")
+    pin_code: Mapped[str] = mapped_column(String, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+    user = relationship("User")
+
+
+class ConsumerPreference(Base):
+    """Citizen preferences for multilingual communications and notification channels."""
+    __tablename__ = "consumer_preferences"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True)
+    preferred_language: Mapped[str] = mapped_column(String, default="en")
+    sms_notifications: Mapped[bool] = mapped_column(Boolean, default=True)
+    email_notifications: Mapped[bool] = mapped_column(Boolean, default=True)
+    bill_reminders: Mapped[bool] = mapped_column(Boolean, default=True)
+    outage_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
+    application_status_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+    user = relationship("User")
+
+
+class ConsumerConnectionLink(Base):
+    """Verified electricity connections linked to a citizen account (1:N support)."""
+    __tablename__ = "consumer_connections"
+    __table_args__ = (
+        UniqueConstraint("user_id", "consumer_no", name="uq_consumer_connections_user_no"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    consumer_no: Mapped[str] = mapped_column(String, index=True)
+    discom: Mapped[str] = mapped_column(String, default="UGVCL")
+    connection_type: Mapped[str] = mapped_column(String, default="RGP")
+    sanctioned_load_kw: Mapped[float] = mapped_column(Float, default=4.0)
+    official_address: Mapped[str] = mapped_column(Text)
+    subdivision: Mapped[str] = mapped_column(String)
+    feeder_name: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+    status: Mapped[str] = mapped_column(String, default="ACTIVE")
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    linked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    source: Mapped[str] = mapped_column(String, default="SELF_LINKED")
+    application_id: Mapped[str | None] = mapped_column(String, nullable=True, default=None)
+
+    user = relationship("User")
+
+
+class ConsumerConnectionOtp(Base):
+    """Transient OTP storage for linking an existing electricity connection."""
+    __tablename__ = "consumer_connection_otps"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    consumer_no: Mapped[str] = mapped_column(String, index=True)
+    masked_mobile: Mapped[str] = mapped_column(String)
+    otp_hash: Mapped[str] = mapped_column(String)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class ConsumerAuditLog(Base):
+    """Immutable audit trail of all profile and security modifications by a consumer."""
+    __tablename__ = "consumer_audit_logs"
+    __table_args__ = (
+        Index("ix_consumer_audit_user_created", "user_id", "created_at"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    event_type: Mapped[str] = mapped_column(String, index=True)
+    description: Mapped[str] = mapped_column(Text)
+    ip_address: Mapped[str] = mapped_column(String, default="")
+    user_agent: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+    user = relationship("User")

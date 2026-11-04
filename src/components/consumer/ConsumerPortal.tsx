@@ -116,6 +116,7 @@ import { ConsumerComplaintTimelineModal } from './ConsumerComplaintTimelineModal
 import { ConsumerMeterBillingSection } from './ConsumerMeterBillingSection';
 import { SmartPaymentCalendar } from './SmartPaymentCalendar';
 import { OverdueBillBreakdownCard } from './OverdueBillBreakdownCard';
+import { ConsumerProfileWorkspace } from './ConsumerProfileWorkspace';
 import {
   GeneratedOfficialDocument,
   getDocumentUiTranslations,
@@ -3642,75 +3643,16 @@ export const ConsumerPortal: React.FC = () => {
         </div>
       )}
 
-      {/* SUBVIEW 9: PROFILE */}
+      {/* SUBVIEW 9: CONSUMER PROFILE WORKSPACE */}
       {activeTab === 'profile' && (
-        <div className="max-w-3xl mx-auto p-4 sm:p-6 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-5 sm:space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3.5 sm:gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-blue-600 text-white font-extrabold text-lg sm:text-xl flex items-center justify-center shadow-md shrink-0">
-              {currentConsumerInitials}
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug break-words">
-                  {currentUserName}
-                </h2>
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded flex items-center gap-1 ${
-                  isDefaultDemoConsumer
-                    ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950'
-                    : 'text-blue-600 dark:text-cyan-400 bg-blue-50 dark:bg-blue-950'
-                }`}>
-                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                  {isDefaultDemoConsumer ? tc.kycVerifiedDemoBadge : tc.registeredCitizenAccount}
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed break-words">
-                {tc.accountIdLabel} <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{currentUserId}</span>
-                {selectedConnection ? ` · ${tc.primaryConnectionLabel} ${selectedConnection.consumerNo}` : ` · ${tc.noConnectionLinked}`}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div className="p-3.5 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">{tc.contactPhoneLabel}</span>
-              <div className="font-semibold text-slate-800 dark:text-slate-200 break-words">
-                {demoSession?.user.mobileNumber || (isDefaultDemoConsumer ? '+91 98250 14820' : tc.notProvided)}
-              </div>
-            </div>
-            <div className="p-3.5 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">{tc.registeredEmailLabel}</span>
-              <div className="font-semibold text-slate-800 dark:text-slate-200 break-words">
-                {currentUserEmail || tc.notSpecified}
-              </div>
-            </div>
-            <div className="p-3.5 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1 md:col-span-2">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">{tc.registeredPremisesAddressLabel}</span>
-              <div className="font-medium text-slate-800 dark:text-slate-200 break-words leading-relaxed">
-                {selectedConnection
-                  ? localizeConsumerAddress(selectedConnection.address, language)
-                  : isDefaultDemoConsumer
-                  ? localizeConsumerAddress('14, Anand Nagar Society, Visnagar Road, Mehsana - 384002', language)
-                  : tc.noServiceAddressDesc}
-              </div>
-            </div>
-            <div className="p-3.5 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">{tc.linkedConnectionsLabel}</span>
-              <div className="font-semibold text-slate-800 dark:text-slate-200">
-                {consumerConnections.length} {consumerConnections.length === 1 ? tc.activeMeterSingular : tc.activeMeterPlural}
-              </div>
-            </div>
-            <div className="p-3.5 rounded-lg border border-slate-100 dark:border-slate-800 space-y-1">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase">{tc.subDivisionJurisdictionLabel}</span>
-              <div className="font-semibold text-slate-800 dark:text-slate-200">
-                {selectedConnection ? localizeSubdivision(selectedConnection.subdivision, language) : tc.pendingAllocation}
-              </div>
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 text-xs text-slate-500">
-            {tc.cisSyncFooterNote}
-          </div>
-        </div>
+        <ConsumerProfileWorkspace
+          onNavigateToNewConnection={() => setActiveTab('new-connection')}
+          onLinkConnectionSuccess={(cNo) => {
+            if (setSelectedConnectionNo) {
+              setSelectedConnectionNo(cNo);
+            }
+          }}
+        />
       )}
 
       {/* REDESIGNED ENTERPRISE PAYMENT MODAL (PHASE 5 STEP 5.2) */}
