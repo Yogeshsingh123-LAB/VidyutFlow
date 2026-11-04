@@ -2,11 +2,6 @@ import React, { useState } from 'react';
 import {
   Building2,
   Calendar,
-  CheckCircle2,
-  MapPin,
-  ExternalLink,
-  ShieldCheck,
-  ChevronRight,
   Maximize2,
   Zap,
   FileCheck,
@@ -14,10 +9,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import {
-  UGVCL_CORPORATE_PROFILE,
   UGVCL_MILESTONES,
-  UgvclMilestone,
-  UGVCL_PHOTO_MANIFEST,
   UGVCL_INFRASTRUCTURE_FACTS
 } from '../../data/ugvclHistoryData';
 import { CountUpNumber } from './CountUpNumber';
@@ -26,6 +18,11 @@ import {
   getLocalizedMilestone,
   getLocalizedInfraFact
 } from '../../i18n/contentTranslations';
+import {
+  getTypographyRoleClasses,
+  isIndicScriptLanguage,
+  truncateAtWordBoundary
+} from '../../utils/typographyTokens';
 
 interface AboutUgvclSectionProps {
   onOpenPhoto: (id: string) => void;
@@ -33,6 +30,7 @@ interface AboutUgvclSectionProps {
 
 export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhoto }) => {
   const { dict, language } = useLanguage();
+  const isIndic = isIndicScriptLanguage(language);
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [expandedMilestones, setExpandedMilestones] = useState<Record<string, boolean>>({});
 
@@ -58,81 +56,136 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
       : UGVCL_MILESTONES.filter((m) => m.category === activeCategory);
 
   return (
-    <section id="about-ugvcl" className="w-full py-16 sm:py-24 bg-white dark:bg-[#0B1528] border-b border-slate-200 dark:border-slate-800 transition-colors">
+    <section
+      id="about-ugvcl"
+      data-testid="about-ugvcl-section"
+      className="w-full py-16 sm:py-24 bg-white dark:bg-[#0B1528] border-b border-slate-200 dark:border-slate-800 transition-colors"
+    >
       <div className="max-w-[1360px] mx-auto px-4 sm:px-8 lg:px-10 space-y-12 sm:space-y-16">
         {/* Section Header */}
         <div className="max-w-4xl space-y-3 text-left">
-          <div className="flex items-center gap-2 text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-cyan-400">
-            <Building2 className="w-4 h-4" />
+          <div
+            className={`flex items-center gap-2 text-xs sm:text-sm font-bold text-blue-700 dark:text-cyan-400 ${
+              isIndic ? 'tracking-normal' : 'uppercase tracking-wider'
+            }`}
+          >
+            <Building2 className="w-4 h-4 shrink-0" aria-hidden="true" />
             <span>{dict.about.badge}</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl lg:text-[40px] font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+          <h2
+            data-testid="about-ugvcl-heading"
+            className={`${getTypographyRoleClasses('sectionHeading', language)} text-slate-900 dark:text-white`}
+          >
             {dict.about.title}
           </h2>
-          <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
+          <p className={`${getTypographyRoleClasses('bodyText', language)} text-slate-600 dark:text-slate-300 max-w-[68ch]`}>
             {dict.about.subtitle}
           </p>
         </div>
 
-        {/* Alternating Photograph-and-Text Composition: Establishment & Service Territory */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+        {/* Alternating Photograph-and-Text Composition: Establishment & Service Territory (Top-Aligned) */}
+        <div
+          data-testid="about-ugvcl-map-grid"
+          className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start"
+        >
           {/* Left: Authentic UGVCL Area Map with Lightbox Zoom */}
           <div className="lg:col-span-5 relative group">
-            <div className="relative rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 shadow-md hover:shadow-2xl transition-all duration-300">
-              <img
-                src="/assets/ugvcl/area_map_ugvcl.jpg"
-                alt="Official Area Map of UGVCL"
-                loading="lazy"
-                decoding="async"
-                className="w-full h-auto object-cover group-hover:scale-102 transition-transform duration-500"
-              />
-              <button
-                type="button"
-                onClick={() => onOpenPhoto('photo-area-map')}
-                className="absolute bottom-4 right-4 px-3.5 py-2 rounded-xl bg-slate-950/85 hover:bg-slate-950 text-white text-xs font-bold flex items-center gap-2 backdrop-blur-md transition-all shadow-md cursor-pointer hover:scale-105"
-                title="Expand and inspect official territory boundaries"
-              >
-                <Maximize2 className="w-4 h-4" />
-                <span>{dict.about.viewFullMap}</span>
-              </button>
-            </div>
+            <div className="p-2.5 sm:p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-300">
+              <div className="relative rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800">
+                <img
+                  src="/assets/ugvcl/area_map_ugvcl.jpg"
+                  alt="Official Area Map of UGVCL"
+                  className="w-full h-auto object-cover group-hover:scale-102 transition-transform duration-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => onOpenPhoto('photo-area-map')}
+                  className="absolute bottom-3.5 right-3.5 px-3.5 py-2 rounded-xl bg-slate-950/85 hover:bg-slate-950 text-white text-xs font-bold flex items-center gap-2 backdrop-blur-md transition-all shadow-md cursor-pointer hover:scale-105"
+                  title="Expand and inspect official territory boundaries"
+                >
+                  <Maximize2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <span>{dict.about.viewFullMap}</span>
+                </button>
+              </div>
 
-            <div className="mt-2.5 text-left space-y-0.5">
-              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                {dict.about.mapCaption}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {dict.about.mapSource}
-              </p>
+              <div className="mt-3 px-1 text-left space-y-1">
+                <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 leading-snug">
+                  {dict.about.mapCaption}
+                </p>
+                <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 leading-normal">
+                  {dict.about.mapSource}
+                </p>
+              </div>
             </div>
           </div>
 
           {/* Right: Institutional Profile & Background */}
           <div className="lg:col-span-7 space-y-6 text-left">
-            <div className="space-y-4 text-slate-700 dark:text-slate-200 text-sm sm:text-base leading-relaxed">
+            <div
+              className={`space-y-4 text-slate-700 dark:text-slate-200 max-w-[68ch] ${getTypographyRoleClasses(
+                'bodyText',
+                language
+              )}`}
+            >
               <p>{dict.about.profileP1}</p>
               <p>{dict.about.profileP2}</p>
               <p>{dict.about.profileP3}</p>
             </div>
 
-            {/* Quick Facts Matrix */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 pt-1">
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 hover:border-blue-400/50 transition-colors">
-                <span className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400 block tracking-wider">{dict.about.quickFactIncorp}</span>
-                <span className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg block mt-1">{dict.about.quickFactIncorpVal}</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">{dict.about.quickFactIncorpSub}</span>
+            {/* Quick Facts Matrix — Uniform Equal-Height Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1 items-stretch">
+              <div className="p-4 sm:p-4.5 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 hover:border-blue-400/50 transition-colors flex flex-col justify-between min-h-[112px]">
+                <span
+                  className={`text-xs font-bold text-slate-500 dark:text-slate-400 block leading-snug ${
+                    isIndic ? 'tracking-normal' : 'uppercase tracking-wider'
+                  }`}
+                >
+                  {dict.about.quickFactIncorp}
+                </span>
+                <div className="mt-2">
+                  <span className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg block leading-snug">
+                    {dict.about.quickFactIncorpVal}
+                  </span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5 leading-snug">
+                    {dict.about.quickFactIncorpSub}
+                  </span>
+                </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 hover:border-blue-400/50 transition-colors">
-                <span className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400 block tracking-wider">{dict.about.quickFactOffice}</span>
-                <span className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg block mt-1">{dict.about.quickFactOfficeVal}</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">{dict.about.quickFactOfficeSub}</span>
+              <div className="p-4 sm:p-4.5 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 hover:border-blue-400/50 transition-colors flex flex-col justify-between min-h-[112px]">
+                <span
+                  className={`text-xs font-bold text-slate-500 dark:text-slate-400 block leading-snug ${
+                    isIndic ? 'tracking-normal' : 'uppercase tracking-wider'
+                  }`}
+                >
+                  {dict.about.quickFactOffice}
+                </span>
+                <div className="mt-2">
+                  <span className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg block leading-snug">
+                    {dict.about.quickFactOfficeVal}
+                  </span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5 leading-snug">
+                    {dict.about.quickFactOfficeSub}
+                  </span>
+                </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 hover:border-blue-400/50 transition-colors col-span-2 sm:col-span-1">
-                <span className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400 block tracking-wider">{dict.about.quickFactParent}</span>
-                <span className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg block mt-1">{dict.about.quickFactParentVal}</span>
-                <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">{dict.about.quickFactParentSub}</span>
+              <div className="p-4 sm:p-4.5 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 hover:border-blue-400/50 transition-colors flex flex-col justify-between min-h-[112px]">
+                <span
+                  className={`text-xs font-bold text-slate-500 dark:text-slate-400 block leading-snug ${
+                    isIndic ? 'tracking-normal' : 'uppercase tracking-wider'
+                  }`}
+                >
+                  {dict.about.quickFactParent}
+                </span>
+                <div className="mt-2">
+                  <span className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg block leading-snug">
+                    {dict.about.quickFactParentVal}
+                  </span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5 leading-snug">
+                    {dict.about.quickFactParentSub}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -143,20 +196,24 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
         {/* ================================================================= */}
         <div className="space-y-6 pt-8 border-t border-slate-200 dark:border-slate-800 text-left">
           <div className="max-w-3xl space-y-2">
-            <div className="flex items-center gap-2 text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-cyan-400">
-              <Zap className="w-4 h-4" />
+            <div
+              className={`flex items-center gap-2 text-xs sm:text-sm font-bold text-blue-700 dark:text-cyan-400 ${
+                isIndic ? 'tracking-normal' : 'uppercase tracking-wider'
+              }`}
+            >
+              <Zap className="w-4 h-4 shrink-0" aria-hidden="true" />
               <span>{dict.about.numbersTag}</span>
             </div>
-            <h3 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+            <h3 className={`${getTypographyRoleClasses('sectionHeading', language)} text-slate-900 dark:text-white`}>
               {dict.about.numbersTitle}
             </h3>
-            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 font-normal">
+            <p className={`${getTypographyRoleClasses('supportingText', language)} text-slate-600 dark:text-slate-300`}>
               {dict.about.numbersSubtitle}
             </p>
           </div>
 
           {/* Responsive Statistics Grid: 3 columns Desktop, 2 columns Tablet, 1 column Mobile */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
             {UGVCL_INFRASTRUCTURE_FACTS.map((stat) => {
               const localizedStat = getLocalizedInfraFact(stat, language);
               const trimmed = stat.value.trim();
@@ -167,11 +224,11 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
               return (
                 <div
                   key={stat.label}
-                  className="p-6 rounded-2xl bg-slate-50 dark:bg-[#0E1A33] border border-slate-200/90 dark:border-slate-800 hover:border-blue-500 dark:hover:border-cyan-400 shadow-xs hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between min-h-[175px] group text-left"
+                  className="p-6 rounded-2xl bg-slate-50 dark:bg-[#0E1A33] border border-slate-200/90 dark:border-slate-800 hover:border-blue-500 dark:hover:border-cyan-400 shadow-xs hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between min-h-[188px] group text-left"
                 >
                   <div className="space-y-3">
-                    {/* Readable 14–16px label without truncation */}
-                    <span className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 block leading-snug group-hover:text-blue-600 dark:group-hover:text-cyan-400 transition-colors">
+                    {/* Readable 15–17px label without truncation */}
+                    <span className="text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 block leading-snug group-hover:text-blue-600 dark:group-hover:text-cyan-400 transition-colors break-words">
                       {localizedStat.label}
                     </span>
 
@@ -190,7 +247,7 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
 
                   {/* Supporting text naturally wrapped */}
                   <div className="pt-3.5 mt-3.5 border-t border-slate-200 dark:border-slate-800/80">
-                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
+                    <p className={`${getTypographyRoleClasses('supportingText', language)} text-slate-600 dark:text-slate-300 break-words`}>
                       {localizedStat.note}
                     </p>
                   </div>
@@ -203,104 +260,145 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
         {/* ================================================================= */}
         {/* HISTORICAL TIMELINE & LANDMARK MILESTONES                         */}
         {/* ================================================================= */}
-        <div className="space-y-8 pt-8 border-t border-slate-200 dark:border-slate-800 text-left">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+        <div
+          data-testid="historical-timeline-section"
+          className="space-y-8 pt-8 border-t border-slate-200 dark:border-slate-800 text-left"
+        >
+          <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-5">
             <div className="max-w-3xl space-y-2">
-              <div className="flex items-center gap-2 text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-700 dark:text-cyan-400">
-                <Calendar className="w-4 h-4" />
+              <div
+                className={`flex items-center gap-2 text-xs sm:text-sm font-bold text-blue-700 dark:text-cyan-400 ${
+                  isIndic ? 'tracking-normal' : 'uppercase tracking-wider'
+                }`}
+              >
+                <Calendar className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span>{dict.about.timelineTag}</span>
               </div>
-              <h3 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+              <h3
+                data-testid="historical-timeline-heading"
+                className={`${getTypographyRoleClasses('sectionHeading', language)} text-slate-900 dark:text-white`}
+              >
                 {dict.about.timelineTitle}
               </h3>
-              <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 font-normal">
+              <p className={`${getTypographyRoleClasses('supportingText', language)} text-slate-600 dark:text-slate-300`}>
                 {dict.about.timelineSubtitle}
               </p>
             </div>
 
-            {/* Category Filter Controls */}
-            <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shrink-0">
-              {categories.map((cat) => (
-                <button
-                  key={cat.key}
-                  onClick={() => setActiveCategory(cat.key)}
-                  className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-blue-500 ${
-                    activeCategory === cat.key
-                      ? 'bg-white dark:bg-[#101C35] text-blue-700 dark:text-cyan-400 shadow-xs font-bold border border-slate-200/80 dark:border-blue-900/60'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60'
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Chronological Progress Rail (Desktop & Tablet) */}
-          <div className="hidden md:block relative pt-3 pb-5">
-            <div className="absolute top-7 left-6 right-6 h-0.5 bg-gradient-to-r from-blue-300 via-blue-500 to-cyan-400 dark:from-blue-900 dark:via-blue-700 dark:to-cyan-600 rounded-full opacity-60" />
-            <div className="relative flex justify-between items-center px-4 overflow-x-auto">
-              {filteredMilestones.map((item) => {
-                const localized = getLocalizedMilestone(item, language);
+            {/* Category Filter Controls — Balanced Height & Clean Wrapping Across Languages */}
+            <div
+              role="tablist"
+              aria-label={dict.about.timelineTitle}
+              className="flex flex-wrap items-center gap-1.5 sm:gap-2 p-1.5 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 w-full xl:w-auto"
+            >
+              {categories.map((cat) => {
+                const isSelected = activeCategory === cat.key;
                 return (
-                  <div
-                    key={`rail-${item.year}`}
-                    className="flex flex-col items-center group cursor-pointer"
-                    onClick={() => {
-                      const el = document.getElementById(`milestone-${item.year}`);
-                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    }}
-                    title={`Jump to ${item.year}: ${localized.title}`}
+                  <button
+                    key={cat.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={isSelected}
+                    onClick={() => setActiveCategory(cat.key)}
+                    className={`min-h-[38px] px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-blue-500 ${
+                      isSelected
+                        ? 'bg-white dark:bg-[#101C35] text-blue-700 dark:text-cyan-400 shadow-xs font-bold border border-slate-200/80 dark:border-blue-900/60'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/60'
+                    }`}
                   >
-                    <div className="w-3.5 h-3.5 rounded-full bg-blue-600 dark:bg-cyan-400 ring-4 ring-white dark:ring-[#0B1528] shadow-xs group-hover:scale-130 transition-transform" />
-                    <span className="text-xs font-bold font-mono text-slate-700 dark:text-slate-300 mt-2">
-                      {item.year}
-                    </span>
-                  </div>
+                    {cat.label}
+                  </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Redesigned Responsive Timeline Card Grid (3 columns Desktop, 2 Tablet, 1 Mobile) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
+          {/* Chronological Progress Rail (Desktop & Tablet) */}
+          <div className="hidden md:block relative pt-3 pb-4 overflow-x-auto">
+            <div className="min-w-[600px] relative px-4 py-1">
+              <div className="absolute top-2.5 left-6 right-6 h-0.5 bg-gradient-to-r from-blue-300 via-blue-500 to-cyan-400 dark:from-blue-900 dark:via-blue-700 dark:to-cyan-600 rounded-full opacity-60" />
+              <div className="relative flex justify-between items-center gap-4">
+                {filteredMilestones.map((item) => {
+                  const localized = getLocalizedMilestone(item, language);
+                  return (
+                    <button
+                      type="button"
+                      key={`rail-${item.year}`}
+                      className="flex flex-col items-center group cursor-pointer focus-visible:outline-2 focus-visible:outline-blue-500 rounded-md px-1"
+                      onClick={() => {
+                        const el = document.getElementById(`milestone-${item.year}`);
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      }}
+                      title={`Jump to ${item.year}: ${localized.title}`}
+                    >
+                      <div className="w-3.5 h-3.5 rounded-full bg-blue-600 dark:bg-cyan-400 ring-4 ring-white dark:ring-[#0B1528] shadow-xs group-hover:scale-125 transition-transform" />
+                      <span className="text-xs font-bold font-mono text-slate-700 dark:text-slate-300 mt-2">
+                        {item.year}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Responsive Timeline Card Grid (3 columns Desktop, 2 Tablet, 1 Mobile) — Natural Height Growth */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7 items-stretch">
             {filteredMilestones.map((item) => {
               const localized = getLocalizedMilestone(item, language);
               const itemKey = item.year;
               const isExpanded = !!expandedMilestones[itemKey];
-              const needsReadMore = localized.description.length > 130;
+              const { truncatedText, isTruncated: needsReadMore } = truncateAtWordBoundary(
+                localized.description,
+                175
+              );
               const displayText = isExpanded || !needsReadMore
                 ? localized.description
-                : `${localized.description.slice(0, 125)}...`;
+                : truncatedText;
 
               return (
-                <div
+                <article
                   id={`milestone-${item.year}`}
                   key={itemKey}
-                  className="p-6 sm:p-7 rounded-2xl bg-white dark:bg-[#0E1A33] border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-xl hover:border-blue-500 dark:hover:border-cyan-400 transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between min-h-[320px] group text-left"
+                  data-testid={`timeline-milestone-card-${item.year}`}
+                  className="p-6 sm:p-7 rounded-2xl bg-white dark:bg-[#0E1A33] border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-xl hover:border-blue-500 dark:hover:border-cyan-400 transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between min-h-[310px] h-full group text-left"
                 >
                   <div className="space-y-4">
                     {/* LEVEL 1: YEAR & LEVEL 2: CATEGORY */}
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center justify-between gap-2.5 flex-wrap">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-3.5 h-3.5 rounded-full bg-blue-600 dark:bg-cyan-400 ring-4 ring-blue-100 dark:ring-blue-950/80 shrink-0" />
+                        <div className="w-3 h-3 rounded-full bg-blue-600 dark:bg-cyan-400 ring-4 ring-blue-100 dark:ring-blue-950/80 shrink-0" />
                         <span className="text-2xl sm:text-3xl font-black text-blue-700 dark:text-cyan-400 font-mono tracking-tight">
                           {item.year}
                         </span>
                       </div>
-                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-md border border-slate-200 dark:border-slate-700/80">
+                      <span
+                        className={`text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800/90 px-3 py-1 rounded-md border border-slate-200 dark:border-slate-700/80 leading-snug ${
+                          isIndic ? 'tracking-normal' : 'uppercase tracking-wider'
+                        }`}
+                      >
                         {localized.category}
                       </span>
                     </div>
 
-                    {/* LEVEL 3: MILESTONE TITLE (19–22px) */}
-                    <h4 className="text-lg sm:text-[20px] font-bold text-slate-900 dark:text-white leading-snug group-hover:text-blue-600 dark:group-hover:text-cyan-400 transition-colors break-words">
+                    {/* LEVEL 3: MILESTONE TITLE */}
+                    <h4
+                      className={`${getTypographyRoleClasses(
+                        'cardHeading',
+                        language
+                      )} text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-cyan-400 transition-colors break-words`}
+                    >
                       {localized.title}
                     </h4>
 
-                    {/* LEVEL 4: SHORT DESCRIPTION (15–16px with Read More / Show Less) */}
-                    <div className="space-y-1.5 pt-0.5">
-                      <p className="text-[15px] sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed font-normal break-words">
+                    {/* LEVEL 4: DESCRIPTION WITH WORD-SAFE READ MORE / SHOW LESS */}
+                    <div className="space-y-2 pt-0.5">
+                      <p
+                        className={`${getTypographyRoleClasses(
+                          'supportingText',
+                          language
+                        )} text-slate-600 dark:text-slate-300 break-words`}
+                      >
                         {displayText}
                       </p>
                       {needsReadMore && (
@@ -312,26 +410,35 @@ export const AboutUgvclSection: React.FC<AboutUgvclSectionProps> = ({ onOpenPhot
                         >
                           <span>{isExpanded ? dict.common.showLess : dict.common.readMore}</span>
                           {isExpanded ? (
-                            <ChevronUp className="w-3.5 h-3.5" />
+                            <ChevronUp className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                           ) : (
-                            <ChevronDown className="w-3.5 h-3.5" />
+                            <ChevronDown className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                           )}
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {/* LEVEL 5: SOURCE / CITATION */}
+                  {/* LEVEL 5: VERIFIED SOURCE / CITATION */}
                   <div className="pt-4 mt-5 border-t border-slate-100 dark:border-slate-800/80 space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      <FileCheck className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400 shrink-0" />
+                    <div
+                      className={`flex items-center gap-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500 ${
+                        isIndic ? 'tracking-normal' : 'uppercase tracking-wider'
+                      }`}
+                    >
+                      <FileCheck className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400 shrink-0" aria-hidden="true" />
                       <span>{dict.about.verifiedCitation}</span>
                     </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-400 italic font-medium leading-normal break-words">
+                    <p
+                      className={`${getTypographyRoleClasses(
+                        'captionMetadata',
+                        language
+                      )} text-slate-600 dark:text-slate-400 break-words ${isIndic ? '' : 'italic'}`}
+                    >
                       {localized.verifiedSource}
                     </p>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>

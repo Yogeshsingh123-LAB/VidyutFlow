@@ -27,6 +27,7 @@ import {
   selectConsumerAccountBillingSummary,
   reconcileBillWithPayments,
   ConsumerAccountBillingSummary,
+  ConnectionBillingSummary,
   ReconciledElectricityBill,
   ConsumerBillingActorScope
 } from './billingEngine';
@@ -41,6 +42,12 @@ import {
   IncidentSessionUserContext
 } from './anomalyDetector';
 import { FieldOfflineQueueItem } from './fieldOfflineQueue';
+import {
+  OverdueFinancialBreakdown,
+  LateChargeWaiverRecord,
+  PaymentReversalRecord,
+  LateChargePolicy,
+} from './lateChargeEngine';
 
 // ============================================================================
 // SHARED TYPES FOR PHASE 6 CANONICAL ANALYTICS & KPI SELECTORS
@@ -74,6 +81,7 @@ export interface ConsumerCanonicalAnalytics {
   selectedConnection: ElectricityConnection | null;
   ownedConnectionsCount: number;
   billingSummary: ConsumerAccountBillingSummary;
+  selectedConnectionSummary: ConnectionBillingSummary;
   // Connection-scoped billing metrics
   connectionBillsCount: number;
   connectionDueBillsCount: number;
@@ -81,12 +89,19 @@ export interface ConsumerCanonicalAnalytics {
   connectionTotalBilledInr: number;
   connectionTotalPaidInr: number;
   connectionOutstandingBalanceInr: number;
+  connectionOverduePrincipalInr?: number;
+  connectionAccruedLateChargesInr?: number;
+  connectionTotalOutstandingWithChargesInr?: number;
   // Account-wide billing metrics
   accountBillsCount: number;
   accountDueBillsCount: number;
   accountTotalBilledInr: number;
   accountTotalPaidInr: number;
   accountOutstandingBalanceInr: number;
+  accountOverduePrincipalInr?: number;
+  accountAccruedLateChargesInr?: number;
+  accountTotalOutstandingWithChargesInr?: number;
+  activeOverdueBreakdown?: OverdueFinancialBreakdown | null;
   // Connection-scoped consumption & trend analytics
   consumptionTrendSeries: ConnectionConsumptionTrendPoint[];
   averageMonthlyKwh: number;
@@ -274,9 +289,13 @@ export interface EmployeeWorkloadAndSlaMetrics {
     paidBillsCount: number;
     unpaidBillsCount: number;
     partiallyPaidBillsCount: number;
+    overdueBillsCount?: number;
     totalBilledAmountInr: number;
     totalCollectedAmountInr: number;
     totalOutstandingAmountInr: number;
+    totalOverduePrincipalInr?: number;
+    totalAccruedLateChargesInr?: number;
+    totalOutstandingWithLateChargesInr?: number;
     liveCollectionEfficiencyPct: number;
     slabIntegrityWarnings: HistoricalBillSlabIntegrityWarning[];
   };
@@ -319,6 +338,9 @@ export interface ManagementCanonicalMetrics {
     liveErpTotalBilledInr: number;
     liveErpTotalCollectedInr: number;
     liveErpTotalOutstandingInr: number;
+    overduePrincipalInr?: number;
+    accruedLateChargesInr?: number;
+    totalOutstandingWithChargesInr?: number;
   };
   monthlyTrajectorySeries: ExecutiveMonthlyTrajectoryPoint[];
   feederSummary: {
@@ -384,6 +406,9 @@ export interface AdminCanonicalMetrics {
     offlineQueueFailed: number;
     totalCanonicalRecords: number;
   };
+  overduePrincipalInr: number;
+  accruedLateChargesInr: number;
+  totalOutstandingWithChargesInr: number;
 }
 
 export interface NotificationCanonicalMetrics {
@@ -546,6 +571,9 @@ export function selectConsumerCanonicalAnalytics(params: {
   actorScope: ConsumerBillingActorScope;
   selectedConnectionNo?: string | null;
   referenceDate?: string;
+  waivers?: LateChargeWaiverRecord[];
+  reversals?: PaymentReversalRecord[];
+  policy?: LateChargePolicy;
 }): ConsumerCanonicalAnalytics {
   const {
     connections,
@@ -556,7 +584,10 @@ export function selectConsumerCanonicalAnalytics(params: {
     notifications,
     actorScope,
     selectedConnectionNo,
-    referenceDate = '15-Oct-2026'
+    referenceDate = '15-Oct-2026',
+    waivers,
+    reversals,
+    policy,
   } = params;
 
   const billingSummary = selectConsumerAccountBillingSummary({
@@ -565,7 +596,10 @@ export function selectConsumerCanonicalAnalytics(params: {
     allPayments: payments,
     actorScope,
     selectedConnectionNo,
-    referenceDate
+    referenceDate,
+    waivers,
+    reversals,
+    policy,
   });
 
   const resolvedSelectedConnNo = billingSummary.selectedConnectionNo || null;
@@ -604,6 +638,30 @@ export function selectConsumerCanonicalAnalytics(params: {
     accountReconciledBills.reduce((sum, b) => sum + Math.max(0, Number(b.totalAmount) || 0), 0)
   );
   const accountOutstandingBalanceInr = Math.max(0, billingSummary.accountTotalOutstandingAmount);
+
+  // Step 4A: Late Payment Surcharges & Overdue Analytics
+  const connectionOverdueBills = connectionReconciledBills.filter(b => b.isOverdue || b.status === 'Overdue');
+  const connectionOverduePrincipalInr = Number(
+    connectionOverdueBills.reduce((sum, b) => sum + b.outstandingBalance, 0).toFixed(2)
+  );
+  const connectionAccruedLateChargesInr = Number(
+    connectionReconciledBills.reduce((sum, b) => sum + (b.lateChargeBreakdown?.netLateChargesPayable || 0), 0).toFixed(2)
+  );
+  const connectionTotalOutstandingWithChargesInr = Number(
+    (connectionOutstandingBalanceInr + connectionAccruedLateChargesInr).toFixed(2)
+  );
+
+  const accountOverdueBills = accountReconciledBills.filter(b => b.isOverdue || b.status === 'Overdue');
+  const accountOverduePrincipalInr = Number(
+    accountOverdueBills.reduce((sum, b) => sum + b.outstandingBalance, 0).toFixed(2)
+  );
+  const accountAccruedLateChargesInr = Number(
+    accountReconciledBills.reduce((sum, b) => sum + (b.lateChargeBreakdown?.netLateChargesPayable || 0), 0).toFixed(2)
+  );
+  const accountTotalOutstandingWithChargesInr = Number(
+    (accountOutstandingBalanceInr + accountAccruedLateChargesInr).toFixed(2)
+  );
+  const activeOverdueBreakdown = connectionOverdueBills[0]?.lateChargeBreakdown || accountOverdueBills[0]?.lateChargeBreakdown || null;
 
   // Total paid across account includes reconciled bill payments plus any historical archived payments (e.g. TXN-DEB-1192837462)
   const reconciledBillNoSet = new Set(accountReconciledBills.map(b => b.billNo));
@@ -767,17 +825,25 @@ export function selectConsumerCanonicalAnalytics(params: {
     selectedConnection,
     ownedConnectionsCount: connections.length,
     billingSummary,
+    selectedConnectionSummary: selectedConnSummary,
     connectionBillsCount,
     connectionDueBillsCount,
     connectionPaidBillsCount,
     connectionTotalBilledInr,
     connectionTotalPaidInr,
     connectionOutstandingBalanceInr,
+    connectionOverduePrincipalInr,
+    connectionAccruedLateChargesInr,
+    connectionTotalOutstandingWithChargesInr,
     accountBillsCount,
     accountDueBillsCount,
     accountTotalBilledInr,
     accountTotalPaidInr,
     accountOutstandingBalanceInr,
+    accountOverduePrincipalInr,
+    accountAccruedLateChargesInr,
+    accountTotalOutstandingWithChargesInr,
+    activeOverdueBreakdown,
     consumptionTrendSeries,
     averageMonthlyKwh,
     averageMonthlyBillInr,
@@ -1439,6 +1505,10 @@ export function selectEmployeeWorkloadAndSlaMetrics(params: {
   subdivisionScope?: string;
   activeUser?: IncidentSessionUserContext | null;
   referenceNow?: Date | string | number;
+  referenceDate?: string;
+  waivers?: LateChargeWaiverRecord[];
+  reversals?: PaymentReversalRecord[];
+  policy?: LateChargePolicy;
 }): EmployeeWorkloadAndSlaMetrics {
   const {
     applications,
@@ -1450,7 +1520,11 @@ export function selectEmployeeWorkloadAndSlaMetrics(params: {
     fieldEngineers = [],
     subdivisionScope,
     activeUser,
-    referenceNow = '2026-10-15T12:00:00.000Z'
+    referenceNow = '2026-10-15T12:00:00.000Z',
+    referenceDate,
+    waivers,
+    reversals,
+    policy,
   } = params;
 
   const appMetrics = selectApplicationCanonicalMetrics({
@@ -1484,13 +1558,23 @@ export function selectEmployeeWorkloadAndSlaMetrics(params: {
     workOrders
   });
 
-  const reconciledLedger = bills.map(b => reconcileBillWithPayments(b, payments, '15-Oct-2026'));
+  const referenceDateStr = referenceDate || '28-Oct-2026';
+  const reconciledLedger = bills.map(b =>
+    reconcileBillWithPayments(b, payments, referenceDateStr, {
+      waivers,
+      reversals,
+      policy,
+    })
+  );
   let paidBillsCount = 0;
   let unpaidBillsCount = 0;
   let partiallyPaidBillsCount = 0;
+  let overdueBillsCount = 0;
   let totalBilledAmountInr = 0;
   let totalPaidAgainstBillsInr = 0;
   let totalOutstandingAmountInr = 0;
+  let totalOverduePrincipalInr = 0;
+  let totalAccruedLateChargesInr = 0;
 
   const billNoSet = new Set<string>();
   for (const rec of reconciledLedger) {
@@ -1498,14 +1582,28 @@ export function selectEmployeeWorkloadAndSlaMetrics(params: {
     totalBilledAmountInr += Math.max(0, Number(rec.totalAmount) || 0);
     totalPaidAgainstBillsInr += Math.max(0, Number(rec.paidAmount) || 0);
     totalOutstandingAmountInr += Math.max(0, Number(rec.remainingBalance) || 0);
-    if (rec.effectiveStatus === 'Paid') paidBillsCount += 1;
-    else if (rec.effectiveStatus === 'Partially Paid') {
+    const lateCharge = rec.lateChargeBreakdown?.netLateChargesPayable || 0;
+    totalAccruedLateChargesInr += lateCharge;
+
+    if (rec.effectiveStatus === 'Paid') {
+      paidBillsCount += 1;
+    } else if (rec.effectiveStatus === 'Overdue' || rec.isOverdue) {
+      overdueBillsCount += 1;
+      unpaidBillsCount += 1;
+      totalOverduePrincipalInr += Math.max(0, Number(rec.remainingBalance) || 0);
+    } else if (rec.effectiveStatus === 'Partially Paid') {
       partiallyPaidBillsCount += 1;
       unpaidBillsCount += 1;
     } else {
       unpaidBillsCount += 1;
     }
   }
+
+  totalAccruedLateChargesInr = Number(totalAccruedLateChargesInr.toFixed(2));
+  totalOverduePrincipalInr = Number(totalOverduePrincipalInr.toFixed(2));
+  const totalOutstandingWithLateChargesInr = Number(
+    (totalOutstandingAmountInr + totalAccruedLateChargesInr).toFixed(2)
+  );
 
   // Include archived historical payment records safely without double-counting
   const archivedPaidInr = payments
@@ -1533,9 +1631,13 @@ export function selectEmployeeWorkloadAndSlaMetrics(params: {
       paidBillsCount,
       unpaidBillsCount,
       partiallyPaidBillsCount,
+      overdueBillsCount,
       totalBilledAmountInr,
       totalCollectedAmountInr,
       totalOutstandingAmountInr,
+      totalOverduePrincipalInr,
+      totalAccruedLateChargesInr,
+      totalOutstandingWithLateChargesInr,
       liveCollectionEfficiencyPct,
       slabIntegrityWarnings
     }
@@ -1556,6 +1658,10 @@ export function selectManagementCanonicalMetrics(params: {
   feeders?: FeederHealth[];
   timePeriod?: ManagementTimePeriod;
   activeUser?: IncidentSessionUserContext | null;
+  referenceDate?: string;
+  waivers?: LateChargeWaiverRecord[];
+  reversals?: PaymentReversalRecord[];
+  policy?: LateChargePolicy;
 }): ManagementCanonicalMetrics {
   const {
     applications,
@@ -1566,7 +1672,11 @@ export function selectManagementCanonicalMetrics(params: {
     payments,
     feeders = FEEDER_METRICS,
     timePeriod = 'Q2-2026',
-    activeUser
+    activeUser,
+    referenceDate,
+    waivers,
+    reversals,
+    policy,
   } = params;
 
   const appMetrics = selectApplicationCanonicalMetrics({ applications });
@@ -1584,7 +1694,14 @@ export function selectManagementCanonicalMetrics(params: {
   ).length;
 
   // Reconcile live ERP billing and payment ledger
-  const reconciledLedger = bills.map(b => reconcileBillWithPayments(b, payments, '15-Oct-2026'));
+  const refDateStr = referenceDate || '28-Oct-2026';
+  const reconciledLedger = bills.map(b =>
+    reconcileBillWithPayments(b, payments, refDateStr, {
+      waivers,
+      reversals,
+      policy,
+    })
+  );
   const billNoSet = new Set(reconciledLedger.map(r => r.billNo));
   const liveBilledActiveInr = reconciledLedger.reduce(
     (sum, r) => sum + Math.max(0, Number(r.totalAmount) || 0),
@@ -1597,6 +1714,20 @@ export function selectManagementCanonicalMetrics(params: {
   const liveOutstandingInr = reconciledLedger.reduce(
     (sum, r) => sum + Math.max(0, Number(r.remainingBalance) || 0),
     0
+  );
+  const overduePrincipalInr = Number(
+    reconciledLedger
+      .filter(r => r.isOverdue || r.effectiveStatus === 'Overdue')
+      .reduce((sum, r) => sum + Math.max(0, Number(r.remainingBalance) || 0), 0)
+      .toFixed(2)
+  );
+  const accruedLateChargesInr = Number(
+    reconciledLedger
+      .reduce((sum, r) => sum + (r.lateChargeBreakdown?.netLateChargesPayable || 0), 0)
+      .toFixed(2)
+  );
+  const totalOutstandingWithChargesInr = Number(
+    (liveOutstandingInr + accruedLateChargesInr).toFixed(2)
   );
   const archivedPaymentsInr = payments
     .filter(p => p.status === 'Successful' && !billNoSet.has(p.billNo))
@@ -1738,7 +1869,10 @@ export function selectManagementCanonicalMetrics(params: {
       liveErpCollectionRatePct,
       liveErpTotalBilledInr,
       liveErpTotalCollectedInr,
-      liveErpTotalOutstandingInr: liveOutstandingInr
+      liveErpTotalOutstandingInr: liveOutstandingInr,
+      overduePrincipalInr,
+      accruedLateChargesInr,
+      totalOutstandingWithChargesInr
     },
     monthlyTrajectorySeries,
     feederSummary: {
@@ -1774,6 +1908,10 @@ export function selectAdminCanonicalMetrics(params: {
   fieldEngineers: FieldEngineerRecord[];
   systemServices?: SystemServiceStatus[];
   staffUsers?: Array<{ id: string; status: 'Active' | 'Locked' }>;
+  referenceDate?: string;
+  waivers?: LateChargeWaiverRecord[];
+  reversals?: PaymentReversalRecord[];
+  policy?: LateChargePolicy;
 }): AdminCanonicalMetrics {
   const {
     consumers,
@@ -1790,7 +1928,11 @@ export function selectAdminCanonicalMetrics(params: {
     employees,
     fieldEngineers,
     systemServices = SYSTEM_SERVICES,
-    staffUsers = []
+    staffUsers = [],
+    referenceDate,
+    waivers,
+    reversals,
+    policy,
   } = params;
 
   const totalServices = systemServices.length;
@@ -1834,7 +1976,14 @@ export function selectAdminCanonicalMetrics(params: {
       l.action.includes('RESTORE')
   ).length;
 
-  const reconciledBills = bills.map(b => reconcileBillWithPayments(b, payments, '15-Oct-2026'));
+  const adminRefDate = referenceDate || '15-Oct-2026';
+  const reconciledBills = bills.map(b =>
+    reconcileBillWithPayments(b, payments, adminRefDate, {
+      waivers,
+      reversals,
+      policy,
+    })
+  );
   const billNoSet = new Set(reconciledBills.map(r => r.billNo));
   const unpaidBills = reconciledBills.filter(r => r.effectiveStatus !== 'Paid').length;
   const paidBills = reconciledBills.filter(r => r.effectiveStatus === 'Paid').length;
@@ -1853,6 +2002,20 @@ export function selectAdminCanonicalMetrics(params: {
   const totalOutstandingInr = reconciledBills.reduce(
     (sum, r) => sum + Math.max(0, Number(r.remainingBalance) || 0),
     0
+  );
+  const overduePrincipalInr = Number(
+    reconciledBills
+      .filter(r => r.isOverdue || r.effectiveStatus === 'Overdue')
+      .reduce((sum, r) => sum + Math.max(0, Number(r.remainingBalance) || 0), 0)
+      .toFixed(2)
+  );
+  const accruedLateChargesInr = Number(
+    reconciledBills
+      .reduce((sum, r) => sum + (r.lateChargeBreakdown?.netLateChargesPayable || 0), 0)
+      .toFixed(2)
+  );
+  const totalOutstandingWithChargesInr = Number(
+    (totalOutstandingInr + accruedLateChargesInr).toFixed(2)
   );
 
   const activeApplications = applications.filter(
@@ -1937,7 +2100,10 @@ export function selectAdminCanonicalMetrics(params: {
       offlineQueueCompleted: queueMetrics.completedCount,
       offlineQueueFailed: queueMetrics.failedCount,
       totalCanonicalRecords
-    }
+    },
+    overduePrincipalInr,
+    accruedLateChargesInr,
+    totalOutstandingWithChargesInr
   };
 }
 

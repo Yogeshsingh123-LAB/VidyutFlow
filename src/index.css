@@ -2,6 +2,12 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --font-sans: 'Plus Jakarta Sans', 'Noto Sans Gujarati', 'Noto Sans Devanagari', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Plus Jakarta Sans', 'Noto Sans Gujarati', 'Noto Sans Devanagari', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Noto Sans Gujarati', 'Noto Sans Devanagari', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
 @layer base {
   :root {
     --primary-navy: #071329;
@@ -15,19 +21,66 @@
     --focus-ring-color: #2563eb;
     --radius-card: 0.75rem;
     --radius-control: 0.5rem;
+    --font-active-sans: 'Plus Jakarta Sans', 'Noto Sans Gujarati', 'Noto Sans Devanagari', system-ui, -apple-system, sans-serif;
   }
 
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    font-family: var(--font-active-sans);
+    text-rendering: optimizeLegibility;
+  }
+
+  html[lang="gu"],
+  html[data-lang="gu"] {
+    --font-active-sans: 'Noto Sans Gujarati', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-active-sans);
+  }
+
+  html[lang="hi"],
+  html[data-lang="hi"],
+  html[lang="mr"],
+  html[data-lang="mr"] {
+    --font-active-sans: 'Noto Sans Devanagari', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-active-sans);
   }
 
   body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-active-sans);
     color: #0f172a;
     background-color: #f8fafc;
     overflow-x: hidden;
     min-width: 320px;
+  }
+
+  /* Script-aware Indic typography safeguards (Gujarati, Hindi, Marathi):
+     1. Prevent synthetic oblique/italic distortion on Indic glyphs.
+     2. Normalize excessive Latin letter-spacing so conjuncts/matras never separate.
+     3. Provide vertical breathing room so top/bottom vowel signs (matras) never clip. */
+  html[lang="gu"] :is(h1, h2, h3, h4, h5, h6),
+  html[lang="hi"] :is(h1, h2, h3, h4, h5, h6),
+  html[lang="mr"] :is(h1, h2, h3, h4, h5, h6) {
+    letter-spacing: 0em;
+    line-height: 1.32;
+  }
+
+  html[lang="gu"] :is(p, li, td, dd, blockquote),
+  html[lang="hi"] :is(p, li, td, dd, blockquote),
+  html[lang="mr"] :is(p, li, td, dd, blockquote) {
+    line-height: 1.65;
+    letter-spacing: 0em;
+  }
+
+  html[lang="gu"] :is(.tracking-wider, .tracking-widest, .tracking-tight, .tracking-tighter),
+  html[lang="hi"] :is(.tracking-wider, .tracking-widest, .tracking-tight, .tracking-tighter),
+  html[lang="mr"] :is(.tracking-wider, .tracking-widest, .tracking-tight, .tracking-tighter) {
+    letter-spacing: 0em !important;
+  }
+
+  html[lang="gu"] .italic,
+  html[lang="hi"] .italic,
+  html[lang="mr"] .italic {
+    font-style: normal;
   }
 
   /* Accessible visible keyboard focus indicators across all interactive elements */
@@ -37,17 +90,23 @@
   select:focus-visible,
   textarea:focus-visible,
   [role="button"]:focus-visible,
+  [role="menuitem"]:focus-visible,
+  [role="option"]:focus-visible,
   [tabindex]:focus-visible {
     outline: 2px solid var(--focus-ring-color);
     outline-offset: 2px;
   }
 
   .font-gujarati {
-    font-family: 'Noto Sans Gujarati', 'Shruti', 'Gujarati Sangam MN', system-ui, -apple-system, sans-serif;
+    font-family: 'Noto Sans Gujarati', 'Plus Jakarta Sans', 'Shruti', 'Gujarati Sangam MN', system-ui, -apple-system, sans-serif;
+  }
+
+  .font-devanagari {
+    font-family: 'Noto Sans Devanagari', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   }
 
   code, pre, .font-mono {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'JetBrains Mono', 'Noto Sans Gujarati', 'Noto Sans Devanagari', monospace;
   }
 }
 

@@ -12,6 +12,7 @@ import {
 import { UGVCL_AWARDS } from '../../data/ugvclHistoryData';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { getLocalizedAward } from '../../i18n/contentTranslations';
+import { truncateAtWordBoundary } from '../../utils/typographyTokens';
 
 export const AchievementsSection: React.FC = () => {
   const { dict, language } = useLanguage();
@@ -42,19 +43,22 @@ export const AchievementsSection: React.FC = () => {
         </div>
 
         {/* 1. Redesigned National Discom Ratings & Achievements Grid (Up to 3 columns Desktop, 2 Tablet, 1 Mobile) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7 items-stretch">
           {UGVCL_AWARDS.map((award) => {
             const localized = getLocalizedAward(award, language);
             const isExpanded = !!expandedAwards[award.id];
-            const needsReadMore = localized.significance.length > 120;
+            const { truncatedText, isTruncated: needsReadMore } = truncateAtWordBoundary(
+              localized.significance,
+              165
+            );
             const displayText = isExpanded || !needsReadMore
               ? localized.significance
-              : `${localized.significance.slice(0, 115)}...`;
+              : truncatedText;
 
             return (
               <div
                 key={award.id}
-                className="p-6 sm:p-7 rounded-2xl bg-white dark:bg-[#0E1A33] border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-xl hover:border-amber-400 dark:hover:border-amber-500/60 transition-all duration-300 hover:-translate-y-1 text-left flex flex-col justify-between min-h-[340px] group"
+                className="p-6 sm:p-7 rounded-2xl bg-white dark:bg-[#0E1A33] border border-slate-200/90 dark:border-slate-800 shadow-xs hover:shadow-xl hover:border-amber-400 dark:hover:border-amber-500/60 transition-all duration-300 hover:-translate-y-1 text-left flex flex-col justify-between min-h-[340px] h-full group"
               >
                 <div className="space-y-4">
                   {/* LEVEL 1: YEAR / CATEGORY */}

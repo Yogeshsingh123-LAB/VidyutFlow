@@ -1,10 +1,18 @@
 {
-  "name": "VidyutOne - UGVCL Intelligent Utility ERP & Portal",
-  "short_name": "VidyutOne",
+  "id": "/",
+  "name": "VidyutFlow - UGVCL Intelligent Utility ERP & Portal",
+  "short_name": "VidyutFlow",
+  "description": "Next-generation, secure and intelligent IT infrastructure and user-friendly ERP/portal ecosystem for Uttar Gujarat Vij Company Limited (UGVCL).",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#F5F7FB",
   "theme_color": "#1E3A8A",
+  "lang": "en-IN",
+  "dir": "ltr",
+  "categories": ["utilities", "productivity", "business"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/assets/ugvcl-logo.png",

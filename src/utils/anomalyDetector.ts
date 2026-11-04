@@ -1302,9 +1302,21 @@ export function sanitizeAndScopeIncidentNotifications(
     }
 
     if (n.incidentId) {
+      // Consumers are strictly prohibited from viewing internal incident notifications
+      if (effectiveRole === 'consumer') {
+        continue;
+      }
+
       const inc = incidentMap.get(n.incidentId);
 
-      if (effectiveRole === 'field') {
+      if (effectiveRole === 'employee') {
+        if (inc) {
+          const auth = authorizeEmployeeAction(inc, 'employee', activeUser);
+          if (!auth.isAuthorized) {
+            continue;
+          }
+        }
+      } else if (effectiveRole === 'field') {
         if (inc) {
           const auth = authorizeIncidentModalAccess(inc, 'field', activeUser);
           if (!auth.isAuthorized) {

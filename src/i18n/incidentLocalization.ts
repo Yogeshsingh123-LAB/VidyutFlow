@@ -1241,6 +1241,83 @@ export function localizeIncidentNotification<T extends { title: string; message:
     })[lang];
   }
 
+  m = title.match(/^Critical\s+Incident\s+Detected:\s*#?(INC-[A-Za-z0-9-]+)$/i);
+  if (m) {
+    const incId = m[1];
+    title = ({
+      en: title,
+      gu: "ગંભીર ઘટના જણાઈ: " + incId,
+      hi: "गंभीर घटना पहचानी गई: " + incId,
+      mr: "अति-गंभीर घटना आढळली: " + incId
+    })[lang];
+  }
+
+  m = title.match(/^Escalated\s+Incident:\s*#?(INC-[A-Za-z0-9-]+)$/i);
+  if (m) {
+    const incId = m[1];
+    title = ({
+      en: title,
+      gu: "એસ્કેલેટ કરેલ ઘટના: " + incId,
+      hi: "अग्रेषित घटना: " + incId,
+      mr: "वरिष्ठांकडे पाठवलेली घटना: " + incId
+    })[lang];
+  }
+
+  m = title.match(/^Incident\s+Acknowledged:\s*#?(INC-[A-Za-z0-9-]+)$/i);
+  if (m) {
+    const incId = m[1];
+    title = ({
+      en: title,
+      gu: "ઘટના સ્વીકારાઈ: " + incId,
+      hi: "घटना स्वीकृत की गई: " + incId,
+      mr: "घटना स्वीकारली गेली: " + incId
+    })[lang];
+  }
+
+  m = title.match(/^Incident\s+Severity\s+Changed:\s*#?(INC-[A-Za-z0-9-]+)$/i);
+  if (m) {
+    const incId = m[1];
+    title = ({
+      en: title,
+      gu: "ઘટનાની ગંભીરતા બદલાઈ: #" + incId,
+      hi: "घटना की गंभीरता बदली: #" + incId,
+      mr: "घटनेचे गांभीर्य बदलले: #" + incId
+    })[lang];
+  }
+
+  m = title.match(/^Field\s+Assistance\s+Requested:\s*#?(INC-[A-Za-z0-9-]+)$/i);
+  if (m) {
+    const incId = m[1];
+    title = ({
+      en: title,
+      gu: "ફીલ્ડ સહાયતા માંગી: #" + incId,
+      hi: "फील्ड सहायता का अनुरोध: #" + incId,
+      mr: "फील्ड सहाय्याची विनंती: #" + incId
+    })[lang];
+  }
+
+  m = title.match(/^Incident\s+Closed:\s*#?(INC-[A-Za-z0-9-]+)$/i);
+  if (m) {
+    const incId = m[1];
+    title = ({
+      en: title,
+      gu: "ઘટના બંધ કરાઈ: " + incId,
+      hi: "घटना बंद की गई: " + incId,
+      mr: "घटना बंद केली: " + incId
+    })[lang];
+  }
+
+  m = title.match(/^SLA\s+Breach\s+Risk:\s*#?(INC-[A-Za-z0-9-]+)$/i);
+  if (m) {
+    const incId = m[1];
+    title = ({
+      en: title,
+      gu: "SLA સમયમર્યાદા ભંગ જોખમ: #" + incId,
+      hi: "SLA समय-सीमा उल्लंघन जोखिम: #" + incId,
+      mr: "SLA मुदत उल्लंघन धोका: #" + incId
+    })[lang];
+  }
+
   if (title === notif.title) {
     title = localizeIncidentTitle(title, lang);
   }
@@ -1257,13 +1334,64 @@ export function localizeIncidentNotification<T extends { title: string; message:
       mr: `फील्ड अभियंता ${engName} यांनी पुष्टी केलेल्या सुरक्षा धोक्याची (${locClass}) नोंद केली: ${locRem}`
     })[lang];
   } else {
-    const localizedDesc = localizeIncidentDescription(message, lang);
-    if (localizedDesc !== message) {
-      message = localizedDesc;
+    // Specific incident notification message matchers
+    const mSevMsg = message.match(/^Incident\s+([A-Za-z0-9-]+)\s+severity\s+changed\s+from\s+([A-Za-z0-9_]+)\s+to\s+([A-Za-z0-9_]+)\s+by\s+(.+?)\.\s*Reason:\s*(.+)$/i);
+    const mAckMsg = message.match(/^Incident\s+([A-Za-z0-9-]+)\s+has\s+been\s+acknowledged\s+by\s+(.+?)\.\s*(.+)$/i);
+    const mResMsg = message.match(/^Incident\s+([A-Za-z0-9-]+)\s+resolved\s+by\s+(.+?)\.\s*Resolution:\s*(.+)$/i);
+    const mEscResMsg = message.match(/^Escalated\s+incident\s+([A-Za-z0-9-]+)\s+resolved\s+by\s+(.+?)\.\s*Resolution:\s*(.+)$/i);
+    const mEscMsg = message.match(/^Escalated\s+to\s+(.+?)\s+by\s+(.+?):\s*(.+)$/i);
+
+    if (mSevMsg) {
+      const [, incId, prevSev, newSev, actor, cleanReason] = mSevMsg;
+      const locPrev = localizeIncidentSeverity(prevSev, lang);
+      const locNew = localizeIncidentSeverity(newSev, lang);
+      message = ({
+        en: message,
+        gu: `ઘટના ${incId} ની ગંભીરતા ${actor} દ્વારા ${locPrev} થી બદલીને ${locNew} કરવામાં આવી. કારણ: ${cleanReason}`,
+        hi: `घटना ${incId} की गंभीरता ${actor} द्वारा ${locPrev} से बदलकर ${locNew} की गई। कारण: ${cleanReason}`,
+        mr: `घटना ${incId} चे गांभीर्य ${actor} द्वारे ${locPrev} वरून ${locNew} करण्यात आले. कारण: ${cleanReason}`
+      })[lang];
+    } else if (mAckMsg) {
+      const [, incId, actor, extra] = mAckMsg;
+      message = ({
+        en: message,
+        gu: `ઘટના ${incId} ${actor} દ્વારા સ્વીકારવામાં આવી છે. પ્રાથમિક તપાસ પ્રગતિમાં છે.`,
+        hi: `घटना ${incId} को ${actor} द्वारा स्वीकृत किया गया है। प्रारंभिक जांच जारी है।`,
+        mr: `घटना ${incId} ${actor} द्वारे स्वीकारली गेली आहे. प्राथमिक तपास सुरू आहे.`
+      })[lang];
+    } else if (mResMsg) {
+      const [, incId, actor, resNotes] = mResMsg;
+      message = ({
+        en: message,
+        gu: `ઘટના ${incId} ${actor} દ્વારા ઉકેલવામાં આવી. નિવારણ નોંધ: ${resNotes}`,
+        hi: `घटना ${incId} का समाधान ${actor} द्वारा किया गया। समाधान विवरण: ${resNotes}`,
+        mr: `घटना ${incId} चे निवारण ${actor} द्वारे करण्यात आले. निवारण नोंदी: ${resNotes}`
+      })[lang];
+    } else if (mEscResMsg) {
+      const [, incId, actor, resNotes] = mEscResMsg;
+      message = ({
+        en: message,
+        gu: `એસ્કેલેટ કરેલ ઘટના ${incId} ${actor} દ્વારા ઉકેલાઈ. નિવારણ: ${resNotes}`,
+        hi: `अग्रेषित घटना ${incId} का समाधान ${actor} द्वारा हुआ। समाधान: ${resNotes}`,
+        mr: `वरिष्ठांकडे पाठवलेली घटना ${incId} चे निवारण ${actor} द्वारे झाले. निवारण: ${resNotes}`
+      })[lang];
+    } else if (mEscMsg) {
+      const [, target, actor, reason] = mEscMsg;
+      message = ({
+        en: message,
+        gu: `${actor} દ્વારા ${target} ને એસ્કેલેટ કરવામાં આવી: ${reason}`,
+        hi: `${actor} द्वारा ${target} को अग्रेषित की गई: ${reason}`,
+        mr: `${actor} द्वारे ${target} कडे पाठवले गेले: ${reason}`
+      })[lang];
     } else {
-      const localizedAudit = localizeAuditTrailNote(message, lang);
-      if (localizedAudit !== message) {
-        message = localizedAudit;
+      const localizedDesc = localizeIncidentDescription(message, lang);
+      if (localizedDesc !== message) {
+        message = localizedDesc;
+      } else {
+        const localizedAudit = localizeAuditTrailNote(message, lang);
+        if (localizedAudit !== message) {
+          message = localizedAudit;
+        }
       }
     }
   }

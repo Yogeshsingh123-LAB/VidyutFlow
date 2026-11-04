@@ -68,9 +68,10 @@ export interface ExportColumnDefinition<T = Record<string, unknown>> {
 }
 
 export interface ExportActorIdentity {
-  id: string;
+  id?: string;
+  userId?: string;
   name: string;
-  role: UserRole;
+  role?: UserRole;
   email?: string;
   subdivision?: string;
   consumerNo?: string;

@@ -1429,6 +1429,24 @@ export function localizeAuditLogEntry(
       hi: 'AI अनुशंसा अस्वीकृत की गई',
       mr: 'AI शिफारस फेटाळली'
     },
+    DEMO_BACKUP_CREATED: {
+      en: 'DEMO_BACKUP_CREATED',
+      gu: 'ડેમો સિસ્ટમ બેકઅપ નિર્માણ',
+      hi: 'डेमो सिस्टम बैकअप निर्माण',
+      mr: 'डेमो प्रणाली बॅकअप निर्मिती'
+    },
+    DEMO_BACKUP_DOWNLOADED: {
+      en: 'DEMO_BACKUP_DOWNLOADED',
+      gu: 'ડેમો બેકઅપ ફાઇલ ડાઉનલોડ',
+      hi: 'डेमो बैकअप फ़ाइल डाउनलोड',
+      mr: 'डेमो बॅकअप फाइल डाउनलोड'
+    },
+    DEMO_BACKUP_RESTORED: {
+      en: 'DEMO_BACKUP_RESTORED',
+      gu: 'ડેમો બેકઅપ સુરક્ષિત પુનઃસ્થાપિત',
+      hi: 'डेमो बैकअप सुरक्षित पुनर्स्थापित',
+      mr: 'डेमो बॅकअप सुरक्षित पुनर्संचयित'
+    },
     SECURITY_REVOKE_SESSION: {
       en: 'SECURITY_REVOKE_SESSION',
       gu: 'સુરક્ષા સત્ર રદ કરવામાં આવ્યું',

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { LanguageCode, LanguageOption, SUPPORTED_LANGUAGES, TranslationDictionary } from './types';
 import { translations, en } from './translations';
+import { getLanguageTypographyProfile } from '../utils/typographyTokens';
 
 export const LANGUAGE_STORAGE_KEY = 'vidyutflow_language_preference';
 
@@ -44,10 +45,13 @@ const persistLanguage = (lang: LanguageCode): void => {
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguageState] = useState<LanguageCode>(() => getSavedLanguage());
 
-  // Keep HTML lang attribute in sync with state
+  // Keep HTML lang and script metadata attributes in sync with active language
   useEffect(() => {
     if (typeof document !== 'undefined') {
+      const profile = getLanguageTypographyProfile(language);
       document.documentElement.lang = language;
+      document.documentElement.dataset.lang = language;
+      document.documentElement.dataset.script = profile.script;
     }
   }, [language]);
 

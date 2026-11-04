@@ -111,7 +111,11 @@ export const ManagementPortal: React.FC = () => {
     dataMode,
     backendStatus,
     isBrowserOffline,
-    isOfflineSimulated
+    isOfflineSimulated,
+    businessReferenceDate,
+    formalNotices,
+    lateChargeWaivers,
+    paymentReversals
   } = useApp();
   const tm = getManagementUiDictionary(language);
   const at = getAnalyticsTransparencyDictionary(language);
@@ -554,6 +558,84 @@ export const ManagementPortal: React.FC = () => {
             </div>
           </div>
 
+          {/* Step 4A: Macro Delinquent Revenue & DPS Late Charge Breakdown */}
+          <div
+            data-testid="mgmt-delinquent-dps-card"
+            className="p-5 rounded-xl bg-gradient-to-r from-amber-50/80 via-white to-rose-50/70 dark:from-[#132238] dark:via-[#101C35] dark:to-[#1a1c35] border border-amber-200/90 dark:border-amber-800/60 shadow-2xs space-y-3"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-amber-100 dark:border-amber-900/40">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {language === 'gu' ? 'વિલંબિત મહેસૂલ અને લેટ ચાર્જ સરચાર્જ વિશ્લેષણ' : language === 'hi' ? 'अतिदेय राजस्व एवं विलंब अधिभार (DPS) विश्लेषण' : language === 'mr' ? 'थकीत महसूल आणि विलंब अधिभार विश्लेषण' : 'Delinquent Revenue & Late Surcharge (DPS) Macro Breakdown'}
+                </h3>
+              </div>
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                {language === 'gu' ? 'શૂન્ય બેવડી ગણતરી (માસિક + દ્વિ-માસિક એકીકૃત)' : language === 'hi' ? 'शून्य दोहराव (मासिक + द्वैमासिक एकीकृत)' : language === 'mr' ? 'शून्य दुहेरी मोजणी (मासिक + द्वैमासिक एकत्रित)' : 'Zero Double-Counting · Monthly & Bi-Monthly Unified'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+              <div className="p-3 rounded-lg bg-white/90 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
+                <span className="text-slate-500 dark:text-slate-400 block text-[11px] mb-1">
+                  {language === 'gu' ? 'કુલ મુદત વીતેલ મુદ્દલ' : language === 'hi' ? 'कुल अतिदेय मूलधन' : language === 'mr' ? 'एकूण मुदतबाह्य मुद्दल' : 'Total Overdue Principal'}
+                </span>
+                <span data-testid="mgmt-overdue-principal" className="text-lg font-bold font-mono text-amber-700 dark:text-amber-300">
+                  ₹{(mgmtCanonicalMetrics.executiveKpis.overduePrincipalInr || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-rose-50/90 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/60">
+                <span className="text-rose-700 dark:text-rose-300 block text-[11px] mb-1">
+                  {language === 'gu' ? 'સંચિત વિલંબિત સરચાર્જ (૧૫% વાર્ષિક)' : language === 'hi' ? 'संचित विलंब अधिभार (१५% वार्षिक)' : language === 'mr' ? 'संचित विलंब अधिभार (१५% वार्षिक)' : 'Accrued Late Charges (DPS @ 15% p.a.)'}
+                </span>
+                <span data-testid="mgmt-accrued-late-charges" className="text-lg font-bold font-mono text-rose-700 dark:text-rose-300">
+                  +₹{(mgmtCanonicalMetrics.executiveKpis.accruedLateChargesInr || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-900 dark:bg-slate-950 text-white border border-slate-800">
+                <span className="text-slate-300 block text-[11px] mb-1">
+                  {language === 'gu' ? 'કુલ બાકી લેણી રકમ (મુદ્દલ + ચાર્જ)' : language === 'hi' ? 'कुल वसूली योग्य बकाया (मूलधन + अधिभार)' : language === 'mr' ? 'एकूण थकीत देय रक्कम (मुद्दल + आकारणी)' : 'Total Outstanding Recoverable'}
+                </span>
+                <span data-testid="mgmt-total-recoverable" className="text-lg font-extrabold font-mono text-white">
+                  ₹{(mgmtCanonicalMetrics.executiveKpis.totalOutstandingWithChargesInr || mgmtCanonicalMetrics.executiveKpis.liveErpTotalOutstandingInr).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            {/* Step 4B: Formal Notice Monitoring & Section 56 Statutory Compliance Strip */}
+            <div
+              data-testid="mgmt-formal-notice-monitoring"
+              className="pt-3 border-t border-amber-200/70 dark:border-amber-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-amber-900 dark:text-amber-200">
+                  {language === 'gu'
+                    ? 'કલમ ૫૬ ઔપચારિક નોટિસ દેખરેખ (DEMO):'
+                    : language === 'hi'
+                    ? 'धारा 56 औपचारिक नोटिस निगरानी (DEMO):'
+                    : language === 'mr'
+                    ? 'कलम ५६ औपचारिक नोटीस देखरेख (DEMO):'
+                    : 'Section 56 Formal Notice Monitoring (DEMO):'}
+                </span>
+                <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300 font-mono text-[11px]">
+                  Active Issued/Served: {formalNotices.filter(n => ['ISSUED', 'SERVED', 'DEADLINE_APPROACHING'].includes(n.status)).length}
+                </span>
+                <span className="px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 font-mono text-[11px]">
+                  Deadline Reached (Review Req.): {formalNotices.filter(n => n.status === 'DEADLINE_REACHED').length}
+                </span>
+                <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-mono text-[11px]">
+                  Resolved / On-Hold: {formalNotices.filter(n => ['RESOLVED', 'ON_HOLD', 'WITHDRAWN'].includes(n.status)).length}
+                </span>
+              </div>
+              <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400">
+                15-Day Statutory Period · Zero Automatic Disconnection
+              </span>
+            </div>
+          </div>
+
+          
           {/* AT&C Loss Trajectory & Revenue Trajectory */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">

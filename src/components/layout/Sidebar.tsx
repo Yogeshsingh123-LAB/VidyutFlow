@@ -58,6 +58,7 @@ export const Sidebar: React.FC = () => {
     workOrders,
     roleIncidents,
     userConnections,
+    consumerBillingSummary,
     userApplications,
     userBills,
     userComplaints,
@@ -66,7 +67,7 @@ export const Sidebar: React.FC = () => {
     exitToWelcomeScreen,
     activeUser
   } = useApp();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -78,7 +79,9 @@ export const Sidebar: React.FC = () => {
 
   // Scoped counts derived strictly from the active consumer account's authorized records
   const consumerConnectionCount = (userConnections || []).length;
-  const unpaidConsumerBills = (userBills || []).filter(b => b.status === 'Unpaid').length;
+  const unpaidConsumerBills =
+    consumerBillingSummary?.sidebarDueBadgeCount ??
+    (userBills || []).filter(b => b.status === 'Unpaid' || b.status === 'Overdue' || b.status === 'Partially Paid').length;
   const activeConsumerCmps = (userComplaints || []).filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
   const activeConsumerApps = (userApplications || []).filter(a => a.status !== 'Meter Installed' && a.status !== 'Rejected').length;
   const unreadConsumerNotifs = (userNotifications || []).filter(n => !n.read).length;
@@ -100,6 +103,12 @@ export const Sidebar: React.FC = () => {
             label: t.erp.navElectricityBills,
             icon: <Receipt className="w-4 h-4" />,
             badge: unpaidConsumerBills > 0 ? `${unpaidConsumerBills} ${t.erp.dueSuffix}` : undefined
+          },
+                    {
+            id: 'calendar',
+            label: language === 'gu' ? 'સ્માર્ટ કેલેન્ડર' : language === 'hi' ? 'स्मार्ट कैलेंडर' : language === 'mr' ? 'स्मार्ट दिनदर्शिका' : 'Payment Calendar',
+            icon: <Calendar className="w-4 h-4" />,
+            badge: unpaidConsumerBills > 0 ? unpaidConsumerBills : undefined
           },
           { id: 'payments', label: t.erp.navPaymentHistory, icon: <CreditCard className="w-4 h-4" /> },
           {

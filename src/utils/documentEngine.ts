@@ -73,6 +73,16 @@ import {
   generateQrCodeSvg,
 } from './qrCodeEngine';
 import {
+  deriveCanonical9FieldBillStatement,
+  FormalNoticeRecord,
+  reconcileFormalNoticeWithStatement,
+  getFormalNoticeTranslations,
+} from './formalNoticeEngine';
+import {
+  LateChargeWaiverRecord,
+  PaymentReversalRecord,
+} from './lateChargeEngine';
+import {
   PdfDocumentTable,
   PdfTableColumn,
   PdfSummaryMetric,
@@ -105,6 +115,7 @@ export {
 export type OfficialDocumentType =
   | 'electricity_bill'
   | 'payment_receipt'
+  | 'account_statement'
   | 'application_acknowledgment'
   | 'complaint_acknowledgment'
   | 'service_request_acknowledgment'
@@ -902,6 +913,8 @@ export function buildDocumentFilename(
       return `vidyutflow-electricity-bill-${safeRef}.pdf`;
     case 'payment_receipt':
       return `vidyutflow-payment-receipt-${safeRef}.pdf`;
+    case 'account_statement':
+      return `vidyutflow-account-statement-${safeRef}.pdf`;
     case 'application_acknowledgment':
       return `vidyutflow-application-acknowledgment-${safeRef}.pdf`;
     case 'complaint_acknowledgment':
@@ -909,6 +922,7 @@ export function buildDocumentFilename(
     case 'service_request_acknowledgment':
       return `vidyutflow-service-request-acknowledgment-${safeRef}.pdf`;
     case 'inspection_summary':
+    default:
       return `vidyutflow-inspection-summary-${safeRef}.pdf`;
   }
 }
@@ -3531,6 +3545,8 @@ export function generatePaymentReceiptDocument(
     ? extra.partialSettlementBadge
     : extra.fullSettlementBadge;
 
+  const cycleMeta = rawBill ? resolveBillCycleMetadata(rawBill, rawConn) : null;
+
   const primaryFields: DocumentFieldItem[] = [
     {
       key: 'receiptReference',
@@ -3579,6 +3595,23 @@ export function generatePaymentReceiptDocument(
     },
   ];
 
+  if (cycleMeta) {
+    const cycleTypeLabel =
+      language === 'gu'
+        ? 'બિલિંગ સાયકલ પ્રકાર'
+        : language === 'hi'
+        ? 'बिलिंग चक्र प्रकार'
+        : language === 'mr'
+        ? 'बिलિંગ चक्र प्रकार'
+        : 'Billing Cycle Type';
+    primaryFields.push({
+      key: 'billingCycleType',
+      label: cycleTypeLabel,
+      value: localizeBillingCycleType(cycleMeta.billingCycleType, language),
+      highlight: cycleMeta.billingCycleType === 'BI_MONTHLY' ? 'blue' : 'default',
+    });
+  }
+
   if (rawPayment?.paymentMethod) {
     primaryFields.push({
       key: 'paymentMethod',
@@ -3618,11 +3651,31 @@ export function generatePaymentReceiptDocument(
     });
   }
   if (rawBill?.billMonth) {
+    const periodValue =
+      cycleMeta && cycleMeta.billingCycleType === 'BI_MONTHLY'
+        ? `${localizeBillMonth(rawBill.billMonth, language)} (${cycleMeta.periodStartDate} – ${cycleMeta.periodEndDate})`
+        : localizeBillMonth(rawBill.billMonth, language);
     consumerFields.push({
       key: 'billingPeriod',
       label: ui.billingPeriod,
-      value: localizeBillMonth(rawBill.billMonth, language),
+      value: periodValue,
     });
+    if (cycleMeta && cycleMeta.billingCycleType === 'BI_MONTHLY') {
+      const periodRangeLabel =
+        language === 'gu'
+          ? 'બિલિંગ સમયગાળો (પ્રારંભ – અંતિમ)'
+          : language === 'hi'
+          ? 'बिलिंग अवधि (प्रारंभ – समाप्ति)'
+          : language === 'mr'
+          ? 'बिलिंग कालावधी (प्रारंभ – समाप्ती)'
+          : 'Billing Period (Start – End)';
+      consumerFields.push({
+        key: 'billingPeriodRange',
+        label: periodRangeLabel,
+        value: `${cycleMeta.periodStartDate} – ${cycleMeta.periodEndDate}`,
+        isMono: true,
+      });
+    }
   }
   if (rawConn?.tariffCategory) {
     consumerFields.push({
@@ -4720,3 +4773,307 @@ export function triggerDocumentPrintOrSavePdf(
     }
   }
 }
+
+/**
+ * Generates a separate Updated Account Statement & Overdue Demand Summary document
+ * (`documentType: 'account_statement'`) for current outstanding balances with
+ * accrued late-payment charges (DPS) and Formal Notice snapshot comparison.
+ *
+ * CRITICAL GUARANTEE: This never mutates or replaces the original issued two-page A4
+ * electricity bill (`generateElectricityBillDocument`) or historical payment receipts
+ * (`generatePaymentReceiptDocument`).
+ */
+export function generateUpdatedAccountStatementDocument(params: {
+  role: UserRole;
+  actor: ExportActorIdentity;
+  bill: ElectricityBill;
+  connection?: ElectricityConnection | null;
+  payments?: PaymentTransaction[];
+  formalNotice?: FormalNoticeRecord | null;
+  waivers?: LateChargeWaiverRecord[];
+  reversals?: PaymentReversalRecord[];
+  referenceDate?: string;
+  language?: Language;
+  dataSource?: ExportDataSourceClassification | string;
+}): GeneratedOfficialDocument {
+  const {
+    role,
+    actor,
+    bill,
+    connection,
+    payments = [],
+    formalNotice,
+    waivers = [],
+    reversals = [],
+    referenceDate = '28-Oct-2026',
+    language = 'en',
+  } = params;
+
+  const ui = getDocumentUiTranslations(language);
+  const fnT = getFormalNoticeTranslations(language);
+  const typo = getLanguageTypographyProfile(language);
+  const normalizedDataSource = normalizeExportDataSource(params.dataSource);
+
+  // Enforce RBAC ownership & subdivision authorization
+  let isAuthorized = true;
+  if (role === 'field') {
+    isAuthorized = false;
+  } else if (role === 'consumer') {
+    const normalizedActor: ExportActorIdentity = {
+      ...actor,
+      id: actor.id || (actor as unknown as { userId?: string }).userId || '',
+      role,
+    };
+    isAuthorized = isRecordOwnedByConsumer(
+      {
+        consumerNo: bill.consumerNo,
+        accountId: connection?.accountId || 'demo_consumer',
+      },
+      normalizedActor
+    );
+  } else if (role === 'employee') {
+    const subdiv = connection?.subdivision || 'Mehsana City North';
+    isAuthorized = isEmployeeAuthorizedForExportSubdivision(actor.subdivision, subdiv);
+  }
+
+  const safeRef = bill.billNo.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+  const filename = `vidyutflow-account-statement-${safeRef}-${language}.pdf`;
+
+  if (!isAuthorized) {
+    return {
+      documentType: 'account_statement',
+      displayMode: 'unauthorized',
+      eligible: false,
+      authorized: false,
+      referenceId: `STMT-${bill.billNo}`,
+      filename,
+      title: fnT.updatedAccountStatementTitle,
+      subtitle: UGVCL_COMPANY_NAME_EN,
+      statusLabel: ui.unauthorizedDocumentAccess,
+      statusTone: 'rose',
+      statusBannerNote: ui.unauthorizedDocumentAccess,
+      recordedTimestamp: referenceDate,
+      generatedAtDisplay: referenceDate,
+      dataSource: normalizedDataSource,
+      dataSourceBadge: `${ui.dataSource}: ${normalizedDataSource}`,
+      demoDisclosureBanner: fnT.demoSafeguardBanner,
+      footerNote: fnT.demoSafeguardBanner,
+      language,
+      fontFamilyCss: FONT_STACKS[language],
+      isIndic: typo.isIndic,
+      sections: [],
+      ineligibleReason: ui.unauthorizedDocumentAccess,
+    };
+  }
+
+  const statement = deriveCanonical9FieldBillStatement(bill, payments, {
+    referenceDate,
+    connection,
+    waivers,
+    reversals,
+    language,
+  });
+
+  const reconciledNotice = formalNotice
+    ? reconcileFormalNoticeWithStatement(formalNotice, statement, referenceDate)
+    : null;
+
+  const formatInr = (val: number) =>
+    `₹${val.toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+  const nineFieldsSection: DocumentSection = {
+    id: 'canonical-9-field-breakdown',
+    title: fnT.currentLiveBalanceTitle,
+    fields: [
+      {
+        key: 'originalBillAmount',
+        label: `1. ${fnT.nineFields.originalBillAmount}`,
+        value: formatInr(statement.originalBillAmount),
+        isMono: true,
+      },
+      {
+        key: 'paymentsSuccessfullySettled',
+        label: `2. ${fnT.nineFields.paymentsSuccessfullySettled}`,
+        value: formatInr(statement.paymentsSuccessfullySettled),
+        isMono: true,
+      },
+      {
+        key: 'remainingPrincipal',
+        label: `3. ${fnT.nineFields.remainingPrincipal}`,
+        value: formatInr(statement.remainingPrincipal),
+        isMono: true,
+        highlight: statement.remainingPrincipal > 0 ? 'amber' : undefined,
+      },
+      {
+        key: 'accruedLatePaymentCharges',
+        label: `4. ${fnT.nineFields.accruedLatePaymentCharges}`,
+        value: formatInr(statement.accruedLatePaymentCharges),
+        isMono: true,
+        highlight: statement.accruedLatePaymentCharges > 0 ? 'rose' : undefined,
+      },
+      {
+        key: 'chargesAlreadyPaidOrWaived',
+        label: `5. ${fnT.nineFields.chargesAlreadyPaidOrWaived}`,
+        value: formatInr(statement.chargesAlreadyPaidOrWaived),
+        isMono: true,
+      },
+      {
+        key: 'totalCurrentOutstanding',
+        label: `6. ${fnT.nineFields.totalCurrentOutstanding}`,
+        value: formatInr(statement.totalCurrentOutstanding),
+        isMono: true,
+        highlight: statement.totalCurrentOutstanding > 0 ? 'rose' : 'emerald',
+      },
+      {
+        key: 'originalDueDate',
+        label: `7. ${fnT.nineFields.originalDueDate}`,
+        value: statement.originalDueDate,
+        isMono: true,
+      },
+      {
+        key: 'daysOverdue',
+        label: `8. ${fnT.nineFields.daysOverdue}`,
+        value: `${statement.daysOverdue}`,
+        isMono: true,
+      },
+      {
+        key: 'lastCalculationDate',
+        label: `9. ${fnT.nineFields.lastCalculationDate}`,
+        value: statement.lastCalculationDate,
+        isMono: true,
+      },
+    ],
+  };
+
+  const consumerSection: DocumentSection = {
+    id: 'account-consumer-identifiers',
+    title: ui.sectionConsumerAndPremises,
+    fields: [
+      { key: 'billNo', label: ui.billReference, value: bill.billNo, isMono: true },
+      { key: 'consumerNo', label: ui.consumerNumber, value: bill.consumerNo, isMono: true },
+      { key: 'consumerName', label: ui.consumerName, value: statement.consumerName },
+      {
+        key: 'subdivision',
+        label: ui.subdivision,
+        value: localizeSubdivision(statement.subdivision, language),
+      },
+      {
+        key: 'tariffCategory',
+        label: ui.tariffCategory,
+        value: localizeTariffCategory(statement.tariffCategory, language),
+      },
+      {
+        key: 'billingPeriod',
+        label: ui.billingPeriod,
+        value: localizeBillMonth(statement.billMonth, language),
+      },
+      {
+        key: 'policyVersion',
+        label: 'DPS Policy Version',
+        value: `${statement.policyId} (${statement.policyVersion} — ${statement.annualRatePercent}% p.a. DEMO)`,
+        isMono: true,
+      },
+    ],
+  };
+
+  const sections: DocumentSection[] = [consumerSection, nineFieldsSection];
+
+  if (reconciledNotice) {
+    sections.push({
+      id: 'formal-notice-status',
+      title: fnT.sectionTitle,
+      fields: [
+        {
+          key: 'noticeId',
+          label: fnT.noticeIdLabel,
+          value: reconciledNotice.noticeId,
+          isMono: true,
+        },
+        {
+          key: 'noticeStatus',
+          label: ui.currentStatus,
+          value: fnT.statuses[reconciledNotice.status],
+          highlight: 'amber',
+        },
+        {
+          key: 'issueDate',
+          label: fnT.issueDateLabel,
+          value: reconciledNotice.issueDate || 'Not Issued',
+          isMono: true,
+        },
+        {
+          key: 'paymentDeadlineDate',
+          label: fnT.paymentDeadlineLabel,
+          value: reconciledNotice.paymentDeadlineDate || 'N/A',
+          isMono: true,
+          highlight: 'rose',
+        },
+        {
+          key: 'snapshotTotalAtIssuance',
+          label: fnT.snapshotAtIssuanceTitle,
+          value: formatInr(reconciledNotice.snapshotAtIssuance.totalOutstandingAtIssuance),
+          isMono: true,
+        },
+        {
+          key: 'disconnectionReviewStatus',
+          label: fnT.disconnectionReviewLabel,
+          value: fnT.disconnectionReviewStatuses[reconciledNotice.disconnectionReviewStatus],
+        },
+      ],
+    });
+  }
+
+  return {
+    documentType: 'account_statement',
+    displayMode: 'official_document',
+    eligible: true,
+    authorized: true,
+    referenceId: `STMT-${bill.billNo}`,
+    filename,
+    title: fnT.updatedAccountStatementTitle,
+    subtitle: `${UGVCL_COMPANY_NAME_EN} · ${bill.billNo}`,
+    statusLabel: statement.isFullySettled
+      ? localizeBillStatus('Paid', language)
+      : statement.isOverdue
+      ? `${localizeBillStatus('Overdue', language)} (${statement.daysOverdue}d)`
+      : localizeBillStatus(statement.derivedStatus, language),
+    statusTone: statement.isFullySettled
+      ? 'emerald'
+      : statement.isOverdue
+      ? 'rose'
+      : 'amber',
+    statusBannerNote: statement.policyDisclaimer,
+    recordedTimestamp: statement.lastCalculationDate,
+    generatedAtDisplay: `${statement.lastCalculationDate}, 10:30 IST`,
+    dataSource: normalizedDataSource,
+    dataSourceBadge: `${ui.dataSource}: ${normalizedDataSource}`,
+    demoDisclosureBanner: fnT.demoSafeguardBanner,
+    footerNote: fnT.demoSafeguardBanner,
+    language,
+    fontFamilyCss: FONT_STACKS[language],
+    isIndic: typo.isIndic,
+    sections,
+    summaryMetrics: [
+      {
+        label: fnT.nineFields.originalBillAmount,
+        value: formatInr(statement.originalBillAmount),
+      },
+      {
+        label: fnT.nineFields.remainingPrincipal,
+        value: formatInr(statement.remainingPrincipal),
+      },
+      {
+        label: fnT.nineFields.accruedLatePaymentCharges,
+        value: formatInr(statement.accruedLatePaymentCharges),
+      },
+      {
+        label: fnT.nineFields.totalCurrentOutstanding,
+        value: formatInr(statement.totalCurrentOutstanding),
+      },
+    ],
+  };
+}
+

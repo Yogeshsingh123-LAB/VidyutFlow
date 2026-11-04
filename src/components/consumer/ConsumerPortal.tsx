@@ -115,11 +115,13 @@ import { submitLiveRequest } from '../../utils/liveData';
 import { ConsumerComplaintTimelineModal } from './ConsumerComplaintTimelineModal';
 import { ConsumerMeterBillingSection } from './ConsumerMeterBillingSection';
 import { SmartPaymentCalendar } from './SmartPaymentCalendar';
+import { OverdueBillBreakdownCard } from './OverdueBillBreakdownCard';
 import {
   GeneratedOfficialDocument,
   getDocumentUiTranslations,
   BILL_AND_RECEIPT_EXTRA_LABELS,
   generateElectricityBillDocument,
+  generateUpdatedAccountStatementDocument,
   generatePaymentReceiptDocument,
   generateApplicationAcknowledgmentDocument,
   generateComplaintAcknowledgmentDocument,
@@ -228,6 +230,10 @@ export const ConsumerPortal: React.FC = () => {
     clearAllNotifications,
     payBillDemo,
     payBillDemoDetailed,
+    formalNotices,
+    lateChargeWaivers,
+    paymentReversals,
+    businessReferenceDate,
     generateDemoBillForActiveConnection,
     submitApplicationDemo,
     submitComplaintDemo,
@@ -642,6 +648,34 @@ export const ConsumerPortal: React.FC = () => {
     }
   };
 
+  const handleViewAccountStatement = (targetBill: ElectricityBill | ReconciledElectricityBill | string) => {
+    const resolvedBill =
+      typeof targetBill === 'string'
+        ? consumerBillingSummary.allAccountReconciledBills.find(b => b.billNo === targetBill) ||
+          bills.find(b => b.billNo === targetBill)
+        : targetBill;
+    if (!resolvedBill) return;
+    const conn =
+      consumerConnections.find(c => c.consumerNo === resolvedBill.consumerNo) ||
+      selectedConnection;
+    const activeNotice =
+      formalNotices.find(n => n.billNo === resolvedBill.billNo) || null;
+    const doc = generateUpdatedAccountStatementDocument({
+      role: 'consumer',
+      actor: consumerDocumentActor,
+      bill: resolvedBill,
+      connection: conn,
+      payments: consumerPayments,
+      waivers: lateChargeWaivers,
+      reversals: paymentReversals,
+      formalNotice: activeNotice,
+      referenceDate: businessReferenceDate,
+      language,
+      dataSource: dataMode,
+    });
+    setActiveOfficialDocument(doc);
+  };
+
   const handleViewReceipt = (bill: ElectricityBill, explicitPayment?: PaymentTransaction) => {
     setSelectedReceipt(bill);
     const conn = consumerConnections.find(c => c.consumerNo === bill.consumerNo) || selectedConnection;
@@ -1050,6 +1084,18 @@ export const ConsumerPortal: React.FC = () => {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Overdue Financial Breakdown & Daily Charges Banner (Step 4A & 4B) */}
+          {hasConnections && currentBill && (currentBill.isOverdue || currentBill.effectiveStatus === 'Overdue' || (currentBill.lateChargeBreakdown && currentBill.lateChargeBreakdown.daysOverdue > 0)) && currentBill.lateChargeBreakdown && (
+            <div className="space-y-1.5" data-testid="dashboard-overdue-breakdown-section">
+              <OverdueBillBreakdownCard
+                breakdown={currentBill.lateChargeBreakdown}
+                formalNotice={formalNotices.find(n => n.billNo === currentBill.billNo) || null}
+                onPay={handlePayClick}
+                onViewAccountStatement={handleViewAccountStatement}
+              />
             </div>
           )}
 
@@ -2738,6 +2784,10 @@ export const ConsumerPortal: React.FC = () => {
               bills={consumerBillingSummary.allAccountReconciledBills}
               connections={consumerConnections}
               payments={consumerPayments}
+              formalNotices={formalNotices}
+              waivers={lateChargeWaivers}
+              reversals={paymentReversals}
+              referenceDate={businessReferenceDate}
               language={language}
               selectedConnectionNo={selectedConnection?.consumerNo}
               onSelectConnection={(no) => setSelectedConnectionNo(no)}
@@ -3673,6 +3723,7 @@ export const ConsumerPortal: React.FC = () => {
           ) || selectedConnection
         }
         existingPayments={consumerPayments}
+        referenceDate={businessReferenceDate}
         language={language}
         onClose={() => setIsPayModalOpen(false)}
         onExecutePayment={({
