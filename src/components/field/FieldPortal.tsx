@@ -4,6 +4,8 @@ import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { UGVCL_LOGO_PATH, FEEDER_METRICS } from '../../data/mockData';
 import { WorkOrder, FeederHealth } from '../../types';
+import { WorkOrderEvidenceModal } from './WorkOrderEvidenceModal';
+import { FieldMeterReadingModal } from './FieldMeterReadingModal';
 import { WORK_ORDER_TRANSITIONS } from '../../services/erpAdapter';
 import { fetchLiveRequests, useLivePoll } from '../../utils/liveData';
 import { ExportMenu } from '../common/ExportMenu';
@@ -83,6 +85,8 @@ const DEFAULT_HAZARD_REMARKS_SET = new Set(
 );
 
 export const FieldPortal: React.FC = () => {
+  const [evidenceModalWO, setEvidenceModalWO] = useState<WorkOrder | null>(null);
+  const [meterReadingWorkOrder, setMeterReadingWorkOrder] = useState<WorkOrder | null>(null);
   const {
     activeTab,
     setActiveTab,
@@ -1021,6 +1025,25 @@ export const FieldPortal: React.FC = () => {
                       </span>
                     )}
                     {wo.status !== 'Completed' && (
+                      <>
+                      <button
+                        type="button"
+                        onClick={() => setMeterReadingWorkOrder(wo)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-950/60 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 border border-cyan-200 dark:border-cyan-800 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Capture OCR Meter Reading"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Meter Reading</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEvidenceModalWO(wo)}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Complete with Evidence"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>Evidence</span>
+                      </button>
                       <button
                         onClick={() => {
                           setSelectedWOId(wo.id);
@@ -1030,6 +1053,7 @@ export const FieldPortal: React.FC = () => {
                       >
                         {tf.btnPerformInspection}
                       </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -2152,6 +2176,22 @@ export const FieldPortal: React.FC = () => {
         onClose={() => setFieldOfficialDoc(null)}
       />
       {activeTab === 'outage-map' && <LazyOutageMapSection />}
+    
+      {evidenceModalWO && (
+        <WorkOrderEvidenceModal
+          workOrder={evidenceModalWO}
+          isOpen={Boolean(evidenceModalWO)}
+          onClose={() => setEvidenceModalWO(null)}
+        />
+      )}
+
+      {meterReadingWorkOrder && (
+        <FieldMeterReadingModal
+          workOrder={meterReadingWorkOrder}
+          isOpen={Boolean(meterReadingWorkOrder)}
+          onClose={() => setMeterReadingWorkOrder(null)}
+        />
+      )}
     </div>
   );
 };

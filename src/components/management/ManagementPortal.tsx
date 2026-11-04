@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { ManagementMeterIntegritySection } from './ManagementMeterIntegritySection';
 import { useApp } from '../../context/AppContext';
 import {
   EXECUTIVE_MONTHLY_METRICS,
@@ -658,6 +659,7 @@ export const ManagementPortal: React.FC = () => {
       {activeTab === 'analytics' && (
         <div className="space-y-6">
           <AIEnergyForecasting />
+          <ManagementMeterIntegritySection />
         </div>
       )}
 

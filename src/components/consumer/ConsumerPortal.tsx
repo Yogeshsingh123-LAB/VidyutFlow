@@ -113,6 +113,7 @@ import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 import { LiveConsumerRequests } from './LiveConsumerRequests';
 import { submitLiveRequest } from '../../utils/liveData';
 import { ConsumerComplaintTimelineModal } from './ConsumerComplaintTimelineModal';
+import { ConsumerMeterBillingSection } from './ConsumerMeterBillingSection';
 import { SmartPaymentCalendar } from './SmartPaymentCalendar';
 import {
   GeneratedOfficialDocument,
@@ -1604,6 +1605,15 @@ export const ConsumerPortal: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Phase 11D: Native Meter Reading & Billing Review Section */}
+            <ConsumerMeterBillingSection
+              selectedConnection={selectedConnection}
+              consumerBills={consumerBills}
+              onRequestSelfReading={() => {
+                showToast('Open the top-bar Meter Reading & Bill Review workspace to perform optical scan.', 'info');
+              }}
+            />
 
           {/* Independent Demonstration Disclosure Bar */}
           <div className="px-4 py-3 rounded-xl bg-slate-100/80 dark:bg-[#0D172B] border border-slate-200/70 dark:border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
@@ -3953,6 +3963,17 @@ export const ConsumerPortal: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+    
+      {activeTimelineComplaint && (
+        <ConsumerComplaintTimelineModal
+          complaint={activeTimelineComplaint}
+          isOpen={Boolean(activeTimelineComplaint)}
+          onClose={() => setSelectedComplaintForTimeline(null)}
+          onReopened={(newCmp) => {
+            setSelectedComplaintForTimeline(newCmp);
+          }}
+        />
       )}
     </div>
   );

@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createAuthApiHandler } from './authRoutes';
 import { createAiChatHandler, createHealthHandler } from './runtimeMiddleware';
-import { handleMeterReadingRoute } from './meterReadingRoutes';
+import { handleMeterReadingRoute, isMeterReadingRoutePath } from './meterReadingRoutes';
 import { handleDirectoryRoute } from './directoryRoutes';
 
 /**
@@ -138,7 +138,7 @@ export function createProductionRequestHandler(options?: {
       return;
     }
 
-    if (pathname === '/api/meter-readings' || pathname.startsWith('/api/meter-readings/')) {
+    if (isMeterReadingRoutePath(pathname)) {
       void handleMeterReadingRoute(req, res);
       return;
     }

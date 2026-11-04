@@ -25,6 +25,7 @@ import { LiveWorkflowKpis } from '../common/LiveWorkflowKpis';
 import { LiveAlertEnginePanel } from '../common/LiveAlertEnginePanel';
 import { LiveAiGovernancePanel } from '../common/LiveAiGovernancePanel';
 import { LiveErpAdapterPanel } from './LiveErpAdapterPanel';
+import { AdminMeterOcrHealthSection } from './AdminMeterOcrHealthSection';
 import { LiveWorkflowTemplatesPanel } from './LiveWorkflowTemplatesPanel';
 import { LiveStaffAssignmentPanel } from './LiveStaffAssignmentPanel';
 import { LivePerformanceTelemetryPanel } from './LivePerformanceTelemetryPanel';
@@ -284,7 +285,12 @@ export const AdminPortal: React.FC = () => {
       {/* VIEW 1: SYSTEM OVERVIEW & INTEGRATIONS */}
       {(activeTab === 'overview' || activeTab === 'integrations') && (
         <div className="space-y-4 sm:space-y-6">
-          {activeTab === 'integrations' && <LiveErpAdapterPanel />}
+          {activeTab === 'integrations' && (
+            <>
+              <LiveErpAdapterPanel />
+              <AdminMeterOcrHealthSection />
+            </>
+          )}
           <LiveWorkflowKpis />
           {/* Bento Health Strip */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
