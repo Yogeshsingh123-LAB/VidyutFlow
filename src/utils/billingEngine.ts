@@ -921,8 +921,9 @@ export function reconcileBillWithPayments(
   const outstandingBalance = Math.max(0, Number((totalAmount - paidAmount).toFixed(2)));
   const isPaid = totalAmount === 0 || outstandingBalance === 0;
   const isPartiallyPaid = !isPaid && paidAmount > 0 && outstandingBalance > 0;
+  const hasValidDueDate = parseVidyutDateToUtcMs(bill.dueDate) !== null;
   const pastDue = isBillPastDueDate(bill.dueDate, referenceDate);
-  const isOverdue = !isPaid && (bill.status === 'Overdue' || pastDue);
+  const isOverdue = !isPaid && (hasValidDueDate ? pastDue : bill.status === 'Overdue');
   const isDue = !isPaid && outstandingBalance > 0;
 
   let effectiveStatus: CanonicalBillStatus;
@@ -2779,10 +2780,13 @@ export function selectConnectionBillingSummary(
   const mostRecentGeneratedBill = reconciledBills.length > 0 ? reconciledBills[0] : null;
 
   // Primary bill for the Dashboard KPI card:
-  // If any bill is due (Unpaid / Overdue / Partially Paid), surface the most recent due bill
-  // so an unpaid balance is never masked by a newer bill or vice versa; otherwise surface the most recent generated bill.
+  // If any bill is due (Unpaid / Overdue / Partially Paid), surface the most urgent/overdue due bill first
+  // (or most recent due bill if none are overdue) so an overdue balance is never masked by a newer unpaid bill.
+  const overdueDueBills = dueBills.filter((b) => b.isOverdue || b.effectiveStatus === 'Overdue');
   const latestBill =
-    dueBills.length > 0
+    overdueDueBills.length > 0
+      ? overdueDueBills[0]
+      : dueBills.length > 0
       ? dueBills[0]
       : mostRecentGeneratedBill;
 
@@ -4982,6 +4986,125 @@ export function ensureConsumerBiMonthlyBillingSchedule(params: {
     bills: genResult.updatedBills,
     newlyScheduledBill: genResult.bill,
   };
+}
+
+/**
+ * Canonical contractual due date ('30-Oct-2026') for the targeted overdue DEMO bills
+ * (`BILL-UG-2026-10-8821` on `04281-99231` and `BILL-UG-2026-10-77190` on `04281-77190`),
+ * ensuring deterministic Asia/Kolkata calendar-day overdue calculation:
+ * - On 30-Oct-2026: 0 days overdue (UNPAID / DUE TODAY, ₹0.00 late charges)
+ * - On 31-Oct-2026: 1 day overdue (OVERDUE)
+ * - On 05-Nov-2026: 6 days overdue (₹36.63 late charges on ₹14,854 -> ₹14,890.63; ₹5.39 on ₹2,185 -> ₹2,190.39)
+ * - On 06-Nov-2026: 7 days overdue (₹42.73 late charges on ₹14,854 -> ₹14,896.73; ₹6.29 on ₹2,185 -> ₹2,191.29)
+ * - On 10-Nov-2026: 11 days overdue
+ */
+export const CANONICAL_OVERDUE_BILL_DUE_DATE = '30-Oct-2026' as const;
+
+/**
+ * Canonical UNPAID (not yet overdue) DEMO bill on the consumer's second linked meter
+ * (`04281-77190` / `MTR-2023-339811`) with a genuine future due date (`25-Nov-2026`).
+ * Before `25-Nov-2026` it displays UNPAID, 0 overdue days, and ₹0.00 late-payment charges.
+ * After `25-Nov-2026` (if unpaid) it transitions to OVERDUE with daily 15% p.a. late charges.
+ */
+export const CANONICAL_UNPAID_FUTURE_BILL_77190: ElectricityBill = {
+  billNo: 'BILL-UG-2026-11-77190',
+  consumerNo: '04281-77190',
+  connectionId: 'UG-MSN-COM-1940',
+  accountId: 'demo_consumer',
+  billMonth: 'October 2026',
+  billDate: '04-Nov-2026',
+  dueDate: '25-Nov-2026',
+  billingCycleType: 'MONTHLY',
+  periodStartDate: '01-Oct-2026',
+  periodEndDate: '31-Oct-2026',
+  billingPeriodLabel: '01-Oct-2026 to 31-Oct-2026',
+  previousReadingDate: '01-Oct-2026',
+  currentReadingDate: '31-Oct-2026',
+  previousReadingKwh: 89920,
+  currentReadingKwh: 91560,
+  readingProvenance: 'AMR_SMART_METER',
+  unitsConsumed: 1640,
+  energyCharges: 9430,
+  fixedCharges: 1620,
+  fuelPriceAdjustment: 1968,
+  electricityDuty: 1302,
+  rebateOrSubsidy: 0,
+  totalAmount: 14320,
+  paidAmount: 0,
+  remainingBalance: 14320,
+  outstandingBalance: 14320,
+  status: 'Unpaid',
+  lifecycleStatus: 'ISSUED_UNPAID',
+  isScheduledNotIssued: false,
+  slabBreakdown: [
+    { slab: 'All Units (NRGP Commercial Rate)', units: 1640, rate: 5.75, amount: 9430 },
+  ],
+};
+
+/**
+ * Reconciles the runtime DEMO bill seed list without mutating static `INITIAL_BILLS` in `mockData.ts`:
+ * 1. Normalizes the contractual due date of `BILL-UG-2026-10-8821` and `BILL-UG-2026-10-77190`
+ *    from legacy `'20-Oct-2026'` / `'22-Oct-2026'` to `'30-Oct-2026'`.
+ * 2. Ensures `CANONICAL_UNPAID_FUTURE_BILL_77190` (`BILL-UG-2026-11-77190`, due `'25-Nov-2026'`, UNPAID)
+ *    is present in the runtime bills collection so both OVERDUE and UNPAID-not-overdue states can be verified.
+ */
+export function reconcileRuntimeDemoBillsSeed(
+  storedBills: ElectricityBill[],
+  seedBills: ElectricityBill[] = []
+): ElectricityBill[] {
+  const seedByBillNo = new Map<string, ElectricityBill>(
+    seedBills.map((b) => [b.billNo, b])
+  );
+  const OVERDUE_TARGET_BILL_NOS = new Set([
+    'BILL-UG-2026-10-8821',
+    'BILL-UG-2026-10-77190',
+  ]);
+
+  const normalized = (storedBills || [])
+    .filter((b) => Boolean(b && b.billNo))
+    .map((b) => {
+      const seed = seedByBillNo.get(b.billNo);
+      const merged: ElectricityBill = seed
+        ? {
+            ...seed,
+            ...b,
+            periodStartDate: b.periodStartDate || seed.periodStartDate,
+            periodEndDate: b.periodEndDate || seed.periodEndDate,
+            previousReadingDate: b.previousReadingDate || seed.previousReadingDate,
+            currentReadingDate: b.currentReadingDate || seed.currentReadingDate,
+            previousReadingKwh:
+              typeof b.previousReadingKwh === 'number'
+                ? b.previousReadingKwh
+                : seed.previousReadingKwh,
+            currentReadingKwh:
+              typeof b.currentReadingKwh === 'number'
+                ? b.currentReadingKwh
+                : seed.currentReadingKwh,
+            readingProvenance: b.readingProvenance || seed.readingProvenance,
+          }
+        : { ...b };
+
+      if (
+        OVERDUE_TARGET_BILL_NOS.has(merged.billNo) &&
+        (merged.dueDate === '22-Oct-2026' ||
+          merged.dueDate === '20-Oct-2026' ||
+          !merged.dueDate)
+      ) {
+        merged.dueDate = CANONICAL_OVERDUE_BILL_DUE_DATE;
+      }
+
+      return merged;
+    });
+
+  const hasUnpaidFuture77190 = normalized.some(
+    (b) => normalizeBillingIdentifier(b.billNo) === normalizeBillingIdentifier(CANONICAL_UNPAID_FUTURE_BILL_77190.billNo)
+  );
+
+  if (!hasUnpaidFuture77190) {
+    normalized.push({ ...CANONICAL_UNPAID_FUTURE_BILL_77190 });
+  }
+
+  return normalized;
 }
 
 

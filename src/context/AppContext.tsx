@@ -171,6 +171,15 @@ import {
   filterFieldEngineerNotifications
 } from '../utils/fieldNotificationEngine';
 import {
+  dispatchTransformerMaintenanceOrder,
+  acceptTransformerMaintenanceOrder,
+  rejectTransformerMaintenanceOrder,
+  reassignTransformerMaintenanceOrder,
+  startTransformerMaintenanceWorkOrder,
+  submitTransformerInspectionOrderForReview,
+  completeTransformerMaintenanceOrder
+} from '../utils/transformerMaintenanceEngine';
+import {
   ConsumerAccountBillingSummary,
   ApplyPaymentToBillResult,
   SimulatedPaymentOutcome,
@@ -183,7 +192,9 @@ import {
   evaluateGentleBillingReminders,
   createPaymentConfirmedNotification,
   normalizeBillingIdentifier,
-  parseVidyutDateToUtcMs
+  parseVidyutDateToUtcMs,
+  reconcileRuntimeDemoBillsSeed,
+  CANONICAL_OVERDUE_BILL_DUE_DATE
 } from '../utils/billingEngine';
 import type { LateChargeWaiverRecord, PaymentReversalRecord } from '../utils/lateChargeEngine';
 import {
@@ -940,6 +951,29 @@ interface AppContextType {
   assignWorkOrder: (woId: string, engineerIdOrName: string, notes?: string) => boolean;
   reassignWorkOrder: (woId: string, newEngineerIdOrName: string, reason?: string) => boolean;
   updateWorkOrderPriorityAndSchedule: (woId: string, priority?: WorkOrder['priority'], scheduledDate?: string, notes?: string) => boolean;
+  dispatchTransformerWorkOrder: (params: {
+    transformerId: string;
+    utilityAssetCode: string;
+    feederId: string;
+    zone: string;
+    priority: 'Emergency' | 'High' | 'Routine';
+    reason: string;
+    recommendedAction?: string;
+    assignedEngineerIdOrName?: string;
+  }) => { success: boolean; workOrder?: WorkOrder; error?: string };
+  acceptTransformerWorkOrder: (woId: string, notes?: string) => { success: boolean; workOrder?: WorkOrder; error?: string };
+  rejectTransformerWorkOrder: (woId: string, reason: string) => { success: boolean; workOrder?: WorkOrder; error?: string };
+  reassignTransformerWorkOrder: (woId: string, newEngineerIdOrName: string, notes?: string) => { success: boolean; workOrder?: WorkOrder; error?: string };
+  startTransformerMaintenanceWork: (woId: string, notes?: string) => { success: boolean; workOrder?: WorkOrder; error?: string };
+  submitTransformerInspectionForReview: (
+    woId: string,
+    report: NonNullable<WorkOrder['inspectionReport']>,
+    checklist?: Record<string, string>,
+    photoRefs?: string[]
+  ) => { success: boolean; workOrder?: WorkOrder; error?: string };
+  completeTransformerMaintenanceWorkOrder: (woId: string, completionNotes?: string) => { success: boolean; workOrder?: WorkOrder; error?: string };
+  activeTransformerTrackingWoId: string | null;
+  setActiveTransformerTrackingWoId: (woId: string | null) => void;
   reportFeederFault: (feederId: string, faultType: string, remarks: string, severity?: IncidentSeverity, emergencyClassification?: EmergencyHazardClassification) => void;
   markNotificationRead: (id: string) => void;
   markSelectedNotificationsRead: (ids: string[]) => void;
@@ -1499,65 +1533,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [bills, setBills] = useState<ElectricityBill[]>(() => {
     const stored = loadStorage<ElectricityBill[]>('vidyutone_bills', INITIAL_BILLS);
-    const seedByBillNo = new Map<string, ElectricityBill>(
-      INITIAL_BILLS.map((b) => [b.billNo, b])
-    );
+    const reconciledSeed = reconcileRuntimeDemoBillsSeed(stored, INITIAL_BILLS);
     const currentRefMs =
       parseVidyutDateToUtcMs(
         businessClockRef.current?.getState().businessDate || '04-Nov-2026'
       ) ?? Date.UTC(2026, 10, 4);
 
-    return stored
-      .filter((b) => Boolean(b && b.billNo))
-      .map((b) => {
-        const billMs = parseVidyutDateToUtcMs(b.billDate);
-        if (
-          billMs !== null &&
-          billMs > currentRefMs &&
-          b.status !== 'Paid' &&
-          !b.paidDate &&
-          (b.paidAmount || 0) === 0
-        ) {
-          return {
-            ...b,
-            status: 'Scheduled' as const,
-            lifecycleStatus: 'SCHEDULED_NOT_ISSUED' as const,
-            isScheduledNotIssued: true,
-            unitsConsumed: 0,
-            energyCharges: 0,
-            fixedCharges: 0,
-            fuelPriceAdjustment: 0,
-            electricityDuty: 0,
-            rebateOrSubsidy: 0,
-            otherAdjustmentsInr: 0,
-            totalAmount: 0,
-            remainingBalance: 0,
-            outstandingBalance: 0,
-            slabBreakdown: [],
-            previousReadingKwh: undefined,
-            currentReadingKwh: undefined,
-          };
-        }
-        const seed = seedByBillNo.get(b.billNo);
-        if (!seed) return b;
+    return reconciledSeed.map((b) => {
+      const billMs = parseVidyutDateToUtcMs(b.billDate);
+      if (
+        billMs !== null &&
+        billMs > currentRefMs &&
+        b.status !== 'Paid' &&
+        !b.paidDate &&
+        (b.paidAmount || 0) === 0 &&
+        b.lifecycleStatus !== 'ISSUED_UNPAID'
+      ) {
         return {
-          ...seed,
           ...b,
-          periodStartDate: b.periodStartDate || seed.periodStartDate,
-          periodEndDate: b.periodEndDate || seed.periodEndDate,
-          previousReadingDate: b.previousReadingDate || seed.previousReadingDate,
-          currentReadingDate: b.currentReadingDate || seed.currentReadingDate,
-          previousReadingKwh:
-            typeof b.previousReadingKwh === 'number'
-              ? b.previousReadingKwh
-              : seed.previousReadingKwh,
-          currentReadingKwh:
-            typeof b.currentReadingKwh === 'number'
-              ? b.currentReadingKwh
-              : seed.currentReadingKwh,
-          readingProvenance: b.readingProvenance || seed.readingProvenance,
+          status: 'Scheduled' as const,
+          lifecycleStatus: 'SCHEDULED_NOT_ISSUED' as const,
+          isScheduledNotIssued: true,
+          unitsConsumed: 0,
+          energyCharges: 0,
+          fixedCharges: 0,
+          fuelPriceAdjustment: 0,
+          electricityDuty: 0,
+          rebateOrSubsidy: 0,
+          otherAdjustmentsInr: 0,
+          totalAmount: 0,
+          remainingBalance: 0,
+          outstandingBalance: 0,
+          slabBreakdown: [],
+          previousReadingKwh: undefined,
+          currentReadingKwh: undefined,
         };
-      });
+      }
+      return b;
+    });
   });
 
   const [payments, setPayments] = useState<PaymentTransaction[]>(() =>
@@ -1571,8 +1584,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
     const enriched = stored.map(n => {
       const seed = canonicalSeedById.get(n.id);
-      if (!seed) return n;
-      return {
+      const baseNotif = !seed ? n : {
         ...seed,
         ...n,
         createdAt: n.createdAt || seed.createdAt,
@@ -1583,6 +1595,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         subdivision: n.subdivision || seed.subdivision,
         statusBadge: n.statusBadge || seed.statusBadge
       };
+      if (baseNotif.id === 'NOTIF-02' && typeof baseNotif.message === 'string') {
+        return {
+          ...baseNotif,
+          message: baseNotif.message.replace(/22-Oct-2026|20-Oct-2026/g, CANONICAL_OVERDUE_BILL_DUE_DATE),
+        };
+      }
+      return baseNotif;
     });
 
     // Ensure any application already persisted in localStorage before this fix has a stored employee notification
@@ -1839,13 +1858,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Cross-tab synchronization for applications, notifications, inbox state, and offline queue
+  const [activeTransformerTrackingWoId, setActiveTransformerTrackingWoId] = useState<string | null>(null);
+
+  // Cross-tab synchronization for applications, work orders, notifications, inbox state, and offline queue
   useEffect(() => {
     const handleStorageSync = (e: StorageEvent) => {
       if (!e.key || !e.newValue) return;
       try {
         if (e.key === 'vidyutone_applications') {
           setApplications(loadStorage('vidyutone_applications', INITIAL_APPLICATIONS));
+        } else if (e.key === 'vidyutone_workorders') {
+          const loadedWos = loadStorage('vidyutone_workorders', INITIAL_WORK_ORDERS);
+          workOrdersRef.current = loadedWos;
+          setWorkOrders(loadedWos);
         } else if (e.key === 'vidyutone_notifications') {
           setNotifications(loadStorage('vidyutone_notifications', INITIAL_NOTIFICATIONS));
         } else if (e.key === 'vidyutflow_notification_inbox_state') {
@@ -2545,7 +2570,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // Reload canonical financial state from shared localStorage without touching local tab UI view or language
-      setBills(loadStorage('vidyutone_bills', INITIAL_BILLS));
+      setBills(reconcileRuntimeDemoBillsSeed(loadStorage('vidyutone_bills', INITIAL_BILLS), INITIAL_BILLS));
       setPayments(loadStorage('vidyutone_payments', INITIAL_PAYMENTS));
       setFormalNotices(
         loadStorage<FormalNoticeRecord[]>('vidyutflow_formal_notices', INITIAL_FORMAL_NOTICES)
@@ -6940,6 +6965,274 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
+  const dispatchTransformerWorkOrder = (params: {
+    transformerId: string;
+    utilityAssetCode: string;
+    feederId: string;
+    zone: string;
+    priority: 'Emergency' | 'High' | 'Routine';
+    reason: string;
+    recommendedAction?: string;
+    assignedEngineerIdOrName?: string;
+  }): { success: boolean; workOrder?: WorkOrder; error?: string } => {
+    const nextWoId = generateNextRecordId(
+      workOrdersRef.current.map(w => w.id),
+      'WO-',
+      4410,
+      4
+    );
+
+    const res = dispatchTransformerMaintenanceOrder({
+      ...params,
+      actorUser: activeUser,
+      effectiveRole,
+      workOrders: workOrdersRef.current,
+      fieldEngineers,
+      notifications,
+      nextWoId
+    });
+
+    if (!res.success || !res.workOrder) {
+      if (res.auditAction) {
+        addAuditEvent(
+          res.auditAction,
+          `Transformer:${params.utilityAssetCode}`,
+          res.auditDetails || res.error || 'Dispatch blocked',
+          activeUser.name,
+          'WARNING'
+        );
+      }
+      showToast(res.error || 'Failed to dispatch transformer work order.', res.workOrder ? 'warning' : 'error');
+      return { success: false, error: res.error, workOrder: res.workOrder };
+    }
+
+    workOrdersRef.current = res.updatedWorkOrders;
+    setWorkOrders(res.updatedWorkOrders);
+    setNotifications(prev => upsertNotificationList(prev, res.updatedNotifications.slice(0, 1)));
+
+    addAuditEvent(
+      res.auditAction || 'TRANSFORMER_WORK_ORDER_DISPATCHED',
+      res.workOrder.id,
+      res.auditDetails || `Dispatched for ${params.utilityAssetCode} to ${res.workOrder.assignedTo}`,
+      activeUser.name
+    );
+
+    showToast(`Work Order ${res.workOrder.id} dispatched to ${res.workOrder.assignedTo} (Awaiting Acceptance)`, 'success');
+    return { success: true, workOrder: res.workOrder };
+  };
+
+  const acceptTransformerWorkOrder = (
+    woId: string,
+    notes?: string
+  ): { success: boolean; workOrder?: WorkOrder; error?: string } => {
+    const res = acceptTransformerMaintenanceOrder({
+      woId,
+      notes,
+      actorUser: activeUser,
+      effectiveRole,
+      workOrders: workOrdersRef.current,
+      fieldEngineers,
+      notifications
+    });
+
+    if (!res.success || !res.workOrder) {
+      showToast(res.error || 'Failed to accept maintenance assignment.', 'error');
+      addAuditEvent('ACCESS_DENIED', woId, res.error || 'Accept blocked', activeUser.name, 'WARNING');
+      return { success: false, error: res.error };
+    }
+
+    workOrdersRef.current = res.updatedWorkOrders;
+    setWorkOrders(res.updatedWorkOrders);
+    setNotifications(prev => upsertNotificationList(prev, res.updatedNotifications.slice(0, 1)));
+
+    addAuditEvent(
+      'TRANSFORMER_WORK_ORDER_ACCEPTED',
+      woId,
+      `Accepted by ${activeUser.name} for ${res.workOrder.utilityAssetCode || res.workOrder.title}`,
+      activeUser.name
+    );
+
+    showToast(`Assignment ${woId} accepted. Ready to start maintenance work.`, 'success');
+    return { success: true, workOrder: res.workOrder };
+  };
+
+  const rejectTransformerWorkOrder = (
+    woId: string,
+    reason: string
+  ): { success: boolean; workOrder?: WorkOrder; error?: string } => {
+    const res = rejectTransformerMaintenanceOrder({
+      woId,
+      reason,
+      actorUser: activeUser,
+      effectiveRole,
+      workOrders: workOrdersRef.current,
+      fieldEngineers,
+      notifications
+    });
+
+    if (!res.success || !res.workOrder) {
+      showToast(res.error || 'Failed to reject maintenance assignment.', 'error');
+      return { success: false, error: res.error };
+    }
+
+    workOrdersRef.current = res.updatedWorkOrders;
+    setWorkOrders(res.updatedWorkOrders);
+    setNotifications(prev => upsertNotificationList(prev, res.updatedNotifications.slice(0, 1)));
+
+    addAuditEvent(
+      'TRANSFORMER_WORK_ORDER_REJECTED',
+      woId,
+      `Rejected by ${activeUser.name}. Reason: "${reason.trim()}"`,
+      activeUser.name,
+      'WARNING'
+    );
+
+    showToast(`Assignment ${woId} rejected. Operations Employee notified for reassignment.`, 'warning');
+    return { success: true, workOrder: res.workOrder };
+  };
+
+  const reassignTransformerWorkOrder = (
+    woId: string,
+    newEngineerIdOrName: string,
+    notes?: string
+  ): { success: boolean; workOrder?: WorkOrder; error?: string } => {
+    const res = reassignTransformerMaintenanceOrder({
+      woId,
+      newEngineerIdOrName,
+      notes,
+      actorUser: activeUser,
+      effectiveRole,
+      workOrders: workOrdersRef.current,
+      fieldEngineers,
+      notifications
+    });
+
+    if (!res.success || !res.workOrder) {
+      showToast(res.error || 'Failed to reassign transformer work order.', 'error');
+      return { success: false, error: res.error };
+    }
+
+    workOrdersRef.current = res.updatedWorkOrders;
+    setWorkOrders(res.updatedWorkOrders);
+    setNotifications(res.updatedNotifications);
+
+    addAuditEvent(
+      'TRANSFORMER_WORK_ORDER_REASSIGNED',
+      woId,
+      `Reassigned to ${res.workOrder.assignedTo} by ${activeUser.name}. Status: AWAITING_ACCEPTANCE`,
+      activeUser.name
+    );
+
+    showToast(`Work Order ${woId} reassigned to ${res.workOrder.assignedTo} (Awaiting Acceptance).`, 'success');
+    return { success: true, workOrder: res.workOrder };
+  };
+
+  const startTransformerMaintenanceWork = (
+    woId: string,
+    notes?: string
+  ): { success: boolean; workOrder?: WorkOrder; error?: string } => {
+    const res = startTransformerMaintenanceWorkOrder({
+      woId,
+      notes,
+      actorUser: activeUser,
+      effectiveRole,
+      workOrders: workOrdersRef.current,
+      fieldEngineers,
+      notifications
+    });
+
+    if (!res.success || !res.workOrder) {
+      showToast(res.error || 'Failed to start maintenance work.', 'error');
+      return { success: false, error: res.error };
+    }
+
+    workOrdersRef.current = res.updatedWorkOrders;
+    setWorkOrders(res.updatedWorkOrders);
+    setNotifications(prev => upsertNotificationList(prev, res.updatedNotifications.slice(0, 1)));
+
+    addAuditEvent(
+      'TRANSFORMER_MAINTENANCE_STARTED',
+      woId,
+      `On-site maintenance started on ${res.workOrder.utilityAssetCode || res.workOrder.title} by ${activeUser.name}`,
+      activeUser.name
+    );
+
+    showToast(`Maintenance work started for ${woId} (Status: In Progress).`, 'info');
+    return { success: true, workOrder: res.workOrder };
+  };
+
+  const submitTransformerInspectionForReview = (
+    woId: string,
+    report: NonNullable<WorkOrder['inspectionReport']>,
+    checklist?: Record<string, string>,
+    photoRefs?: string[]
+  ): { success: boolean; workOrder?: WorkOrder; error?: string } => {
+    const res = submitTransformerInspectionOrderForReview({
+      woId,
+      report,
+      checklist,
+      photoRefs,
+      actorUser: activeUser,
+      effectiveRole,
+      workOrders: workOrdersRef.current,
+      fieldEngineers,
+      notifications
+    });
+
+    if (!res.success || !res.workOrder) {
+      showToast(res.error || 'Failed to submit transformer inspection.', 'error');
+      return { success: false, error: res.error };
+    }
+
+    workOrdersRef.current = res.updatedWorkOrders;
+    setWorkOrders(res.updatedWorkOrders);
+    setNotifications(prev => upsertNotificationList(prev, res.updatedNotifications.slice(0, 1)));
+
+    addAuditEvent(
+      'TRANSFORMER_INSPECTION_SUBMITTED',
+      woId,
+      `Inspection submitted for review on ${res.workOrder.utilityAssetCode || res.workOrder.title} by ${activeUser.name}`,
+      activeUser.name
+    );
+
+    showToast(`Inspection submitted for ${woId} (Status: Pending Review).`, 'success');
+    return { success: true, workOrder: res.workOrder };
+  };
+
+  const completeTransformerMaintenanceWorkOrder = (
+    woId: string,
+    completionNotes?: string
+  ): { success: boolean; workOrder?: WorkOrder; error?: string } => {
+    const res = completeTransformerMaintenanceOrder({
+      woId,
+      completionNotes,
+      actorUser: activeUser,
+      effectiveRole,
+      workOrders: workOrdersRef.current,
+      fieldEngineers,
+      notifications
+    });
+
+    if (!res.success || !res.workOrder) {
+      showToast(res.error || 'Failed to complete maintenance work order.', 'error');
+      return { success: false, error: res.error };
+    }
+
+    workOrdersRef.current = res.updatedWorkOrders;
+    setWorkOrders(res.updatedWorkOrders);
+    setNotifications(prev => upsertNotificationList(prev, res.updatedNotifications.slice(0, 2)));
+
+    addAuditEvent(
+      'TRANSFORMER_WORK_ORDER_COMPLETED',
+      woId,
+      `Maintenance work order ${woId} completed by ${activeUser.name}`,
+      activeUser.name
+    );
+
+    showToast(`Maintenance Work Order ${woId} marked Completed!`, 'success');
+    return { success: true, workOrder: res.workOrder };
+  };
+
   const refreshFieldOfflineQueueFromStorage = (): FieldOfflineQueueItem[] => {
     const loaded = loadFieldOfflineQueue();
     fieldOfflineQueueRef.current = loaded;
@@ -7665,7 +7958,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setWorkOrders(reconciledReset.workOrders);
     setEmployees(INITIAL_EMPLOYEES);
     setFieldEngineers(CANONICAL_FIELD_ENGINEERS);
-    setBills(INITIAL_BILLS);
+    const resetRuntimeBills = reconcileRuntimeDemoBillsSeed(INITIAL_BILLS, INITIAL_BILLS);
+    setBills(resetRuntimeBills);
     setPayments(INITIAL_PAYMENTS);
     setFormalNotices(INITIAL_FORMAL_NOTICES);
     setLateChargeWaivers([]);
@@ -8364,6 +8658,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         assignWorkOrder,
         reassignWorkOrder,
         updateWorkOrderPriorityAndSchedule,
+        dispatchTransformerWorkOrder,
+        acceptTransformerWorkOrder,
+        rejectTransformerWorkOrder,
+        reassignTransformerWorkOrder,
+        startTransformerMaintenanceWork,
+        submitTransformerInspectionForReview,
+        completeTransformerMaintenanceWorkOrder,
+        activeTransformerTrackingWoId,
+        setActiveTransformerTrackingWoId,
         reportFeederFault,
         markNotificationRead,
         markSelectedNotificationsRead,

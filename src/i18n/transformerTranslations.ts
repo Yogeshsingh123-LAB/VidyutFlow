@@ -128,6 +128,34 @@ export interface TransformerPhase12Dictionary {
   btnCancel: string;
   btnSave: string;
   liveAriaStatus: string;
+
+  // Maintenance Assignment & Tracking System
+  colOperationalStatus: string;
+  colMaintenanceStatus: string;
+  maintNotAssigned: string;
+  maintAwaitingAcceptance: string;
+  maintAccepted: string;
+  maintInProgress: string;
+  maintPendingReview: string;
+  maintCompleted: string;
+  maintRejected: string;
+  maintCancelled: string;
+  counterAwaitingAcceptance: string;
+  counterInProgress: string;
+  counterReassignmentRequired: string;
+  counterCompleted: string;
+  filterAllMaintenance: string;
+  sortPriorityIndicator: string;
+  btnTrackWo: string;
+  btnReassignWo: string;
+  btnAcceptAssignment: string;
+  btnRejectAssignment: string;
+  btnStartMaintenance: string;
+  btnSubmitForReview: string;
+  btnCompleteMaintenance: string;
+  modalTrackWoTitle: string;
+  modalReassignTitle: string;
+  lblRejectionReason: string;
 }
 
 export const TRANSFORMER_TRANSLATIONS: Record<LanguageCode, TransformerPhase12Dictionary> = {
@@ -249,7 +277,33 @@ export const TRANSFORMER_TRANSLATIONS: Record<LanguageCode, TransformerPhase12Di
     btnClose: 'Close',
     btnCancel: 'Cancel',
     btnSave: 'Save',
-    liveAriaStatus: 'Real-time telemetry event stream status'
+    liveAriaStatus: 'Real-time telemetry event stream status',
+    colOperationalStatus: 'Operational Status',
+    colMaintenanceStatus: 'Maintenance Status',
+    maintNotAssigned: 'Not Assigned',
+    maintAwaitingAcceptance: 'Awaiting Acceptance',
+    maintAccepted: 'Accepted',
+    maintInProgress: 'In Progress',
+    maintPendingReview: 'Inspection Submitted',
+    maintCompleted: 'Completed',
+    maintRejected: 'Rejected • Reassign',
+    maintCancelled: 'Cancelled',
+    counterAwaitingAcceptance: 'Awaiting Acceptance',
+    counterInProgress: 'In Progress',
+    counterReassignmentRequired: 'Reassignment Required',
+    counterCompleted: 'Completed',
+    filterAllMaintenance: 'All Maintenance States',
+    sortPriorityIndicator: 'Sorted by Action Priority & Risk',
+    btnTrackWo: 'Track Work Order',
+    btnReassignWo: 'Reassign Engineer',
+    btnAcceptAssignment: 'Accept Assignment',
+    btnRejectAssignment: 'Reject Assignment',
+    btnStartMaintenance: 'Start Maintenance Work',
+    btnSubmitForReview: 'Submit Inspection for Review',
+    btnCompleteMaintenance: 'Complete Maintenance',
+    modalTrackWoTitle: 'Work Order Lifecycle & Audit Timeline',
+    modalReassignTitle: 'Reassign Maintenance Work Order',
+    lblRejectionReason: 'Reason for Rejection'
   },
   gu: {
     cockpitTitle: 'ડિસ્ટ્રિબ્યુશન ટ્રાન્સફોર્મર્સ (ડીટીઆર) કોકપિટ',
@@ -369,7 +423,33 @@ export const TRANSFORMER_TRANSLATIONS: Record<LanguageCode, TransformerPhase12Di
     btnClose: 'બંધ કરો',
     btnCancel: 'રદ કરો',
     btnSave: 'સાચવો',
-    liveAriaStatus: 'રીઅલ-ટાઇમ ટેલિમેટ્રી ઇવેન્ટ સ્ટ્રીમ સ્થિતિ'
+    liveAriaStatus: 'રીઅલ-ટાઇમ ટેલિમેટ્રી ઇવેન્ટ સ્ટ્રીમ સ્થિતિ',
+    colOperationalStatus: 'કાર્યકારી સ્થિતિ',
+    colMaintenanceStatus: 'જાળવણી સ્થિતિ',
+    maintNotAssigned: 'સોંપાયેલ નથી',
+    maintAwaitingAcceptance: 'સ્વીકૃતિની રાહમાં',
+    maintAccepted: 'સ્વીકારાયેલ',
+    maintInProgress: 'કાર્ય પ્રગતિમાં',
+    maintPendingReview: 'નિરીક્ષણ સબમિટ થયેલ',
+    maintCompleted: 'પૂર્ણ થયેલ',
+    maintRejected: 'નકારાયેલ • ફરી સોંપો',
+    maintCancelled: 'રદ થયેલ',
+    counterAwaitingAcceptance: 'સ્વીકૃતિ બાકી',
+    counterInProgress: 'કાર્ય પ્રગતિમાં',
+    counterReassignmentRequired: 'ફરી સોંપણી જરૂરી',
+    counterCompleted: 'પૂર્ણ થયેલ',
+    filterAllMaintenance: 'બધી જાળવણી સ્થિતિઓ',
+    sortPriorityIndicator: 'કાર્યવાહી અગ્રતા અને જોખમ મુજબ ક્રમાંકિત',
+    btnTrackWo: 'વર્ક ઓર્ડર ટ્રેક કરો',
+    btnReassignWo: 'એન્જિનિયર ફરી સોંપો',
+    btnAcceptAssignment: 'સોંપણી સ્વીકારો',
+    btnRejectAssignment: 'સોંપણી નકારો',
+    btnStartMaintenance: 'જાળવણી કાર્ય શરૂ કરો',
+    btnSubmitForReview: 'સમીક્ષા માટે નિરીક્ષણ સબમિટ કરો',
+    btnCompleteMaintenance: 'જાળવણી પૂર્ણ કરો',
+    modalTrackWoTitle: 'વર્ક ઓર્ડર જીવનચક્ર અને ઓડિટ ટાઇમલાઇન',
+    modalReassignTitle: 'જાળવણી વર્ક ઓર્ડર ફરી સોંપો',
+    lblRejectionReason: 'નકારવાનું કારણ'
   },
   hi: {
     cockpitTitle: 'वितरण ट्रांसफॉर्मर (डीटीआर) कॉकपिट',
@@ -489,7 +569,33 @@ export const TRANSFORMER_TRANSLATIONS: Record<LanguageCode, TransformerPhase12Di
     btnClose: 'बंद करें',
     btnCancel: 'रद्द करें',
     btnSave: 'सहेजें',
-    liveAriaStatus: 'रीयल-टाइम टेलीमेट्री इवेंट स्ट्रीम स्थिति'
+    liveAriaStatus: 'रीयल-टाइम टेलीमेट्री इवेंट स्ट्रीम स्थिति',
+    colOperationalStatus: 'परिचालन स्थिति',
+    colMaintenanceStatus: 'रखरखाव स्थिति',
+    maintNotAssigned: 'असाइन नहीं किया गया',
+    maintAwaitingAcceptance: 'स्वीकृति की प्रतीक्षा में',
+    maintAccepted: 'स्वीकृत',
+    maintInProgress: 'प्रगति पर',
+    maintPendingReview: 'निरीक्षण प्रस्तुत',
+    maintCompleted: 'पूर्ण',
+    maintRejected: 'अस्वीकृत • पुनः असाइन करें',
+    maintCancelled: 'रद्द',
+    counterAwaitingAcceptance: 'स्वीकृति लंबित',
+    counterInProgress: 'प्रगति पर',
+    counterReassignmentRequired: 'पुनः असाइनमेंट आवश्यक',
+    counterCompleted: 'पूर्ण',
+    filterAllMaintenance: 'सभी रखरखाव स्थितियां',
+    sortPriorityIndicator: 'कार्रवाई प्राथमिकता और जोखिम द्वारा क्रमबद्ध',
+    btnTrackWo: 'वर्क ऑर्डर ट्रैक करें',
+    btnReassignWo: 'इंजीनियर पुनः असाइन करें',
+    btnAcceptAssignment: 'असाइनमेंट स्वीकार करें',
+    btnRejectAssignment: 'असाइनमेंट अस्वीकार करें',
+    btnStartMaintenance: 'रखरखाव कार्य शुरू करें',
+    btnSubmitForReview: 'समीक्षा हेतु निरीक्षण जमा करें',
+    btnCompleteMaintenance: 'रखरखाव पूर्ण करें',
+    modalTrackWoTitle: 'वर्क ऑर्डर जीवनचक्र और ऑडिट समयरेखा',
+    modalReassignTitle: 'रखरखाव वर्क ऑर्डर पुनः असाइन करें',
+    lblRejectionReason: 'अस्वीकृति का कारण'
   },
   mr: {
     cockpitTitle: 'वितरण ट्रान्सफॉर्मर्स (डीटीआर) कॉकपिट',
@@ -609,7 +715,33 @@ export const TRANSFORMER_TRANSLATIONS: Record<LanguageCode, TransformerPhase12Di
     btnClose: 'बंद करा',
     btnCancel: 'रद्द करा',
     btnSave: 'जतन करा',
-    liveAriaStatus: 'रिअल-टाइम टेलिमेट्री इव्हेंट प्रवाह स्थिती'
+    liveAriaStatus: 'रिअल-टाइम टेलिमेट्री इव्हेंट प्रवाह स्थिती',
+    colOperationalStatus: 'कार्यप्रणाली स्थिती',
+    colMaintenanceStatus: 'देखभाल स्थिती',
+    maintNotAssigned: 'नियुक्त नाही',
+    maintAwaitingAcceptance: 'स्वीकृतीच्या प्रतीक्षेत',
+    maintAccepted: 'स्वीकारले',
+    maintInProgress: 'प्रगतीपथावर',
+    maintPendingReview: 'तपासणी सादर केली',
+    maintCompleted: 'पूर्ण झाले',
+    maintRejected: 'नाकारले • पुन्हा नियुक्त करा',
+    maintCancelled: 'रद्द केले',
+    counterAwaitingAcceptance: 'स्वीकृती प्रलंबित',
+    counterInProgress: 'प्रगतीपथावर',
+    counterReassignmentRequired: 'पुनर्नियुक्ती आवश्यक',
+    counterCompleted: 'पूर्ण झाले',
+    filterAllMaintenance: 'सर्व देखभाल स्थिती',
+    sortPriorityIndicator: 'कृती प्राधान्य आणि जोखमीनुसार क्रमवारी',
+    btnTrackWo: 'वर्क ऑर्डर ट्रॅक करा',
+    btnReassignWo: 'अभियंता पुन्हा नियुक्त करा',
+    btnAcceptAssignment: 'नियुक्ती स्वीकारा',
+    btnRejectAssignment: 'नियुक्ती नाकारा',
+    btnStartMaintenance: 'देखभाल काम सुरू करा',
+    btnSubmitForReview: 'पुनरावलोकनासाठी तपासणी सादर करा',
+    btnCompleteMaintenance: 'देखभाल पूर्ण करा',
+    modalTrackWoTitle: 'वर्क ऑर्डर जीवनचक्र आणि ऑडिट टाइमलाइन',
+    modalReassignTitle: 'देखभाल वर्क ऑर्डर पुन्हा नियुक्त करा',
+    lblRejectionReason: 'नाकारण्याचे कारण'
   }
 };
 
@@ -617,4 +749,5 @@ export function getTransformerI18n(lang: LanguageCode | string): TransformerPhas
   const code = (lang || 'en') as LanguageCode;
   return TRANSFORMER_TRANSLATIONS[code] || TRANSFORMER_TRANSLATIONS.en;
 }
+
 

@@ -29,7 +29,58 @@ export function vidyutMitraAiPlugin(): Plugin {
   };
 }
 
+import net from 'net';
+
 const FASTAPI_TARGET = process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8008';
+
+let _upstreamCached: boolean | null = null;
+let _upstreamLastCheck = 0;
+
+function isUpstreamReachable(targetUrlStr: string): Promise<boolean> {
+  const now = Date.now();
+  if (_upstreamCached !== null && now - _upstreamLastCheck < 3000) {
+    return Promise.resolve(_upstreamCached);
+  }
+  return new Promise(resolve => {
+    try {
+      const parsed = new URL(targetUrlStr);
+      const port = Number(parsed.port) || (parsed.protocol === 'https:' ? 443 : 80);
+      const host = parsed.hostname;
+      const sock = net.createConnection(port, host, () => {
+        sock.destroy();
+        _upstreamCached = true;
+        _upstreamLastCheck = Date.now();
+        resolve(true);
+      });
+      sock.on('error', () => {
+        _upstreamCached = false;
+        _upstreamLastCheck = Date.now();
+        resolve(false);
+      });
+      sock.setTimeout(60, () => {
+        sock.destroy();
+        _upstreamCached = false;
+        _upstreamLastCheck = Date.now();
+        resolve(false);
+      });
+    } catch {
+      _upstreamCached = false;
+      _upstreamLastCheck = Date.now();
+      resolve(false);
+    }
+  });
+}
+
+async function fastApiBypassHandler(req: any, res: any) {
+  const reachable = await isUpstreamReachable(FASTAPI_TARGET);
+  if (!reachable) {
+    if (res && !res.headersSent && !res.writableEnded) {
+      res.writeHead(502, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ detail: 'Upstream FastAPI service unreachable' }));
+    }
+    return false;
+  }
+}
 
 export default defineConfig(() => {
   return {
@@ -49,77 +100,92 @@ export default defineConfig(() => {
         '/api/backend': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api\/backend/, '')
+          rewrite: path => path.replace(/^\/api\/backend/, ''),
+          bypass: fastApiBypassHandler
         },
         '/api/notifications': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          rewrite: path => path.replace(/^\/api/, ''),
+          bypass: fastApiBypassHandler
         },
         '/api/requests': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          rewrite: path => path.replace(/^\/api/, ''),
+          bypass: fastApiBypassHandler
         },
         '/api/evidence': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          rewrite: path => path.replace(/^\/api/, ''),
+          bypass: fastApiBypassHandler
         },
         '/api/directory': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          rewrite: path => path.replace(/^\/api/, ''),
+          bypass: fastApiBypassHandler
         },
         '/api/system': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          rewrite: path => path.replace(/^\/api/, ''),
+          bypass: fastApiBypassHandler
         },
         '/api/erp': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          rewrite: path => path.replace(/^\/api/, ''),
+          bypass: fastApiBypassHandler
         },
         '/api/workflows': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          rewrite: path => path.replace(/^\/api/, ''),
+          bypass: fastApiBypassHandler
         },
         '/api/staff': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          rewrite: path => path.replace(/^\/api/, ''),
+          bypass: fastApiBypassHandler
         },
         '/api/v1': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          rewrite: path => path.replace(/^\/api/, ''),
+          bypass: fastApiBypassHandler
         },
         '/api/billing': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          rewrite: path => path.replace(/^\/api/, ''),
+          bypass: fastApiBypassHandler
         },
         '/api/transformers': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          rewrite: path => path.replace(/^\/api/, ''),
+          bypass: fastApiBypassHandler
         },
         '/api/transformer-analytics': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          rewrite: path => path.replace(/^\/api/, ''),
+          bypass: fastApiBypassHandler
         },
         '/api/transformer-policies': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          rewrite: path => path.replace(/^\/api/, ''),
+          bypass: fastApiBypassHandler
         },
         '/api/assistant': {
           target: FASTAPI_TARGET,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, '')
+          rewrite: path => path.replace(/^\/api/, ''),
+          bypass: fastApiBypassHandler
         }
       }
     },
@@ -129,6 +195,7 @@ export default defineConfig(() => {
       allowedHosts: true
     },
     build: {
+      emptyOutDir: true,
       chunkSizeWarningLimit: 500,
       rollupOptions: {
         output: {

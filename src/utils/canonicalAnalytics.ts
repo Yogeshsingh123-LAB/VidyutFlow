@@ -562,6 +562,20 @@ function resolveClosingShortMonthForTrajectory(billMonth: string): string {
 // 1. CONSUMER CANONICAL ANALYTICS SELECTOR
 // ============================================================================
 
+export const COMMERCIAL_CONSUMPTION_HISTORY_77190: Array<{
+  month: string;
+  units: number;
+  amount: number;
+  avgTempC: number;
+}> = [
+  { month: 'May 2026', units: 1680, amount: 14610, avgTempC: 41 },
+  { month: 'Jun 2026', units: 1820, amount: 15740, avgTempC: 42 },
+  { month: 'Jul 2026', units: 1760, amount: 15210, avgTempC: 34 },
+  { month: 'Aug 2026', units: 1620, amount: 14120, avgTempC: 32 },
+  { month: 'Sep 2026', units: 1710, amount: 14854, avgTempC: 33 },
+  { month: 'Oct 2026', units: 1640, amount: 14320, avgTempC: 31 },
+];
+
 export function selectConsumerCanonicalAnalytics(params: {
   connections: ElectricityConnection[];
   bills: ElectricityBill[];
@@ -575,6 +589,7 @@ export function selectConsumerCanonicalAnalytics(params: {
   waivers?: LateChargeWaiverRecord[];
   reversals?: PaymentReversalRecord[];
   policy?: LateChargePolicy;
+  enableCommercialHybridHistory?: boolean;
 }): ConsumerCanonicalAnalytics {
   const {
     connections,
@@ -585,10 +600,11 @@ export function selectConsumerCanonicalAnalytics(params: {
     notifications,
     actorScope,
     selectedConnectionNo,
-    referenceDate = '15-Oct-2026',
+    referenceDate = '05-Nov-2026',
     waivers,
     reversals,
     policy,
+    enableCommercialHybridHistory = false,
   } = params;
 
   const billingSummary = selectConsumerAccountBillingSummary({
@@ -722,6 +738,59 @@ export function selectConsumerCanonicalAnalytics(params: {
           units: Math.max(0, Number(unmatchedRec.unitsConsumed) || 0),
           amount: Math.max(0, Number(unmatchedRec.totalAmount) || 0),
           avgTempC: 32,
+          isHistoricalSeed: false,
+          isEstimated: false,
+          billNo: unmatchedRec.billNo
+        });
+      }
+
+      consumptionTrendSeries = baseSeries;
+    } else if (
+      selectedConnection.consumerNo === '04281-77190' &&
+      enableCommercialHybridHistory
+    ) {
+      trendDataSourceScope = 'PRIMARY_DEMO_HYBRID_HISTORY';
+      const billByShortMonth = new Map<string, ReconciledElectricityBill>();
+      for (const rec of connectionReconciledBills) {
+        const shortLabel = formatShortBillMonthLabel(rec.billMonth);
+        billByShortMonth.set(shortLabel.toLowerCase(), rec);
+      }
+
+      const baseSeries: ConnectionConsumptionTrendPoint[] = COMMERCIAL_CONSUMPTION_HISTORY_77190.map(pt => {
+        const normalizedKey = pt.month.replace(/\s*\(Est\)/i, '').trim().toLowerCase();
+        const liveMatch = billByShortMonth.get(normalizedKey);
+        if (liveMatch) {
+          billByShortMonth.delete(normalizedKey);
+          return {
+            month: pt.month,
+            rawMonthKey: pt.month,
+            units: Math.max(0, Number(liveMatch.unitsConsumed) || 0),
+            amount: Math.max(0, Number(liveMatch.totalAmount) || 0),
+            avgTempC: pt.avgTempC,
+            isHistoricalSeed: false,
+            isEstimated: pt.month.includes('(Est)'),
+            billNo: liveMatch.billNo
+          };
+        }
+        return {
+          month: pt.month,
+          rawMonthKey: pt.month,
+          units: Math.max(0, Number(pt.units) || 0),
+          amount: Math.max(0, Number(pt.amount) || 0),
+          avgTempC: pt.avgTempC,
+          isHistoricalSeed: true,
+          isEstimated: pt.month.includes('(Est)')
+        };
+      });
+
+      for (const [, unmatchedRec] of billByShortMonth.entries()) {
+        const shortMonth = formatShortBillMonthLabel(unmatchedRec.billMonth);
+        baseSeries.push({
+          month: shortMonth,
+          rawMonthKey: shortMonth,
+          units: Math.max(0, Number(unmatchedRec.unitsConsumed) || 0),
+          amount: Math.max(0, Number(unmatchedRec.totalAmount) || 0),
+          avgTempC: 33,
           isHistoricalSeed: false,
           isEstimated: false,
           billNo: unmatchedRec.billNo

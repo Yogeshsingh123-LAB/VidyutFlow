@@ -266,6 +266,24 @@ export interface ComplaintRecord {
   followUpComplaintId?: string;
 }
 
+export type TransformerMaintenanceStatus =
+  | 'NOT_ASSIGNED'
+  | 'AWAITING_ACCEPTANCE'
+  | 'ACCEPTED'
+  | 'IN_PROGRESS'
+  | 'PENDING_REVIEW'
+  | 'COMPLETED'
+  | 'REJECTED'
+  | 'CANCELLED';
+
+export interface WorkOrderReassignmentEvent {
+  timestamp: string;
+  previousAssignee: string;
+  newAssignee: string;
+  reason: string;
+  reassignedBy: string;
+}
+
 export interface WorkOrder {
   id: string;
   title: string;
@@ -297,7 +315,38 @@ export interface WorkOrder {
   verificationStatus?: WorkOrderVerificationStatus;
   completionReport?: WorkOrderCompletionReport;
   verificationReview?: WorkOrderVerificationReview;
+  // Phase 12 / Prompt 3: Transformer Maintenance Assignment & Tracking
+  maintenanceStatus?: TransformerMaintenanceStatus;
+  transformerId?: string;
+  utilityAssetCode?: string;
+  assignedEngineerId?: string;
+  dispatchedBy?: string;
+  dispatchedByUserId?: string;
+  dispatchedAt?: string;
+  updatedAt?: string;
+  scopeDescription?: string;
+  recommendedAction?: string;
+  rejectionReason?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  reassignmentHistory?: WorkOrderReassignmentEvent[];
+  inspectionChecklist?: Record<string, string>;
+  inspectionPhotoRefs?: string[];
+  previousAssignees?: string[];
 }
+
+export function deriveTransformerMaintenanceStatus(wo?: WorkOrder | null): TransformerMaintenanceStatus {
+  if (!wo) return 'NOT_ASSIGNED';
+  if (wo.maintenanceStatus) return wo.maintenanceStatus;
+  if (wo.status === 'Deferred') return 'REJECTED';
+  if (wo.status === 'Assigned' || wo.status === 'Pending') return 'AWAITING_ACCEPTANCE';
+  if (wo.status === 'En Route' || wo.status === 'On Site') return 'ACCEPTED';
+  if (wo.status === 'In Progress') return 'IN_PROGRESS';
+  if (wo.status === 'Completed' && wo.verificationStatus === 'pending_verification') return 'PENDING_REVIEW';
+  if (wo.status === 'Completed') return 'COMPLETED';
+  return 'NOT_ASSIGNED';
+}
+
 
 export interface FeederHealth {
   id: string;

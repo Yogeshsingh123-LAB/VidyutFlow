@@ -22,7 +22,7 @@ export interface DemoTransformerAsset {
   latitude: number;
   longitude: number;
   coordinate_source: string;
-  status: 'IN_SERVICE' | 'MAINTENANCE' | 'FAULT' | 'RETIRED';
+  status: 'IN_SERVICE' | 'MAINTENANCE' | 'FAULT' | 'RETIRED' | 'OFFLINE';
   load_utilization_pct: number;
   oil_temp_c: number;
   winding_temp_c: number;
@@ -30,6 +30,10 @@ export interface DemoTransformerAsset {
   active_alerts_count: number;
   risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
   prediction_horizon: '7D' | '30D';
+  telemetry_status?: 'LIVE' | 'DEMO' | 'STALE' | 'OFFLINE';
+  last_updated_at?: string;
+  recommended_action?: string;
+  explainable_risk_factors?: string[];
 }
 
 export interface DemoTransformerSensor {
@@ -91,6 +95,110 @@ export const DEMO_TRANSFORMERS: DemoTransformerAsset[] = [
     active_alerts_count: 2,
     risk_level: 'HIGH',
     prediction_horizon: '7D',
+    telemetry_status: 'DEMO',
+    last_updated_at: '2026-11-05T07:45:00Z',
+    recommended_action: 'Urgent: Dispatch maintenance crew for thermal camera scan, load redistribution & tap adjustment.',
+    explainable_risk_factors: [
+      'Peak utilization at 94.6% (>90% critical threshold)',
+      'Top-oil temperature 88.5°C approaching 90°C thermal runaway threshold',
+      'Winding temperature 98.2°C indicates accelerated paper insulation aging'
+    ]
+  },
+  {
+    id: 'tr-north-02-uuid',
+    utility_asset_code: 'DEMO-TR-NORTH-02',
+    feeder_id: '11KV-NORTH-RES-02',
+    substation_id: 'SS-MEHSANA-66KV-01',
+    zone: 'North',
+    rated_kva: 250.0,
+    phases: 3,
+    voltage_class: '11kV/415V',
+    commissioning_date: '2022-03-10',
+    manufacturer: 'Schneider Electric India',
+    serial_number: 'SE-2022-250-1092',
+    latitude: 23.5910,
+    longitude: 72.3720,
+    coordinate_source: 'FIELD_GPS',
+    status: 'IN_SERVICE',
+    load_utilization_pct: 48.0,
+    oil_temp_c: 54.0,
+    winding_temp_c: 62.5,
+    vibration_mms: 1.8,
+    active_alerts_count: 0,
+    risk_level: 'LOW',
+    prediction_horizon: '30D',
+    telemetry_status: 'DEMO',
+    last_updated_at: '2026-11-05T07:58:00Z',
+    recommended_action: 'Nominal condition: Continue standard preventive inspection schedule (Next: 90 days).',
+    explainable_risk_factors: [
+      'Healthy load profile at 48% well within 70% optimal operating band',
+      'Top-oil temperature 54°C shows excellent thermal margin (>26°C below warning)',
+      'Vibration 1.8 mm/s indicates balanced core clamping and good mechanical health'
+    ]
+  },
+  {
+    id: 'tr-north-03-uuid',
+    utility_asset_code: 'DEMO-TR-NORTH-03',
+    feeder_id: '11KV-NORTH-COMM-03',
+    substation_id: 'SS-MEHSANA-66KV-01',
+    zone: 'North',
+    rated_kva: 400.0,
+    phases: 3,
+    voltage_class: '11kV/415V',
+    commissioning_date: '2020-11-18',
+    manufacturer: 'ABB India Ltd',
+    serial_number: 'ABB-2020-400-3341',
+    latitude: 23.5840,
+    longitude: 72.3650,
+    coordinate_source: 'FIELD_GPS',
+    status: 'IN_SERVICE',
+    load_utilization_pct: 81.0,
+    oil_temp_c: 76.0,
+    winding_temp_c: 85.4,
+    vibration_mms: 3.2,
+    active_alerts_count: 1,
+    risk_level: 'MEDIUM',
+    prediction_horizon: '30D',
+    telemetry_status: 'DEMO',
+    last_updated_at: '2026-11-05T07:50:00Z',
+    recommended_action: 'Advisory: Monitor commercial peak loads; schedule breather silica-gel and oil sample test within 14 days.',
+    explainable_risk_factors: [
+      'Elevated peak utilization at 81.0% crossing warning threshold (80%)',
+      'Top-oil temperature 76.0°C within 4°C of 80°C threshold',
+      'Load ramp velocity indicates commercial HVAC surge during afternoon peak'
+    ]
+  },
+  {
+    id: 'tr-north-04-uuid',
+    utility_asset_code: 'DEMO-TR-NORTH-04',
+    feeder_id: '11KV-NORTH-RURAL-04',
+    substation_id: 'SS-MEHSANA-66KV-01',
+    zone: 'North',
+    rated_kva: 100.0,
+    phases: 3,
+    voltage_class: '11kV/415V',
+    commissioning_date: '2018-07-22',
+    manufacturer: 'Crompton Greaves Ltd',
+    serial_number: 'CG-2018-100-0554',
+    latitude: 23.5790,
+    longitude: 72.3580,
+    coordinate_source: 'GIS_PORTAL',
+    status: 'OFFLINE',
+    load_utilization_pct: 67.0,
+    oil_temp_c: 64.0,
+    winding_temp_c: 71.0,
+    vibration_mms: 2.1,
+    active_alerts_count: 1,
+    risk_level: 'MEDIUM',
+    prediction_horizon: '30D',
+    telemetry_status: 'STALE',
+    last_updated_at: '2026-11-04T22:15:00Z',
+    recommended_action: 'Telemetry loss: Dispatch field technician to verify modem power supply, SIM connection, and RTU battery.',
+    explainable_risk_factors: [
+      'Telemetry heartbeat missing for over 9 hours (Last received: 04-Nov 22:15 UTC)',
+      'Last recorded load was 67.0% with 64.0°C oil temperature',
+      'Communication failure risk: Grid SCADA cannot verify current agricultural load state'
+    ]
   },
   {
     id: 'tr-south-01-uuid',
@@ -115,6 +223,13 @@ export const DEMO_TRANSFORMERS: DemoTransformerAsset[] = [
     active_alerts_count: 0,
     risk_level: 'LOW',
     prediction_horizon: '30D',
+    telemetry_status: 'DEMO',
+    last_updated_at: '2026-11-05T07:30:00Z',
+    recommended_action: 'Nominal condition: Continue seasonal agricultural feeder monitoring.',
+    explainable_risk_factors: [
+      'Load utilization 68.2% within safe limits',
+      'Oil and winding temperatures normal'
+    ]
   },
   {
     id: 'tr-central-01-uuid',
@@ -139,6 +254,13 @@ export const DEMO_TRANSFORMERS: DemoTransformerAsset[] = [
     active_alerts_count: 1,
     risk_level: 'MEDIUM',
     prediction_horizon: '30D',
+    telemetry_status: 'DEMO',
+    last_updated_at: '2026-11-05T07:40:00Z',
+    recommended_action: 'Advisory: Monitor high ambient temperatures during summer midday cycles.',
+    explainable_risk_factors: [
+      'Load utilization 79.4% near 80% threshold',
+      'Oil temperature 78.6°C within normal summer range'
+    ]
   },
 ];
 
@@ -176,7 +298,87 @@ export const DEMO_TRANSFORMER_ALERTS: DemoTransformerAlert[] = [
     last_seen_at: '2026-11-04T17:00:00Z',
     description: 'Top oil temperature reached 88.5 deg C (warning threshold 80.0 deg C).',
   },
+  {
+    id: 'alt-03',
+    transformer_id: 'tr-north-03-uuid',
+    utility_asset_code: 'DEMO-TR-NORTH-03',
+    zone: 'North',
+    alert_type: 'ELEVATED_COMMERCIAL_PEAK',
+    severity: 'INFO',
+    status: 'ACTIVE',
+    first_seen_at: '2026-11-05T06:30:00Z',
+    last_seen_at: '2026-11-05T07:50:00Z',
+    description: 'Load utilization reached 81.0% (324 kVA of 400 kVA rated capacity) with oil temp at 76.0°C.',
+  },
+  {
+    id: 'alt-04',
+    transformer_id: 'tr-north-04-uuid',
+    utility_asset_code: 'DEMO-TR-NORTH-04',
+    zone: 'North',
+    alert_type: 'TELEMETRY_HEARTBEAT_LOSS',
+    severity: 'WARN',
+    status: 'ACTIVE',
+    first_seen_at: '2026-11-04T22:15:00Z',
+    last_seen_at: '2026-11-05T07:45:00Z',
+    description: 'Modem telemetry heartbeat missing for >9 hours. Last reported load 67 kVA (67% of 100 kVA), 64.0°C.',
+  },
 ];
+
+export function getTransformerTelemetrySeries(tr: DemoTransformerAsset): DemoTelemetryPoint[] {
+  const rated = tr.rated_kva;
+  const currentLoad = Math.round((tr.load_utilization_pct / 100) * rated);
+  const currentOil = tr.oil_temp_c;
+  const currentWinding = tr.winding_temp_c;
+  const currentVib = tr.vibration_mms;
+
+  return [
+    {
+      timestamp: '2026-11-05T02:00:00Z',
+      timeLabel: '02:00',
+      load_kva: Math.round(currentLoad * 0.72),
+      rated_kva: rated,
+      oil_temp_c: Math.round((currentOil - 8.5) * 10) / 10,
+      winding_temp_c: Math.round((currentWinding - 9.0) * 10) / 10,
+      vibration_mms: Math.max(1.0, Math.round((currentVib - 0.8) * 10) / 10),
+    },
+    {
+      timestamp: '2026-11-05T04:00:00Z',
+      timeLabel: '04:00',
+      load_kva: Math.round(currentLoad * 0.78),
+      rated_kva: rated,
+      oil_temp_c: Math.round((currentOil - 6.0) * 10) / 10,
+      winding_temp_c: Math.round((currentWinding - 6.5) * 10) / 10,
+      vibration_mms: Math.max(1.0, Math.round((currentVib - 0.5) * 10) / 10),
+    },
+    {
+      timestamp: '2026-11-05T06:00:00Z',
+      timeLabel: '06:00',
+      load_kva: Math.round(currentLoad * 0.88),
+      rated_kva: rated,
+      oil_temp_c: Math.round((currentOil - 3.2) * 10) / 10,
+      winding_temp_c: Math.round((currentWinding - 3.5) * 10) / 10,
+      vibration_mms: Math.max(1.0, Math.round((currentVib - 0.3) * 10) / 10),
+    },
+    {
+      timestamp: '2026-11-05T07:00:00Z',
+      timeLabel: '07:00',
+      load_kva: Math.round(currentLoad * 0.95),
+      rated_kva: rated,
+      oil_temp_c: Math.round((currentOil - 1.2) * 10) / 10,
+      winding_temp_c: Math.round((currentWinding - 1.5) * 10) / 10,
+      vibration_mms: currentVib,
+    },
+    {
+      timestamp: '2026-11-05T07:45:00Z',
+      timeLabel: '07:45',
+      load_kva: currentLoad,
+      rated_kva: rated,
+      oil_temp_c: currentOil,
+      winding_temp_c: currentWinding,
+      vibration_mms: currentVib,
+    },
+  ];
+}
 
 export interface InspectionChecklistItem {
   id: string;

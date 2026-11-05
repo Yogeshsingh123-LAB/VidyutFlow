@@ -1222,6 +1222,8 @@ export function triggerBrowserDownload(
   }
 }
 
+export const triggerBrowserFileDownload = triggerBrowserDownload;
+
 /**
  * High-level, role-aware dataset export pipeline.
  */

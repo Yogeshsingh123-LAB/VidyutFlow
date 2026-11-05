@@ -126,8 +126,12 @@ import {
   generatePaymentReceiptDocument,
   generateApplicationAcknowledgmentDocument,
   generateComplaintAcknowledgmentDocument,
+  generateConsumptionReportDocument,
+  generatePaymentHistoryReportDocument,
   triggerOfficialDocumentPdfDownload,
 } from '../../utils/documentEngine';
+import { triggerBrowserFileDownload } from '../../utils/exportEngine';
+import type { OverdueFinancialBreakdown } from '../../utils/lateChargeEngine';
 import {
   BillingReminderType,
   ReconciledElectricityBill,
@@ -319,7 +323,11 @@ export const ConsumerPortal: React.FC = () => {
           consumerName: currentUserName,
           ownedConsumerNos: consumerConnections.map(c => c.consumerNo)
         },
-        selectedConnectionNo
+        selectedConnectionNo,
+        referenceDate: businessReferenceDate,
+        waivers: lateChargeWaivers,
+        reversals: paymentReversals,
+        enableCommercialHybridHistory: true,
       }),
     [
       consumerConnections,
@@ -331,7 +339,10 @@ export const ConsumerPortal: React.FC = () => {
       currentUserId,
       currentUserEmail,
       currentUserName,
-      selectedConnectionNo
+      selectedConnectionNo,
+      businessReferenceDate,
+      lateChargeWaivers,
+      paymentReversals,
     ]
   );
 
@@ -345,6 +356,7 @@ export const ConsumerPortal: React.FC = () => {
   );
 
   const [isPayModalOpen, setIsPayModalOpen] = useState(false);
+  const [showConsumptionDataTable, setShowConsumptionDataTable] = useState(false);
   const [billStatusFilter, setBillStatusFilter] = useState<'ALL' | 'UNPAID' | 'OVERDUE' | 'PAID' | 'PARTIALLY_PAID' | 'SCHEDULED'>('ALL');
   const [expandedBillTimelines, setExpandedBillTimelines] = useState<Record<string, boolean>>({});
   const [selectedBillToPay, setSelectedBillToPay] = useState<string | null>(null);
@@ -580,8 +592,12 @@ export const ConsumerPortal: React.FC = () => {
     if (billStatusFilter === 'SCHEDULED') return [];
     return selectedConnectionBills.filter(bill => {
       if (billStatusFilter === 'ALL') return true;
-      if (billStatusFilter === 'UNPAID') return bill.isDue && !bill.isPaid;
-      if (billStatusFilter === 'OVERDUE') return !bill.isPaid && (bill.effectiveStatus === 'Overdue' || bill.isOverdue);
+      if (billStatusFilter === 'UNPAID') {
+        return !bill.isPaid && bill.isDue && !bill.isOverdue && bill.effectiveStatus !== 'Overdue';
+      }
+      if (billStatusFilter === 'OVERDUE') {
+        return !bill.isPaid && (bill.effectiveStatus === 'Overdue' || bill.isOverdue);
+      }
       if (billStatusFilter === 'PAID') return bill.isPaid || bill.effectiveStatus === 'Paid';
       if (billStatusFilter === 'PARTIALLY_PAID') return bill.isPartiallyPaid || bill.effectiveStatus === 'Partially Paid';
       return true;
@@ -693,6 +709,170 @@ export const ConsumerPortal: React.FC = () => {
       dataSource: dataMode,
     });
     setActiveOfficialDocument(doc);
+  };
+
+  const handleDownloadAccountStatementPdf = (
+    targetBill: ElectricityBill | ReconciledElectricityBill | string
+  ) => {
+    const resolvedBill =
+      typeof targetBill === 'string'
+        ? consumerBillingSummary.allAccountReconciledBills.find(b => b.billNo === targetBill) ||
+          bills.find(b => b.billNo === targetBill)
+        : targetBill;
+    if (!resolvedBill) return;
+    const conn =
+      consumerConnections.find(c => c.consumerNo === resolvedBill.consumerNo) ||
+      selectedConnection;
+    const activeNotice =
+      formalNotices.find(n => n.billNo === resolvedBill.billNo) || null;
+    const doc = generateUpdatedAccountStatementDocument({
+      role: 'consumer',
+      actor: consumerDocumentActor,
+      bill: resolvedBill,
+      connection: conn,
+      payments: consumerPayments,
+      waivers: lateChargeWaivers,
+      reversals: paymentReversals,
+      formalNotice: activeNotice,
+      referenceDate: businessReferenceDate,
+      language,
+      dataSource: dataMode,
+    });
+    const res = triggerOfficialDocumentPdfDownload(doc);
+    if (res.downloaded) {
+      showToast(`Downloaded ${res.filename}`, 'success');
+    }
+  };
+
+  const handleDownloadOverdueBreakdownCsv = (
+    billNo: string,
+    breakdown: OverdueFinancialBreakdown
+  ) => {
+    const headers = [
+      'Bill No',
+      'Consumer No',
+      'Original Bill Amount (INR)',
+      'Payments Settled (INR)',
+      'Remaining Principal (INR)',
+      'Accrued Late Charges DPS (INR)',
+      'Waived Or Settled Charges (INR)',
+      'Total Current Outstanding (INR)',
+      'Original Due Date',
+      'Days Overdue',
+      'Chargeable Days',
+      'Annual Rate (%)',
+      'Daily Charge Rate (INR)',
+      'Calculation Reference Date',
+      'Policy Version',
+    ];
+    const waivedOrSettled = Number(
+      ((breakdown.lateChargesWaived || 0) + (breakdown.lateChargesSettled || 0)).toFixed(2)
+    );
+    const row = [
+      breakdown.billNo,
+      breakdown.consumerNo,
+      breakdown.originalBillAmount.toFixed(2),
+      breakdown.successfulPayments.toFixed(2),
+      breakdown.remainingPrincipal.toFixed(2),
+      breakdown.netLateChargesPayable.toFixed(2),
+      waivedOrSettled.toFixed(2),
+      breakdown.totalOutstandingPayable.toFixed(2),
+      breakdown.dueDate,
+      String(breakdown.daysOverdue),
+      String(breakdown.chargeableDays),
+      String(breakdown.effectiveAnnualRatePercent),
+      breakdown.dailyChargeRate.toFixed(3),
+      breakdown.referenceDate,
+      breakdown.policyVersion,
+    ];
+    const csvContent = `\uFEFF${headers.join(',')}\n${row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')}\n`;
+    const safeBill = billNo.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+    const filename = `vidyutflow-overdue-breakdown-${safeBill}-${businessReferenceDate}.csv`;
+    triggerBrowserFileDownload(csvContent, filename, 'text/csv;charset=utf-8');
+    showToast(`Downloaded ${filename}`, 'success');
+  };
+
+  const handleDownloadConsumptionReportPdf = () => {
+    if (!selectedConnection) return;
+    const doc = generateConsumptionReportDocument({
+      role: 'consumer',
+      actor: consumerDocumentActor,
+      connection: selectedConnection,
+      consumptionSeries: consumerCanonicalAnalytics.consumptionTrendSeries,
+      referenceDate: businessReferenceDate,
+      language,
+      dataSource: dataMode,
+    });
+    const res = triggerOfficialDocumentPdfDownload(doc);
+    if (res.downloaded) {
+      showToast(`Downloaded ${res.filename}`, 'success');
+    }
+  };
+
+  const handleDownloadConsumptionReportCsv = () => {
+    if (!selectedConnection) return;
+    const headers = [
+      'Month',
+      'Consumer No',
+      'Meter Serial No',
+      'Tariff Category',
+      'Units Consumed (kWh)',
+      'Billed Amount (INR)',
+      'Ambient Temp (C)',
+      'Data Provenance',
+      'Bill Reference',
+    ];
+    const rows = consumerCanonicalAnalytics.consumptionTrendSeries.map(pt => [
+      pt.month,
+      selectedConnection.consumerNo,
+      selectedConnection.meterNo,
+      selectedConnection.tariffCategory,
+      String(pt.units),
+      String(pt.amount),
+      String(pt.avgTempC ?? ''),
+      pt.isEstimated ? 'Estimated' : pt.billNo ? 'Actual Billed' : 'Recorded Meter History',
+      pt.billNo || 'N/A',
+    ]);
+    const csvLines = [
+      headers.join(','),
+      ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')),
+    ];
+    const csvContent = `\uFEFF${csvLines.join('\n')}\n`;
+    const safeConn = selectedConnection.consumerNo.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+    const filename = `vidyutflow-consumption-report-${safeConn}-${businessReferenceDate}.csv`;
+    triggerBrowserFileDownload(csvContent, filename, 'text/csv;charset=utf-8');
+    showToast(`Downloaded ${filename}`, 'success');
+  };
+
+  const handleDownloadPaymentHistoryPdf = () => {
+    if (!selectedConnection) return;
+    const doc = generatePaymentHistoryReportDocument({
+      role: 'consumer',
+      actor: consumerDocumentActor,
+      connection: selectedConnection,
+      payments: selectedConnectionPayments,
+      referenceDate: businessReferenceDate,
+      language,
+      dataSource: dataMode,
+    });
+    const res = triggerOfficialDocumentPdfDownload(doc);
+    if (res.downloaded) {
+      showToast(`Downloaded ${res.filename}`, 'success');
+    }
+  };
+
+  const handleDownloadComplaintAcknowledgmentPdf = (cmp: ComplaintRecord) => {
+    const doc = generateComplaintAcknowledgmentDocument({
+      role: 'consumer',
+      actor: consumerDocumentActor,
+      complaint: cmp,
+      language,
+      dataSource: dataMode,
+    });
+    const res = triggerOfficialDocumentPdfDownload(doc);
+    if (res.downloaded) {
+      showToast(`Downloaded ${res.filename}`, 'success');
+    }
   };
 
   const handleViewReceipt = (bill: ElectricityBill, explicitPayment?: PaymentTransaction) => {
@@ -1119,6 +1299,8 @@ export const ConsumerPortal: React.FC = () => {
                 formalNotice={formalNotices.find(n => n.billNo === currentBill.billNo) || null}
                 onPay={handlePayClick}
                 onViewAccountStatement={handleViewAccountStatement}
+                onDownloadStatementPdf={handleDownloadAccountStatementPdf}
+                onDownloadStatementCsv={handleDownloadOverdueBreakdownCsv}
               />
             </div>
           )}
@@ -1559,7 +1741,7 @@ export const ConsumerPortal: React.FC = () => {
                 )}
               </div>
               {hasConnections && selectedConnection && (
-                <div className="flex flex-wrap items-center gap-4 text-xs">
+                <div className="flex flex-wrap items-center gap-3 text-xs">
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-semibold">
                       {tc.sixMonthAverage} ({at.calculated})
@@ -1580,6 +1762,35 @@ export const ConsumerPortal: React.FC = () => {
                       {selectedConnection.currentReadingKwh.toLocaleString()} kWh
                     </span>
                   </div>
+                  <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block" />
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowConsumptionDataTable(prev => !prev)}
+                      data-testid="toggle-consumption-data-table-btn"
+                      className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-[11px] transition-colors cursor-pointer"
+                    >
+                      {showConsumptionDataTable ? 'Hide Table' : 'Data Table'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadConsumptionReportPdf}
+                      data-testid="download-consumption-report-pdf-btn"
+                      className="px-2.5 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/50 hover:bg-blue-100 text-blue-700 dark:text-blue-300 font-semibold text-[11px] inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>PDF</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadConsumptionReportCsv}
+                      data-testid="download-consumption-report-csv-btn"
+                      className="px-2.5 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/50 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 font-semibold text-[11px] inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>CSV</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1596,60 +1807,122 @@ export const ConsumerPortal: React.FC = () => {
             )}
 
             {hasConnections ? (
-              <div className="h-72 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={localizedConsumptionHistory} margin={{ top: 10, right: 16, left: 0, bottom: 4 }}>
-                    <defs>
-                      <linearGradient id="colorUnits" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#2563EB" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#2563EB" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.18} />
-                    <XAxis
-                      dataKey="displayMonth"
-                      stroke="#64748b"
-                      fontSize={11}
-                      tickLine={false}
-                      axisLine={{ stroke: '#cbd5e1', strokeOpacity: 0.4 }}
-                      dy={6}
-                    />
-                    <YAxis
-                      stroke="#64748b"
-                      fontSize={11}
-                      tickLine={false}
-                      axisLine={false}
-                      width={62}
-                      tickFormatter={(val: number) => `${val} kWh`}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#0F172A',
-                        border: '1px solid #1E293B',
-                        borderRadius: '10px',
-                        fontSize: '12px',
-                        color: '#F8FAFC',
-                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.35)',
-                        padding: '10px 14px'
-                      }}
-                      formatter={(value, name, props) => {
-                        const payload = props?.payload as { amount?: number; avgTempC?: number } | undefined;
-                        const extra = payload?.amount ? ` · ${tc.chartBilledPrefix} ₹${payload.amount.toLocaleString()}` : '';
-                        return [`${value ?? 0} kWh${extra}`, String(name ?? tc.chartConsumedEnergy)];
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="units"
-                      stroke="#2563EB"
-                      strokeWidth={2.5}
-                      activeDot={{ r: 5, strokeWidth: 2, stroke: '#ffffff', fill: '#2563EB' }}
-                      fillOpacity={1}
-                      fill="url(#colorUnits)"
-                      name={tc.chartConsumedEnergy}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+              <div className="space-y-4">
+                <div className="h-72 w-full" data-testid="consumer-monthly-consumption-chart">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={localizedConsumptionHistory} margin={{ top: 10, right: 16, left: 0, bottom: 4 }}>
+                      <defs>
+                        <linearGradient id="colorUnits" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#2563EB" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#2563EB" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.18} />
+                      <XAxis
+                        dataKey="displayMonth"
+                        stroke="#64748b"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={{ stroke: '#cbd5e1', strokeOpacity: 0.4 }}
+                        dy={6}
+                      />
+                      <YAxis
+                        stroke="#64748b"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                        width={62}
+                        tickFormatter={(val: number) => `${val} kWh`}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#0F172A',
+                          border: '1px solid #1E293B',
+                          borderRadius: '10px',
+                          fontSize: '12px',
+                          color: '#F8FAFC',
+                          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.35)',
+                          padding: '10px 14px'
+                        }}
+                        formatter={(value, name, props) => {
+                          const payload = props?.payload as { amount?: number; avgTempC?: number; isEstimated?: boolean; billNo?: string } | undefined;
+                          const extra = payload?.amount ? ` · ${tc.chartBilledPrefix} ₹${payload.amount.toLocaleString()}` : '';
+                          const prov = payload?.isEstimated ? ' (Est)' : payload?.billNo ? ` (${payload.billNo})` : '';
+                          return [`${value ?? 0} kWh${extra}${prov}`, String(name ?? tc.chartConsumedEnergy)];
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="units"
+                        stroke="#2563EB"
+                        strokeWidth={2.5}
+                        dot={{ r: 4, strokeWidth: 2, stroke: '#2563EB', fill: '#ffffff' }}
+                        activeDot={{ r: 6, strokeWidth: 2, stroke: '#ffffff', fill: '#2563EB' }}
+                        fillOpacity={1}
+                        fill="url(#colorUnits)"
+                        name={tc.chartConsumedEnergy}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Accessible Legend & Provenance Strip */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/70 text-[11px] text-slate-500 dark:text-slate-400">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" />
+                      <span>Actual Billed / Recorded Meter Reading (kWh)</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
+                      <span>Estimated Cycle (Est)</span>
+                    </span>
+                  </div>
+                  <span className="font-mono text-[10px]">
+                    Peak: <strong>{consumerCanonicalAnalytics.peakMonthlyKwh.toLocaleString()} kWh</strong> · Avg Bill: <strong>₹{consumerCanonicalAnalytics.averageMonthlyBillInr.toLocaleString()}</strong>
+                  </span>
+                </div>
+
+                {/* Accessible Monthly Consumption Data Table */}
+                {showConsumptionDataTable && (
+                  <div
+                    data-testid="consumption-data-table"
+                    className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800"
+                  >
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 uppercase text-[10px] border-b border-slate-200 dark:border-slate-800">
+                        <tr>
+                          <th className="p-2.5 font-semibold">Billing Month</th>
+                          <th className="p-2.5 font-semibold text-right">Consumption (kWh)</th>
+                          <th className="p-2.5 font-semibold text-right">Billed Amount (₹)</th>
+                          <th className="p-2.5 font-semibold text-center">Provenance</th>
+                          <th className="p-2.5 font-semibold">Invoice Ref</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {localizedConsumptionHistory.map(row => (
+                          <tr key={row.rawMonthKey} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                            <td className="p-2.5 font-semibold text-slate-800 dark:text-slate-200">{row.displayMonth}</td>
+                            <td className="p-2.5 text-right font-mono font-bold text-blue-600 dark:text-blue-400">{row.units.toLocaleString()} kWh</td>
+                            <td className="p-2.5 text-right font-mono text-slate-800 dark:text-slate-200">₹{row.amount.toLocaleString()}</td>
+                            <td className="p-2.5 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                                row.isEstimated
+                                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
+                                  : row.billNo
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                                  : 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300'
+                              }`}>
+                                {row.isEstimated ? 'Estimated' : row.billNo ? 'Actual Billed' : 'Meter History'}
+                              </span>
+                            </td>
+                            <td className="p-2.5 font-mono text-[11px] text-slate-500">{row.billNo || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="py-12 px-6 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/30">
@@ -2743,8 +3016,8 @@ export const ConsumerPortal: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
             {[
               { id: 'ALL' as const, label: language === 'gu' ? 'બધા બિલ' : language === 'hi' ? 'सभी बिल' : language === 'mr' ? 'सर्व बिले' : 'All Bills', count: selectedConnectionBills.length },
-              { id: 'UNPAID' as const, label: language === 'gu' ? 'બાકી અને ચાલુ' : language === 'hi' ? 'अदत्त एवं देय' : language === 'mr' ? 'थकीत आणि देय' : 'Unpaid & Due', count: selectedConnectionBills.filter(b => b.isDue && !b.isPaid).length },
-              { id: 'OVERDUE' as const, label: language === 'gu' ? 'મુદતવીતી' : language === 'hi' ? 'अतिदेय' : language === 'mr' ? 'मुदतबाह्य' : 'Overdue', count: selectedConnectionBills.filter(b => !b.isPaid && (b.effectiveStatus === 'Overdue' || b.isOverdue)).length },
+              { id: 'UNPAID' as const, label: language === 'gu' ? 'બાકી (Unpaid)' : language === 'hi' ? 'अदत्त (Unpaid)' : language === 'mr' ? 'अदत्त (Unpaid)' : 'Unpaid (Not Overdue)', count: selectedConnectionBills.filter(b => !b.isPaid && b.isDue && !b.isOverdue && b.effectiveStatus !== 'Overdue').length },
+              { id: 'OVERDUE' as const, label: language === 'gu' ? 'મુદતવીતી (Overdue)' : language === 'hi' ? 'अतिदेय (Overdue)' : language === 'mr' ? 'मुदतबाह्य (Overdue)' : 'Overdue', count: selectedConnectionBills.filter(b => !b.isPaid && (b.effectiveStatus === 'Overdue' || b.isOverdue)).length },
               { id: 'PAID' as const, label: language === 'gu' ? 'ચૂકવેલ' : language === 'hi' ? 'भुगतान पूर्ण' : language === 'mr' ? 'भरलेले' : 'Paid', count: selectedConnectionBills.filter(b => b.isPaid || b.effectiveStatus === 'Paid').length },
               { id: 'PARTIALLY_PAID' as const, label: language === 'gu' ? 'અંશતઃ ચૂકવેલ' : language === 'hi' ? 'आंशिक भुगतान' : language === 'mr' ? 'अंशतः भरलेले' : 'Partially Paid', count: selectedConnectionBills.filter(b => b.isPartiallyPaid || b.effectiveStatus === 'Partially Paid').length },
               { id: 'SCHEDULED' as const, label: language === 'gu' ? 'નિર્ધારિત (Scheduled)' : language === 'hi' ? 'निर्धारित (Scheduled)' : language === 'mr' ? 'नियोजित (Scheduled)' : 'Scheduled', count: selectedConnectionScheduledBills.length },
@@ -2998,14 +3271,34 @@ export const ConsumerPortal: React.FC = () => {
                       </button>
 
                       {!bill.isPaid && canonicalCurrentPayable > 0 && bill.isDue && (
-                        <button
-                          type="button"
-                          onClick={() => handlePayClick(bill.billNo)}
-                          data-testid={`pay-online-btn-${bill.billNo}`}
-                          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs cursor-pointer"
-                        >
-                          {tc.payOnlineBtn}
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleViewAccountStatement(bill)}
+                            data-testid={`view-bill-statement-btn-${bill.billNo}`}
+                            className="px-3 py-2 rounded-lg border border-amber-200 dark:border-amber-800/80 bg-amber-50/60 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 hover:bg-amber-100/80 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>Statement</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadAccountStatementPdf(bill)}
+                            data-testid={`download-account-statement-pdf-btn-${bill.billNo}`}
+                            className="px-3 py-2 rounded-lg border border-rose-200 dark:border-rose-800/80 bg-rose-50/60 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 hover:bg-rose-100/80 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Statement PDF</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handlePayClick(bill.billNo)}
+                            data-testid={`pay-online-btn-${bill.billNo}`}
+                            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs cursor-pointer"
+                          >
+                            {tc.payOnlineBtn}
+                          </button>
+                        </>
                       )}
                       {(bill.isPaid || bill.paidAmount > 0) && (
                         <>
@@ -3354,11 +3647,24 @@ export const ConsumerPortal: React.FC = () => {
                 {tc.paymentHistorySub} ({selectedConnection ? `${selectedConnection.consumerName} · ${selectedConnection.consumerNo}` : currentUserName})
               </p>
             </div>
-            <ExportMenu
-              datasetKey="payments"
-              filteredRecords={selectedConnection ? selectedConnectionPayments : consumerPayments}
-              allAuthorizedRecords={consumerPayments}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              {selectedConnection && (
+                <button
+                  type="button"
+                  onClick={handleDownloadPaymentHistoryPdf}
+                  data-testid="download-payment-history-pdf-btn"
+                  className="px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/50 hover:bg-blue-100 text-blue-700 dark:text-blue-300 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Payment History PDF</span>
+                </button>
+              )}
+              <ExportMenu
+                datasetKey="payments"
+                filteredRecords={selectedConnection ? selectedConnectionPayments : consumerPayments}
+                allAuthorizedRecords={consumerPayments}
+              />
+            </div>
           </div>
 
           <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">
@@ -3376,9 +3682,9 @@ export const ConsumerPortal: React.FC = () => {
                     <th className="p-3.5 font-semibold text-right whitespace-nowrap">{docUi.paymentReceipt}</th>
                   </tr>
                 </thead>
-                {consumerPayments.length > 0 ? (
+                {(selectedConnection ? selectedConnectionPayments : consumerPayments).length > 0 ? (
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                    {consumerPayments.map(p => (
+                    {(selectedConnection ? selectedConnectionPayments : consumerPayments).map(p => (
                       <tr key={p.txId} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                         <td className="p-3.5 font-mono font-semibold text-slate-900 dark:text-white whitespace-nowrap">
                           {p.txId}
@@ -3569,17 +3875,31 @@ export const ConsumerPortal: React.FC = () => {
                       <span className="text-blue-600 dark:text-blue-400 font-medium">
                         {tc.expectedResolutionLabel} {cmp.slaDueTime}
                       </span>
-                      <button
-                        type="button"
-                        onClick={e => {
-                          e.stopPropagation();
-                          handleViewComplaintAcknowledgment(cmp);
-                        }}
-                        className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
-                      >
-                        <FileText className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                        <span>{docUi.viewAcknowledgment}</span>
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleViewComplaintAcknowledgment(cmp);
+                          }}
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <FileText className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                          <span>{docUi.viewAcknowledgment}</span>
+                        </button>
+                        <button
+                          type="button"
+                          data-testid={`download-complaint-ack-pdf-btn-${cmp.id}`}
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleDownloadComplaintAcknowledgmentPdf(cmp);
+                          }}
+                          className="px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/50 hover:bg-blue-100 text-blue-700 dark:text-blue-300 text-[11px] font-semibold inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>PDF</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

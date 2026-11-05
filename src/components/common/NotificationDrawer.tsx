@@ -88,7 +88,9 @@ export const NotificationDrawer: React.FC = () => {
     unreadIncidentsCount,
     criticalIncidentsCount,
     fieldEngineers,
-    demoSession
+    demoSession,
+    workOrders,
+    setActiveTransformerTrackingWoId
   } = useApp();
   const { language, t } = useLanguage();
 
@@ -268,6 +270,20 @@ export const NotificationDrawer: React.FC = () => {
   const handleOpenWorkOrderFromNotification = (item: AppNotification, woId: string) => {
     if (isConsumerSession) return;
     markNotificationRead(item.id);
+    const linkedWo = workOrders.find(w => w.id === woId);
+    const isTransformerWo =
+      linkedWo?.type === 'Transformer Overload Inspection' ||
+      Boolean(linkedWo?.transformerId || linkedWo?.utilityAssetCode) ||
+      item.title.includes('DTR') ||
+      item.message.includes('DEMO-TR-');
+
+    if (isTransformerWo) {
+      setActiveTransformerTrackingWoId(woId);
+      setActiveTab('transformers');
+      setIsNotificationDrawerOpen(false);
+      return;
+    }
+
     if (effectiveRole === 'field') {
       setActiveTab('workorders');
     }

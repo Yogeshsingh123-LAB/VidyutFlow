@@ -17,6 +17,7 @@ import {
   FileText,
   Scale,
   CheckCircle2,
+  Download,
 } from 'lucide-react';
 
 interface OverdueBillBreakdownCardProps {
@@ -24,6 +25,8 @@ interface OverdueBillBreakdownCardProps {
   formalNotice?: FormalNoticeRecord | null;
   onPay?: (billNo: string, amountToPay?: number) => void;
   onViewAccountStatement?: (billNo: string) => void;
+  onDownloadStatementPdf?: (billNo: string) => void;
+  onDownloadStatementCsv?: (billNo: string, breakdown: OverdueFinancialBreakdown) => void;
   className?: string;
   compact?: boolean;
 }
@@ -33,6 +36,8 @@ export const OverdueBillBreakdownCard: React.FC<OverdueBillBreakdownCardProps> =
   formalNotice,
   onPay,
   onViewAccountStatement,
+  onDownloadStatementPdf,
+  onDownloadStatementCsv,
   className = '',
   compact = false,
 }) => {
@@ -278,6 +283,30 @@ export const OverdueBillBreakdownCard: React.FC<OverdueBillBreakdownCardProps> =
             >
               <FileText className="w-3.5 h-3.5 text-amber-400" />
               <span>{fnT.updatedAccountStatementBtn}</span>
+            </button>
+          )}
+          {onDownloadStatementPdf && (
+            <button
+              type="button"
+              onClick={() => onDownloadStatementPdf(breakdown.billNo)}
+              data-testid={`download-statement-pdf-btn-${breakdown.billNo}`}
+              className="px-3 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              title="Download Overdue Breakdown & Account Statement PDF"
+            >
+              <Download className="w-3.5 h-3.5 text-blue-400" />
+              <span>PDF</span>
+            </button>
+          )}
+          {onDownloadStatementCsv && (
+            <button
+              type="button"
+              onClick={() => onDownloadStatementCsv(breakdown.billNo, breakdown)}
+              data-testid={`download-statement-csv-btn-${breakdown.billNo}`}
+              className="px-3 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 font-semibold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              title="Download Overdue Financial Breakdown CSV"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <span>CSV</span>
             </button>
           )}
           {onPay && breakdown.totalOutstandingPayable > 0 && (

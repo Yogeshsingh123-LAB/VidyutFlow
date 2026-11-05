@@ -5558,3 +5558,372 @@ export function generateUpdatedAccountStatementDocument(params: {
   };
 }
 
+/**
+ * Generates an official printable/downloadable Monthly Electricity Consumption Report PDF
+ * (`vidyutflow-consumption-report-{consumerNo}-{language}.pdf`) strictly scoped to the selected connection/meter.
+ */
+export function generateConsumptionReportDocument(params: {
+  role: UserRole;
+  actor: ExportActorIdentity;
+  connection: ElectricityConnection;
+  consumptionSeries: Array<{
+    month: string;
+    units: number;
+    amount: number;
+    avgTempC?: number;
+    isEstimated?: boolean;
+    isHistoricalSeed?: boolean;
+    billNo?: string;
+  }>;
+  referenceDate?: string;
+  language?: Language;
+  dataSource?: ExportDataSourceClassification | string;
+}): GeneratedOfficialDocument {
+  const {
+    role,
+    actor,
+    connection,
+    consumptionSeries = [],
+    referenceDate = '05-Nov-2026',
+    language = 'en',
+  } = params;
+
+  const ui = getDocumentUiTranslations(language);
+  const typo = getLanguageTypographyProfile(language);
+  const normalizedDataSource = normalizeExportDataSource(params.dataSource);
+
+  let isAuthorized = true;
+  if (role === 'field') {
+    isAuthorized = false;
+  } else if (role === 'consumer') {
+    const normalizedActor: ExportActorIdentity = {
+      ...actor,
+      id: actor.id || (actor as unknown as { userId?: string }).userId || '',
+      role,
+    };
+    isAuthorized = isRecordOwnedByConsumer(
+      {
+        consumerNo: connection.consumerNo,
+        accountId: connection.accountId || 'demo_consumer',
+      },
+      normalizedActor
+    );
+  } else if (role === 'employee') {
+    isAuthorized = isEmployeeAuthorizedForExportSubdivision(
+      actor.subdivision,
+      connection.subdivision
+    );
+  }
+
+  const safeRef = connection.consumerNo.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+  const filename = `vidyutflow-consumption-report-${safeRef}-${language}.pdf`;
+  const reportTitle =
+    language === 'gu'
+      ? 'માસિક વીજ વપરાશ અહેવાલ (Monthly Consumption Report)'
+      : language === 'hi'
+      ? 'मासिक विद्युत खपत रिपोर्ट (Monthly Consumption Report)'
+      : language === 'mr'
+      ? 'मासिक वीज वापर अहवाल (Monthly Consumption Report)'
+      : 'Monthly Electricity Consumption & Meter Reading Report';
+
+  if (!isAuthorized) {
+    return {
+      documentType: 'account_statement',
+      displayMode: 'unauthorized',
+      eligible: false,
+      authorized: false,
+      referenceId: `CONS-RPT-${connection.consumerNo}`,
+      filename,
+      title: reportTitle,
+      subtitle: UGVCL_COMPANY_NAME_EN,
+      statusLabel: ui.unauthorizedDocumentAccess,
+      statusTone: 'rose',
+      statusBannerNote: ui.unauthorizedDocumentAccess,
+      recordedTimestamp: referenceDate,
+      generatedAtDisplay: referenceDate,
+      dataSource: normalizedDataSource,
+      dataSourceBadge: `${ui.dataSource}: ${normalizedDataSource}`,
+      demoDisclosureBanner: ui.demoAcknowledgmentDisclosure,
+      footerNote: ui.demoAcknowledgmentDisclosure,
+      language,
+      fontFamilyCss: FONT_STACKS[language],
+      isIndic: typo.isIndic,
+      sections: [],
+      ineligibleReason: ui.unauthorizedDocumentAccess,
+    };
+  }
+
+  const totalUnits = consumptionSeries.reduce((s, p) => s + (Number(p.units) || 0), 0);
+  const avgUnits =
+    consumptionSeries.length > 0
+      ? Math.round(totalUnits / consumptionSeries.length)
+      : connection.averageMonthlyKwh || 0;
+  const peakUnits =
+    consumptionSeries.length > 0
+      ? Math.max(...consumptionSeries.map((p) => Number(p.units) || 0))
+      : avgUnits;
+  const avgAmount =
+    consumptionSeries.length > 0
+      ? Math.round(
+          consumptionSeries.reduce((s, p) => s + (Number(p.amount) || 0), 0) /
+            consumptionSeries.length
+        )
+      : 0;
+
+  const meterSection: DocumentSection = {
+    id: 'consumption-meter-particulars',
+    title: ui.sectionConsumerAndPremises,
+    fields: [
+      { key: 'consumerNo', label: ui.consumerNumber, value: connection.consumerNo, isMono: true },
+      { key: 'meterNo', label: 'Meter Serial No.', value: connection.meterNo, isMono: true },
+      { key: 'consumerName', label: ui.consumerName, value: connection.consumerName },
+      {
+        key: 'subdivision',
+        label: ui.subdivision,
+        value: localizeSubdivision(connection.subdivision, language),
+      },
+      {
+        key: 'tariffCategory',
+        label: ui.tariffCategory,
+        value: `${localizeTariffCategory(connection.tariffCategory, language)} (${connection.sanctionedLoadKw} kW · ${connection.phase})`,
+      },
+      {
+        key: 'latestMeterReading',
+        label: 'Latest Cumulative Reading',
+        value: `${(connection.currentReadingKwh || 0).toLocaleString('en-IN')} kWh (as of ${connection.lastReadingDate})`,
+        isMono: true,
+        highlight: 'blue',
+      },
+    ],
+  };
+
+  const monthlyFields: DocumentFieldItem[] = consumptionSeries.map((pt, idx) => {
+    const provenanceLabel = pt.isEstimated
+      ? 'Estimated (Est)'
+      : pt.billNo
+      ? `Actual Billed (${pt.billNo})`
+      : 'Recorded Meter History';
+    return {
+      key: `month-${idx}-${pt.month}`,
+      label: `${idx + 1}. ${pt.month}`,
+      value: `${pt.units.toLocaleString('en-IN')} kWh · ₹${pt.amount.toLocaleString('en-IN')}${pt.avgTempC ? ` · ${pt.avgTempC}°C` : ''} · [${provenanceLabel}]`,
+      isMono: true,
+      highlight: pt.isEstimated ? 'amber' : 'emerald',
+    };
+  });
+
+  const historySection: DocumentSection = {
+    id: 'monthly-consumption-series',
+    title: 'Monthly Electricity Consumption Trajectory (kWh & Billed Amount)',
+    fields: monthlyFields,
+  };
+
+  return {
+    documentType: 'account_statement',
+    displayMode: 'official_document',
+    eligible: true,
+    authorized: true,
+    referenceId: `CONS-RPT-${connection.consumerNo}`,
+    filename,
+    title: reportTitle,
+    subtitle: `${UGVCL_COMPANY_NAME_EN} · Meter ${connection.meterNo} (${connection.consumerNo})`,
+    statusLabel: `${consumptionSeries.length} Months Verified`,
+    statusTone: 'blue',
+    statusBannerNote: `Connection-scoped consumption trajectory for Consumer No. ${connection.consumerNo} (Meter ${connection.meterNo}). Generated on ${referenceDate}.`,
+    recordedTimestamp: referenceDate,
+    generatedAtDisplay: `${referenceDate}, 10:30 IST`,
+    dataSource: normalizedDataSource,
+    dataSourceBadge: `${ui.dataSource}: ${normalizedDataSource}`,
+    demoDisclosureBanner: ui.demoAcknowledgmentDisclosure,
+    footerNote: ui.demoAcknowledgmentDisclosure,
+    language,
+    fontFamilyCss: FONT_STACKS[language],
+    isIndic: typo.isIndic,
+    sections: [meterSection, historySection],
+    summaryMetrics: [
+      { label: '6-Month Avg Consumption', value: `${avgUnits.toLocaleString('en-IN')} kWh` },
+      { label: 'Peak Monthly Usage', value: `${peakUnits.toLocaleString('en-IN')} kWh` },
+      { label: 'Average Monthly Bill', value: `₹${avgAmount.toLocaleString('en-IN')}` },
+      {
+        label: 'Latest Meter Reading',
+        value: `${(connection.currentReadingKwh || 0).toLocaleString('en-IN')} kWh`,
+      },
+    ],
+  };
+}
+
+/**
+ * Generates an official printable/downloadable Payment & Settlement History Report PDF
+ * (`vidyutflow-payment-history-{consumerNo}-{language}.pdf`) strictly scoped to the selected connection/meter.
+ */
+export function generatePaymentHistoryReportDocument(params: {
+  role: UserRole;
+  actor: ExportActorIdentity;
+  connection: ElectricityConnection;
+  payments: PaymentTransaction[];
+  referenceDate?: string;
+  language?: Language;
+  dataSource?: ExportDataSourceClassification | string;
+}): GeneratedOfficialDocument {
+  const {
+    role,
+    actor,
+    connection,
+    payments = [],
+    referenceDate = '05-Nov-2026',
+    language = 'en',
+  } = params;
+
+  const ui = getDocumentUiTranslations(language);
+  const typo = getLanguageTypographyProfile(language);
+  const normalizedDataSource = normalizeExportDataSource(params.dataSource);
+
+  let isAuthorized = true;
+  if (role === 'field') {
+    isAuthorized = false;
+  } else if (role === 'consumer') {
+    const normalizedActor: ExportActorIdentity = {
+      ...actor,
+      id: actor.id || (actor as unknown as { userId?: string }).userId || '',
+      role,
+    };
+    isAuthorized = isRecordOwnedByConsumer(
+      {
+        consumerNo: connection.consumerNo,
+        accountId: connection.accountId || 'demo_consumer',
+      },
+      normalizedActor
+    );
+  } else if (role === 'employee') {
+    isAuthorized = isEmployeeAuthorizedForExportSubdivision(
+      actor.subdivision,
+      connection.subdivision
+    );
+  }
+
+  const safeRef = connection.consumerNo.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+  const filename = `vidyutflow-payment-history-${safeRef}-${language}.pdf`;
+  const reportTitle =
+    language === 'gu'
+      ? 'ચુકવણી ઇતિહાસ અહેવાલ (Payment History Report)'
+      : language === 'hi'
+      ? 'भुगतान इतिहास रिपोर्ट (Payment History Report)'
+      : language === 'mr'
+      ? 'पेमेंट इतिहास अहवाल (Payment History Report)'
+      : 'Official Payment & Settlement History Report';
+
+  if (!isAuthorized) {
+    return {
+      documentType: 'account_statement',
+      displayMode: 'unauthorized',
+      eligible: false,
+      authorized: false,
+      referenceId: `PAY-HIST-${connection.consumerNo}`,
+      filename,
+      title: reportTitle,
+      subtitle: UGVCL_COMPANY_NAME_EN,
+      statusLabel: ui.unauthorizedDocumentAccess,
+      statusTone: 'rose',
+      statusBannerNote: ui.unauthorizedDocumentAccess,
+      recordedTimestamp: referenceDate,
+      generatedAtDisplay: referenceDate,
+      dataSource: normalizedDataSource,
+      dataSourceBadge: `${ui.dataSource}: ${normalizedDataSource}`,
+      demoDisclosureBanner: ui.demoPaymentReceiptDisclosure,
+      footerNote: ui.demoPaymentReceiptDisclosure,
+      language,
+      fontFamilyCss: FONT_STACKS[language],
+      isIndic: typo.isIndic,
+      sections: [],
+      ineligibleReason: ui.unauthorizedDocumentAccess,
+    };
+  }
+
+  const successfulPayments = payments.filter((p) => p.status === 'Successful');
+  const totalSettledInr = successfulPayments.reduce(
+    (sum, p) => sum + (Number(p.amount) || 0),
+    0
+  );
+
+  const meterSection: DocumentSection = {
+    id: 'payment-history-consumer-particulars',
+    title: ui.sectionConsumerAndPremises,
+    fields: [
+      { key: 'consumerNo', label: ui.consumerNumber, value: connection.consumerNo, isMono: true },
+      { key: 'meterNo', label: 'Meter Serial No.', value: connection.meterNo, isMono: true },
+      { key: 'consumerName', label: ui.consumerName, value: connection.consumerName },
+      {
+        key: 'subdivision',
+        label: ui.subdivision,
+        value: localizeSubdivision(connection.subdivision, language),
+      },
+      {
+        key: 'tariffCategory',
+        label: ui.tariffCategory,
+        value: localizeTariffCategory(connection.tariffCategory, language),
+      },
+    ],
+  };
+
+  const txFields: DocumentFieldItem[] =
+    payments.length > 0
+      ? payments.map((p, idx) => ({
+          key: `tx-${idx}-${p.txId}`,
+          label: `${idx + 1}. ${p.txId} (${p.date})`,
+          value: `Bill: ${p.billNo} · ₹${(Number(p.amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · ${localizePaymentMethod(p.paymentMethod, language)} · [${localizePaymentStatus(p.status, language)}]`,
+          isMono: true,
+          highlight:
+            p.status === 'Successful'
+              ? 'emerald'
+              : p.status === 'Failed'
+              ? 'rose'
+              : 'amber',
+        }))
+      : [
+          {
+            key: 'no-transactions',
+            label: 'Recorded Transactions',
+            value: 'No payment transactions recorded for this connection.',
+          },
+        ];
+
+  const ledgerSection: DocumentSection = {
+    id: 'payment-history-ledger',
+    title: 'Connection-Scoped Payment & Settlement Ledger',
+    fields: txFields,
+  };
+
+  return {
+    documentType: 'account_statement',
+    displayMode: 'official_document',
+    eligible: true,
+    authorized: true,
+    referenceId: `PAY-HIST-${connection.consumerNo}`,
+    filename,
+    title: reportTitle,
+    subtitle: `${UGVCL_COMPANY_NAME_EN} · Meter ${connection.meterNo} (${connection.consumerNo})`,
+    statusLabel: `${successfulPayments.length} Settled / ${payments.length} Total`,
+    statusTone: 'emerald',
+    statusBannerNote: `Connection-scoped payment ledger for Consumer No. ${connection.consumerNo} (Meter ${connection.meterNo}). Generated on ${referenceDate}.`,
+    recordedTimestamp: referenceDate,
+    generatedAtDisplay: `${referenceDate}, 10:30 IST`,
+    dataSource: normalizedDataSource,
+    dataSourceBadge: `${ui.dataSource}: ${normalizedDataSource}`,
+    demoDisclosureBanner: ui.demoPaymentReceiptDisclosure,
+    footerNote: ui.demoPaymentReceiptDisclosure,
+    language,
+    fontFamilyCss: FONT_STACKS[language],
+    isIndic: typo.isIndic,
+    sections: [meterSection, ledgerSection],
+    summaryMetrics: [
+      { label: 'Total Transactions', value: `${payments.length}` },
+      { label: 'Settled Payments', value: `${successfulPayments.length}` },
+      {
+        label: 'Total Settled Amount',
+        value: `₹${totalSettledInr.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      },
+      { label: 'Reference Date', value: referenceDate },
+    ],
+  };
+}
+

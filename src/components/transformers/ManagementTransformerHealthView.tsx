@@ -10,10 +10,11 @@ import {
   Filter,
   CheckCircle2,
   TrendingUp,
-  MapPin,
   Clock,
   Layers,
-  ChevronRight
+  Wrench,
+  UserCheck,
+  FileText
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -35,6 +36,12 @@ import {
   DEMO_TRANSFORMER_ALERTS,
   DemoTransformerAsset
 } from '../../data/transformerDemoData';
+import { deriveTransformerMaintenanceStatus, TransformerMaintenanceStatus } from '../../types';
+import {
+  getLatestTransformerWorkOrder,
+  sortTransformersByMaintenancePriority,
+  computeTransformerMaintenanceCounts
+} from '../../utils/transformerMaintenanceEngine';
 
 interface ZoneMetrics {
   zone: string;
@@ -46,24 +53,18 @@ interface ZoneMetrics {
 }
 
 export const ManagementTransformerHealthView: React.FC = () => {
-  const { showToast } = useApp();
+  const { showToast, workOrders } = useApp();
   const { t } = useLanguage();
   const tr = t.transformers;
 
-  const [transformers, setTransformers] = useState<DemoTransformerAsset[]>(DEMO_TRANSFORMERS);
+  const [transformers] = useState<DemoTransformerAsset[]>(DEMO_TRANSFORMERS);
   const [selectedZone, setSelectedZone] = useState<string>('ALL');
   const [isLoading, setIsLoading] = useState(false);
-  const [fleetHealthSummary, setFleetHealthSummary] = useState<any>(null);
 
-  // Fetch summary analytics from backend
   const fetchAnalytics = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/v1/transformer-analytics/summary', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setFleetHealthSummary(data);
-      }
+      await fetch('/api/v1/transformer-analytics/summary', { credentials: 'include' });
     } catch {
       // Fallback
     } finally {
@@ -75,13 +76,16 @@ export const ManagementTransformerHealthView: React.FC = () => {
     fetchAnalytics();
   }, [fetchAnalytics]);
 
-  // Filtered by zone
   const visibleTransformers = useMemo(() => {
     if (selectedZone === 'ALL') return transformers;
     return transformers.filter((t) => t.zone.toLowerCase() === selectedZone.toLowerCase());
   }, [transformers, selectedZone]);
 
-  // Aggregate zone metrics
+  // Maintenance summary counts across visible fleet
+  const maintenanceCounts = useMemo(() => {
+    return computeTransformerMaintenanceCounts(visibleTransformers, workOrders);
+  }, [visibleTransformers, workOrders]);
+
   const zoneBreakdown = useMemo<ZoneMetrics[]>(() => {
     const zones = ['North', 'South', 'Central'];
     return zones.map((z) => {
@@ -97,34 +101,83 @@ export const ManagementTransformerHealthView: React.FC = () => {
     });
   }, [transformers]);
 
-  // Fleet Totals
   const fleetTotals = useMemo(() => {
-    const total = transformers.length;
-    const inService = transformers.filter((t) => t.status === 'IN_SERVICE').length;
-    const highRisk = transformers.filter((t) => t.risk_level === 'HIGH').length;
-    const mediumRisk = transformers.filter((t) => t.risk_level === 'MEDIUM').length;
-    const lowRisk = transformers.filter((t) => t.risk_level === 'LOW').length;
+    const total = visibleTransformers.length;
+    const inService = visibleTransformers.filter((t) => t.status === 'IN_SERVICE').length;
+    const highRisk = visibleTransformers.filter((t) => t.risk_level === 'HIGH').length;
+    const mediumRisk = visibleTransformers.filter((t) => t.risk_level === 'MEDIUM').length;
+    const lowRisk = visibleTransformers.filter((t) => t.risk_level === 'LOW').length;
     const activeAlerts = DEMO_TRANSFORMER_ALERTS.filter((a) => a.status === 'ACTIVE').length;
     const fleetHealth = Math.round(
       zoneBreakdown.reduce((acc, z) => acc + z.healthIndex, 0) / Math.max(1, zoneBreakdown.length)
     );
 
     return { total, inService, highRisk, mediumRisk, lowRisk, activeAlerts, fleetHealth };
-  }, [transformers, zoneBreakdown]);
+  }, [visibleTransformers, zoneBreakdown]);
 
-  // Risk Distribution Chart Data
   const riskPieData = useMemo(() => [
     { name: 'Low Risk', value: fleetTotals.lowRisk, color: '#10b981' },
     { name: 'Medium Risk', value: fleetTotals.mediumRisk, color: '#f59e0b' },
     { name: 'High Risk (Action Needed)', value: fleetTotals.highRisk, color: '#ef4444' },
   ], [fleetTotals]);
 
-  // Top Risk Transformers Ranking
-  const topRiskTransformers = useMemo(() => {
-    return [...transformers]
-      .sort((a, b) => b.load_utilization_pct - a.load_utilization_pct)
-      .slice(0, 5);
-  }, [transformers]);
+  // Prioritize transformers by Maintenance Action Priority & Risk Severity
+  const prioritizedTransformers = useMemo(() => {
+    return sortTransformersByMaintenancePriority(visibleTransformers, workOrders);
+  }, [visibleTransformers, workOrders]);
+
+  const renderMaintenanceBadge = (status: TransformerMaintenanceStatus) => {
+    switch (status) {
+      case 'REJECTED':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+            <AlertTriangle className="w-3 h-3 text-rose-600" />
+            {tr.maintRejected || 'Rejected • Reassign'}
+          </span>
+        );
+      case 'AWAITING_ACCEPTANCE':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+            <Clock className="w-3 h-3 text-amber-600" />
+            {tr.maintAwaitingAcceptance || 'Awaiting Acceptance'}
+          </span>
+        );
+      case 'ACCEPTED':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-cyan-50 text-cyan-800 border border-cyan-200">
+            <UserCheck className="w-3 h-3 text-cyan-600" />
+            {tr.maintAccepted || 'Accepted'}
+          </span>
+        );
+      case 'IN_PROGRESS':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+            <Wrench className="w-3 h-3 text-blue-600" />
+            {tr.maintInProgress || 'In Progress'}
+          </span>
+        );
+      case 'PENDING_REVIEW':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+            <FileText className="w-3 h-3 text-indigo-600" />
+            {tr.maintPendingReview || 'Inspection Submitted'}
+          </span>
+        );
+      case 'COMPLETED':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+            {tr.maintCompleted || 'Completed'}
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+            {tr.maintNotAssigned || 'Not Assigned'}
+          </span>
+        );
+    }
+  };
 
   const handleExportReport = () => {
     showToast?.('Executive DTR Fleet Summary exported (PDF/CSV ready)', 'success');
@@ -144,7 +197,7 @@ export const ManagementTransformerHealthView: React.FC = () => {
                 Distribution Transformer Fleet Health & Risk Analytics
               </h1>
               <p className="text-sm text-slate-500">
-                Executive Cockpit • Cross-Subdivision Grid Asset Reliability & Failure Forecasting
+                Executive Cockpit • Cross-Subdivision Grid Asset Reliability & Maintenance Oversight
               </p>
             </div>
           </div>
@@ -208,7 +261,7 @@ export const ManagementTransformerHealthView: React.FC = () => {
           </div>
           <div className="mt-3 text-3xl font-extrabold text-slate-900">{fleetTotals.total}</div>
           <div className="mt-1 text-xs text-slate-500 font-medium">
-            {fleetTotals.inService} In-Service Across 3 Subdivisions
+            {fleetTotals.inService} In-Service Across Subdivisions
           </div>
         </div>
 
@@ -225,19 +278,20 @@ export const ManagementTransformerHealthView: React.FC = () => {
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
-            <span>ACTIVE GRID ALERTS</span>
-            <Activity className="w-4 h-4 text-amber-600" />
+            <span>ACTIVE MAINTENANCE ORDERS</span>
+            <Wrench className="w-4 h-4 text-indigo-600" />
           </div>
-          <div className="mt-3 text-3xl font-extrabold text-amber-600">{fleetTotals.activeAlerts}</div>
+          <div className="mt-3 text-3xl font-extrabold text-indigo-600">
+            {maintenanceCounts.awaitingAcceptance + maintenanceCounts.inProgress + maintenanceCounts.reassignmentRequired}
+          </div>
           <div className="mt-1 text-xs text-slate-500 font-medium">
-            Subdivision AE Ops Triaging
+            {maintenanceCounts.reassignmentRequired} Reassign • {maintenanceCounts.completed} Completed
           </div>
         </div>
       </div>
 
       {/* Visual Analytics Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Subdivision Risk Breakdown */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <h3 className="font-bold text-sm text-slate-900 mb-1 flex items-center gap-2">
             <Layers className="w-4 h-4 text-indigo-600" />
@@ -261,7 +315,6 @@ export const ManagementTransformerHealthView: React.FC = () => {
           </div>
         </div>
 
-        {/* Fleet Risk Level Distribution */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
           <h3 className="font-bold text-sm text-slate-900 mb-1 flex items-center gap-2">
             <Activity className="w-4 h-4 text-indigo-600" />
@@ -293,15 +346,19 @@ export const ManagementTransformerHealthView: React.FC = () => {
         </div>
       </div>
 
-      {/* Top Risk Asset Table */}
+      {/* Prioritized Fleet Asset & Maintenance Tracking Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-5 border-b border-slate-200 flex items-center justify-between">
           <div>
-            <h3 className="font-bold text-sm text-slate-900">Highest Risk Transformers (Prioritized for Triage)</h3>
-            <p className="text-xs text-slate-500">Based on multi-factor loading stress, thermal rise, and failure horizon</p>
+            <h3 className="font-bold text-sm text-slate-900">
+              Prioritized Transformer Fleet & Maintenance Assignment Ledger
+            </h3>
+            <p className="text-xs text-slate-500">
+              Automatically ordered by Maintenance Action Priority (Rejected → Awaiting Acceptance → In Progress → Completed) & Risk Severity
+            </p>
           </div>
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
-            Top Priority Fleet Units
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-rose-50 text-rose-700 border border-rose-200">
+            Executive Live Ledger
           </span>
         </div>
 
@@ -311,43 +368,58 @@ export const ManagementTransformerHealthView: React.FC = () => {
               <tr>
                 <th className="px-4 py-3">Asset Code</th>
                 <th className="px-4 py-3">Subdivision</th>
-                <th className="px-4 py-3">Capacity</th>
                 <th className="px-4 py-3">Load %</th>
                 <th className="px-4 py-3">Top Oil Temp</th>
                 <th className="px-4 py-3">Risk Tier</th>
-                <th className="px-4 py-3">Failure Horizon</th>
-                <th className="px-4 py-3">Recommended Review</th>
+                <th className="px-4 py-3">{tr.colOperationalStatus || 'Operational Status'}</th>
+                <th className="px-4 py-3">{tr.colMaintenanceStatus || 'Maintenance Status'}</th>
+                <th className="px-4 py-3">Assigned Crew & WO</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {topRiskTransformers.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="px-4 py-3 font-semibold text-slate-900">{t.utility_asset_code}</td>
-                  <td className="px-4 py-3">{t.zone} Subdivision</td>
-                  <td className="px-4 py-3">{t.rated_kva} kVA</td>
-                  <td className="px-4 py-3">
-                    <span className={t.load_utilization_pct > 90 ? 'text-rose-600 font-bold' : 'text-slate-700'}>
-                      {t.load_utilization_pct}%
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 font-medium">{t.oil_temp_c}°C</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                        t.risk_level === 'HIGH'
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}
-                    >
-                      {t.risk_level}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 font-bold text-slate-900">{t.prediction_horizon}</td>
-                  <td className="px-4 py-3 text-xs text-slate-600">
-                    Thermal camera scan and load tap changer adjustment
-                  </td>
-                </tr>
-              ))}
+              {prioritizedTransformers.map((t) => {
+                const latestWo = getLatestTransformerWorkOrder(t, workOrders);
+                const maintStatus = deriveTransformerMaintenanceStatus(latestWo);
+                return (
+                  <tr key={t.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-4 py-3 font-semibold text-slate-900">{t.utility_asset_code}</td>
+                    <td className="px-4 py-3">{t.zone} Subdivision</td>
+                    <td className="px-4 py-3 font-mono">
+                      <span className={t.load_utilization_pct > 90 ? 'text-rose-600 font-bold' : 'text-slate-700'}>
+                        {t.load_utilization_pct}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-medium font-mono">{t.oil_temp_c}°C</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ${
+                          t.risk_level === 'HIGH'
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : t.risk_level === 'MEDIUM'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        }`}
+                      >
+                        {t.risk_level} ({t.prediction_horizon})
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-bold text-slate-700">{t.status}</span>
+                    </td>
+                    <td className="px-4 py-3">{renderMaintenanceBadge(maintStatus)}</td>
+                    <td className="px-4 py-3 text-xs text-slate-600">
+                      {latestWo ? (
+                        <div>
+                          <span className="font-mono font-bold text-slate-900">{latestWo.id}</span> •{' '}
+                          <span className="font-medium">{latestWo.assignedTo}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">No active dispatch</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
