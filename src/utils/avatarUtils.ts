@@ -79,6 +79,7 @@ export interface ActiveUserIdentity {
   isCustomUser?: boolean;
   id?: string;
   subdivision?: string;
+  zone?: string;
   badge?: string;
 }
 

@@ -61,7 +61,8 @@ export const formatToolChipName = (toolName: string): string => {
   return map[toolName] || toolName.replace(/([A-Z])/g, ' $1').trim();
 };
 
-export { ROLE_ALLOWED_TABS } from '../../utils/authSecurity';
+import { ROLE_ALLOWED_TABS } from '../../utils/authSecurity';
+export { ROLE_ALLOWED_TABS };
 
 export const AIAssistantDrawer: React.FC = () => {
   const {
