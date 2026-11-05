@@ -2,6 +2,7 @@
 Temporal/Camunda distributed orchestration remains roadmap — see docs/ROADMAP.md."""
 import json
 from datetime import datetime, timedelta, timezone
+from sqlalchemy import case
 from sqlalchemy.orm import Session
 from .models import ConnectionRequest, User, WorkflowTemplate
 from .config import settings
@@ -120,7 +121,11 @@ def run_workflow(db: Session, req: ConnectionRequest) -> ConnectionRequest:
     officer = (
         db.query(User)
         .filter(User.role == "officer", User.zone == req.zone, User.is_active.is_(True))
-        .order_by(User.created_at.asc(), User.id.asc())
+        .order_by(
+            case((User.email.like("%@vidyut.local"), 0), else_=1),
+            User.created_at.asc(),
+            User.id.asc(),
+        )
         .first()
     )
     if officer:
@@ -131,7 +136,11 @@ def run_workflow(db: Session, req: ConnectionRequest) -> ConnectionRequest:
         engineer = (
             db.query(User)
             .filter(User.role == "engineer", User.zone == req.zone, User.is_active.is_(True))
-            .order_by(User.created_at.asc(), User.id.asc())
+            .order_by(
+                case((User.email.like("%@vidyut.local"), 0), else_=1),
+                User.created_at.asc(),
+                User.id.asc(),
+            )
             .first()
         )
         if engineer:

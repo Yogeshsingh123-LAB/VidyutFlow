@@ -1,3 +1,4 @@
+import shutil
 """Comprehensive backend tests for teammate backlog items (#1, #4, #8, #18, #21, #23, #28, #29, #30)."""
 from concurrent.futures import ThreadPoolExecutor
 import json
@@ -206,6 +207,8 @@ def test_item8_item18_item21_cookie_auth_sso_encryption_and_redis_rate_limiter(m
 
         # Simulated SSO must hard-fail in production
         monkeypatch.setattr(settings, "app_env", "production")
+        from app import login_limit
+        monkeypatch.setattr(login_limit.login_limiter, "_check_redis", lambda _c: (True, 0.0))
         sso_prod = c.post(
             "/v1/auth/sso/login",
             json={
@@ -332,6 +335,10 @@ def test_item28_and_item29_gps_coordinates_and_reusable_saved_premises():
         assert c.delete(f"/v1/auth/premises/{pid}", headers=consumer).status_code == 200
 
 
+@pytest.mark.skipif(
+    shutil.which("sha256sum") is None or shutil.which("bash") is None,
+    reason="Requires bash and sha256sum CLI utilities (Linux/POSIX)",
+)
 def test_item23_offsite_replication_script_verifies_checksum_and_manifest():
     import hashlib
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
