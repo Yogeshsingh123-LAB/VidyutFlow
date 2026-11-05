@@ -9,6 +9,7 @@ import { ALERT_ENGINE_TRANSLATIONS } from '../src/components/common/LiveAlertEng
 import { PERFORMANCE_TELEMETRY_TRANSLATIONS } from '../src/components/admin/LivePerformanceTelemetryPanel';
 import { WORKFLOW_TEMPLATE_TRANSLATIONS } from '../src/components/admin/LiveWorkflowTemplatesPanel';
 import { EXECUTIVE_ANALYTICS_TRANSLATIONS } from '../src/components/management/LiveExecutiveAnalyticsSection';
+import { TRANSFORMER_TRANSLATIONS } from '../src/i18n/transformerTranslations';
 
 const frontendDir = process.cwd();
 
@@ -105,6 +106,7 @@ function run() {
     'codePlaceholder',
   ]);
   verifyFourLanguageDict('EXECUTIVE_ANALYTICS_TRANSLATIONS', EXECUTIVE_ANALYTICS_TRANSLATIONS);
+  verifyFourLanguageDict('TRANSFORMER_TRANSLATIONS', TRANSFORMER_TRANSLATIONS);
 
   // Guard against stale "Random Forest" claim in LiveSlaRiskWatchlist
   const watchlistSrc = fs.readFileSync(

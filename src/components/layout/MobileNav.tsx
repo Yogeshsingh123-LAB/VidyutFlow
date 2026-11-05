@@ -172,6 +172,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
       case 'employee':
         return [
           { id: 'dashboard', label: t.erp.navErpOverview, icon: <LayoutDashboard className="w-4 h-4" /> },
+          { id: 'transformers', label: t.erp.navTransformers, icon: <Cpu className="w-4 h-4" /> }, // Distribution Transformers
           { id: 'incidents', label: t.erp.navIncidentControlDesk, icon: <AlertTriangle className="w-4 h-4" />, badge: activeEmployeeIncidents > 0 ? activeEmployeeIncidents : undefined },
           { id: 'outage-map', label: t.erp.navOutageMap, icon: <MapPin className="w-4 h-4" /> },
           { id: 'applications', label: t.erp.navApplicationQueue, icon: <Inbox className="w-4 h-4" />, badge: pendingApps > 0 ? pendingApps : undefined },
@@ -184,6 +185,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
       case 'field':
         return [
           { id: 'dashboard', label: t.erp.navFieldConsole, icon: <LayoutDashboard className="w-4 h-4" /> },
+          { id: 'transformers', label: t.erp.navTransformerInspections, icon: <Cpu className="w-4 h-4" /> }, // DTR Inspections
           { id: 'outage-map', label: t.erp.navOutageMap, icon: <MapPin className="w-4 h-4" /> },
           { id: 'workorders', label: t.erp.navWorkOrders, icon: <Wrench className="w-4 h-4" />, badge: pendingWos > 0 ? pendingWos : undefined },
           { id: 'inspections', label: t.erp.navSiteFeasibility, icon: <ClipboardCheck className="w-4 h-4" /> },
@@ -194,6 +196,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
       case 'management':
         return [
           { id: 'dashboard', label: t.erp.navExecutiveCockpit, icon: <LineChart className="w-4 h-4" /> },
+          { id: 'transformers', label: t.erp.navTransformerFleetHealth, icon: <Cpu className="w-4 h-4" /> }, // Transformer Fleet Health
           { id: 'outage-map', label: t.erp.navOutageMap, icon: <MapPin className="w-4 h-4" /> },
           { id: 'analytics', label: t.erp.navRevenueDemand, icon: <PieChart className="w-4 h-4" /> },
           { id: 'sla', label: t.erp.navSlaRedressal, icon: <Clock className="w-4 h-4" /> },
@@ -204,6 +207,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
       case 'admin':
         return [
           { id: 'overview', label: t.erp.navSystemOverview, icon: <Activity className="w-4 h-4" /> },
+          { id: 'transformers', label: t.erp.navTransformerAssetRegistry, icon: <Cpu className="w-4 h-4" /> }, // Transformer Asset Registry
           { id: 'directory', label: t.erp.navUgvclDirectory, icon: <Network className="w-4 h-4" /> },
           { id: 'outage-map', label: t.erp.navOutageMap, icon: <MapPin className="w-4 h-4" /> },
           { id: 'users', label: t.erp.navUsersRoles, icon: <UsersIcon className="w-4 h-4" />, badge: 12 },

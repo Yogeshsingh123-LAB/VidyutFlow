@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
+const FieldTransformerInspectionsView = React.lazy(() =>
+  import('../transformers/FieldTransformerInspectionsView').then(m => ({ default: m.FieldTransformerInspectionsView }))
+);
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { UGVCL_LOGO_PATH, FEEDER_METRICS } from '../../data/mockData';
@@ -2176,6 +2179,11 @@ export const FieldPortal: React.FC = () => {
         onClose={() => setFieldOfficialDoc(null)}
       />
       {activeTab === 'outage-map' && <LazyOutageMapSection />}
+      {activeTab === 'transformers' && (
+        <React.Suspense fallback={<div className="p-8 text-center text-slate-500 font-medium">Loading DTR Inspections...</div>}>
+          <FieldTransformerInspectionsView />
+        </React.Suspense>
+      )}
     
       {evidenceModalWO && (
         <WorkOrderEvidenceModal

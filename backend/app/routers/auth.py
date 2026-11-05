@@ -223,8 +223,8 @@ def register_consumer_internal(
     norm_email = email.strip().lower()
     if db.query(User).filter(func.lower(User.email) == norm_email).first():
         raise HTTPException(
-            409,
-            "An account with this email address already exists. Please proceed to login.",
+            400,
+            "Registration could not be completed with the provided details. Please verify your information or proceed to login.",
         )
     try:
         pw_hash = hash_password(password)
@@ -263,7 +263,7 @@ def register(body: Register, db: Session = Depends(get_db)):
     return {"id": u.id, "email": u.email, "name": u.name, "role": u.role, "zone": u.zone}
 
 
-@router.post("/signup", status_code=201, dependencies=[Depends(enforce_login_limit)])
+@router.post("/signup", status_code=201, dependencies=[Depends(enforce_login_limit)], include_in_schema=False)
 def signup(
     body: SignupRequest,
     response: Response,

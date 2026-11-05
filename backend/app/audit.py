@@ -138,7 +138,7 @@ def audit(
             next_seq = max(int(head.last_seq or 0), chained_count) + 1
 
         row = AuditLog(
-            actor_id=getattr(actor, "id", "system"),
+            actor_id=getattr(actor, "id", None) or (actor if isinstance(actor, str) else "system"),
             actor_role=getattr(actor, "role", "system"),
             action=action,
             entity=entity,
@@ -223,3 +223,6 @@ def verify_chain(db: Session) -> dict:
         "last_entry_hash": prev,
         "broken_at": None,
     }
+
+# Alias log_action to audit for Phase 12 audit tracking
+log_action = audit

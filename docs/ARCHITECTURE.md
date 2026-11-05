@@ -19,8 +19,9 @@ Consumer / Subdivision Officer / Field JE / Executive / Admin (React 19 + TS · 
         │
         └── /api/* & /api/v1/* (Same-origin proxy · verified Bearer + 15m rotating refresh session)
               ▼
-FastAPI Control Plane & Non-Invasive Enterprise API Gateway (61 Paths / 66 HTTP Operations)
+FastAPI Control Plane & Non-Invasive Enterprise API Gateway (78 Paths / 88 HTTP Operations)
  ├─ Auth, RBAC, Staff TOTP MFA & Zone Isolation · HKDF-SHA256 + AES-256-GCM field & document vault encryption
+ ├─ Phase 12 Distribution Transformer Fleet Health (HMAC telemetry ingestion, rules engine, SSE streaming, XGBoost + SHAP risk)
  ├─ Phase 13 Verified Field Completion (/v1/evidence/* — client_uuid idempotent, staff-only BOLA, officer review)
  ├─ Fork-proof SHA-256 AuditLog hash chain + ArcSight/Wazuh CEF:0 SIEM export (/v1/system/siem-events)
  ├─ Configurable Workflow Engine: validate → ML triage → calibrated SLA risk → zone auto-assign

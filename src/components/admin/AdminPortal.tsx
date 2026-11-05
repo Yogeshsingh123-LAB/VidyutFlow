@@ -45,6 +45,9 @@ import { deriveCanonical9FieldBillStatement, getFormalNoticeTranslations } from 
 import { reconcileBillWithPayments } from '../../utils/billingEngine';
 import { AdminDemoBackupCenter } from './AdminDemoBackupCenter';
 import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
+const AdminTransformerRegistryView = React.lazy(() =>
+  import('../transformers/AdminTransformerRegistryView').then(m => ({ default: m.AdminTransformerRegistryView }))
+);
 import { OrganizationalDirectoryWorkspace } from './OrganizationalDirectoryWorkspace';
 import {
   Activity,
@@ -1247,6 +1250,11 @@ export const AdminPortal: React.FC = () => {
 
       {/* VIEW 6: SYSTEM SETTINGS */}
       {activeTab === 'outage-map' && <LazyOutageMapSection />}
+      {activeTab === 'transformers' && (
+        <React.Suspense fallback={<div className="p-8 text-center text-slate-500 font-medium">Loading DTR Asset Registry...</div>}>
+          <AdminTransformerRegistryView />
+        </React.Suspense>
+      )}
       {activeTab === 'directory' && <OrganizationalDirectoryWorkspace />}
 
       {activeTab === 'settings' && (

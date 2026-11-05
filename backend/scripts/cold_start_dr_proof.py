@@ -19,10 +19,15 @@ REPORT_PATH = REPO_ROOT / "docs" / "verification" / "r4-cold-start-dr-proof.txt"
 
 
 def main() -> None:
-    with tempfile.TemporaryDirectory(prefix="vidyut_coldstart_") as tmp:
+    with tempfile.TemporaryDirectory(prefix="vidyut_coldstart_", ignore_cleanup_errors=True) as tmp:
         cold_db = Path(tmp) / "cold_start_vidyutflow.db"
         os.environ["DATABASE_URL"] = f"sqlite:///{cold_db}"
         sys.path.insert(0, str(BACKEND_DIR))
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        try:
+            import export_openapi
+        except Exception:
+            pass
 
         t_boot0 = time.perf_counter()
         from fastapi.testclient import TestClient

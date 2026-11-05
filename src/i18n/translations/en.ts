@@ -4,6 +4,7 @@ import { FIELD_UI_TRANSLATIONS } from '../fieldContentTranslations';
 import { MANAGEMENT_UI_TRANSLATIONS } from '../managementContentTranslations';
 import { ADMIN_UI_TRANSLATIONS } from '../adminContentTranslations';
 import { METER_PHASE11_TRANSLATIONS } from '../meterPhase11Translations';
+import { TRANSFORMER_TRANSLATIONS } from '../transformerTranslations';
 
 export const en: TranslationDictionary = {
   common: {
@@ -566,6 +567,10 @@ export const en: TranslationDictionary = {
     navSystemSettings: 'System Settings',
     navOutageMap: 'Outage Map & Timeline',
     navConsumerOutageStatus: 'Area Outage Status',
+    navTransformers: 'Distribution Transformers',
+    navTransformerInspections: 'DTR Inspections',
+    navTransformerFleetHealth: 'Transformer Fleet Health',
+    navTransformerAssetRegistry: 'Transformer Asset Registry',
     menu: 'Menu',
     activePortal: 'Active Portal',
     consumerServices: 'Consumer Services',
@@ -1183,5 +1188,6 @@ export const en: TranslationDictionary = {
   field: FIELD_UI_TRANSLATIONS.en,
   management: MANAGEMENT_UI_TRANSLATIONS.en,
   admin: ADMIN_UI_TRANSLATIONS.en,
-  meterPhase11: METER_PHASE11_TRANSLATIONS.en
+  meterPhase11: METER_PHASE11_TRANSLATIONS.en,
+  transformers: TRANSFORMER_TRANSLATIONS.en
 };

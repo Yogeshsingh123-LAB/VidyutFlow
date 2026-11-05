@@ -4,6 +4,7 @@ import { FIELD_UI_TRANSLATIONS } from '../fieldContentTranslations';
 import { MANAGEMENT_UI_TRANSLATIONS } from '../managementContentTranslations';
 import { ADMIN_UI_TRANSLATIONS } from '../adminContentTranslations';
 import { METER_PHASE11_TRANSLATIONS } from '../meterPhase11Translations';
+import { TRANSFORMER_TRANSLATIONS } from '../transformerTranslations';
 
 export const gu: TranslationDictionary = {
   common: {
@@ -566,6 +567,10 @@ export const gu: TranslationDictionary = {
     navSystemSettings: 'સિસ્ટમ સેટિંગ્સ',
     navOutageMap: 'આઉટેજ નકશો અને ટાઇમલાઇન',
     navConsumerOutageStatus: 'વિસ્તાર વીજ સ્થિતિ',
+    navTransformers: 'ડિસ્ટ્રિબ્યુશન ટ્રાન્સફોર્મર્સ',
+    navTransformerInspections: 'ડીટીઆર નિરીક્ષણ',
+    navTransformerFleetHealth: 'ટ્રાન્સફોર્મર ફ્લીટ આરોગ્ય',
+    navTransformerAssetRegistry: 'ટ્રાન્સફોર્મર એસેટ રજિસ્ટ્રી',
     menu: 'મેનુ',
     activePortal: 'સક્રિય પોર્ટલ',
     consumerServices: 'ગ્રાહક સેવાઓ',
@@ -1183,5 +1188,6 @@ export const gu: TranslationDictionary = {
   field: FIELD_UI_TRANSLATIONS.gu,
   management: MANAGEMENT_UI_TRANSLATIONS.gu,
   admin: ADMIN_UI_TRANSLATIONS.gu,
-  meterPhase11: METER_PHASE11_TRANSLATIONS.gu
+  meterPhase11: METER_PHASE11_TRANSLATIONS.gu,
+  transformers: TRANSFORMER_TRANSLATIONS.gu
 };

@@ -3,6 +3,9 @@ import { WorkOrderVerificationReviewModal } from './WorkOrderVerificationReviewM
 import { EmployeeMeterReviewWorkspace } from './EmployeeMeterReviewWorkspace';
 import React, { useState } from 'react';
 import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
+const EmployeeTransformersView = React.lazy(() =>
+  import('../transformers/EmployeeTransformersView').then(m => ({ default: m.EmployeeTransformersView }))
+);
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
 import {
@@ -2394,6 +2397,11 @@ export const EmployeePortal: React.FC = () => {
         onClose={() => setEmployeeOfficialDoc(null)}
       />
       {activeTab === 'outage-map' && <LazyOutageMapSection />}
+      {activeTab === 'transformers' && (
+        <React.Suspense fallback={<div className="p-8 text-center text-slate-500 font-medium">Loading Distribution Transformers...</div>}>
+          <EmployeeTransformersView />
+        </React.Suspense>
+      )}
     
       {reviewingWorkOrder && (
         <WorkOrderVerificationReviewModal

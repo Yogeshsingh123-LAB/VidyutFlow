@@ -50,7 +50,11 @@ if [ -n "${S3_OFFSITE_URI:-}" ]; then
 fi
 
 # Retention pruning in offsite vault (keep newest RETENTION_COUNT dumps)
-python3 - "$OFFSITE_DIR" "$RETENTION_COUNT" "$BASENAME" "$SHA_HEX" "$SIZE_BYTES" "$NOW_UTC" "$RPO_TARGET_MINUTES" "$RTO_TARGET_MINUTES" "$S3_STATUS" <<'PY'
+PYTHON_BIN="python3"
+if ! command -v python3 >/dev/null 2>&1 || ! python3 -V >/dev/null 2>&1; then
+  PYTHON_BIN="python"
+fi
+"$PYTHON_BIN" - "$OFFSITE_DIR" "$RETENTION_COUNT" "$BASENAME" "$SHA_HEX" "$SIZE_BYTES" "$NOW_UTC" "$RPO_TARGET_MINUTES" "$RTO_TARGET_MINUTES" "$S3_STATUS" <<'PY'
 import glob, json, os, sys
 
 offsite_dir, keep_s, basename, sha_hex, size_s, now_utc, rpo_s, rto_s, s3_status = sys.argv[1:]

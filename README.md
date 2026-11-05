@@ -8,6 +8,7 @@
 | 5 workflow templates | ✅ Built | `new_connection`, `load_extension`, `meter_replacement`, `billing_dispute`, `outage_safety` |
 | Smart Outage Map & live timeline (Phase 10) | ✅ Built | Leaflet + schematic fallback, role-scoped visibility, citizen GPS/PII redaction (`src/outageMap/*`) |
 | Meter reading OCR & bill review (Phase 11) | ✅ Built (Demo store) | Browser-local Tesseract.js WASM OCR, maker-checker employee review, read-only GERC tariff validation |
+| Transformer Fleet Health & Ingestion (Phase 12) | ✅ Built | HMAC sensor ingestion, deterministic rules engine, real-time SSE stream, XGBoost + SHAP risk scoring & 4-portal views |
 | Verified field completion & transparency (Phase 13) | ✅ Built | `/v1/evidence/*` + IndexedDB photos, safety exemptions, officer verification gate, sanitized citizen timeline |
 | Offline field sync (queue + replay) | ✅ Built (see [docs/OFFLINE.md](docs/OFFLINE.md)) | IndexedDB v3 + `localStorage` queue, `client_uuid` dedupe; no version-vector merge |
 | AES-256-GCM document vault & polyglot defense | ✅ Built (application-layer) | `VFENC1` HKDF-SHA256 + AES-256-GCM in `uploads_encrypted/` + anti-polyglot magic-byte validation |
@@ -36,7 +37,7 @@ If evaluating against PS000125, read [docs/PS_GAP_ANALYSIS.md](docs/PS_GAP_ANALY
 
 - **Zero manual re-entry within prototype portals**: `0` applicant fields re-typed across staff stages; `0` manual routing handoffs; `3` staff transitions from submission to completion ([`docs/WORKLOAD_MEASUREMENT.md`](docs/WORKLOAD_MEASUREMENT.md)).
 - **Multilingual citizen & staff UX**: Full 4-language parity across **English, Gujarati (`ગુજરાતી`), Hindi (`हिन्दी`), and Marathi (`मराठी`)**.
-- **100% tested API contract**: **61 paths / 66 HTTP operations** dual-served at `/` and `/v1/*` (`X-API-Version: v1`), snapshot-enforced against [`docs/api/openapi.json`](docs/api/openapi.json) with **`66 / 66 (100.0%)` endpoint test coverage** verified in [`docs/verification/r4-api-endpoint-coverage.txt`](docs/verification/r4-api-endpoint-coverage.txt).
+- **100% tested API contract**: **78 paths / 88 HTTP operations** dual-served at `/` and `/v1/*` (`X-API-Version: v1`), snapshot-enforced against [`docs/api/openapi.json`](docs/api/openapi.json) with **`88 / 88 (100.0%)` endpoint test coverage** verified in [`docs/verification/r4-api-endpoint-coverage.txt`](docs/verification/r4-api-endpoint-coverage.txt).
 
 ---
 
@@ -46,7 +47,7 @@ VidyutFlow runs as a **two-tier web & API architecture** with an offline-capable
 
 1. **Browser PWA & Edge Layer (`src/`, `public/sw.js`)**: Five role-based React 19 + TypeScript + Tailwind 4 portals, Service Worker shell caching, IndexedDB v3 offline queue (`vidyutflow_offline_db`), Smart Outage Map (`src/outageMap/*`), and on-device Tesseract.js WASM OCR in a Web Worker.
 2. **Node / Vite Runtime Gateway (`:3000` dev / `:5173` prod — `src/server/*`, `api/index.ts`)**: Issues `HttpOnly; SameSite=Lax` portal cookies (`vidyutflow_sid`), runs the role-grounded AI proxy (`/api/ai-chat` with 3,500ms Gemini timeout + deterministic Grounded Engine fallback), serves Phase 11 meter-reading review endpoints (`/api/meter-readings/*`), and proxies `/api/*` & `/api/v1/*` same-origin to FastAPI.
-3. **FastAPI Core Control Plane (`:8008` — `backend/app/*`, `61` paths / `66` HTTP operations)**: Short-lived 15-min JWT + rotating 384-bit refresh sessions (`backendSession.ts` bridge), RBAC/BOLA & zone isolation, configurable workflow engine, Phase 13 work-order evidence (`/v1/evidence/*`), `VFENC1` AES-256-GCM encrypted upload vault, SHA-256 `AuditChainHead`, 5 `scikit-learn` models + local `TF-IDF` Policy RAG, and simulated ERP connectors over SQLite / PostgreSQL.
+3. **FastAPI Core Control Plane (`:8008` — `backend/app/*`, `78` paths / `88` HTTP operations)**: Short-lived 15-min JWT + rotating 384-bit refresh sessions (`backendSession.ts` bridge), RBAC/BOLA & zone isolation, configurable workflow engine, Phase 12 distribution transformer monitoring & XGBoost/SHAP predictive maintenance, Phase 13 work-order evidence (`/v1/evidence/*`), `VFENC1` AES-256-GCM encrypted upload vault, SHA-256 `AuditChainHead`, 5 `scikit-learn` models + XGBoost grid risk engine + local `TF-IDF` Policy RAG, and simulated ERP connectors over SQLite / PostgreSQL.
 
 ```mermaid
 flowchart LR
@@ -54,11 +55,13 @@ flowchart LR
     PWA -. "Offline queue & photos" .-> IDB["IndexedDB v3 + localStorage<br/>client_uuid sync queue"]
     PWA -->|"/api/auth · /api/ai-chat · /api/meter-readings<br/>(HttpOnly vidyutflow_sid + CSRF)"| NODE["Node / Vite Runtime Gateway<br/>prodServer.ts · runtimeMiddleware.ts"]
     IDB -->|"Reconnect & idempotent replay"| NODE
-    NODE -->|"Same-origin proxy /api/* & /api/v1/*<br/>(Verified Bearer + 15m refresh rotation)"| API["FastAPI Control Plane (:8008)<br/>61 paths / 66 operations"]
+    NODE -->|"Same-origin proxy /api/* & /api/v1/*<br/>(Verified Bearer + 15m refresh rotation)"| API["FastAPI Control Plane (:8008)<br/>78 paths / 88 operations"]
     API --> WORK["Workflows & Evidence<br/>Requests · /v1/evidence · AuditChainHead"]
+    API --> DTR["Phase 12 DTR Health<br/>HMAC Ingestion · Rules · SSE · XGBoost/SHAP"]
     API --> SUPPORT["Decision support<br/>5 sklearn models · TF-IDF Policy RAG"]
     API --> ERP["ERP gateway (simulated)<br/>OData v4 & 3-system fan-out mocks"]
     WORK --> DATA[("SQLite demo / PostgreSQL 16<br/>+ VFENC1 AES-256-GCM Vault")]
+    DTR --> DATA
     SUPPORT --> DATA
     ERP --> DATA
 ```
@@ -67,7 +70,8 @@ flowchart LR
 | :--- | :--- |
 | **Browser PWA (`src/`)** | Five role-based portals (`Consumer`, `Subdivision Officer`, `Field Engineer`, `Management`, `Admin`), Phase 10 Smart Outage Map, and on-device Tesseract.js meter OCR. |
 | **Node Runtime Gateway (`src/server/`)** | Serves compiled SPA assets (`prodServer.ts`) or Vite dev middleware, `HttpOnly` portal auth (`/api/auth/*`), role-scoped AI co-pilot proxy (`/api/ai-chat`), Phase 11 meter review (`/api/meter-readings/*`), and FastAPI reverse proxy. |
-| **FastAPI Control Plane (`backend/app/`)** | Canonical workflow state, 15-min JWT + refresh rotation, Staff TOTP MFA, Phase 13 work-order evidence (`/v1/evidence/*`), `VFENC1` encrypted vault, SHA-256 audit chain, analytics, alerts, and simulated ERP endpoints. |
+| **FastAPI Control Plane (`backend/app/`)** | Canonical workflow state, 15-min JWT + refresh rotation, Staff TOTP MFA, Phase 12 transformer health & XGBoost/SHAP, Phase 13 work-order evidence (`/v1/evidence/*`), `VFENC1` encrypted vault, SHA-256 audit chain, analytics, alerts, and simulated ERP endpoints. |
+| **DTR Monitoring & Ingestion (Phase 12)** | Multi-sensor edge telemetry ingestion (HMAC), IEC 60076 rules engine, real-time SSE stream, and explainable XGBoost + SHAP predictive failure risk model. |
 | **Offline Field Sync (`offlineFieldSync.ts`)** | Persists field inspections, meter readings/photos, and completion reports in IndexedDB v3 + `localStorage` and replays idempotently via `client_uuid` (see [`docs/OFFLINE.md`](docs/OFFLINE.md)). |
 | **Decision Support (`backend/app/ml/`)** | Five synthetic-trained `scikit-learn` models, `TF-IDF` policy RAG, and optional server-side `Gemini` synthesis advise staff; authorized human officers make all final decisions. |
 | **Data & Recovery (`scripts/`, `backend/`)** | SQLite supports local demos; PostgreSQL 16 is configured in `docker-compose.yml`. Local backup, replication, and restore drill scripts verify SHA-256 snapshot checksums. |
@@ -188,7 +192,7 @@ The Welcome screen provides **one-click role cards** (`@vidyutflow.demo` / `Demo
 ## 6. Automated Verification Gates
 
 ```bash
-# Backend: 154 pytest tests (61 paths / 66 ops OpenAPI contract, Phases 1-6 security hardening, Phase 13 evidence RBAC, magic-byte vault, 5 ML models, OData v4 mock, SIEM, backup drill)
+# Backend: 173 pytest tests (78 paths / 88 ops OpenAPI contract, Phase 12 transformer telemetry & XGBoost/SHAP, Phases 1-6 security hardening, Phase 13 evidence RBAC, magic-byte vault, 5 ML models, OData v4 mock, SIEM, backup drill)
 cd backend && ../.venv/bin/pytest -q tests
 
 # Frontend (from repository root): TypeScript strict check + 41 end-to-end/unit/i18n/security suites + production bundle build
@@ -211,7 +215,10 @@ npm run lint && npm test && npm run build
 - [`docs/INFRA_PROPOSAL.md`](docs/INFRA_PROPOSAL.md) — Infrastructure modernisation proposal (explicitly not delivered by prototype)
 - [`docs/PS000125_OFFICIAL.md`](docs/PS000125_OFFICIAL.md) — Verbatim official problem statement
 - [`docs/REQUIREMENT_MAPPING.md`](docs/REQUIREMENT_MAPPING.md) — Detailed 12-area PS000125 mapping & honesty boundaries
-- [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) & [`docs/api/openapi.json`](docs/api/openapi.json) — OpenAPI 3.1.0 specification (61 paths / 66 operations Dual-served `/` and `/v1`)
+- [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) & [`docs/api/openapi.json`](docs/api/openapi.json) — OpenAPI 3.1.0 specification (78 paths / 88 operations Dual-served `/` and `/v1`)
+- [`docs/phase12/PHASE12_TRANSFORMER_TELEMETRY_ARCHITECTURE.md`](docs/phase12/PHASE12_TRANSFORMER_TELEMETRY_ARCHITECTURE.md) — Phase 12 Distribution Transformer fleet health, telemetry ingestion, rules engine, SSE streaming & XGBoost/SHAP risk architecture
+- [`docs/phase12/API_CONTRACT.md`](docs/phase12/API_CONTRACT.md) — Phase 12 Transformer Telemetry & Maintenance API specification
+- [`docs/phase12/SECURITY_AUDIT_AND_DR.md`](docs/phase12/SECURITY_AUDIT_AND_DR.md) — Phase 12 Security hardening, 403 audit logging (`SECURITY_VIOLATION`), HMAC sensor authentication & cold-start disaster recovery
 - [`docs/ML_REPORT.md`](docs/ML_REPORT.md) — 5-model `scikit-learn` evaluation (`0.9074` accuracy (synthetic holdout) on team-authored synthetic/OOD sanity-check set) & human-approval governance
 - [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md) — Local SQLite backup, SHA-256 checksum & restore drill scripts
 - [`docs/TEAM_ROLES.md`](docs/TEAM_ROLES.md), [`docs/VIVA_QUESTION_BANK.md`](docs/VIVA_QUESTION_BANK.md) & [`docs/DEFENCE_QA.md`](docs/DEFENCE_QA.md) — 5-member viva bank & Q&A
