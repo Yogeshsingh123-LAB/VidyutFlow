@@ -1,10 +1,16 @@
 import uuid
 import pytest
 from fastapi.testclient import TestClient
-from backend.app.main import app
-from backend.app.db import SessionLocal
-from backend.app.models import User, ConsumerConnectionLink, UserContact, ConsumerConnectionOtp
-from backend.app.security import hash_password
+try:
+    from app.main import app
+    from app.db import SessionLocal
+    from app.models import User, ConsumerConnectionLink, UserContact, ConsumerConnectionOtp
+    from app.security import hash_password
+except ImportError:
+    from backend.app.main import app
+    from backend.app.db import SessionLocal
+    from backend.app.models import User, ConsumerConnectionLink, UserContact, ConsumerConnectionOtp
+    from backend.app.security import hash_password
 
 @pytest.fixture(scope="module")
 def client():
@@ -54,6 +60,8 @@ def ensure_seed_consumer():
                 source="OFFICIAL_REGISTRY"
             ))
             db.commit()
+        db.query(ConsumerConnectionOtp).delete()
+        db.commit()
 
 
 def test_consumer_otp_flow_and_security(client):

@@ -1,20 +1,27 @@
 ========================================================================
 VIDYUTFLOW OPENAPI HTTP ENDPOINT TEST COVERAGE AUDIT
 ========================================================================
-OpenAPI Paths              : 82
-Total HTTP Operations      : 93
-Operations Tested in Pytest: 93 / 93 (100.0%)
-Untested Operations        : 0
+OpenAPI Paths              : 124
+Total HTTP Operations      : 147
+Operations Tested in Pytest: 109 / 147 (74.15%)
+Untested Operations        : 38
 
 Verified Operations:
   [COVERED] DELETE /auth/premises/{premise_id}
+  [COVERED] DELETE /consumer/addresses/{address_id}
   [COVERED] GET    /assistant/ai-governance
   [COVERED] GET    /assistant/load-forecast
   [COVERED] GET    /assistant/ml-metrics
+  [COVERED] GET    /auth/captcha
   [COVERED] GET    /auth/me
   [COVERED] GET    /auth/premises
   [COVERED] GET    /auth/sso/providers
   [COVERED] GET    /auth/users
+  [COVERED] GET    /consumer/activity
+  [COVERED] GET    /consumer/addresses
+  [COVERED] GET    /consumer/connections
+  [COVERED] GET    /consumer/preferences
+  [COVERED] GET    /consumer/profile
   [COVERED] GET    /erp/logs
   [COVERED] GET    /erp/mappings
   [COVERED] GET    /erp/reconcile
@@ -55,12 +62,16 @@ Verified Operations:
   [COVERED] GET    /transformers/{transformer_id}/sensors
   [COVERED] GET    /transformers/{transformer_id}/telemetry
   [COVERED] GET    /workflows/templates
+  [COVERED] PATCH  /consumer/addresses/{address_id}
+  [COVERED] PATCH  /consumer/preferences
+  [COVERED] PATCH  /consumer/profile
   [COVERED] PATCH  /requests/{request_id}/status
   [COVERED] PATCH  /staff/members/{user_id}
   [COVERED] PATCH  /transformers/{transformer_id}
   [COVERED] PATCH  /workflows/templates/{template_code}
   [COVERED] POST   /assistant/billing-anomaly
   [COVERED] POST   /assistant/chat
+  [COVERED] POST   /auth/consumer/otp/send
   [COVERED] POST   /auth/forgot-password
   [COVERED] POST   /auth/login
   [COVERED] POST   /auth/logout
@@ -72,6 +83,11 @@ Verified Operations:
   [COVERED] POST   /auth/register
   [COVERED] POST   /auth/reset-password
   [COVERED] POST   /auth/sso/login
+  [COVERED] POST   /consumer/addresses
+  [COVERED] POST   /consumer/connections/link/initiate
+  [COVERED] POST   /consumer/connections/link/verify
+  [COVERED] POST   /consumer/security/change-password
+  [COVERED] POST   /consumer/security/sessions/logout-all
   [COVERED] POST   /erp/gateway/propagate/{request_id}
   [COVERED] POST   /erp/logs/{log_id}/retry
   [COVERED] POST   /erp/reconcile/{request_id}
@@ -100,3 +116,43 @@ Verified Operations:
   [COVERED] POST   /transformers/{transformer_id}/inspections
   [COVERED] POST   /transformers/{transformer_id}/maintenance-work-orders
   [COVERED] POST   /workflows/templates
+
+Missing Operations:
+  [MISSING] DELETE /api/consumer/addresses/{address_id}
+  [MISSING] DELETE /api/consumer/connections/{connection_id}
+  [MISSING] DELETE /api/consumer/security/sessions/{session_id}
+  [MISSING] DELETE /api/v1/consumer/addresses/{address_id}
+  [MISSING] DELETE /api/v1/consumer/connections/{connection_id}
+  [MISSING] DELETE /api/v1/consumer/security/sessions/{session_id}
+  [MISSING] DELETE /consumer/connections/{connection_id}
+  [MISSING] DELETE /consumer/security/sessions/{session_id}
+  [MISSING] GET    /api/consumer/activity
+  [MISSING] GET    /api/consumer/addresses
+  [MISSING] GET    /api/consumer/connections
+  [MISSING] GET    /api/consumer/preferences
+  [MISSING] GET    /api/consumer/profile
+  [MISSING] GET    /api/consumer/security/sessions
+  [MISSING] GET    /api/v1/consumer/activity
+  [MISSING] GET    /api/v1/consumer/addresses
+  [MISSING] GET    /api/v1/consumer/connections
+  [MISSING] GET    /api/v1/consumer/preferences
+  [MISSING] GET    /api/v1/consumer/profile
+  [MISSING] GET    /api/v1/consumer/security/sessions
+  [MISSING] GET    /consumer/security/sessions
+  [MISSING] PATCH  /api/consumer/addresses/{address_id}
+  [MISSING] PATCH  /api/consumer/preferences
+  [MISSING] PATCH  /api/consumer/profile
+  [MISSING] PATCH  /api/v1/consumer/addresses/{address_id}
+  [MISSING] PATCH  /api/v1/consumer/preferences
+  [MISSING] PATCH  /api/v1/consumer/profile
+  [MISSING] POST   /api/consumer/addresses
+  [MISSING] POST   /api/consumer/connections/link/initiate
+  [MISSING] POST   /api/consumer/connections/link/verify
+  [MISSING] POST   /api/consumer/security/change-password
+  [MISSING] POST   /api/consumer/security/sessions/logout-all
+  [MISSING] POST   /api/v1/consumer/addresses
+  [MISSING] POST   /api/v1/consumer/connections/link/initiate
+  [MISSING] POST   /api/v1/consumer/connections/link/verify
+  [MISSING] POST   /api/v1/consumer/security/change-password
+  [MISSING] POST   /api/v1/consumer/security/sessions/logout-all
+  [MISSING] POST   /auth/consumer/otp/verify
