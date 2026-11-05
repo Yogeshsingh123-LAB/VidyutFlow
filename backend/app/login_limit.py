@@ -78,7 +78,7 @@ class LoginLimiter:
                 headers={"Retry-After": str(max(1, math.ceil(retry_s)))},
             )
 
-        if redis_res is None and settings.app_env == "production":
+        if redis_res is None and settings.app_env == "production" and bool(settings.redis_url):
             raise HTTPException(
                 503,
                 "Authentication rate-limiting cluster service is temporarily unavailable. Please retry shortly.",

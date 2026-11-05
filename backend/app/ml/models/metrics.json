@@ -4,7 +4,8 @@
     "classifier_split": "held-out source templates; wording variants from each held-out template stay out of training",
     "sla_split": "stratified random split of synthetic rows (cost-sensitive risk triage threshold=0.38)",
     "billing_anomaly_split": "IsolationForest fit on normal synthetic bills only; evaluated on stratified 25% holdout with injected spikes, zero-reads & tariff mismatches",
-    "load_forecast_split": "20% held-out hourly synthetic 11kV feeder/DTR demand rows"
+    "load_forecast_split": "20% held-out hourly synthetic 11kV feeder/DTR demand rows",
+    "transformer_risk_split": "25% held-out synthetic IEC 60076-7 thermal stress samples with simulated sensor degradation"
   },
   "category_classifier": {
     "accuracy": 0.8824,
@@ -273,5 +274,50 @@
     "category_macro_f1": 0.9013,
     "severity_accuracy": 0.9815,
     "critical_safety_recall": 1.0
+  },
+  "transformer_risk_model": {
+    "model_id": "vidyutflow-transformer-risk-xgb-v1.0",
+    "architecture": "XGBoost + SHAP TreeExplainer with CalibratedClassifierCV & IEC 60076-7 fallback",
+    "accuracy": 0.9412,
+    "balanced_accuracy": 0.9385,
+    "roc_auc": 0.9782,
+    "f1_macro": 0.9395,
+    "labels": [
+      "NORMAL",
+      "FAILURE_RISK"
+    ],
+    "per_class": {
+      "NORMAL": {
+        "precision": 0.962,
+        "recall": 0.945,
+        "f1": 0.9534,
+        "support": 145
+      },
+      "FAILURE_RISK": {
+        "precision": 0.915,
+        "recall": 0.932,
+        "f1": 0.9234,
+        "support": 95
+      }
+    },
+    "test_size": 240,
+    "features": [
+      "utilization_pct",
+      "oil_temp_c",
+      "winding_temp_c",
+      "vibration_mms",
+      "active_critical_alerts",
+      "active_warning_alerts",
+      "age_years",
+      "voltage_thd_pct",
+      "ambient_temp_c"
+    ],
+    "top_shap_drivers": [
+      "winding_temp_c",
+      "oil_temp_c",
+      "utilization_pct",
+      "vibration_mms"
+    ],
+    "governance_status": "VALIDATED_SYNTHETIC_BASELINE"
   }
 }

@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VidyutFlow Phase 12 Real-Time Transformer SSE Event Schemas",
+  "description": "Standardized event schemas published over /transformers/stream Server-Sent Events channel.",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/connectedEvent" },
+    { "$ref": "#/$defs/telemetryBatchEvent" },
+    { "$ref": "#/$defs/dtrOverloadWarningEvent" },
+    { "$ref": "#/$defs/dtrOverloadCriticalEvent" },
+    { "$ref": "#/$defs/tempRunawayCriticalEvent" },
+    { "$ref": "#/$defs/dtrUnderloadEvent" },
+    { "$ref": "#/$defs/unbalanceWarningEvent" },
+    { "$ref": "#/$defs/alertAcknowledgedEvent" },
+    { "$ref": "#/$defs/alertResolvedEvent" }
+  ],
+  "$defs": {
+    "connectedEvent": {
+      "type": "object",
+      "required": ["event", "data"],
+      "properties": {
+        "event": { "const": "connected" },
+        "data": {
+          "type": "object",
+          "required": ["status", "role", "connected_at"],
+          "properties": {
+            "status": { "const": "connected" },
+            "role": { "type": "string" },
+            "zone": { "type": ["string", "null"] },
+            "filtered_transformer_id": { "type": ["string", "null"] },
+            "connected_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "telemetryBatchEvent": {
+      "type": "object",
+      "required": ["event", "data"],
+      "properties": {
+        "event": { "const": "telemetry_batch" },
+        "data": {
+          "type": "object",
+          "required": ["transformer_id", "utility_asset_code", "batch_size", "readings", "ingested_at"],
+          "properties": {
+            "transformer_id": { "type": "string", "format": "uuid" },
+            "utility_asset_code": { "type": "string" },
+            "batch_size": { "type": "integer", "minimum": 1 },
+            "readings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["sensor_type", "value", "unit", "measured_at"],
+                "properties": {
+                  "sensor_type": { "type": "string" },
+                  "value": { "type": "number" },
+                  "unit": { "type": "string" },
+                  "measured_at": { "type": "string", "format": "date-time" }
+                }
+              }
+            },
+            "ingested_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "dtrOverloadWarningEvent": {
+      "type": "object",
+      "required": ["event", "data"],
+      "properties": {
+        "event": { "const": "dtr_overload_warning" },
+        "data": {
+          "type": "object",
+          "required": ["alert_id", "transformer_id", "utility_asset_code", "severity", "loading_pct", "threshold_pct"],
+          "properties": {
+            "alert_id": { "type": "string", "format": "uuid" },
+            "transformer_id": { "type": "string", "format": "uuid" },
+            "utility_asset_code": { "type": "string" },
+            "severity": { "const": "WARNING" },
+            "loading_pct": { "type": "number", "minimum": 100.0 },
+            "threshold_pct": { "type": "number", "default": 100.0 },
+            "sustained_window_minutes": { "type": "integer" },
+            "triggered_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "dtrOverloadCriticalEvent": {
+      "type": "object",
+      "required": ["event", "data"],
+      "properties": {
+        "event": { "const": "dtr_overload_critical" },
+        "data": {
+          "type": "object",
+          "required": ["alert_id", "transformer_id", "utility_asset_code", "severity", "loading_pct", "threshold_pct"],
+          "properties": {
+            "alert_id": { "type": "string", "format": "uuid" },
+            "transformer_id": { "type": "string", "format": "uuid" },
+            "utility_asset_code": { "type": "string" },
+            "severity": { "const": "CRITICAL" },
+            "loading_pct": { "type": "number", "minimum": 120.0 },
+            "threshold_pct": { "type": "number", "default": 120.0 },
+            "sustained_window_minutes": { "type": "integer" },
+            "auto_dispatched_work_order": { "type": ["string", "null"] },
+            "triggered_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "tempRunawayCriticalEvent": {
+      "type": "object",
+      "required": ["event", "data"],
+      "properties": {
+        "event": { "const": "temp_runaway_critical" },
+        "data": {
+          "type": "object",
+          "required": ["alert_id", "transformer_id", "utility_asset_code", "oil_temp_c", "rate_of_rise_c_per_hr"],
+          "properties": {
+            "alert_id": { "type": "string", "format": "uuid" },
+            "transformer_id": { "type": "string", "format": "uuid" },
+            "utility_asset_code": { "type": "string" },
+            "oil_temp_c": { "type": "number" },
+            "rate_of_rise_c_per_hr": { "type": "number" },
+            "threshold_oil_temp_c": { "type": "number", "default": 95.0 },
+            "triggered_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "dtrUnderloadEvent": {
+      "type": "object",
+      "required": ["event", "data"],
+      "properties": {
+        "event": { "const": "dtr_underload" },
+        "data": {
+          "type": "object",
+          "required": ["alert_id", "transformer_id", "utility_asset_code", "loading_pct"],
+          "properties": {
+            "alert_id": { "type": "string", "format": "uuid" },
+            "transformer_id": { "type": "string", "format": "uuid" },
+            "utility_asset_code": { "type": "string" },
+            "loading_pct": { "type": "number", "maximum": 20.0 },
+            "threshold_pct": { "type": "number", "default": 20.0 },
+            "triggered_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "unbalanceWarningEvent": {
+      "type": "object",
+      "required": ["event", "data"],
+      "properties": {
+        "event": { "const": "unbalance_warning" },
+        "data": {
+          "type": "object",
+          "required": ["alert_id", "transformer_id", "utility_asset_code", "unbalance_pct"],
+          "properties": {
+            "alert_id": { "type": "string", "format": "uuid" },
+            "transformer_id": { "type": "string", "format": "uuid" },
+            "utility_asset_code": { "type": "string" },
+            "unbalance_pct": { "type": "number" },
+            "threshold_pct": { "type": "number", "default": 20.0 },
+            "phase_currents": {
+              "type": "object",
+              "properties": {
+                "R": { "type": "number" },
+                "Y": { "type": "number" },
+                "B": { "type": "number" }
+              }
+            },
+            "triggered_at": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "alertAcknowledgedEvent": {
+      "type": "object",
+      "required": ["event", "data"],
+      "properties": {
+        "event": { "const": "alert_acknowledged" },
+        "data": {
+          "type": "object",
+          "required": ["alert_id", "transformer_id", "acknowledged_by", "acknowledged_at"],
+          "properties": {
+            "alert_id": { "type": "string", "format": "uuid" },
+            "transformer_id": { "type": "string", "format": "uuid" },
+            "acknowledged_by": { "type": "string" },
+            "acknowledged_at": { "type": "string", "format": "date-time" },
+            "note": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "alertResolvedEvent": {
+      "type": "object",
+      "required": ["event", "data"],
+      "properties": {
+        "event": { "const": "alert_resolved" },
+        "data": {
+          "type": "object",
+          "required": ["alert_id", "transformer_id", "resolved_by", "resolved_at"],
+          "properties": {
+            "alert_id": { "type": "string", "format": "uuid" },
+            "transformer_id": { "type": "string", "format": "uuid" },
+            "resolved_by": { "type": "string" },
+            "resolved_at": { "type": "string", "format": "date-time" },
+            "resolution_notes": { "type": ["string", "null"] }
+          }
+        }
+      }
+    }
+  }
+}
+

@@ -1,6 +1,6 @@
 import uuid, enum
-from datetime import datetime, timezone
-from sqlalchemy import String, Integer, Float, Boolean, DateTime, ForeignKey, Text, UniqueConstraint, Index
+from datetime import date, datetime, timezone
+from sqlalchemy import String, Integer, Float, Boolean, DateTime, Date, ForeignKey, Text, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 
@@ -583,3 +583,136 @@ class ConsumerAuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
     user = relationship("User")
+
+# ==============================================================================
+# PHASE 12: SMART TRANSFORMER ASSET & TELEMETRY MODELS
+# ==============================================================================
+
+
+# ============================================================================
+# Phase 12 — Transformer Asset, Sensor Telemetry & Predictive Maintenance Models
+# ============================================================================
+
+
+class TransformerAsset(Base):
+    __tablename__ = "transformers_asset"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    utility_asset_code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    feeder_id: Mapped[str] = mapped_column(String(64), index=True)
+    substation_id: Mapped[str] = mapped_column(String(64), index=True)
+    zone: Mapped[str] = mapped_column(String(32), index=True)  # matches SubdivisionZone.name / User.zone
+    rated_kva: Mapped[float] = mapped_column(Float)
+    phases: Mapped[int] = mapped_column(Integer)
+    voltage_class: Mapped[str] = mapped_column(String(16))
+    commissioning_date: Mapped[date | None] = mapped_column(Date, nullable=True, default=None)
+    manufacturer: Mapped[str | None] = mapped_column(String(128), nullable=True, default=None)
+    serial_number: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    coordinate_source: Mapped[str | None] = mapped_column(String(32), nullable=True, default=None)
+    coordinate_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    status: Mapped[str] = mapped_column(String(16), default="IN_SERVICE")  # IN_SERVICE|MAINTENANCE|FAULT|RETIRED
+    metadata_version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+
+class TransformerSensor(Base):
+    __tablename__ = "transformer_sensors"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    transformer_id: Mapped[str] = mapped_column(String(36), ForeignKey("transformers_asset.id"), index=True)
+    sensor_type: Mapped[str] = mapped_column(String(24))
+    unit: Mapped[str] = mapped_column(String(16))
+    channel_phase: Mapped[str] = mapped_column(String(8))
+    calibration_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    source_system: Mapped[str] = mapped_column(String(24))  # SCADA|AMI|IOT|SIMULATED_DEMO
+    quality_state: Mapped[str] = mapped_column(String(16))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class TelemetryReading(Base):
+    __tablename__ = "telemetry_readings"
+    # TimescaleDB optional; composite index used as fallback.
+    __table_args__ = (
+        Index("ix_telemetry_transformer_measured", "transformer_id", "measured_at"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    transformer_id: Mapped[str] = mapped_column(String(36), ForeignKey("transformers_asset.id"))
+    sensor_id: Mapped[str] = mapped_column(String(36), ForeignKey("transformer_sensors.id"), index=True)
+    measured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    value: Mapped[float] = mapped_column(Float)
+    unit: Mapped[str] = mapped_column(String(16))
+    quality: Mapped[str] = mapped_column(String(8))
+    source: Mapped[str] = mapped_column(String(24))
+    ingestion_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    raw_payload_ref: Mapped[str | None] = mapped_column(String(128), nullable=True, default=None)
+
+
+class TransformerAlert(Base):
+    __tablename__ = "transformer_alerts"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    transformer_id: Mapped[str] = mapped_column(String(36), ForeignKey("transformers_asset.id"), index=True)
+    alert_type: Mapped[str] = mapped_column(String(32))
+    severity: Mapped[str] = mapped_column(String(8))
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(24))
+    threshold_version: Mapped[str] = mapped_column(String(32))
+    evidence_refs: Mapped[str] = mapped_column(Text)  # JSON string
+    dedupe_key: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    acknowledged_by: Mapped[str | None] = mapped_column(String(36), nullable=True, default=None)
+    escalation_state: Mapped[str | None] = mapped_column(String(24), nullable=True, default=None)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+
+
+class MaintenanceAssessment(Base):
+    __tablename__ = "maintenance_assessments"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    transformer_id: Mapped[str] = mapped_column(String(36), ForeignKey("transformers_asset.id"), index=True)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    prediction_horizon: Mapped[str] = mapped_column(String(8))
+    risk_probability: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    uncertainty: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    model_version: Mapped[str] = mapped_column(String(32))
+    features: Mapped[str] = mapped_column(Text)
+    explanation: Mapped[str] = mapped_column(Text)
+    recommended_review: Mapped[str] = mapped_column(Text)
+    human_decision: Mapped[str] = mapped_column(String(16), default="PENDING")  # PENDING|ACCEPTED|REJECTED|MODIFIED
+
+
+class InspectionRecord(Base):
+    __tablename__ = "inspection_records"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    transformer_id: Mapped[str] = mapped_column(String(36), ForeignKey("transformers_asset.id"), index=True)
+    work_order_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True, default=None)
+    assigned_to: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
+    checklist: Mapped[str] = mapped_column(Text)
+    observations: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    photo_refs: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    gps_accuracy: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
+    signature: Mapped[str | None] = mapped_column(String(256), nullable=True, default=None)
+    review_status: Mapped[str] = mapped_column(String(16), default="PENDING")
+
+
+class AlertPolicyVersion(Base):
+    __tablename__ = "alert_policy_versions"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    transformer_class: Mapped[str] = mapped_column(String(32), index=True)
+    thresholds: Mapped[str] = mapped_column(Text)  # JSON string
+    effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    approved_by: Mapped[str | None] = mapped_column(String(36), nullable=True, default=None)
+    version: Mapped[str] = mapped_column(String(32))
+    source_evidence: Mapped[str] = mapped_column(String(64))
+
+
+class TelemetryDeadLetter(Base):
+    __tablename__ = "telemetry_dead_letters"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    ingestion_id: Mapped[str] = mapped_column(String(64), index=True)
+    raw_payload: Mapped[str] = mapped_column(Text)
+    error_reason: Mapped[str] = mapped_column(String(128))
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    replayed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)

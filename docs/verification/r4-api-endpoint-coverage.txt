@@ -1,9 +1,9 @@
 ========================================================================
 VIDYUTFLOW OPENAPI HTTP ENDPOINT TEST COVERAGE AUDIT
 ========================================================================
-OpenAPI Paths              : 61
-Total HTTP Operations      : 66
-Operations Tested in Pytest: 66 / 66 (100.0%)
+OpenAPI Paths              : 82
+Total HTTP Operations      : 93
+Operations Tested in Pytest: 93 / 93 (100.0%)
 Untested Operations        : 0
 
 Verified Operations:
@@ -39,9 +39,25 @@ Verified Operations:
   [COVERED] GET    /system/security-posture
   [COVERED] GET    /system/siem-events
   [COVERED] GET    /system/status
+  [COVERED] GET    /transformer-analytics/summary
+  [COVERED] GET    /transformer-policies
+  [COVERED] GET    /transformer-policies/risk-model-mode
+  [COVERED] GET    /transformers
+  [COVERED] GET    /transformers/alerts
+  [COVERED] GET    /transformers/stream
+  [COVERED] GET    /transformers/telemetry/dead-letters
+  [COVERED] GET    /transformers/{transformer_id}
+  [COVERED] GET    /transformers/{transformer_id}/alerts
+  [COVERED] GET    /transformers/{transformer_id}/assessments
+  [COVERED] GET    /transformers/{transformer_id}/health
+  [COVERED] GET    /transformers/{transformer_id}/inspections
+  [COVERED] GET    /transformers/{transformer_id}/maintenance-history
+  [COVERED] GET    /transformers/{transformer_id}/sensors
+  [COVERED] GET    /transformers/{transformer_id}/telemetry
   [COVERED] GET    /workflows/templates
   [COVERED] PATCH  /requests/{request_id}/status
   [COVERED] PATCH  /staff/members/{user_id}
+  [COVERED] PATCH  /transformers/{transformer_id}
   [COVERED] PATCH  /workflows/templates/{template_code}
   [COVERED] POST   /assistant/billing-anomaly
   [COVERED] POST   /assistant/chat
@@ -72,4 +88,15 @@ Verified Operations:
   [COVERED] POST   /staff/members
   [COVERED] POST   /staff/zones
   [COVERED] POST   /system/dr-failover-drill
+  [COVERED] POST   /transformer-policies
+  [COVERED] POST   /transformer-policies/risk-model-mode
+  [COVERED] POST   /transformers
+  [COVERED] POST   /transformers/alerts/{alert_id}/acknowledge
+  [COVERED] POST   /transformers/alerts/{alert_id}/resolve
+  [COVERED] POST   /transformers/telemetry
+  [COVERED] POST   /transformers/{transformer_id}/assessments
+  [COVERED] POST   /transformers/{transformer_id}/assessments/{assessment_id}/decision
+  [COVERED] POST   /transformers/{transformer_id}/evaluate-alerts
+  [COVERED] POST   /transformers/{transformer_id}/inspections
+  [COVERED] POST   /transformers/{transformer_id}/maintenance-work-orders
   [COVERED] POST   /workflows/templates

@@ -47,6 +47,9 @@ import { LiveAiGovernancePanel } from '../common/LiveAiGovernancePanel';
 import { LivePredictiveDecisionPanel } from '../common/LivePredictiveDecisionPanel';
 import { LiveExecutiveAnalyticsSection } from './LiveExecutiveAnalyticsSection';
 import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
+const ManagementTransformerHealthView = React.lazy(() =>
+  import('../transformers/ManagementTransformerHealthView').then(m => ({ default: m.ManagementTransformerHealthView }))
+);
 import { formatErpDateTime } from '../../utils/dateUtils';
 import { useLanguage } from '../../i18n/LanguageContext';
 import {
@@ -1408,6 +1411,11 @@ export const ManagementPortal: React.FC = () => {
         </div>
       )}
       {activeTab === 'outage-map' && <LazyOutageMapSection />}
+      {activeTab === 'transformers' && (
+        <React.Suspense fallback={<div className="p-8 text-center text-slate-500 font-medium">Loading DTR Fleet Health...</div>}>
+          <ManagementTransformerHealthView />
+        </React.Suspense>
+      )}
     </div>
   );
 };

@@ -1,11 +1,18 @@
 import os
+os.environ["DATABASE_URL"] = "sqlite:///./test_vidyutflow.db"
+os.environ["ENABLE_TRANSFORMER_SCHEDULER"] = "false"
+
 from pathlib import Path
 import sys
 import pytest
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_DIR))
-os.environ["DATABASE_URL"] = "sqlite:///./test_vidyutflow.db"
+sys.path.insert(0, str(BACKEND_DIR / "scripts"))
+try:
+    import export_openapi
+except Exception:
+    pass
 
 
 def _remove_stale_test_sqlite_files() -> None:

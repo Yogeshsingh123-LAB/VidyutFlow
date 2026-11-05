@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "provenance_disclaimer": "DEMO simulated baseline inspired by IEC 60076-7 thermal loading guidelines and standard Discom DTR operating circulars. Actual production deployment must calibrate limits against site-specific ambient thermal profiles and certified utility asset guidelines.",
+  "last_updated": "2026-11-05T08:00:00Z",
+  "active_policies": [
+    {
+      "transformer_class": "DISTRIBUTION_11KV_DEMO",
+      "version": "1.0.0-demo",
+      "description": "Standard 11kV/433V 3-phase oil-immersed distribution transformer operating limits.",
+      "source_evidence": "IEC 60076-7 / UGVCL Operations Circular 2026",
+      "thresholds": {
+        "load_pct_warn": {
+          "value": 85.0,
+          "unit": "%",
+          "severity": "WARNING",
+          "sustained_window_minutes": 15,
+          "action": "FLAG_OVERLOAD_WARNING_AND_NOTIFY_SUBDIVISION"
+        },
+        "load_pct_crit": {
+          "value": 100.0,
+          "unit": "%",
+          "severity": "CRITICAL",
+          "sustained_window_minutes": 5,
+          "action": "FLAG_CRITICAL_OVERLOAD_TRIGGER_WO_AND_DISPATCH"
+        },
+        "oil_temp_warn_c": {
+          "value": 80.0,
+          "unit": "°C",
+          "severity": "WARNING",
+          "sustained_window_minutes": 10,
+          "action": "LOG_THERMAL_ALERT_NOTIFY_ENGINEER"
+        },
+        "oil_temp_crit_c": {
+          "value": 90.0,
+          "unit": "°C",
+          "severity": "CRITICAL",
+          "sustained_window_minutes": 5,
+          "action": "TRIGGER_EMERGENCY_COOLING_INSPECTION"
+        },
+        "winding_temp_warn_c": {
+          "value": 90.0,
+          "unit": "°C",
+          "severity": "WARNING",
+          "sustained_window_minutes": 10,
+          "action": "LOG_HOT_SPOT_WARNING"
+        },
+        "winding_temp_crit_c": {
+          "value": 105.0,
+          "unit": "°C",
+          "severity": "CRITICAL",
+          "sustained_window_minutes": 3,
+          "action": "EMERGENCY_LOAD_SHED_RECOMMENDATION"
+        },
+        "vibration_warn_mm_s": {
+          "value": 4.5,
+          "unit": "mm/s",
+          "severity": "WARNING",
+          "sustained_window_minutes": 30,
+          "action": "SCHEDULE_CORE_CLAMP_AND_BUSHING_INSPECTION"
+        },
+        "vibration_crit_mm_s": {
+          "value": 7.1,
+          "unit": "mm/s",
+          "severity": "CRITICAL",
+          "sustained_window_minutes": 10,
+          "action": "DISPATCH_URGENT_FIELD_EXAMINATION"
+        }
+      }
+    }
+  ]
+}
+

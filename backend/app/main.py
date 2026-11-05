@@ -1,5 +1,10 @@
+import asyncio
 from contextlib import asynccontextmanager
+import json
+import logging
 import time
+
+logger = logging.getLogger("app.main")
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -7,7 +12,7 @@ from sqlalchemy import inspect as sa_inspect, text
 from sqlalchemy.exc import OperationalError
 from .db import Base, engine, SessionLocal, check_database_health
 from . import models  # noqa
-from .routers import auth, requests, assistant, system, notifications, erp, workflows, staff, evidence, directory, consumer_profile
+from .routers import auth, requests, assistant, system, notifications, erp, workflows, staff, evidence, directory, consumer_profile, transformers
 from .routers.staff import ensure_subdivision_zones
 from .erp_adapter import record_erp_sync
 from .alerts import evaluate_and_dispatch_alerts
@@ -46,9 +51,20 @@ def seed():
         return
     db = SessionLocal()
     try:
+        from datetime import datetime, timezone, timedelta
+        base_time = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        idx = 0
         for email, name, role, zone, pw in DEMO:
             if not db.query(models.User).filter(models.User.email==email).first():
-                db.add(models.User(email=email, name=name, role=role, zone=zone, hashed_password=hash_password(pw)))
+                db.add(models.User(
+                    email=email,
+                    name=name,
+                    role=role,
+                    zone=zone,
+                    hashed_password=hash_password(pw),
+                    created_at=base_time + timedelta(seconds=idx),
+                ))
+            idx += 1
         db.commit()
 
         # Seed verified contact and connection link for canonical demo consumer
@@ -210,6 +226,53 @@ def migrate_auth_session_security(db_engine):
                         raise
 
 
+def ensure_alert_policies(db) -> None:
+    """Idempotently seed Phase 12 demo alert policy thresholds (Items #1 & #2)."""
+    policies = [
+        {
+            "transformer_class": "DISTRIBUTION_11KV_DEMO",
+            "thresholds": json.dumps({
+                "oil_temp_warn_c": 80.0,
+                "oil_temp_crit_c": 90.0,
+                "winding_temp_warn_c": 90.0,
+                "winding_temp_crit_c": 105.0,
+                "load_pct_warn": 85.0,
+                "load_pct_crit": 100.0,
+                "vibration_warn_mm_s": 4.5,
+                "vibration_crit_mm_s": 7.1,
+            }),
+            "version": "1.0.0-demo",
+            "source_evidence": "DEMO_NOT_AUTHORITATIVE",
+        },
+        {
+            "transformer_class": "POWER_66KV_DEMO",
+            "thresholds": json.dumps({
+                "oil_temp_warn_c": 75.0,
+                "oil_temp_crit_c": 85.0,
+                "winding_temp_warn_c": 85.0,
+                "winding_temp_crit_c": 98.0,
+                "load_pct_warn": 80.0,
+                "load_pct_crit": 95.0,
+                "vibration_warn_mm_s": 3.5,
+                "vibration_crit_mm_s": 5.5,
+            }),
+            "version": "1.0.0-demo",
+            "source_evidence": "DEMO_NOT_AUTHORITATIVE",
+        },
+    ]
+    for p in policies:
+        existing = db.query(models.AlertPolicyVersion).filter(
+            models.AlertPolicyVersion.transformer_class == p["transformer_class"]
+        ).first()
+        if not existing:
+            db.add(models.AlertPolicyVersion(
+                transformer_class=p["transformer_class"],
+                thresholds=p["thresholds"],
+                version=p["version"],
+                source_evidence=p["source_evidence"],
+            ))
+
+
 @asynccontextmanager
 async def lifespan(_app):
     # In development, auto-sync convenience tables. In production, schema is managed strictly via Alembic.
@@ -228,12 +291,42 @@ async def lifespan(_app):
     with SessionLocal() as tpl_db:
         ensure_workflow_templates(tpl_db)
         ensure_subdivision_zones(tpl_db)
+        ensure_alert_policies(tpl_db)
         tpl_db.commit()
     if settings.app_env == "production":
         reject_seeded_demo_accounts()
     else:
         seed(); seed_requests()
-    yield
+
+    scheduler_task = None
+    if getattr(settings, "enable_transformer_scheduler", False):
+        try:
+            from .services.rules_engine import evaluate_all_active_transformers
+
+            async def _transformer_scheduler():
+                while True:
+                    try:
+                        await asyncio.sleep(60)
+                        with SessionLocal() as db:
+                            evaluate_all_active_transformers(db)
+                    except asyncio.CancelledError:
+                        break
+                    except Exception as exc:
+                        print(f"[warn] transformer background telemetry evaluator error: {exc}")
+
+            scheduler_task = asyncio.create_task(_transformer_scheduler())
+        except Exception as e:
+            print(f"[warn] failed to start transformer telemetry scheduler: {e}")
+
+    try:
+        yield
+    finally:
+        if scheduler_task is not None:
+            scheduler_task.cancel()
+            try:
+                await scheduler_task
+            except asyncio.CancelledError:
+                pass
 
 class ApiVersionPrefixMiddleware:
     """Supports versioned `/v1/<path>` requests seamlessly alongside unversioned `<path>`."""
@@ -310,14 +403,14 @@ app.add_middleware(ApiVersionPrefixMiddleware)
 @app.get("/health")
 def health(): return {"status": "ok", "service": "VidyutFlow", "data_notice": "Demo uses synthetic data only."}
 
-@app.get("/health/db")
-@app.get("/api/health/db")
+@app.get("/health/db", include_in_schema=False)
+@app.get("/api/health/db", include_in_schema=False)
 def health_database():
     """Verify database connection pool status, read latency, and write readiness."""
     return check_database_health()
 
 app.include_router(auth.router)
-app.include_router(auth.router, prefix="/api")
+app.include_router(auth.router, prefix="/api", include_in_schema=False)
 app.include_router(requests.router)
 app.include_router(assistant.router)
 app.include_router(system.router)
@@ -326,9 +419,16 @@ app.include_router(erp.router)
 app.include_router(workflows.router)
 app.include_router(staff.router)
 app.include_router(evidence.router)
-app.include_router(directory.router)
-app.include_router(directory.router, prefix="/api")
+app.include_router(directory.router, include_in_schema=False)
+app.include_router(directory.router, prefix="/api", include_in_schema=False)
 
 app.include_router(consumer_profile.router)
 app.include_router(consumer_profile.router, prefix="/api")
 app.include_router(consumer_profile.router, prefix="/api/v1")
+
+app.include_router(transformers.router)
+app.include_router(transformers.router, prefix="/api", include_in_schema=False)
+app.include_router(transformers.analytics_router)
+app.include_router(transformers.analytics_router, prefix="/api", include_in_schema=False)
+app.include_router(transformers.policies_router)
+app.include_router(transformers.policies_router, prefix="/api", include_in_schema=False)

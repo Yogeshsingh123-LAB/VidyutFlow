@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     kpi_cache_ttl_seconds: float = Field(default=15.0, ge=0.0, le=300.0, allow_inf_nan=False)
     latency_window_size: int = Field(default=1000, ge=50, le=10000)
     model_dir: str = _DEFAULT_MODEL_DIR
+    # Phase 12 Telemetry Ingestion Secret (Step 4)
+    telemetry_ingest_secret: str = "vidyutflow-dev-telemetry-ingest-secret-2026"
+    # Phase 12 Background Scheduler (disabled by default in test/dev)
+    enable_transformer_scheduler: bool = False
+    # Phase 12 Risk Prediction Mode ("ml_advisory" vs "rules_baseline")
+    transformer_risk_mode: str = "ml_advisory"
 
     @model_validator(mode="after")
     def validate_production_secret(self):

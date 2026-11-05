@@ -1,6 +1,6 @@
 import json
 import math
-from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File, Form, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -91,7 +91,7 @@ def create(body: CreateReq, db: Session = Depends(get_db), u: User = Depends(req
     db.commit(); kpi_cache.bump_epoch(); db.refresh(r); return out(r)
 
 @router.post("/with-document", status_code=201)
-async def create_with_doc(applicant_name: str = Form(...), phone: str = Form(...), address: str = Form(...),
+async def create_with_doc(request: Request, applicant_name: str = Form(...), phone: str = Form(...), address: str = Form(...),
     zone: str | None = Form(None), pin_code: str = Form(""),
     latitude: float | None = Form(None), longitude: float | None = Form(None),
     request_type: str = Form("new_connection"),
@@ -101,8 +101,12 @@ async def create_with_doc(applicant_name: str = Form(...), phone: str = Form(...
     if not math.isfinite(requested_load_kw):
         raise HTTPException(422, "Requested load must be finite")
     lat, lon = _validate_coordinates(latitude, longitude)
-    effective_zone = "North" if zone is None else zone
-    canonical_zone = resolve_active_zone(db, effective_zone)
+    form_data = await request.form()
+    if "zone" in form_data:
+        canonical_zone = resolve_active_zone(db, str(form_data.get("zone") or ""))
+    else:
+        effective_zone = "North" if zone is None else zone
+        canonical_zone = resolve_active_zone(db, effective_zone)
     tpl = resolve_active_template(db, request_type)
     clean_applicant_name = sanitize_untrusted_text(applicant_name)
     clean_address = sanitize_untrusted_text(address)

@@ -8,13 +8,14 @@ Demonstrates:
   4. Promotion of Standby Replica to active engine + full verification of zero lost records (RPO = 0
      on replicated state) and intact cryptographic `AuditLog` hash chain, measuring failover RTO.
 """
+import hashlib
 import os
+from pathlib import Path
 import shutil
 import sqlite3
 import subprocess
 import tempfile
 import time
-from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = BACKEND_DIR.parent
@@ -65,23 +66,34 @@ def run_failover_drill(
         # 2. Create checksummed snapshot & replicate to offsite standby vault via offsite_replicate.sh
         snap_src = tmp_path / "vidyutflow-20261031-000001.db"
         shutil.copy2(primary_db, snap_src)
-        sha_out = subprocess.run(
-            ["sha256sum", snap_src.name],
-            cwd=str(tmp_path),
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
-        (tmp_path / f"{snap_src.name}.sha256").write_text(sha_out, encoding="utf-8")
 
-        env = {**os.environ, "OFFSITE_BACKUP_DIR": str(offsite_dir), "BACKUP_RETENTION_COUNT": "5"}
-        subprocess.run(
-            ["bash", str(OFFSITE_SCRIPT), str(snap_src)],
-            env=env,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        has_tools = bool(shutil.which("sha256sum") and shutil.which("bash"))
+        if has_tools:
+            sha_out = subprocess.run(
+                ["sha256sum", snap_src.name],
+                cwd=str(tmp_path),
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            (tmp_path / f"{snap_src.name}.sha256").write_text(sha_out, encoding="utf-8")
+
+            env = {**os.environ, "OFFSITE_BACKUP_DIR": str(offsite_dir), "BACKUP_RETENTION_COUNT": "5"}
+            subprocess.run(
+                ["bash", str(OFFSITE_SCRIPT), str(snap_src)],
+                env=env,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        else:
+            data = snap_src.read_bytes()
+            h = hashlib.sha256(data).hexdigest()
+            sha_out = f"{h}  {snap_src.name}\n"
+            (tmp_path / f"{snap_src.name}.sha256").write_text(sha_out, encoding="utf-8")
+            offsite_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(snap_src, offsite_dir / snap_src.name)
+            (offsite_dir / f"{snap_src.name}.sha256").write_text(sha_out, encoding="utf-8")
         os.remove(snap_src)
 
         # 3. Simulate catastrophic primary node storage failure
@@ -94,13 +106,19 @@ def run_failover_drill(
         assert snapshots, "No offsite standby snapshot found!"
         latest_snap = snapshots[-1]
 
-        subprocess.run(
-            ["sha256sum", "-c", f"{latest_snap.name}.sha256"],
-            cwd=str(offsite_dir),
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        if has_tools:
+            subprocess.run(
+                ["sha256sum", "-c", f"{latest_snap.name}.sha256"],
+                cwd=str(offsite_dir),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        else:
+            data = latest_snap.read_bytes()
+            h = hashlib.sha256(data).hexdigest()
+            expected_h = (offsite_dir / f"{latest_snap.name}.sha256").read_text(encoding="utf-8").split()[0]
+            assert h == expected_h, "SHA-256 checksum mismatch"
         shutil.copy2(latest_snap, promoted_db)
 
         promoted_conn = sqlite3.connect(promoted_db)

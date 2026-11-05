@@ -43,7 +43,10 @@ const FASTAPI_PREFIXES = [
   '/api/erp',
   '/api/workflows',
   '/api/staff',
-  '/api/assistant'
+  '/api/assistant',
+  '/api/transformers',
+  '/api/transformer-analytics',
+  '/api/transformer-policies'
 ];
 
 function applySecurityHeaders(res: ServerResponse) {

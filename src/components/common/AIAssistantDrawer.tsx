@@ -61,13 +61,7 @@ export const formatToolChipName = (toolName: string): string => {
   return map[toolName] || toolName.replace(/([A-Z])/g, ' $1').trim();
 };
 
-export const ROLE_ALLOWED_TABS: Record<string, string[]> = {
-  consumer: ['dashboard', 'connections', 'new-connection', 'bills', 'payments', 'complaints', 'requests', 'notifications', 'profile'],
-  employee: ['dashboard', 'applications', 'consumers', 'complaints', 'approvals', 'coordination', 'reports'],
-  field: ['dashboard', 'workorders', 'inspections', 'maintenance', 'offline', 'history'],
-  management: ['dashboard', 'analytics', 'sla', 'feeders', 'ai-insights', 'reports'],
-  admin: ['overview', 'users', 'access', 'audit', 'integrations', 'infra', 'settings']
-};
+export { ROLE_ALLOWED_TABS } from '../../utils/authSecurity';
 
 export const AIAssistantDrawer: React.FC = () => {
   const {

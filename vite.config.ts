@@ -96,6 +96,21 @@ export default defineConfig(() => {
           changeOrigin: true,
           rewrite: path => path.replace(/^\/api/, '')
         },
+        '/api/transformers': {
+          target: FASTAPI_TARGET,
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api/, '')
+        },
+        '/api/transformer-analytics': {
+          target: FASTAPI_TARGET,
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api/, '')
+        },
+        '/api/transformer-policies': {
+          target: FASTAPI_TARGET,
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api/, '')
+        },
         '/api/assistant': {
           target: FASTAPI_TARGET,
           changeOrigin: true,

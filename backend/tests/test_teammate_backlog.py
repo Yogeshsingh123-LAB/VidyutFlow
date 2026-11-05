@@ -333,20 +333,21 @@ def test_item28_and_item29_gps_coordinates_and_reusable_saved_premises():
 
 
 def test_item23_offsite_replication_script_verifies_checksum_and_manifest():
-    with tempfile.TemporaryDirectory() as tmpdir:
+    import hashlib
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         dummy_db = os.path.join(tmpdir, "vidyutflow-20261030-120000.db")
+        payload = b"SQLite format 3\x00synthetic-dr-test-payload"
         with open(dummy_db, "wb") as fh:
-            fh.write(b"SQLite format 3\x00synthetic-dr-test-payload")
-        subprocess.run(
-            ["sha256sum", os.path.basename(dummy_db)],
-            cwd=tmpdir,
-            stdout=open(dummy_db + ".sha256", "w"),
-            check=True,
-        )
+            fh.write(payload)
+        h = hashlib.sha256(payload).hexdigest()
+        with open(dummy_db + ".sha256", "w", newline="\n") as sha_f:
+            sha_f.write(f"{h}  {os.path.basename(dummy_db)}\n")
         offsite_vault = os.path.join(tmpdir, "offsite_vault")
         env = dict(os.environ, OFFSITE_BACKUP_DIR=offsite_vault, DR_RPO_TARGET_MINUTES="60", DR_RTO_TARGET_MINUTES="120")
+        git_bash = r"C:\Program Files\Git\bin\bash.exe"
+        bash_bin = git_bash if os.path.exists(git_bash) else "bash"
         proc = subprocess.run(
-            ["bash", os.path.join(BACKEND_DIR, "scripts", "offsite_replicate.sh"), dummy_db],
+            [bash_bin, os.path.join(BACKEND_DIR, "scripts", "offsite_replicate.sh"), dummy_db],
             env=env,
             capture_output=True,
             text=True,

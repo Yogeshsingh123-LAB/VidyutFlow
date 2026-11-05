@@ -10,6 +10,7 @@ import io
 import os
 import sys
 import tempfile
+import uuid
 
 os.environ["DATABASE_URL"] = "sqlite:///./test_vidyutflow.db"
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -218,7 +219,7 @@ def test_sap_odata_gateway_siem_export_encrypted_vault_and_dr_failover():
                     "/v1/staff/members",
                     headers=admin,
                     json={
-                        "email": "temp.je.south@vidyut.local",
+                        "email": f"temp.je.south.{uuid.uuid4().hex[:6]}@vidyut.local",
                         "name": "Temp South Junior Engineer",
                         "role": "engineer",
                         "zone": "South",

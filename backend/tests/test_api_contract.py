@@ -1,5 +1,13 @@
 import json
 from pathlib import Path
+import sys
+
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+    import export_openapi
+except Exception:
+    pass
+
 from app.main import app
 
 
@@ -9,5 +17,5 @@ def test_openapi_matches_reviewed_snapshot():
         'API schema changed: review docs/API_CONTRACT.md and regenerate the snapshot deliberately.'
     )
     schema = app.openapi()
-    assert len(schema['paths']) >= 61
-    assert sum(len(methods) for methods in schema['paths'].values()) >= 66
+    assert len(schema['paths']) == 124
+    assert sum(len(methods) for methods in schema['paths'].values()) == 147

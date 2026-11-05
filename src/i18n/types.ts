@@ -3,6 +3,7 @@ import type { FieldUiDictionary } from './fieldContentTranslations';
 import type { ManagementUiDictionary } from './managementContentTranslations';
 import type { AdminUiDictionary } from './adminContentTranslations';
 import type { MeterPhase11Dictionary } from './meterPhase11Translations';
+import type { TransformerPhase12Dictionary } from './transformerTranslations';
 
 export type LanguageCode = 'en' | 'gu' | 'hi' | 'mr';
 export type Language = LanguageCode;
@@ -582,6 +583,10 @@ export interface TranslationDictionary {
     navSystemSettings: string;
     navOutageMap: string;
     navConsumerOutageStatus: string;
+    navTransformers: string;
+    navTransformerInspections: string;
+    navTransformerFleetHealth: string;
+    navTransformerAssetRegistry: string;
     menu: string;
     activePortal: string;
     consumerServices: string;
@@ -1199,6 +1204,7 @@ export interface TranslationDictionary {
   management: ManagementUiDictionary;
   admin: AdminUiDictionary;
   meterPhase11: MeterPhase11Dictionary;
+  transformers: TransformerPhase12Dictionary;
 }
 
 export type TranslationKey = string;
