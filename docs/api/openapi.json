@@ -3758,7 +3758,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
                 "type": "object",
                 "title": "Payload"
               }
@@ -4041,7 +4040,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
                 "type": "object",
                 "title": "Payload"
               }
@@ -5935,6 +5933,726 @@
           }
         ]
       }
+    },
+    "/billing/bills": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "List Bills",
+        "description": "List electricity bills with role-scoped authorization and cycle filtering.",
+        "operationId": "list_bills_billing_bills_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consumerNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Consumerno"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Create Bill",
+        "description": "Issue a new electricity bill with progressive slabs and audit trail.",
+        "operationId": "create_bill_billing_bills_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBillRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/billing/calculate": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Calculate Tariff Breakdown",
+        "description": "Calculate progressive cycle tariff breakdown for preview and verification.",
+        "operationId": "calculate_tariff_breakdown_billing_calculate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TariffCalculateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/billing/calendar": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Get Payment Calendar",
+        "description": "Expose smart payment calendar events with 9-field canonical overdue properties.",
+        "operationId": "get_payment_calendar_billing_calendar_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consumerNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Consumerno"
+            }
+          },
+          {
+            "name": "referenceDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Referencedate"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/billing/calendar/export.ics": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Export Payment Calendar Ics",
+        "description": "Export smart payment calendar obligations as an RFC 5545 compliant .ics file.",
+        "operationId": "export_payment_calendar_ics_billing_calendar_export_ics_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "billNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Billno"
+            }
+          },
+          {
+            "name": "consumerNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Consumerno"
+            }
+          },
+          {
+            "name": "referenceDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Referencedate"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/billing/overdue-statement": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Get Overdue Statement",
+        "description": "Return the real-time canonical 9-field overdue statement with daily DPS accrual.",
+        "operationId": "get_overdue_statement_billing_overdue_statement_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "billNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Billno"
+            }
+          },
+          {
+            "name": "consumerNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Consumerno"
+            }
+          },
+          {
+            "name": "referenceDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Referencedate"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/billing/pay": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Settle Bill Payment",
+        "description": "Settle an electricity bill payment, reduce balance, and atomically resolve formal notices.",
+        "operationId": "settle_bill_payment_billing_pay_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettlePaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/billing/settle": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Settle Bill Payment",
+        "description": "Settle an electricity bill payment, reduce balance, and atomically resolve formal notices.",
+        "operationId": "settle_bill_payment_billing_settle_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettlePaymentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/billing/payments": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "List Payments",
+        "description": "List financial payment transactions and settlement receipt audit trails.",
+        "operationId": "list_payments_billing_payments_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "billNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Billno"
+            }
+          },
+          {
+            "name": "consumerNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Consumerno"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/billing/aging": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Get Delinquency Aging",
+        "description": "Compute executive 5-bucket delinquency aging analysis across active bills.",
+        "operationId": "get_delinquency_aging_billing_aging_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "referenceDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Referencedate"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/billing/notices": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Serve Formal Notice",
+        "description": "Serve a simulated Section 56 statutory demand notice with 15-day payment countdown.",
+        "operationId": "serve_formal_notice_billing_notices_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServeNoticeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "List Formal Notices",
+        "description": "List formal notices with role-based scoping.",
+        "operationId": "list_formal_notices_billing_notices_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "consumerNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Consumerno"
+            }
+          },
+          {
+            "name": "billNo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Billno"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6321,7 +7039,7 @@
           },
           "document": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "Document"
           }
         },
@@ -6458,6 +7176,74 @@
           "otp"
         ],
         "title": "ConsumerOtpVerifyRequest"
+      },
+      "CreateBillRequest": {
+        "properties": {
+          "consumer_no": {
+            "type": "string",
+            "title": "Consumer No"
+          },
+          "bill_month": {
+            "type": "string",
+            "title": "Bill Month"
+          },
+          "bill_date": {
+            "type": "string",
+            "title": "Bill Date"
+          },
+          "due_date": {
+            "type": "string",
+            "title": "Due Date"
+          },
+          "period_start_date": {
+            "type": "string",
+            "title": "Period Start Date"
+          },
+          "period_end_date": {
+            "type": "string",
+            "title": "Period End Date"
+          },
+          "previous_reading_kwh": {
+            "type": "number",
+            "title": "Previous Reading Kwh"
+          },
+          "current_reading_kwh": {
+            "type": "number",
+            "title": "Current Reading Kwh"
+          },
+          "sanctioned_load_kw": {
+            "type": "number",
+            "title": "Sanctioned Load Kw",
+            "default": 2.0
+          },
+          "tariff_category": {
+            "type": "string",
+            "title": "Tariff Category",
+            "default": "Residential (RGPU)"
+          },
+          "billing_cycle_type": {
+            "type": "string",
+            "title": "Billing Cycle Type",
+            "default": "MONTHLY"
+          },
+          "rebate_or_subsidy": {
+            "type": "number",
+            "title": "Rebate Or Subsidy",
+            "default": 0.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "consumer_no",
+          "bill_month",
+          "bill_date",
+          "due_date",
+          "period_start_date",
+          "period_end_date",
+          "previous_reading_kwh",
+          "current_reading_kwh"
+        ],
+        "title": "CreateBillRequest"
       },
       "CreateReq": {
         "properties": {
@@ -6967,7 +7753,6 @@
           "extra_metadata": {
             "anyOf": [
               {
-                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -7315,6 +8100,108 @@
         ],
         "title": "SapInboundAckPayload"
       },
+      "ServeNoticeRequest": {
+        "properties": {
+          "bill_no": {
+            "type": "string",
+            "title": "Bill No"
+          },
+          "issue_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue Date"
+          },
+          "payment_deadline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payment Deadline"
+          },
+          "service_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bill_no"
+        ],
+        "title": "ServeNoticeRequest"
+      },
+      "SettlePaymentRequest": {
+        "properties": {
+          "bill_no": {
+            "type": "string",
+            "title": "Bill No"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          },
+          "payment_method": {
+            "type": "string",
+            "title": "Payment Method",
+            "default": "UPI"
+          },
+          "transaction_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Id"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "reference_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bill_no",
+          "amount"
+        ],
+        "title": "SettlePaymentRequest"
+      },
       "SignupRequest": {
         "properties": {
           "name": {
@@ -7511,6 +8398,64 @@
         ],
         "title": "StatusUpdate"
       },
+      "TariffCalculateRequest": {
+        "properties": {
+          "tariff_category": {
+            "type": "string",
+            "title": "Tariff Category",
+            "default": "Residential (RGPU)"
+          },
+          "sanctioned_load_kw": {
+            "type": "number",
+            "title": "Sanctioned Load Kw",
+            "default": 2.0
+          },
+          "units_consumed": {
+            "type": "number",
+            "title": "Units Consumed",
+            "default": 100.0
+          },
+          "billing_cycle_type": {
+            "type": "string",
+            "title": "Billing Cycle Type",
+            "default": "MONTHLY"
+          },
+          "rebate_or_subsidy": {
+            "type": "number",
+            "title": "Rebate Or Subsidy",
+            "default": 0.0
+          },
+          "other_adjustments": {
+            "type": "number",
+            "title": "Other Adjustments",
+            "default": 0.0
+          },
+          "billed_days_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Billed Days Count"
+          },
+          "standard_cycle_days_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Cycle Days Count"
+          }
+        },
+        "type": "object",
+        "title": "TariffCalculateRequest"
+      },
       "UpdateWorkflowTemplateBody": {
         "properties": {
           "name": {
@@ -7657,13 +8602,6 @@
           "type": {
             "type": "string",
             "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
           }
         },
         "type": "object",

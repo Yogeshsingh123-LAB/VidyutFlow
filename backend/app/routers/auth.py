@@ -384,8 +384,8 @@ def register_consumer_internal(
     norm_email = email.strip().lower()
     if db.query(User).filter(func.lower(User.email) == norm_email).first():
         raise HTTPException(
-            409,
-            "An account with this email address already exists. Please proceed to login.",
+            400,
+            "Registration could not be completed with the provided information. Please check your details or proceed to login.",
         )
     try:
         pw_hash = hash_password(password)

@@ -1,5 +1,9 @@
+from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
+import logging
 import time
+
+logger = logging.getLogger("vidyutflow")
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -7,7 +11,7 @@ from sqlalchemy import inspect as sa_inspect, text
 from sqlalchemy.exc import OperationalError
 from .db import Base, engine, SessionLocal, check_database_health
 from . import models  # noqa
-from .routers import auth, requests, assistant, system, notifications, erp, workflows, staff, evidence, directory, consumer_profile
+from .routers import auth, requests, assistant, system, notifications, erp, workflows, staff, evidence, directory, consumer_profile, billing
 from .routers.staff import ensure_subdivision_zones
 from .erp_adapter import record_erp_sync
 from .alerts import evaluate_and_dispatch_alerts
@@ -46,9 +50,10 @@ def seed():
         return
     db = SessionLocal()
     try:
-        for email, name, role, zone, pw in DEMO:
+        base_seed_dt = datetime.now(timezone.utc)
+        for i, (email, name, role, zone, pw) in enumerate(DEMO):
             if not db.query(models.User).filter(models.User.email==email).first():
-                db.add(models.User(email=email, name=name, role=role, zone=zone, hashed_password=hash_password(pw)))
+                db.add(models.User(email=email, name=name, role=role, zone=zone, hashed_password=hash_password(pw), created_at=base_seed_dt + timedelta(seconds=i)))
         db.commit()
 
         # Seed verified contact and connection link for canonical demo consumer
@@ -77,7 +82,111 @@ def seed():
                     is_primary=True,
                     source="OFFICIAL_REGISTRY"
                 ))
-            db.commit()
+
+        # Seed initial bills and payment transactions for Meenaben (04281-99231)
+        import json
+        bill1 = db.query(models.ElectricityBill).filter(models.ElectricityBill.bill_no == "BILL-UG-2026-10-8821").first()
+        if not bill1:
+            db.add(models.ElectricityBill(
+                bill_no="BILL-UG-2026-10-8821",
+                consumer_no="04281-99231",
+                bill_month="September 2026",
+                bill_date="04-Oct-2026",
+                due_date="22-Oct-2026",
+                billing_cycle_type="MONTHLY",
+                period_start_date="01-Sep-2026",
+                period_end_date="30-Sep-2026",
+                previous_reading_date="01-Sep-2026",
+                current_reading_date="30-Sep-2026",
+                previous_reading_kwh=14460.0,
+                current_reading_kwh=14820.0,
+                reading_provenance="AMR_SMART_METER",
+                units_consumed=360.0,
+                energy_charges=1420.0,
+                fixed_charges=180.0,
+                fuel_price_adjustment=432.0,
+                electricity_duty=203.0,
+                rebate_or_subsidy=50.0,
+                total_amount=2185.0,
+                status="Unpaid",
+                slab_breakdown_json=json.dumps([
+                    {"slab": "First 50 Units (0-50 kWh)", "units": 50, "rate": 3.05, "amount": 152.5},
+                    {"slab": "Next 50 Units (51-100 kWh)", "units": 50, "rate": 3.50, "amount": 175.0},
+                    {"slab": "Next 150 Units (101-250 kWh)", "units": 150, "rate": 4.15, "amount": 622.5},
+                    {"slab": "Above 250 Units (>250 kWh)", "units": 110, "rate": 5.20, "amount": 572.0},
+                ]),
+            ))
+
+        bill2 = db.query(models.ElectricityBill).filter(models.ElectricityBill.bill_no == "BILL-UG-2026-09-8821").first()
+        if not bill2:
+            db.add(models.ElectricityBill(
+                bill_no="BILL-UG-2026-09-8821",
+                consumer_no="04281-99231",
+                bill_month="August 2026",
+                bill_date="03-Sep-2026",
+                due_date="21-Sep-2026",
+                billing_cycle_type="MONTHLY",
+                period_start_date="01-Aug-2026",
+                period_end_date="31-Aug-2026",
+                previous_reading_date="01-Aug-2026",
+                current_reading_date="31-Aug-2026",
+                previous_reading_kwh=14050.0,
+                current_reading_kwh=14460.0,
+                reading_provenance="AMR_SMART_METER",
+                units_consumed=410.0,
+                energy_charges=1680.0,
+                fixed_charges=180.0,
+                fuel_price_adjustment=492.0,
+                electricity_duty=235.0,
+                rebate_or_subsidy=50.0,
+                total_amount=2537.0,
+                status="Paid",
+            ))
+
+        payment = db.query(models.PaymentTransaction).filter(models.PaymentTransaction.transaction_id == "TXN-UPI-9921448102").first()
+        if not payment:
+            db.add(models.PaymentTransaction(
+                transaction_id="TXN-UPI-9921448102",
+                bill_no="BILL-UG-2026-09-8821",
+                consumer_no="04281-99231",
+                amount=2537.0,
+                payment_date="15-Sep-2026",
+                payment_method="UPI",
+                status="Successful",
+                principal_settled=2537.0,
+                late_charges_settled=0.0,
+            ))
+
+        notice = db.query(models.FormalNotice).filter(models.FormalNotice.id == "FN-UG-2026-001").first()
+        if not notice:
+            db.add(models.FormalNotice(
+                id="FN-UG-2026-001",
+                bill_no="BILL-UG-2026-10-8821",
+                consumer_no="04281-99231",
+                status="SERVED",
+                issue_date="24-Oct-2026",
+                service_date="24-Oct-2026",
+                payment_deadline="08-Nov-2026",
+                disconnection_review_status="PENDING_REVIEW",
+            ))
+
+        policy = db.query(models.LateChargePolicy).filter(models.LateChargePolicy.id == "POL-UGVCL-DPS-DEMO-2026.1").first()
+        if not policy:
+            db.add(models.LateChargePolicy(
+                id="POL-UGVCL-DPS-DEMO-2026.1",
+                version="2026.1-DEMO",
+                effective_from="2026-01-01",
+                is_demo_simulation=True,
+                tariff_authority="UGVCL Tariff Regulation Simulation (DEMO Verification Engine)",
+                calculation_method="DAILY_SIMPLE",
+                annual_rate_percent=15.0,
+                grace_period_days=0,
+                days_in_year_basis=365,
+                minimum_charge_inr=0.0,
+                rounding_method="ROUND_HALF_UP_2DEC",
+                notes="Configurable DEMO Late-Payment Surcharge Policy: 15% p.a. simple daily accrual on outstanding principal.",
+            ))
+        db.commit()
     finally: db.close()
 
 def seed_requests():
@@ -236,7 +345,7 @@ async def lifespan(_app):
     yield
 
 class ApiVersionPrefixMiddleware:
-    """Supports versioned `/v1/<path>` requests seamlessly alongside unversioned `<path>`."""
+    """Supports versioned `/v1/<path>`, `/api/v1/<path>`, and `/api/<path>` requests seamlessly."""
 
     def __init__(self, inner_app):
         self.inner_app = inner_app
@@ -244,8 +353,15 @@ class ApiVersionPrefixMiddleware:
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
             path = scope.get("path", "")
+            rewritten = None
             if path == "/v1" or path.startswith("/v1/"):
                 rewritten = path[3:] or "/"
+            elif path.startswith("/api/v1/"):
+                rewritten = path[7:] or "/"
+            elif path == "/api" or path.startswith("/api/"):
+                rewritten = path[4:] or "/"
+
+            if rewritten is not None:
                 scope = dict(scope)
                 scope["path"] = rewritten
                 if "raw_path" in scope:
@@ -332,3 +448,5 @@ app.include_router(directory.router, prefix="/api")
 app.include_router(consumer_profile.router)
 app.include_router(consumer_profile.router, prefix="/api")
 app.include_router(consumer_profile.router, prefix="/api/v1")
+
+app.include_router(billing.router)

@@ -1,0 +1,543 @@
+path	type	size	sha256	purpose
+.agents/rules/ponytail.md	MD Asset	2753	5b60b2a5e405736f8e92504facc792cc8854a2bc86076ea92ea138c12c3cfa47	Repository asset file: ponytail.md
+.agents/skills/mirofish-simulation/SKILL.md	MD Asset	6183	23d365830298ab0e7a491da9112287ff773bb318b4dcf56971276afd1e0e3cac	Repository asset file: SKILL.md
+.agents/skills/ponytail-audit/SKILL.md	MD Asset	5520	3ab632ce4695de214dafe4db13d6f939e1c4be328bd0754ea751dc28b70be554	Repository asset file: SKILL.md
+.agents/skills/ponytail-debt/SKILL.md	MD Asset	1813	f0b59cb7e623f68568f2164864c757d41f0452d176c2f28b5b9b3c6b7ef3a799	Repository asset file: SKILL.md
+.agents/skills/ponytail-gain/SKILL.md	MD Asset	2216	b87f5b982820479831608d3b3d4b942c95577820fef088662348eb16b48792dc	Repository asset file: SKILL.md
+.agents/skills/ponytail-help/SKILL.md	MD Asset	3264	c4b353c9a13a9fd7008e319d1965816faaed13dcb61feb90afc514e50031706b	Repository asset file: SKILL.md
+.agents/skills/ponytail-review/SKILL.md	MD Asset	5244	affa0eedca467b58699fafbea28f6f85352aa3e7f23785964bf42f029a291504	Repository asset file: SKILL.md
+.agents/skills/ponytail/SKILL.md	MD Asset	3548	f18008471528f0adde90a560d053f85935eed5cee26c447b7177ad24472bcf32	Repository asset file: SKILL.md
+.agents/skills/security-audit/AI-AND-LLM.md	MD Asset	10700	0d57a4d8b1ce05015e867bc89277aabf80f4a3031beba42df4481fc92027f83b	Repository asset file: AI-AND-LLM.md
+.agents/skills/security-audit/ATTACK-CLASSES.md	MD Asset	15825	fff6ce0269696d17bda38bfeb27410bdce820f2299cb68a7ceb81883204a3604	Repository asset file: ATTACK-CLASSES.md
+.agents/skills/security-audit/CLIENT-SIDE.md	MD Asset	8677	e9098dc5da89a996e28c25e9e3e3e976ec777a19c4f05c9a04cd4c0d4a3ce120	Repository asset file: CLIENT-SIDE.md
+.agents/skills/security-audit/CLOUD-AND-DEPLOYMENT.md	MD Asset	8377	29514d7c3a9e83d48f1f519e70e8b2fde4e1d1ac92d2500737b6c8be718c3b2d	Repository asset file: CLOUD-AND-DEPLOYMENT.md
+.agents/skills/security-audit/DATA-ISOLATION-AND-LIFECYCLE.md	MD Asset	7882	5c546940150363cb4039038e2c00c080a8d302e7a2e50f72f3960e4c67801b5e	Repository asset file: DATA-ISOLATION-AND-LIFECYCLE.md
+.agents/skills/security-audit/DESKTOP-MOBILE-AND-LOCAL-IPC.md	MD Asset	8828	055fec61e744d5ba434cbf0c1f2994b1f83d961f5e43d89cc0bb690d16a11f3b	Repository asset file: DESKTOP-MOBILE-AND-LOCAL-IPC.md
+.agents/skills/security-audit/HUNTING.md	MD Asset	22697	b980765f1a616a141044b00e3dcbb7c36ec4d7cf43740d85985d0bdbca9cfe91	Repository asset file: HUNTING.md
+.agents/skills/security-audit/MEMORY-SAFETY-AND-BINARY.md	MD Asset	10614	c88390b508fc86838b7b12889499fabf28acfe32ca34f2d4ff655a420264f44f	Repository asset file: MEMORY-SAFETY-AND-BINARY.md
+.agents/skills/security-audit/PROTOCOLS-RPC-AND-MESSAGING.md	MD Asset	7564	2bc534260d9842cc9a6bb15615e58c5350201008880083da78969bdeb657a7ce	Repository asset file: PROTOCOLS-RPC-AND-MESSAGING.md
+.agents/skills/security-audit/RECONNAISSANCE.md	MD Asset	16058	a02316fae383754621d312215170479685f85c1142b6c117a9a03c6ad8f907e4	Repository asset file: RECONNAISSANCE.md
+.agents/skills/security-audit/RESOURCE-EXHAUSTION-AND-AVAILABILITY.md	MD Asset	7554	a9590f9966de194e51dd7c82f930bc910662f0275357e433e33758756755ec8d	Repository asset file: RESOURCE-EXHAUSTION-AND-AVAILABILITY.md
+.agents/skills/security-audit/SKILL.md	MD Asset	22218	2a68ab5531dfccedac2b054e0814f2b6517daae9887b3ee40afcc5d8a7063c3a	Repository asset file: SKILL.md
+.agents/skills/security-audit/SUPPLY-CHAIN-AND-RELEASE.md	MD Asset	7331	c1eb0a8b9a6ab1e979b214ee70fd8fff4c173d4063fd82df82fc5269cb115c17	Repository asset file: SUPPLY-CHAIN-AND-RELEASE.md
+.agents/skills/security-audit/VALIDATION-AND-REPORTING.md	MD Asset	18029	943e68578aa1d7031282837d1455cf64d1e95d032c9df09b3f182ce134e89072	Repository asset file: VALIDATION-AND-REPORTING.md
+.agents/skills/security-audit/WEB-PROTOCOL-AND-AUTH.md	MD Asset	12405	757c5191cc397ad7145ffe5b6ffa438bdd36fefd351da640267630d05f01bfae	Repository asset file: WEB-PROTOCOL-AND-AUTH.md
+.agents/skills/security-audit/report-schema.json	JSON Asset	14955	7bea150f30dcef07df1859d33d01406953cf600f6a08250e1e59e10f252e2c4c	Repository asset file: report-schema.json
+.agents/skills/security-audit/validate-coverage-ledger.cjs	CJS Asset	34394	db2d1a36031ed1552e1d45cefe1da591ef4eebf2d3f3ee3b0298d07051e3a312	Repository asset file: validate-coverage-ledger.cjs
+.agents/skills/security-audit/validate-coverage-ledger.test.cjs	CJS Asset	29223	44dd5a6200952fb4f149a3f0dbabdbe116c402c63f0bd2858043207debe39bcc	Repository asset file: validate-coverage-ledger.test.cjs
+.agents/skills/security-audit/validate-findings.cjs	CJS Asset	29579	31dabfb5ed2454e4bfa5000fe0f2600df0df9f7ad1781a2fdb9a98a50f507963	Repository asset file: validate-findings.cjs
+.agents/skills/security-audit/validate-findings.test.cjs	CJS Asset	27036	7c91656073b51cbb7e029e33804de97c1d8c0b52f3521fd60e3978133e8cb73a	Repository asset file: validate-findings.test.cjs
+.agents/skills/unslop/SKILL.md	MD Asset	31560	3375a859a14b4283b36e192e864b88971672ad390315995f97081a010dfd832c	Repository asset file: SKILL.md
+.agents/skills/unslop/agents/openai.yaml	YAML Asset	200	4e1da5f2a19ef9421ebd7fdc8c8382b6fc68e3df1838d34a0ada2b514ea53ab3	Repository asset file: openai.yaml
+.agents/skills/unslop/references/effects.md	MD Asset	4977	e5631d5612bbbb69b6246db0b81bd9bca9551887b96508b73576a178ef1cc588	Repository asset file: effects.md
+.agents/skills/unslop/references/refs.md	MD Asset	2475	348b9cd636ad4ed8d29bae07c71ec0d8d411292855f821c87af4ceffe05ec2dd	Repository asset file: refs.md
+.agents/skills/unslop/references/refs/beacon-engraving.webp	WEBP Asset	569124	44e7680e9c944f03c8fe45df999bdf74077a106925a8189eebf89e751e306e5b	Repository asset file: beacon-engraving.webp
+.agents/skills/unslop/references/refs/meadow-3d.webp	WEBP Asset	286608	84f526b68021a06fc6d32f162406fab6cc8074da1ef76d2ae4530e1b58219b14	Repository asset file: meadow-3d.webp
+.agents/skills/unslop/references/refs/story-dashboard-frames.webp	WEBP Asset	187334	cfbf837e40b7626d5a5789dbce54f5c197aab303aa350d13a042048310717137	Repository asset file: story-dashboard-frames.webp
+.agents/skills/unslop/references/refs/unslop-dashboard-after.webp	WEBP Asset	74724	48067794f86b43dab20515b3810f245d67bff05d10bfa83c0f5885bee93cea52	Repository asset file: unslop-dashboard-after.webp
+.agents/skills/unslop/references/refs/unslop-hero-after.webp	WEBP Asset	223664	92b2d796c5b6116a2039f5ca2b0f3edf700c92b41846b11b9501a4e32f72af6e	Repository asset file: unslop-hero-after.webp
+.agents/skills/unslop/references/signs.md	MD Asset	7141	3a25ae4562e26ec8a1264035c4214594dea58f98edfcd594c6d542b7885b2287	Repository asset file: signs.md
+.agents/skills/unslop/references/tokens.md	MD Asset	6629	234019529bf016cc35df37bfb61e69c524f421c342ae343310c391e764a4ea31	Repository asset file: tokens.md
+.agents/skills/unslop/references/visuals.md	MD Asset	8390	61da49f6ed02f22b199fe3aec7b819036108c1375991c76649267a30bdcff1ce	Repository asset file: visuals.md
+.agents/skills/unslop/scripts/snapshot.mjs	MJS Asset	6653	dec907235241dd7f8ed68eb305225663d1dddde92cec3239ad3c2aabe1bbfa42	Repository asset file: snapshot.mjs
+.agents/skills/unslop/scripts/story.mjs	MJS Asset	23670	e5f05b65e6569e408b208367b3287f6531fde26cde874539b3abc0b4afe60a60	Repository asset file: story.mjs
+.dockerignore	File Asset	60	227f94509cf5b5261900fc2afbfda8569c41f15888a42e0bdd63a9da2a63f326	Repository asset file: .dockerignore
+.editorconfig	File Asset	146	07e0137423c794b4d52dba1919b3c67827267374f6c9a77c5b07a3b7abc41288	Repository asset file: .editorconfig
+.env.example	EXAMPLE Asset	325	ebeb7dead8b48fb11a3f1412e19cb245989e9c0765d9a7f2a38cd7ce8bd22b4a	Repository asset file: .env.example
+.github/ISSUE_TEMPLATE/bug_report.md	MD Asset	515	4ad258504830133b2eb5333312405f343834885e251f6492de9125ae59737d5f	Repository asset file: bug_report.md
+.github/ISSUE_TEMPLATE/config.yml	YML Asset	419	216d4422952ea13b77fcbb6d3d20fa41d92291ddaaf69ad9a1fe0235f98989e4	Repository asset file: config.yml
+.github/ISSUE_TEMPLATE/feature_request.md	MD Asset	760	95e85741a7e6858f6d76e1c036815593a0db25fbde1f688559d0d25147f4bbdd	Repository asset file: feature_request.md
+.github/PULL_REQUEST_TEMPLATE.md	MD Asset	1070	de3a632d67b7e3848fe0672b8d1604245707d78df042276a2ae67bdfdf20776f	Repository asset file: PULL_REQUEST_TEMPLATE.md
+.github/dependabot.yml	YML Asset	405	b8a54cbee63318fa0ae307f9aef54c5acf24a4add063af326f5a3bad7dc9b136	Repository asset file: dependabot.yml
+.gitignore	Git Config	579	c45b9220e58190934b44f71d32ee010b901c99d65d82cbe1c2ca280893e2851f	Git ignore patterns for build outputs and local caches
+BACKEND_INTEGRATION_GUIDE.md	MD Asset	14992	7e6f42e673c1434852f318d42a30e6d4d84f629f74968a92002db7aa4beaa65b	Repository asset file: BACKEND_INTEGRATION_GUIDE.md
+CHANGELOG.md	MD Asset	13252	e8090073e213f233b210f4a2566a7d38d72991db66abfaa168c39084693b463b	Repository asset file: CHANGELOG.md
+CODE_OF_CONDUCT.md	MD Asset	1216	345ee1c771546867a7881d846a2e7640a122307a76e938b9576230ad7ec23147	Repository asset file: CODE_OF_CONDUCT.md
+CONTRIBUTING.md	MD Asset	2575	596a4a85b91321937d72094a5969c4a88675adbfd315aae77e71e1866deb161d	Repository asset file: CONTRIBUTING.md
+DEPLOYMENT_GUIDE.md	MD Asset	9811	630a35327f258c97cc90bbf96c1fbe6da01cd1e4cc0b01aba278666bb6eee181	Repository asset file: DEPLOYMENT_GUIDE.md
+Dockerfile	File Asset	180	fc5a001b981132c681bfd6723ef3ed554b37c5000e026507edfcbb5c85457b1a	Repository asset file: Dockerfile
+HACKATHON_DEMO_SCRIPT.md	MD Asset	11891	986440a391e58cb3d454e33f27473d27730fc4f4c9b1c688e2191b57f808a6d9	Repository asset file: HACKATHON_DEMO_SCRIPT.md
+HACKATHON_READINESS_REPORT.md	MD Asset	16054	763417dfce5a18b23939eca86591421570d8242f00d784cec7d8f2a8fb7399d2	Repository asset file: HACKATHON_READINESS_REPORT.md
+LICENSE	File Asset	1096	6ac5b452f91cc1fa89464ab71b4c424de39692065625fbafea459d9bf31291ae	Repository asset file: LICENSE
+Makefile	File Asset	1863	8a38cf9614ab317df1de265c0aea1182e50ce538640beaa40cf57cd8619f15c3	Repository asset file: Makefile
+README.md	Documentation	23456	c1bed7c4b89563ca14a089288d8b36ff0e16a6974a6738bb8f47413d1897fd18	Project overview, quickstart instructions, and architecture documentation
+SECURITY.md	MD Asset	5258	826899d0bf54267453066f962fc5890776414430e84e0fa4adc5dd7589530aa4	Repository asset file: SECURITY.md
+api/index.ts	TS Asset	508	74cc1b4ae82a44d8e95560ad785a8b29996872a8a8a395434d5b5db634336661	Repository asset file: index.ts
+assets/banner.svg	SVG Asset	1594	9fa4d9cc06bec25ddd00e3286a5fd04400e5a8a15872fd896cfc1f73cba5a2ff	Repository asset file: banner.svg
+backend/.dockerignore	Docker Config	113	d593a7275d827ef26e3c67261fb63c7a6a315ff75b7ada75e08a3df7b19ebffe	Docker build context ignore rules
+backend/Dockerfile	Docker Config	197	759e1d6676894b3c972fb89658d6376ada789ef6fa50a8aaeb93bd264da80acd	Multi-stage container definition for backend FastAPI service
+backend/alembic.ini	Alembic Config	5157	8a70641ffa66bb1c228e16a62d8b7a2111810888819c9c662c17ea72e2d70b49	Database migration tool configuration and logging settings
+backend/alembic/README	Alembic Script	38	31595cf53626af9ed16e15c44fa43183209cc163fbc3ebcb904b22ac436a8884	Alembic environment configuration and execution harness
+backend/alembic/env.py	Alembic Script	2194	3c82ff34de51ef14c4a9388206974a59661e604e820777c0b562b2a3566df158	Alembic environment configuration and execution harness
+backend/alembic/script.py.mako	Alembic Script	732	a60ec52443699fdc2aec93254f06dfdcdfb7f9a5fc7432b7a7e12b9c253713db	Alembic environment configuration and execution harness
+backend/alembic/versions/c6af20b4dbc1_001_phase1_auth_session_security.py	Alembic Migration	4562	470c5d4b8b2864a9579157504bb1efcc664061e12c8697e5cc10d8ec300bc67e	Database migration revision script (c6af20b4dbc1_001_phase1_auth_session_security.py)
+backend/alembic/versions/d7b031e42ba2_002_phase13_work_order_evidence.py	Alembic Migration	2981	e8352340e41cb929a570002e1a8bcb6b2eeeb7eeebfae0206d46129d1fe66095	Database migration revision script (d7b031e42ba2_002_phase13_work_order_evidence.py)
+backend/alembic/versions/e8c12a34b567_003_geo_validation_and_directory.py	Alembic Migration	14704	f7f9daaa6e4fc661b5a5eb7fdf5097343fc94f14761cefd35eb6b515299ae7b4	Database migration revision script (e8c12a34b567_003_geo_validation_and_directory.py)
+backend/alembic/versions/f9a8b7c6d5e4_004_consumer_profile_system.py	Alembic Migration	10227	ea222836493bf55420be555cba54650fcd69f93c24605b89fb588c08dc378efe	Database migration revision script (f9a8b7c6d5e4_004_consumer_profile_system.py)
+backend/app/__init__.py	PY Asset	0	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	Repository asset file: __init__.py
+backend/app/access.py	Access Control	933	6b541c5023c2d88d65b98ff7147bb5ae3930558eb4a52736a017fd5e98957212	Row-level object access rules, zone scoping, and request visibility enforcement
+backend/app/alerts.py	Alert Engine	11798	ffc496b50a340f473f421fc9b10e4541761a0cc6847c4959f79b2999bea7faa3	Rule-based operational alert evaluation and dispatch for SLA and unassigned tasks
+backend/app/assistant/__init__.py	PY Asset	0	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	Repository asset file: __init__.py
+backend/app/assistant/service.py	PY Asset	1485	da0c3267744f5b13dd232f7d3d072e811357a3ccd79337f962237374c3702fd4	Repository asset file: service.py
+backend/app/audit.py	Audit Hash Chain	7922	0ba6be96fb16dd245a9b012c45ca464917c81fb5b95cd8d35ac96ce764685acb	SHA-256 tamper-evident monotonic audit log chain with concurrency lock
+backend/app/config.py	Configuration	3741	5c4b1b9087fb0dec035354892f085289fcb09aa945d167aae528e5a11a773b0a	Pydantic BaseSettings loading environment variables with defaults
+backend/app/db.py	Database Engine	2827	53d4f834fb324b522ac0a1889c82b102ae9e4529fa94da127bc8e39b132fb9d1	SQLAlchemy session maker, database engine connection pool, and health checks
+backend/app/deps.py	Dependencies	1864	281826f873db180215c51f629a714f7761d1c126428957090ac6a81e37de31f2	FastAPI dependency injection for database sessions, JWT auth, and role verification
+backend/app/erp_adapter.py	ERP Integration	9530	493ed8435c35b066df2dcef5df84090d4f8d1583ba4ccd07a59a827930a8d0fc	Mock adapter recording bidirectional ERP synchronization and retry logs
+backend/app/login_limit.py	Rate Limiter	5457	9f7f4a75cc544c7b93c7413d895c0e3e2b34acf8ca51148a41da32be33c3dc70	In-memory and Redis-backed sliding window rate limiter for login protection
+backend/app/main.py	FastAPI Entrypoint	16938	b5a5e443e7c6331460733acd7493156d29b47378c98baf0bc52207650449f416	FastAPI application root, lifespan handler, CORS, security middleware, and route mounting
+backend/app/ml/__init__.py	ML Engine	0	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	Machine learning module for __init__.py (synthetic training, prediction, or governance)
+backend/app/ml/governance.py	ML Engine	8776	9594d74eff49b942547bdca18c64bdd444749a2b9b044d448a8e2b25b6d8f2c9	Machine learning module for governance.py (synthetic training, prediction, or governance)
+backend/app/ml/models/metrics.json	ML Engine	5630	902b97c6a638c4170f52035e6d963f70ad3d893c713226230273d9eb38127bcf	Machine learning module for metrics.json (synthetic training, prediction, or governance)
+backend/app/ml/predict.py	ML Engine	3524	a41f5f3430910b2e0863e296a4bfe2c93768aed450dd6dd55eeb85fb6a320219	Machine learning module for predict.py (synthetic training, prediction, or governance)
+backend/app/ml/predictive_services.py	ML Engine	7890	83cd415b9c5cafbe84e2e65f67988d6d83b8dc3d6cd5cc90f71327ba10ef33a9	Machine learning module for predictive_services.py (synthetic training, prediction, or governance)
+backend/app/ml/synthetic.py	ML Engine	11160	5db2280ec7fa1ec13fbccdfbc7136e0e38ab4fd232edef31ffc182f2c3309d17	Machine learning module for synthetic.py (synthetic training, prediction, or governance)
+backend/app/ml/train.py	ML Engine	11809	f7b0e61985f8af987deb201269ba15e74411cc27d0f8abc067ecb42298f4c183	Machine learning module for train.py (synthetic training, prediction, or governance)
+backend/app/models.py	SQLAlchemy Models	35581	a389f4732bf3ac39c56470198e247683aad8c4e1b0d5a3f167d5b069eef49267	Database schema definitions for users, requests, audit logs, and workflow entities
+backend/app/notify.py	Notification Engine	1934	66b6b989677727354dcd59ef2cb586e64a164940fa0e84e49dee6f46d4042360	Internal notification creation, user dispatch, and role notification routing
+backend/app/perf.py	Performance Monitoring	7783	b074ca8e518748e831af0fbb20524ddd08521db3e21f01c8cf4a2c3668b2792a	Database index creation, response latency tracking, and cache management
+backend/app/routers/__init__.py	FastAPI Router	0	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	API endpoints for   init   resource operations
+backend/app/routers/assistant.py	FastAPI Router	6668	bf92983828eb3475017deb2ea66a243f6d31fe5e2d6ff8775a39b41ce1873efc	API endpoints for assistant resource operations
+backend/app/routers/auth.py	FastAPI Router	53880	148e286bd396dbc4c224b03123ac39e75d86c9aa85122dd0b585e67bf67924bd	API endpoints for auth resource operations
+backend/app/routers/consumer_profile.py	FastAPI Router	29251	170abb5918a76b92d8e1912da38cf046092fada2605f4759f2e49b7ff65305c3	API endpoints for consumer profile resource operations
+backend/app/routers/directory.py	FastAPI Router	30605	0379f08b6e64c798f10079684f08197892953e2336a11eca533c29bf28e53d37	API endpoints for directory resource operations
+backend/app/routers/erp.py	FastAPI Router	15822	9e594b5c338abaab4158ed4bcc76d04117d5ae81eb5afe22e2052fdedcc1cad8	API endpoints for erp resource operations
+backend/app/routers/evidence.py	FastAPI Router	7971	f82cb1e05486d6f7c52b4db3dec2d0fffe2c9b7040bf58d693c902bb22c829ba	API endpoints for evidence resource operations
+backend/app/routers/notifications.py	FastAPI Router	6104	9e18456bd8048fcc4338866f3e84c24ca88e81de81791fcf817303b9d0a053dc	API endpoints for notifications resource operations
+backend/app/routers/requests.py	FastAPI Router	27554	0748c7d92d7ae95ddfa4e65d75fb4e7307263605b6020789635cd417f082133c	API endpoints for requests resource operations
+backend/app/routers/staff.py	FastAPI Router	12259	f1b7b5e7887c29fb1a5c8387d7c42f1b9ef6a22472f052e5f5ca3e993e9723aa	API endpoints for staff resource operations
+backend/app/routers/system.py	FastAPI Router	11091	0f0881a2faf1cf78cd8ee1d2930cad48f95c45da3930e1bd523ea71a11548e56	API endpoints for system resource operations
+backend/app/routers/workflows.py	FastAPI Router	7652	4bd071dd51b546e82442e6d7299462fd1807465dfb910c1929a5f698da6e75a3	API endpoints for workflows resource operations
+backend/app/security.py	Security Utilities	8270	81adce6f1e1489cc8bfeb8b75f974ee9ed1d4f5011b68027117157cd208feef3	Text sanitization, password policy validation, and cryptographic helpers
+backend/app/transitions.py	State Transitions	2256	4c9ff2201072de2d42e35ab385073c955412046cf2bf080b9ffbc5e55a0d4aae	Finite state machine transition rules and terminal status locking
+backend/app/uploads.py	Upload Security	18808	ef88e74380466cef7b9ea330dd528411e76a4d3e100d068fa61c10aabda68dd5	Document upload sanitization, MIME verification, and AES-256-GCM vault encryption
+backend/app/workflow.py	Workflow Execution	6692	0621cce0b5ba4c3be77982b1840a88c261f5730b828ee5f48f6cda2df6e967ea	Deterministic request intake evaluation, auto-assignment, and status routing
+backend/app/workflow_templates.py	Workflow Templates	7056	0178bf3a85006e52c4a6cf1dc71f0f66e845cf389145a954f6f22fad8cd7acea	Configurable workflow template definitions and zone routing persistence
+backend/data/benchmarks/gerc_ugvcl_public_field_benchmark.json	JSON Asset	10124	7033272150e306174403d2a2750df88e0e02064182c87007b7780d39234ec9e2	Repository asset file: gerc_ugvcl_public_field_benchmark.json
+backend/data/policies/new_connection.md	MD Asset	830	a6d585d7d25417f49180d0077a3ed3528b9b1c91cd4d2d39a55ca2e9b9c7cde8	Repository asset file: new_connection.md
+backend/data/policies/offline_field_work.md	MD Asset	411	d54a14632c1dff6d0a839eb18be8bff61fdf80bcf326a9260c4153bd38e72029	Repository asset file: offline_field_work.md
+backend/data/policies/sla_and_escalation.md	MD Asset	498	c154b75d351e2a03844da259085b649371f0fe105b09bcc44629853576afc3a6	Repository asset file: sla_and_escalation.md
+backend/requirements-dev.txt	Python Dependencies	30	9f6383e414f56971a61a25c4e4d8fbe5092ccca76a77aae4538164d710fc9682	Development and testing Python package dependencies
+backend/requirements.txt	Python Dependencies	328	f0647501d1734b666ceac250cf1e8b77417a607f3bd13091471d468fd2746bfa	Production Python package dependencies and pinned versions
+backend/scripts/audit_api_coverage.py	Backend Script	3698	21cd6d5787d44b91d1e15b4a62a39f368ebecea22e07f5debd51e2ba6ff0a83a	CLI maintenance and verification utility (audit_api_coverage.py)
+backend/scripts/backup.sh	Backend Script	971	3623cf90d31a4d5ce3505ebb068cd1e31905114511ac22e4aaf8298e3e716c48	CLI maintenance and verification utility (backup.sh)
+backend/scripts/cold_start_dr_proof.py	Backend Script	4746	fc37290e7696de927b28d058e96bda3960818ea11af63b7ec2af4fdc213320d2	CLI maintenance and verification utility (cold_start_dr_proof.py)
+backend/scripts/dr_failover_drill.py	Backend Script	6877	b20de21fb0c593b4e9c6b03c2ec375912d9dc240aefa8d2550da7281ef24c12d	CLI maintenance and verification utility (dr_failover_drill.py)
+backend/scripts/evaluate_realworld_benchmark.py	Backend Script	4736	d130aa0da37d5a7b6819840557fc52f5c4dfd8f1cc34fc47ab590592635cc22a	CLI maintenance and verification utility (evaluate_realworld_benchmark.py)
+backend/scripts/export_ml_charts.py	Backend Script	5106	d9aecef7a3fd06518b4685ad78b31f6d0185786b115cae20f195c4919da9ced3	CLI maintenance and verification utility (export_ml_charts.py)
+backend/scripts/export_openapi.py	Backend Script	518	cf1d504e2bdb3345b73a2120da7e1cb6fc5e1b933fca99fd13808d9bc8e62fcd	CLI maintenance and verification utility (export_openapi.py)
+backend/scripts/load_check.py	Backend Script	4638	ad0dcd5647d18239ad3c5ce0dc47069374e458c82589c03a16e0dfe7d300ef29	CLI maintenance and verification utility (load_check.py)
+backend/scripts/measure_workload.py	Backend Script	6899	75c090064a9dd1bb4c1c9fc6e83f08a0de311849dea14138a6ee3effcb176315	CLI maintenance and verification utility (measure_workload.py)
+backend/scripts/offsite_replicate.sh	Backend Script	3624	97b6f849aadff92e8f69ffa50bce3a0ec88bf224ae6f37668f7bd9ac3467f855	CLI maintenance and verification utility (offsite_replicate.sh)
+backend/scripts/restore.sh	Backend Script	1006	160c3a377af7f9d07b9331cf13e72b6935b5c49d36fcc5a80b47ca7cd226f21a	CLI maintenance and verification utility (restore.sh)
+backend/scripts/restore_drill.sh	Backend Script	1756	4ac18a8e94404da46e3b8fed058327efa7b0583b3db98cb19729b8ce3f18d59e	CLI maintenance and verification utility (restore_drill.sh)
+backend/scripts/train_models.py	Backend Script	158	92360a644906e2b262c66891638347f5829460d1e62537838b62e6dc6803e7d1	CLI maintenance and verification utility (train_models.py)
+backend/tests/conftest.py	Backend Test	2323	807f084a6350725c71badef50179e9aefdac51637693b90f796921f1d0762793	Pytest unit and contract test specification (conftest.py)
+backend/tests/test_ai_governance.py	Backend Test	4952	df3d657972b4314a2683cbfc4bf94c0e08e386bb752c7bda1691742f996d7fd8	Pytest unit and contract test specification (test_ai_governance.py)
+backend/tests/test_alert_engine.py	Backend Test	6860	3e87ec766c8138abbe775b526606800f1e70001ddded86687ee910ee18423749	Pytest unit and contract test specification (test_alert_engine.py)
+backend/tests/test_api_contract.py	Backend Test	518	08e5e452d82073e45c293d478a1785460851fc7a572e31c9cc897c43f121973c	Pytest unit and contract test specification (test_api_contract.py)
+backend/tests/test_audit_chain.py	Backend Test	3413	7677f3513e16c320eb72bea375db72705d43d89aac113efb3126ec33018a58fd	Pytest unit and contract test specification (test_audit_chain.py)
+backend/tests/test_auth_security.py	Backend Test	5493	586bee2ba670e020614b499e62a3732a2e27c256491492efc29bdbceb2deb52b	Pytest unit and contract test specification (test_auth_security.py)
+backend/tests/test_consumer_profile.py	Backend Test	9761	82aa89cb596542882df1e61d99ca172497476bb3463bcd8a332ac98df9d134b4	Pytest unit and contract test specification (test_consumer_profile.py)
+backend/tests/test_document_upload_validation.py	Backend Test	11506	4dcebcbbaaee452a1e9d3bfeb7240a43cfc56efe6c1883e10a60e641a80bb4ff	Pytest unit and contract test specification (test_document_upload_validation.py)
+backend/tests/test_erp_adapter.py	Backend Test	7315	d0cb7811cae3fbf6cbe176629353ea7adbaa59c666afb51190988ea914cc39d1	Pytest unit and contract test specification (test_erp_adapter.py)
+backend/tests/test_executive_analytics.py	Backend Test	4078	040dadf9fb9e031766d38ba30809493e63cee184e9c5b1ca553d4adb04745793	Pytest unit and contract test specification (test_executive_analytics.py)
+backend/tests/test_field_demo_offline_sync.py	Backend Test	3018	443a6bc0e7478477afd2c4b7f1a80fe1f49a9c409f74a226964812ff0edda7be	Pytest unit and contract test specification (test_field_demo_offline_sync.py)
+backend/tests/test_flow.py	Backend Test	17342	2748bb56632b7a8600421f558c85ca2020cde7febf95474f960548a7c95cad4a	Pytest unit and contract test specification (test_flow.py)
+backend/tests/test_judge_gap_closure.py	Backend Test	12059	08d93b00f4e27a0d658a06896b240bcfd662412b268461d1b1ecd791bdd73f91	Pytest unit and contract test specification (test_judge_gap_closure.py)
+backend/tests/test_notifications.py	Backend Test	3603	73ef6ea9ae114ff57c23ce62459d5eb242c757f2f8b462caef9fd7aab23d56be	Pytest unit and contract test specification (test_notifications.py)
+backend/tests/test_performance_monitoring.py	Backend Test	4061	90a015638d39606c5a08b3da906682273dafbcea7491e84024e9aaa709650ce6	Pytest unit and contract test specification (test_performance_monitoring.py)
+backend/tests/test_phase13_work_order_evidence.py	Backend Test	4181	44c79371cfd63b887f75b5121623f797a4cf079c75b1500048ce77334a6395d8	Pytest unit and contract test specification (test_phase13_work_order_evidence.py)
+backend/tests/test_phase1_auth_hardening.py	Backend Test	14954	ea8e8b5e5556f59c777fd9d7257c215a4ebcc284fd9ee43a01e0eddea3931953	Pytest unit and contract test specification (test_phase1_auth_hardening.py)
+backend/tests/test_phase2_authorization_hardening.py	Backend Test	11958	5dff29c273124c849c4a90ba297ab2c2a67b287b3d9ab30c71c4d7debb4b0c45	Pytest unit and contract test specification (test_phase2_authorization_hardening.py)
+backend/tests/test_phase3_upload_hardening.py	Backend Test	9059	51a38def77a2f83f071ba992e1579499bf49f792d759784298baa3eb6e5f3648	Pytest unit and contract test specification (test_phase3_upload_hardening.py)
+backend/tests/test_phase4_input_validation_hardening.py	Backend Test	8095	825835cbf3b4cf7b33de0747fc450f0cb0f97673e8377e74317dd062c47d912d	Pytest unit and contract test specification (test_phase4_input_validation_hardening.py)
+backend/tests/test_phase5_audit_hashchain_hardening.py	Backend Test	5867	e62b292db8f091e9714fcecc2031ba600e3d07dd3d2263e7b91d3d25573ab25f	Pytest unit and contract test specification (test_phase5_audit_hashchain_hardening.py)
+backend/tests/test_phase6_transport_dos_hardening.py	Backend Test	2483	477c911df66786aaf21a7f6b28f03ca809a8a6a5477b814f8f573a4fde935732	Pytest unit and contract test specification (test_phase6_transport_dos_hardening.py)
+backend/tests/test_request_load_validation.py	Backend Test	4286	5ceb68b4a609ebc5ff61bca1da80eee8ff774b7df21897fd5e866b4b64de6ec5	Pytest unit and contract test specification (test_request_load_validation.py)
+backend/tests/test_request_phone_validation.py	Backend Test	1877	c39922c94918830037b33d003c112a7b5b5333e40db0078c18c9aa1b806f27d0	Pytest unit and contract test specification (test_request_phone_validation.py)
+backend/tests/test_system_status.py	Backend Test	855	3184d0f9e38fd35e41d9bf79b928ec2a42673f212cdb2503ee880f332557a370	Pytest unit and contract test specification (test_system_status.py)
+backend/tests/test_teammate_backlog.py	Backend Test	13689	fad5fe710e345a0aead7cc0533bfcc53489c1fe2c30ec25b25c611f8ee4f961b	Pytest unit and contract test specification (test_teammate_backlog.py)
+backend/tests/test_transitions.py	Backend Test	5943	cbc6b0130b972b6abbc5d028ad3ad8102666e1baa14fc9a6c8cc063b01cd461d	Pytest unit and contract test specification (test_transitions.py)
+backend/tests/test_unified_login.py	Backend Test	6846	f8e206ed328079dfc706e226e2c424964c69f4a1911e3b86117da37ccf4f1ecd	Pytest unit and contract test specification (test_unified_login.py)
+backend/tests/test_validation_issue_persistence.py	Backend Test	4127	43bb965f048354c0a13adf08bd3608754f6262e35ffbc595b59c7bd391e73a39	Pytest unit and contract test specification (test_validation_issue_persistence.py)
+backend/tests/test_workflow_templates.py	Backend Test	9404	cf5b5fe9b14e73f0a3222af4757887628581d6b9bde76e7e77e12d8f1a4fb7b2	Pytest unit and contract test specification (test_workflow_templates.py)
+backend/tests/test_workload_measurement.py	Backend Test	4216	5b230a8d21d32f61304d2665b7d4d19b7961c0dbb16194634f6967e5c13623ae	Pytest unit and contract test specification (test_workload_measurement.py)
+bun.lock	LOCK Asset	88530	9a4e70f373a4d4f448ff7fd8fbcac25ae64e5e63d587cd218baad2a8611feda1	Repository asset file: bun.lock
+docker-compose.yml	Container Config	1672	d68ebda83c9554302fe5d38f7ed0301dffcce4835542fddc59a0453f1e1d7e24	Multi-container orchestration for FastAPI, PostgreSQL, and Redis
+docs/API_CONTRACT.md	Documentation	22957	7a6921f99331b0d4e643aea1d80a507dccddeebea3c9773b430b939594721e05	Architecture, contract, or audit documentation (API_CONTRACT.md)
+docs/ARCHITECTURE.md	Documentation	3501	d9649eeece71e7e0a9961a6d3fb61d6cd7ba4492165f61d16e171304367d5da9	Architecture, contract, or audit documentation (ARCHITECTURE.md)
+docs/AUTHENTICATION_ARCHITECTURE.md	Documentation	5001	60e9ce3448d019d80709cf97236e46e980172364bb0b62c42e63a795bd967d6f	Architecture, contract, or audit documentation (AUTHENTICATION_ARCHITECTURE.md)
+docs/BACKEND_INTEGRATION_AUDIT.md	Documentation	8481	5a71a9c67c49524724304432dcfc939b035b9abb15ba253275962473247da6b3	Architecture, contract, or audit documentation (BACKEND_INTEGRATION_AUDIT.md)
+docs/BRANDING.md	Documentation	1131	99d584a7dec7235028960b08ccb91b101fe00cfdb789b5fe30218de492d880ca	Architecture, contract, or audit documentation (BRANDING.md)
+docs/CODE_REVIEW.md	Documentation	17992	5f53af6baba342f9e67c0b5b5b72eaa956a03fe727915852b6db5e585f320cf4	Architecture, contract, or audit documentation (CODE_REVIEW.md)
+docs/COMPLETE_PROJECT_AUDIT.md	Documentation	11886	f4bfee014a0abb9a04558e8cae2f7df10b5320e9abd496bdb1d0f66525655104	Architecture, contract, or audit documentation (COMPLETE_PROJECT_AUDIT.md)
+docs/COMPOSE_VERIFICATION.md	Documentation	4262	f52d5e64985eeaf277df16b53bf441be3a579b49f93f1270603d70fc589779eb	Architecture, contract, or audit documentation (COMPOSE_VERIFICATION.md)
+docs/DATABASE_MIGRATIONS.md	Documentation	2913	9c44990186ca20ea1ea8f8659c6f6e182e3ebf0f45cec41335d0e0ba6afe4aef	Architecture, contract, or audit documentation (DATABASE_MIGRATIONS.md)
+docs/DECK_OUTLINE.md	Documentation	3785	90cdd87cb6bd5e99c217027489452cadc09d261a2c485b2e022fb644226cb42f	Architecture, contract, or audit documentation (DECK_OUTLINE.md)
+docs/DEFENCE_QA.md	Documentation	7473	20c39055d7dc4a3e180d31ce98a3b5171e933b11a0625d343a03184bc7aa10b3	Architecture, contract, or audit documentation (DEFENCE_QA.md)
+docs/DEMO_LOAD_REVIEW.md	Documentation	3490	ab5a265d65eb9e458a0a3db6110dbba0b8a5d3bd84af1efb40fd78ae808c7e86	Architecture, contract, or audit documentation (DEMO_LOAD_REVIEW.md)
+docs/DEMO_SCRIPT.md	Documentation	2555	5a6f3d2efaa980bb50e5a20c631d550d50fe44fa0496946a87f415c8daaa8460	Architecture, contract, or audit documentation (DEMO_SCRIPT.md)
+docs/DISASTER_RECOVERY.md	Documentation	3527	3008a28aafd29bc01b8555eb14ed47e9b6ffa3fc9139f69a55764f6b2959d65f	Architecture, contract, or audit documentation (DISASTER_RECOVERY.md)
+docs/DISTRIBUTED_STORAGE.md	Documentation	4563	02c71f62d611989c90aa20e32149f77b6564386b735620c06ec55b3421c688f9	Architecture, contract, or audit documentation (DISTRIBUTED_STORAGE.md)
+docs/FEATURE_COMPLETION_MATRIX.md	Documentation	15768	33a9fb4dcda95bb112b385c844e51961b071d5637135e62e266fa872bd23c515	Architecture, contract, or audit documentation (FEATURE_COMPLETION_MATRIX.md)
+docs/INFRASTRUCTURE.md	Documentation	9694	55dc3d4d191a7a8d263f84e55d982beee09df1a72a8cb6d376af59282f61c33a	Architecture, contract, or audit documentation (INFRASTRUCTURE.md)
+docs/INFRASTRUCTURE_BOM_SOURCES.md	Documentation	5490	943d3b76af765d55e85914151919cd2886d0712b913c18df50f443c7730673b7	Architecture, contract, or audit documentation (INFRASTRUCTURE_BOM_SOURCES.md)
+docs/INFRASTRUCTURE_ROADMAP.md	Documentation	8939	fc9e5701a6e089b3d13076f8f9138dfd1d7b02f128cb9a7c5c2b4e983c4a72c8	Architecture, contract, or audit documentation (INFRASTRUCTURE_ROADMAP.md)
+docs/INFRA_PROPOSAL.md	Documentation	3263	bf05e296d2b18687be26438cec95b41fc7aae9781c6be6623adededecf6ebefd	Architecture, contract, or audit documentation (INFRA_PROPOSAL.md)
+docs/MAIL_TO_UGVCL.md	Documentation	8154	c9f926e3f8d3e9c2b400b3aee0ed416846a0a89e01b7a5aa50a6e50c783c4084	Architecture, contract, or audit documentation (MAIL_TO_UGVCL.md)
+docs/MAIL_TO_UGVCL.pdf	Documentation	30714	f5783d8b5e66091fccfdc4ed95247743088cd1f9d93332b03c611cf34953dce1	Architecture, contract, or audit documentation (MAIL_TO_UGVCL.pdf)
+docs/ML_REPORT.md	Documentation	6674	0208167447b7ea7fa7964d9182a4bb2ce030c5b7d90fcdd8e2a9f5e266b7ea45	Architecture, contract, or audit documentation (ML_REPORT.md)
+docs/OFFLINE.md	Documentation	7429	acef3f362cad28146f828ba4ed73d72567f7b362f9ddfb4253aacd8ca0b425db	Architecture, contract, or audit documentation (OFFLINE.md)
+docs/PENETRATION_TEST_PLAN.md	Documentation	5603	8a8bb9dc385945fd45613d6941ed8940506947f1f896932323c2384340b5af7a	Architecture, contract, or audit documentation (PENETRATION_TEST_PLAN.md)
+docs/PHASE10_BACKEND_CONTRACT.md	Documentation	7162	0ca6def82ecde418e971d37d3bd40cffec8d9fd17c01a3df74917b9f40722cf8	Architecture, contract, or audit documentation (PHASE10_BACKEND_CONTRACT.md)
+docs/PHASE10_INTEGRATION_GUIDE.md	Documentation	6726	836512ae751520d1ef2fc50b050c45d7ff112e266f4b682512d8b8c27b0e624d	Architecture, contract, or audit documentation (PHASE10_INTEGRATION_GUIDE.md)
+docs/PHASE11_METER_READINGS.md	Documentation	5122	ead5225d23e4618f5bcfde850c131f970b37f8c244ef056986f8657295490d1f	Architecture, contract, or audit documentation (PHASE11_METER_READINGS.md)
+docs/PHASE13_VERIFIED_COMPLETION_CONTRACT.md	Documentation	16932	cf5baa7d068fb3e364c5625a1ddb2e814790dc93c70db8d672e0586618494e3d	Architecture, contract, or audit documentation (PHASE13_VERIFIED_COMPLETION_CONTRACT.md)
+docs/PRODUCTION_CONFIGURATION.md	Documentation	2542	3e22aaaf3d64d27d26a48252b6410f1b45ea9513c04c9c7f571ff039a5d05629	Architecture, contract, or audit documentation (PRODUCTION_CONFIGURATION.md)
+docs/PRODUCTION_READINESS.md	Documentation	7990	c68d4aeb7fd312a0884062e794703a23e3aa234d77a80c34c672c2500786b41f	Architecture, contract, or audit documentation (PRODUCTION_READINESS.md)
+docs/PS000125_OFFICIAL.md	Documentation	4338	349c5dccaf1d8eab2bea053e3a2b89156c34ddd971a982e215dd10fb367d052b	Architecture, contract, or audit documentation (PS000125_OFFICIAL.md)
+docs/PS_GAP_ANALYSIS.md	Documentation	8145	3cf18a5259341018c898b950b6b01314881059232ad5d707326f5f40c73d834a	Architecture, contract, or audit documentation (PS_GAP_ANALYSIS.md)
+docs/QUICK_AUDIT.md	Documentation	7546	f1a544bf4dbbb49d4170714d09ee39271dd75a838fcfe66069eef6e5e197f992	Architecture, contract, or audit documentation (QUICK_AUDIT.md)
+docs/README.md	Documentation	2973	ec64704c1d5bc736af9bd1bd1a5e4d2bbd520ed35f59947caea9e52a62937625	Architecture, contract, or audit documentation (README.md)
+docs/REQUIREMENT_MAPPING.md	Documentation	7009	e9a563fc7b4fe8a3cf9a379938024b9c3bedb59c40d07d073139dc5ee1278cc1	Architecture, contract, or audit documentation (REQUIREMENT_MAPPING.md)
+docs/ROADMAP.md	Documentation	2468	cb6f0159e41526de38a3f010c407420ce084075c166de9a511ce47e6ec317c42	Architecture, contract, or audit documentation (ROADMAP.md)
+docs/SECURITY.md	Documentation	9508	4c0c4949e61d0d1e3b1f8e01302a5055a89e028da0c5b4157e9e2f04a40d2e58	Architecture, contract, or audit documentation (SECURITY.md)
+docs/SECURITY_AUDIT.md	Documentation	10050	501396f466ba411326f9e8908cb69b4f86f1cb0d1c854ad7b780b439ed69d4f6	Architecture, contract, or audit documentation (SECURITY_AUDIT.md)
+docs/SECURITY_AUDIT_REPORT.md	Documentation	16763	d9539c53e75d7be5268f09854618c58be2cf510b6d4264af0cb8c24b00eb6341	Architecture, contract, or audit documentation (SECURITY_AUDIT_REPORT.md)
+docs/SECURITY_RETEST_REPORT.md	Documentation	3306	18f47975fd70a083f40d32ca1dd3348183b9f5d6d7b6ece6ff315eedf851dd66	Architecture, contract, or audit documentation (SECURITY_RETEST_REPORT.md)
+docs/STATUS_TRANSITIONS.md	Documentation	4383	ff6f934b2753f0abf205125293bd424205d64b3d4d346b23309de65acbf3a85e	Architecture, contract, or audit documentation (STATUS_TRANSITIONS.md)
+docs/SYNOPSIS_ABSTRACT.md	Documentation	3468	db9166adce53510289d9adfdeeb58cb560e26f7adbe16b8b292a28ea4bc5a8ba	Architecture, contract, or audit documentation (SYNOPSIS_ABSTRACT.md)
+docs/TEAM_COMMIT_AND_VIVA_PLAN.md	Documentation	8036	482943bfae60febcf39c13f3158cb88bfc5ca9dfc8924608e1863ebb0928cc5d	Architecture, contract, or audit documentation (TEAM_COMMIT_AND_VIVA_PLAN.md)
+docs/TEAM_ROLES.md	Documentation	13878	d2888b5f7ea5f910f8d5605d487641e76d81ec80ee896b4fab76a04e85c98884	Architecture, contract, or audit documentation (TEAM_ROLES.md)
+docs/UGVCL_HIERARCHY_DATABASE.md	Documentation	5986	247907ec48799dd316d21e199843e3027c829c09301cb06bca9c84fa5234ba67	Architecture, contract, or audit documentation (UGVCL_HIERARCHY_DATABASE.md)
+docs/UGVCL_OFFICE_DIRECTORY_DATA_SOURCES.md	Documentation	4332	d6be5f3bfd4304bcf3fd60abbce8d1ac73bf055b0d871086fddf66aa112418d0	Architecture, contract, or audit documentation (UGVCL_OFFICE_DIRECTORY_DATA_SOURCES.md)
+docs/UGVCL_OFFICE_IMPORT_GUIDE.md	Documentation	3815	72aa882950791d951b79c930a2da8bc53097502e1f5c87101e64840cfb642db7	Architecture, contract, or audit documentation (UGVCL_OFFICE_IMPORT_GUIDE.md)
+docs/UGVCL_ORGANIZATION_STRUCTURE.md	Documentation	6427	0f85d22e050bb943d4b37cf71b42e2145550307caf8f0a849ee3dbac61659caa	Architecture, contract, or audit documentation (UGVCL_ORGANIZATION_STRUCTURE.md)
+docs/VIDYUTONE_UPGRADE.md	Documentation	3340	ea007d9c46b0384ff94307a0dc4a93e6eb496e7df02b4a4e587e04c8c428a95a	Architecture, contract, or audit documentation (VIDYUTONE_UPGRADE.md)
+docs/VIVA_QUESTION_BANK.md	Documentation	18475	8163cfaf2af9abebc3218e392f763745d608071be53a7a10862664cd1d70d385	Architecture, contract, or audit documentation (VIVA_QUESTION_BANK.md)
+docs/WHOLE_REPO_REMEDIATION_REPORT.md	Documentation	5696	15926cec806396e9d4ebedfa1bc512df4006549678f25eed019d5c6a5754e7f2	Architecture, contract, or audit documentation (WHOLE_REPO_REMEDIATION_REPORT.md)
+docs/WORKLOAD_MEASUREMENT.md	Documentation	5267	80835296e344057c8594d2e94152cdc57121094edb232e4f94730f944e6913b1	Architecture, contract, or audit documentation (WORKLOAD_MEASUREMENT.md)
+docs/WORK_PLAN.md	Documentation	10456	1117c8cf1b07979a0a898d05a82df2aa53be7ba3ee6f6531ade3fe63e945d157	Architecture, contract, or audit documentation (WORK_PLAN.md)
+docs/api/openapi.json	Documentation	204147	7e77250bdf43f0d2316010d929bcd0c0aad7783f4346c4ac0a5ecc74f9047d4a	Architecture, contract, or audit documentation (openapi.json)
+docs/assets/architecture.png	Documentation	264476	e1241379f3aa08ec9315125656dbc5d195758b1cd37a30bbbe7f802da2cb9de6	Architecture, contract, or audit documentation (architecture.png)
+docs/assets/architecture.svg	Documentation	7735	187d748930969317c139f35c3d0c8bc83be0319dc5fed29c99d87882cf023bb0	Architecture, contract, or audit documentation (architecture.svg)
+docs/assets/ml_confusion_matrices.png	Documentation	93688	10beb4c400139ed366eed3d428217e7ae82ba5824f75dafae8e71e7e53d415fa	Architecture, contract, or audit documentation (ml_confusion_matrices.png)
+docs/assets/ml_risk_distribution.png	Documentation	79502	e56eede76547545a22175574e71634c649249d8edbd9cea94e17527b2b422e06	Architecture, contract, or audit documentation (ml_risk_distribution.png)
+docs/ci.yml	Documentation	2590	53e0607891e883c5ddd55cb31631455ea5eaec48d2774024b5054e47b0fb4073	Architecture, contract, or audit documentation (ci.yml)
+docs/deck/VidyutFlow_PS000125.pptx	Documentation	458086	95350b3c63cb7d785ffbab868096b41e6441175e292eaad38d391275cdc5266c	Architecture, contract, or audit documentation (VidyutFlow_PS000125.pptx)
+docs/verification/README.md	Documentation	4778	e0949ae48ca48a89418dd89edd15b4fbd75ddb72bab597ef64c2d4cdb17514ca	Architecture, contract, or audit documentation (README.md)
+docs/verification/backend-tests.txt	Documentation	1555	3ff4994d54adc144e68a2c92b94eacce8bdcf8b64779a2c026468c98279c85de	Architecture, contract, or audit documentation (backend-tests.txt)
+docs/verification/browser-checks.txt	Documentation	728	b82044c6eb679cab862704b2bb21a8d2f6db4353f461af8a8b34bfb5568dd5ce	Architecture, contract, or audit documentation (browser-checks.txt)
+docs/verification/browser-completed.png	Documentation	125630	094a44ad68d059444ba26dba3e37f230c77453129a224e428cbd3799e06b362b	Architecture, contract, or audit documentation (browser-completed.png)
+docs/verification/browser-conflict-retained.png	Documentation	95450	439d0d6843552571955e05bf31323ee060c667b89645bdd9bf414502b391e3b1	Architecture, contract, or audit documentation (browser-conflict-retained.png)
+docs/verification/browser-offline-queued.png	Documentation	170672	fcd4624749da55188eab77b6eae3a41bd5414996fd95178027e37827323f5137	Architecture, contract, or audit documentation (browser-offline-queued.png)
+docs/verification/browser-results.json	Documentation	473	45e8c24373d0b4152bf633913972f9a3f6da5170a8092d4995d5b0266bb1cf58	Architecture, contract, or audit documentation (browser-results.json)
+docs/verification/compose-smoke.txt	Documentation	1318	f9b1f0e5a48f7a09f96c30bfa67ede9956c480e0bbfef82466b2d840df7b44e5	Architecture, contract, or audit documentation (compose-smoke.txt)
+docs/verification/frontend-build.txt	Documentation	395	c84e17767d54863666e773cf6b58061b65ff9d2fbbdcdc7b44035506adf8be01	Architecture, contract, or audit documentation (frontend-build.txt)
+docs/verification/persistence.txt	Documentation	275	d09dce266d171b36a164a9da9b75854e85de1a169437f1287457c262c0035c36	Architecture, contract, or audit documentation (persistence.txt)
+docs/verification/r3-realworld-text-eval.txt	Documentation	1983	d9ff6c0c13eb1cdd0e736c2e86e31637e77e5ea90950dcddb4923c29a5d8db34	Architecture, contract, or audit documentation (r3-realworld-text-eval.txt)
+docs/verification/r4-api-endpoint-coverage.txt	Documentation	3106	ad9e7779619c10b4be4def65366efc8f27d4fe1ce663268a94a9d85828015d20	Architecture, contract, or audit documentation (r4-api-endpoint-coverage.txt)
+docs/verification/r4-backup-restore.txt	Documentation	1500	3cb27f46cc76a4ad9cf383b7c2698ade48043c09fbfb2d8f88a41f3be3d5cdaa	Architecture, contract, or audit documentation (r4-backup-restore.txt)
+docs/verification/r4-cold-start-dr-proof.txt	Documentation	819	07fd7fc7696aa7440feccb9795770b0c1d32c125e74ef764267d5bb0d5dab20e	Architecture, contract, or audit documentation (r4-cold-start-dr-proof.txt)
+docs/verification/r4-dr-failover-drill.txt	Documentation	573	05958f0784bf328593a501a3e5e9f1bb8cb8f926d99cc553b36f650de9eddce2	Architecture, contract, or audit documentation (r4-dr-failover-drill.txt)
+docs/verification/r4-load-check.txt	Documentation	738	637734424eead103f4812763cbaa3f44e34727dd99a2f2172949b5644fcb0984	Architecture, contract, or audit documentation (r4-load-check.txt)
+docs/verification/r5-workload-measurement.txt	Documentation	778	fc4346126e85e44e8dc8ca3144989f2ff36a367616c98f92d1941ced37bd29e7	Architecture, contract, or audit documentation (r5-workload-measurement.txt)
+e2e/accessibility.spec.ts	E2E Test	3278	ffc451bb8b5080620bcb98e584ab976daff06e50c50042eea1ca11a462cea5aa	Playwright browser end-to-end test specification: accessibility.spec.ts
+e2e/helpers.ts	E2E Test	1201	893bf4eb0e57e769da3c7b573c0a51fc9db8bc551d136c3914ba39d0060405dc	Playwright browser end-to-end test specification: helpers.ts
+e2e/live-workflow-and-predictive.spec.ts	E2E Test	7587	fbdc1af377f348ac7e24bd3b4f5b6fa9919d93d5ab1889970cf868555880eeea	Playwright browser end-to-end test specification: live-workflow-and-predictive.spec.ts
+e2e/portals-and-i18n.spec.ts	E2E Test	2449	078805a64ee2a18e3111821e1a6d327ef352c5e7901a7cb7ac9cffba8b7af392	Playwright browser end-to-end test specification: portals-and-i18n.spec.ts
+index.html	HTML Entrypoint	1701	176646559a85771257d834b4b7be1e403f444bee75f3a6e6892a0e541a3ecc4a	Vite Single Page Application HTML root template
+metadata.json	JSON Asset	342	9f360a2da9389b2c20eb9ac9858737a8a607f740e00939f4da286158c93cfe8b	Repository asset file: metadata.json
+package.json	Frontend Config	7536	88488efec22b29186d15bcda8233d118368c6197d60caf9374685e3442b7a89e	NPM package configuration, dependencies, and test/build scripts
+playwright.config.ts	Test Config	949	ccc98a3a9bcb0cf5ead5683496acf2337c968ec3ecb3438bd4e1c78b52464620	Playwright configuration for end-to-end browser and accessibility testing
+public/assets/aistudio/0948d97d-4e99-4963-9cea-f63bb30f3b2b_d8eb7d80.png	Public Asset	698996	d8eb7d803b87f9b25ce292e7475d09a0c1871264d30776a9f4586bc201254dff	Static browser asset, font, or icon (0948d97d-4e99-4963-9cea-f63bb30f3b2b_d8eb7d80.png)
+public/assets/aistudio/250edba0-2f25-4a7f-8a8a-61c51bf115f7_962e7deb.png	Public Asset	724534	962e7deb5dc6a7efce33277dbea110f74d16bc0388209645e3c65cf436693b80	Static browser asset, font, or icon (250edba0-2f25-4a7f-8a8a-61c51bf115f7_962e7deb.png)
+public/assets/aistudio/download_c3c13e1f.png	Public Asset	612202	c3c13e1fd0c99dd31115e262aecdfb897e1449e061febc6f3bc8224ec3af405f	Static browser asset, font, or icon (download_c3c13e1f.png)
+public/assets/aistudio/image_e2f7884b.png	Public Asset	490381	e2f7884b71511d76edefecffae4252cd4d6be99c3cab9b0b33324d6f505d78a1	Static browser asset, font, or icon (image_e2f7884b.png)
+public/assets/ugvcl-logo.png	Public Asset	11305	6232ca72c751008b66e7bdc0ec0ac4e180927d84ec977b1a18c053aafe8ad6f9	Static browser asset, font, or icon (ugvcl-logo.png)
+public/assets/ugvcl-logo.svg	Public Asset	1843	931807df59595ec8fd6150db8b72fb86343a2fea73bd336186262a11caced116	Static browser asset, font, or icon (ugvcl-logo.svg)
+public/assets/ugvcl/area_map_ugvcl.jpg	Public Asset	180163	42da1ffbe04c3fd314e882e74daf636b96b317186fb7eca4cb2a19e1efb3b9a6	Static browser asset, font, or icon (area_map_ugvcl.jpg)
+public/assets/ugvcl/charanka_solar_park_patan.jpg	Public Asset	95689	772597fa0700e51f598916386de01e03315b174f7a23bd7e8b7cd3bc4bd04314	Static browser asset, font, or icon (charanka_solar_park_patan.jpg)
+public/assets/ugvcl/distribution_substation_switchyard.jpg	Public Asset	290837	d4ba7d94132efcbee5b7d5c7a327b26842dbe2a9c55d82031cb7a0b237bc9338	Static browser asset, font, or icon (distribution_substation_switchyard.jpg)
+public/assets/ugvcl/distribution_transformer_pole.jpg	Public Asset	189098	fc8dd5a1e9748f61f67cb87c4b66d0eb21483b8e475e606a8cbf3b836d72bdd5	Static browser asset, font, or icon (distribution_transformer_pole.jpg)
+public/assets/ugvcl/india_grid_substation_stepup.jpg	Public Asset	128820	5f5e32a72e2bd2643023c01ed9925b1e7e9d694d8afa5f9c73ff36b5e5d5e507	Static browser asset, font, or icon (india_grid_substation_stepup.jpg)
+public/assets/ugvcl/transmission_pylon_sunset.jpg	Public Asset	43005	8022526262ef98ed227b471cb5f72ab5e5f7b6db2766c8732c67e3f951d42e7c	Static browser asset, font, or icon (transmission_pylon_sunset.jpg)
+public/assets/ugvcl/ugvcl_logo.png	Public Asset	11305	6232ca72c751008b66e7bdc0ec0ac4e180927d84ec977b1a18c053aafe8ad6f9	Static browser asset, font, or icon (ugvcl_logo.png)
+public/manifest.webmanifest	Public Asset	862	1e12e4f060c60d5f335f5aa20f0e2537b9856aed747f6b6d37b6c6eb999bed86	Static browser asset, font, or icon (manifest.webmanifest)
+public/sw.js	Public Asset	8961	8991586371443a606f383f116d17cb1e4dc861011254aa50d354380c31664510	Static browser asset, font, or icon (sw.js)
+run.bat	BAT Asset	13660	093142d424569fbab296030a518ccee930b4e82e53835ed02b115614d2ae4914	Repository asset file: run.bat
+scripts/build_deck.py	Build/Dev Script	13199	ab2c353fddfdf3ee9491f67474e87f4fa607d25690f52c5600f6fea412f23f58	Build-time helper script (build_deck.py)
+scripts/build_logo.mjs	Build/Dev Script	1563	c9f8d9508d5dc5ec8b07254e3b792ed83e2cb59898772e259857b0fad5357fff	Build-time helper script (build_logo.mjs)
+scripts/copy-tesseract-assets.mjs	Build/Dev Script	1051	575005b4ab75ad27f0aaf82334ab390b555c3fdbd81eeafd696e530d930e175d	Build-time helper script (copy-tesseract-assets.mjs)
+scripts/demo_reset.sh	Build/Dev Script	264	26316f928e2eea813c7b964beecafd7814e2a7cdcc7ec3ff2f6182f2d6594e4b	Build-time helper script (demo_reset.sh)
+scripts/find_port.py	Build/Dev Script	510	7f693721fae639a3f61fca1cf2f376c571dd29701225a5cc0513385024ffdd8b	Build-time helper script (find_port.py)
+scripts/generate_ugvcl_logo.mjs	Build/Dev Script	3003	ea0f977e0096266be2f49a2e742ec731eaed9e88553f705772980685404bbd6f	Build-time helper script (generate_ugvcl_logo.mjs)
+scripts/verify_browser_conflicts.py	Build/Dev Script	8205	3ed93910b80ef425533f7c79d5111658f8d7e16d9ccfe6d53344eea2938f6177	Build-time helper script (verify_browser_conflicts.py)
+scripts/verify_compose.py	Build/Dev Script	4560	50c98c50616692ce69e71fd2d945a5f350ca206c869a95d04ecf5f9572393a3b	Build-time helper script (verify_compose.py)
+src/App.tsx	React App Root	4105	eb0133c7aaff6a614238972f375f00c0fd09bb59438ae44067a66dbf716a60d3	Root application component rendering portals and active views
+src/components/admin/AdminDemoBackupCenter.tsx	React Component	45805	ee66b6ce950d9750ce5889ae050e9513ad94b5fedc893c74b1c176d2e8a829d0	UI component: AdminDemoBackupCenter
+src/components/admin/AdminMeterOcrHealthSection.tsx	React Component	26217	bbc26a7296b4cc001f0c2adb13ea61fc06a44ea3268704257e0f432c19bfba79	UI component: AdminMeterOcrHealthSection
+src/components/admin/AdminPortal.tsx	React Component	75278	9083b4f2bb8273b00ff17b005ef4b1df036e6803b3f8dc26178f84d73236eb92	UI component: AdminPortal
+src/components/admin/LiveErpAdapterPanel.tsx	React Component	21274	36e5bcf6903e6272bf45a6989b9906a2960ebf3799e5d8496347cf398b3885e4	UI component: LiveErpAdapterPanel
+src/components/admin/LivePerformanceTelemetryPanel.tsx	React Component	12008	0bedeab401ca04b7c4cdb6ab38d5616c15baf226463beb5737740f5fbccdebaf	UI component: LivePerformanceTelemetryPanel
+src/components/admin/LiveStaffAssignmentPanel.tsx	React Component	19824	700e51b708a43f253d72705e034b2a0116072521b9feac5d7260432e9094314d	UI component: LiveStaffAssignmentPanel
+src/components/admin/LiveWorkflowTemplatesPanel.tsx	React Component	25397	d21189d374a465727486c75b8c31a6b2612a47fd7a28b1c7f61f08dc2990d97f	UI component: LiveWorkflowTemplatesPanel
+src/components/admin/OrganizationalDirectoryWorkspace.tsx	React Component	26172	fee511f04168b2a5206f16b3ae4fe2dc49787a842c291852f6c792ab43f4912d	UI component: OrganizationalDirectoryWorkspace
+src/components/common/AIAssistantDrawer.tsx	React Component	34254	530e8db70ed14280960f03b25b0f091ae6979604c135bb108964982edf33f180	UI component: AIAssistantDrawer
+src/components/common/BillVerificationModal.tsx	React Component	10612	6217256d4b415b6702a2c903e964a4b8709c550a1e8ded463ff0720071f01695	UI component: BillVerificationModal
+src/components/common/CaseDetailDrawer.tsx	React Component	50057	ea542a1530e189a58a361329521c2779f4e832815253c2556df45fe1423ede38	UI component: CaseDetailDrawer
+src/components/common/CommandPalette.tsx	React Component	18602	767e4e15d6928fea7e4509a9d6865506ef80d1e508a44e938ab3e0b9fcd0e74f	UI component: CommandPalette
+src/components/common/CriticalIncidentModal.tsx	React Component	9256	98fd832f86d37e93ef869b71f53f57fb5347d76c757923e6914766b9f5fe837c	UI component: CriticalIncidentModal
+src/components/common/EnterpriseAccountMenu.tsx	React Component	26761	84591eb6c20b1aecf4a36d2b8ff99fffb2fada922f43bf8e068c7f3fc2909818	UI component: EnterpriseAccountMenu
+src/components/common/ErrorBoundary.tsx	React Component	7020	cce50487d700c5685bc069f7d3bf2dff1a4da7270dfbcbe18903fdcfa444ef3c	UI component: ErrorBoundary
+src/components/common/ExportMenu.tsx	React Component	15278	a248c4f73e5ddded4168e8f7df73b6d3c553fc5ea746597ca95147cc785f791c	UI component: ExportMenu
+src/components/common/HumanApprovalModal.tsx	React Component	14877	df16ac843676b263e3028186e623287ebe12ea67523fab02fac30047b47d3ce1	UI component: HumanApprovalModal
+src/components/common/IncidentActionModal.tsx	React Component	47625	b631812287757106345abc66e3f4abc3ddf11bfa0f62e604aa2ff4a15a4d6bc3	UI component: IncidentActionModal
+src/components/common/LanguageSelector.tsx	React Component	11319	402b1c5b51ece92817e50b4d7ed00827aec35ea9e887af548c741916e4ccd224	UI component: LanguageSelector
+src/components/common/LiveAiGovernancePanel.tsx	React Component	18674	3e92d956bfc9fdf58ab004bff3d8fcc576c786275f9e1a0698cdfa7183dcddfb	UI component: LiveAiGovernancePanel
+src/components/common/LiveAlertEnginePanel.tsx	React Component	20534	d782686d113445c03cad98f64d512e625f8628f98c6bf424fa2deb6f296e4cc4	UI component: LiveAlertEnginePanel
+src/components/common/LivePredictiveDecisionPanel.tsx	React Component	31327	ce40a2c6a91e90716c41ca6f8440380f3b138956989010dded1c105e06d4fec0	UI component: LivePredictiveDecisionPanel
+src/components/common/LiveRequestQueue.tsx	React Component	11128	2a7804472e28469037978a1fd5426e037eda9a439227a58fb5ac8b8c58fc1d67	UI component: LiveRequestQueue
+src/components/common/LiveSlaRiskWatchlist.tsx	React Component	10130	f04cf20d85c4df0151945326d688e5fefe4b01f250de8efed762942a6e902a6e	UI component: LiveSlaRiskWatchlist
+src/components/common/LiveWorkflowKpis.tsx	React Component	12056	c986423de923f4544e6f1f86e6e2ded9b0d3f7c0c90effeac286b490fb797666	UI component: LiveWorkflowKpis
+src/components/common/LocationPinPicker.tsx	React Component	12676	03a92500b26138b465f4df143c70d44905299a568d2515a09251062603cb2171	UI component: LocationPinPicker
+src/components/common/MeterReadingWorkspace.tsx	React Component	71282	b1a05627237b83c9a1da814061e1f05147f45590acb9d6d9ca6fd3d236a2e35f	UI component: MeterReadingWorkspace
+src/components/common/NotificationDrawer.tsx	React Component	66332	5afacabad7bf7a74a9be31c0ea204af1bb9ecf5c3c59463fd37c9db44bb1fa1f	UI component: NotificationDrawer
+src/components/common/OfficialDocumentModal.tsx	React Component	27869	33d18e2af7359b662cbdf8af6a3cd23bd2c264f2cb1d322364f2eef6aca0f8c4	UI component: OfficialDocumentModal
+src/components/common/PortalLoadingFallback.tsx	React Component	4073	e72657873d3c316f56f30c33b56fa585de1e60b1390d9d23d08db9dbb8a7d06d	UI component: PortalLoadingFallback
+src/components/common/PresentationAboutModal.tsx	React Component	6681	3690377dfc6dcab6b975962576a4b713857fe473e02f55d4be32c50c0b90bf4d	UI component: PresentationAboutModal
+src/components/common/RoleWelcomeModal.tsx	React Component	352	b10e84efe6c0d0204522fe8e432999e86afcbed40deb209b72e2149da9ab0d01	UI component: RoleWelcomeModal
+src/components/common/SafeMarkdown.tsx	React Component	11346	e81eb6ed7254f420f6554ecaf8efc06e3e6a7eb6e65988a95e1e1f063fa41cfc	UI component: SafeMarkdown
+src/components/common/ToastContainer.tsx	React Component	3179	6bf07e42f6d0027eac940233b1bcbb5d43fdb61fa4fc6d776af0e2f766097610	UI component: ToastContainer
+src/components/common/UgvclBrandIdentity.tsx	React Component	9342	c9ebeef5aa0f9ae3b52c62e4d7d4f76673f3810dd67fff173ff52329c4adcaa6	UI component: UgvclBrandIdentity
+src/components/common/VidyutFlowAuthModal.tsx	React Component	48646	b110944b90e893b6367d0975327b68f18dea9d9a4641dc8e3f1ffd1f2c8b2893	UI component: VidyutFlowAuthModal
+src/components/common/WorkflowVisualizerModal.tsx	React Component	12859	be6e8847faca6a762c583b86d7d118594ecde2d820138454dbdbe4090fe9d32b	UI component: WorkflowVisualizerModal
+src/components/consumer/ConsumerComplaintTimelineModal.tsx	React Component	18782	d58933199adb6cd97df061de129186904bbb8d392ed9757e25e8c7d6d9bab5cb	UI component: ConsumerComplaintTimelineModal
+src/components/consumer/ConsumerMeterBillingSection.tsx	React Component	30422	1c7f453bfdf14c810f1b8c5c15d890c1c87e180b9616a6aaa6de3fec00aa662c	UI component: ConsumerMeterBillingSection
+src/components/consumer/ConsumerPortal.tsx	React Component	233986	c9b1a9ef7e4cf1c27748b42e7e4247731128522c3a66fa3f3bf7933f00f038b0	UI component: ConsumerPortal
+src/components/consumer/ConsumerProfileWorkspace.tsx	React Component	71851	75c0a3ca23cc4df63668561cc990a8fa2d2e1e7f035355e48619f24af964b9c9	UI component: ConsumerProfileWorkspace
+src/components/consumer/EnterprisePaymentModal.tsx	React Component	74264	464d41c039cb507982ac46ed7c22d568df6d65843e0b995493279c383702dd4d	UI component: EnterprisePaymentModal
+src/components/consumer/LiveConsumerRequests.tsx	React Component	11630	0301b6f253260b0ee3e67493aed4fad203f26b55e546eab989733a5d0dc2fb92	UI component: LiveConsumerRequests
+src/components/consumer/OverdueBillBreakdownCard.tsx	React Component	14074	63d46525ec6cae6fd5a12a79b660d4f058f07bda85746c81d12f7ce5694afd45	UI component: OverdueBillBreakdownCard
+src/components/consumer/SavedPremisesBar.tsx	React Component	11232	bdc89df3c7465b57e874af24b252cc82a8ee779c2226ca77701ae9194b8b5ad5	UI component: SavedPremisesBar
+src/components/consumer/SmartPaymentCalendar.tsx	React Component	42651	aa22c3f1f568a3a37d67c6155701da96a0e858afbf28dd7d34b026a7b01e5868	UI component: SmartPaymentCalendar
+src/components/consumer/UgvclElectricityBillTwoPage.tsx	React Component	123800	f80f8c6249ded7c3583161ca6480fb4d4af04ee5593c610b9ec3a61f797031d6	UI component: UgvclElectricityBillTwoPage
+src/components/employee/EmployeeMeterReviewWorkspace.tsx	React Component	61253	80d9ed1e1c12458032ce0eb82634bed353d52da5422d6142c609684096d71819	UI component: EmployeeMeterReviewWorkspace
+src/components/employee/EmployeePortal.tsx	React Component	135904	2d3cd5da2635e394a5abdb87975a0f4fe12eed5ce905435c32bd72fcf346ee60	UI component: EmployeePortal
+src/components/employee/WorkOrderVerificationReviewModal.tsx	React Component	25118	92084161a77292242d36489d9261bebe4b75b2a7e043441cfc0fc5f1cd9db302	UI component: WorkOrderVerificationReviewModal
+src/components/field/FieldMeterReadingModal.tsx	React Component	4792	d3a85619adac05d09984fec193b199c7397139cf7c2b1ead7ea4f1f542c98d92	UI component: FieldMeterReadingModal
+src/components/field/FieldPortal.tsx	React Component	114233	90cb1380fd9e49dd11c7c52a8ed00dcdcc5972c172e9cef2146d4428febfe5b7	UI component: FieldPortal
+src/components/field/WorkOrderEvidenceModal.tsx	React Component	28004	769cdccb71bafb3dd20e69d3858d30add8f2a1b2777e09639a0e5a9f518f5c5f	UI component: WorkOrderEvidenceModal
+src/components/intro/AIEnergyForecasting.tsx	React Component	20726	33c4d2113db5c13c099f3018c12d1c9fee2556ec323a1043018d658d3d566ef5	UI component: AIEnergyForecasting
+src/components/intro/CinematicHeroVisual.tsx	React Component	9073	475a0d2f8171b5bbbf2e54817273ad23a69029427bdfb3c689a749c02a69c3d5	UI component: CinematicHeroVisual
+src/components/intro/CinematicIntro.tsx	React Component	17994	489d73309bcaca9951ab23a92bb2d1af0fb918cdfb9980cd52b0d46d6ad98d68	UI component: CinematicIntro
+src/components/intro/ConnectedEcosystemDiagram.tsx	React Component	13897	1fb3a1cf23c9781ebf7fa0b32ccfe9af67f6ff5e197486af9644f5560c2ae49d	UI component: ConnectedEcosystemDiagram
+src/components/intro/SmartGridDigitalTwin.tsx	React Component	41429	7e96e92e9ed8ef607602ba574cafb135042c454614fc65bd2ad9514eb2a8f6cb	UI component: SmartGridDigitalTwin
+src/components/intro/TheChallengeSection.tsx	React Component	8476	a21fd2ab3ee8583f25a2584aa5242c5569d4b2048208e4999b51f225477d1b38	UI component: TheChallengeSection
+src/components/intro/WelcomePortalPage.tsx	React Component	4286	d324f7269a41823493d794254a6a8818403e5dc51f2a0b2e98e2073a1c8b59e8	UI component: WelcomePortalPage
+src/components/layout/AppShell.tsx	React Component	7297	47c04d1afc4cb1ef4884fada819cf111970db34884ed57ff398ae8c2fc212ad8	UI component: AppShell
+src/components/layout/MobileNav.tsx	React Component	22317	af558114f87eaa0ac497e18e4d4e8c529e4ea586b665ac4faa0ec1978736e521	UI component: MobileNav
+src/components/layout/Sidebar.tsx	React Component	16124	c6738c00b0fb1b23e8c25a8ae119f5e2c84953f9f1f7941721f2c778b6d9ed28	UI component: Sidebar
+src/components/layout/TopNav.tsx	React Component	18440	dc27d5c3596f29dbf71acd5608ae3e98e95288c069858aab90cdcd7938c6b592	UI component: TopNav
+src/components/management/ExecutiveDelinquencyAgingSection.tsx	React Component	34738	4b191a44d27fcd7eb3971637ec92683b6b977ff6617b205702a604a34253d608	UI component: ExecutiveDelinquencyAgingSection
+src/components/management/LiveExecutiveAnalyticsSection.tsx	React Component	30970	f3758e87abe1c3234ede7e1c17f600f76c780c7c78d6b40447494bcd46261926	UI component: LiveExecutiveAnalyticsSection
+src/components/management/ManagementMeterIntegritySection.tsx	React Component	11873	148d149dada36c533243a724e0e5d30eb9d268a00792ea04b4c623382850a3f9	UI component: ManagementMeterIntegritySection
+src/components/management/ManagementPortal.tsx	React Component	79615	f4482fd723edf7226c51ae508d74ad07f265a698db895fa9ee8e15ef8a515c58	UI component: ManagementPortal
+src/components/outageMap/LazyOutageMapSection.tsx	React Component	873	d19155bf808d2b87084244669ec91e44e63c6496b37e1bfdf345855d96a07b9d	UI component: LazyOutageMapSection
+src/components/outageMap/OperationsTimelinePanel.tsx	React Component	8841	cc69fdc7882f3423d70b404ea842d007b6281cde7439a5e140fed1f235955fa9	UI component: OperationsTimelinePanel
+src/components/outageMap/SmartOutageMapPanel.tsx	React Component	24213	79472204c4d64b3a5f7b464eb0d90e52249acfd7bfc99c5a443607c331dcacb8	UI component: SmartOutageMapPanel
+src/components/outageMap/SmartOutageMapWorkspace.tsx	React Component	37895	7b3783b287b9bcec5d366240952576f49434b04802fdbde60d5581b339b092bc	UI component: SmartOutageMapWorkspace
+src/components/welcome/AboutUgvclSection.tsx	React Component	23270	4cd8028073cf2ddc635aa95ec4871034b7d3060c60366f9a8e254c4afa354b9a	UI component: AboutUgvclSection
+src/components/welcome/AchievementsSection.tsx	React Component	10923	a882273116f841250e819122835537eee819b3570e8bb5dd39340f7102e0e349	UI component: AchievementsSection
+src/components/welcome/ConsumerServicesSection.tsx	React Component	16642	982aa9cad49c0a24189c4147052a3d2efa776d1fe402633c8e1a302a0988a854	UI component: ConsumerServicesSection
+src/components/welcome/CountUpNumber.tsx	React Component	3205	19111cc5a1255c4a34d5325caab3c1a2aa5e0270e8a7d1f67736fae33a74778c	UI component: CountUpNumber
+src/components/welcome/DistributionJourneySection.tsx	React Component	8110	8c07623f55601da55445406d8216acd2a5c7f488ed0d95702dd21e8c19084c8e	UI component: DistributionJourneySection
+src/components/welcome/ElectricityBillEstimator.tsx	React Component	44906	46e152ebf5b3c7d04bbe6c0f90eeeff009752f96de5239ad4051fea890dabff0	UI component: ElectricityBillEstimator
+src/components/welcome/InstitutionalFooter.tsx	React Component	7536	7738a9e7b438af72cbb623c2d14bd2fc39e93449979431f9f3e4a07950408ec8	UI component: InstitutionalFooter
+src/components/welcome/InstitutionalHeader.tsx	React Component	11811	982fb4054b7a88ee2382e17b656f98499b196fea8d9be2f8f4cfdcfa2b4d4fc5	UI component: InstitutionalHeader
+src/components/welcome/MediaGallerySection.tsx	React Component	10841	cdb52cbeb725d9030abd6a2b67803bca708f83723809c4d2acedc54979a8b57b	UI component: MediaGallerySection
+src/components/welcome/MediaLightboxModal.tsx	React Component	6107	9b564a15e2ee5066ed18becf360aef80c6c33027730f3b835e9ba1b1b3faf591	UI component: MediaLightboxModal
+src/components/welcome/NewsNoticesSection.tsx	React Component	11438	4a3c8954f64b508169099d7abc76f982adc083401ab7e39eb98826ef9d888df6	UI component: NewsNoticesSection
+src/components/welcome/NoticeDetailModal.tsx	React Component	21825	f3f59fdaa16e107eaec46691e26cef65cf1a7791af3bfee1382217811934d176	UI component: NoticeDetailModal
+src/components/welcome/NoticeTicker.tsx	React Component	4669	000e1732870b0de5914b3a388bf03feb5e4b4384b022cba8b51bef05ba7cb23e	UI component: NoticeTicker
+src/components/welcome/SourceManifestModal.tsx	React Component	6107	a80e3f136417672febe3144c676e15d69423b748302aade7cb8ae6cb6011adc9	UI component: SourceManifestModal
+src/components/welcome/WelcomeHero.tsx	React Component	15122	08fd10fb7e9550f9000d7fd0b2fa74711e49341342364b110121707f7ddc00ca	UI component: WelcomeHero
+src/context/AppContext.tsx	React Context	326353	f9596d601a94df7196477a90b9c8925c567c0e015ccb8250e36d73fecf017483	Global application state management: AppContext
+src/data/demoAuthData.ts	Frontend Data	18622	2b38267276de801efe9d8c8d4197d7a257d69b28051c0757983efb0d9cd1a0df	Static mock data, schemas, or fixtures: demoAuthData.ts
+src/data/mockData.ts	Frontend Data	35063	d61f94e97a66411e71f8e87ba9f9e116fe5eb3d26626d60d052786c966b400ff	Static mock data, schemas, or fixtures: mockData.ts
+src/data/ugvclHistoryData.ts	Frontend Data	20476	9409d3c1c150796b84e8425885243ae844d4c9537df5a2f4687b18f7ce3d8afa	Static mock data, schemas, or fixtures: ugvclHistoryData.ts
+src/data/ugvclTariffSchedule.ts	Frontend Data	18997	4beb049f95d5d4dd5d615a322a68bc2156e955c7396d1a47cf9e42d4b03971e7	Static mock data, schemas, or fixtures: ugvclTariffSchedule.ts
+src/i18n/LanguageContext.tsx	Localization	5003	fb3a27a8969f26f81e1aefef712d6de0816fb6eb13893126fce82fb4b26bd9a2	Multilingual translation dictionary or loader: LanguageContext.tsx
+src/i18n/adminContentTranslations.ts	Localization	86925	c7aeaab6b7408b2072517526a4b69a9a83c40fa116c16b857a63658b51541346	Multilingual translation dictionary or loader: adminContentTranslations.ts
+src/i18n/assistantContentTranslations.ts	Localization	60230	c72bd0dd21674dcef80d1cec32852143c04bc5f4872744c6424251c35000d0f9	Multilingual translation dictionary or loader: assistantContentTranslations.ts
+src/i18n/consumerContentTranslations.ts	Localization	179855	41fa2007785bc54c22d3be372db8c4826461497e7b7730c14e3194053f0e0ecd	Multilingual translation dictionary or loader: consumerContentTranslations.ts
+src/i18n/contentTranslations.ts	Localization	93286	af349595d5997472f59bc977936c3bf95002174b0c31971614ee47a0ee43efdb	Multilingual translation dictionary or loader: contentTranslations.ts
+src/i18n/employeeContentTranslations.ts	Localization	223887	45df495099738ab1d31cc6abbd8375956a8f85aab946b3fee962c80b047dabf4	Multilingual translation dictionary or loader: employeeContentTranslations.ts
+src/i18n/fieldContentTranslations.ts	Localization	131222	1bcb89b1fdecb3f09cc747da2f823fd8312d5702cd01c79d48490e37bc0b8740	Multilingual translation dictionary or loader: fieldContentTranslations.ts
+src/i18n/incidentLocalization.ts	Localization	86462	1a6aaad685f86caef4677209640b1bb9ad51a20e82ca7d8d97671e299e56c259	Multilingual translation dictionary or loader: incidentLocalization.ts
+src/i18n/managementContentTranslations.ts	Localization	122487	8149985a8ce9da81c4cc6fd96c82ccf455e924c7c742cd63288961741304bece	Multilingual translation dictionary or loader: managementContentTranslations.ts
+src/i18n/meterPhase11Translations.ts	Localization	114827	4306beb96897c9eeabbebfb0b864e13a7ee95678d0beef3b29ff73fa9d0fb2d5	Multilingual translation dictionary or loader: meterPhase11Translations.ts
+src/i18n/outageMapTranslations.ts	Localization	41852	4678733a0a939e858064ef92c5aab7075612e78dbb5a824b7ec13c2e50f3e327	Multilingual translation dictionary or loader: outageMapTranslations.ts
+src/i18n/translations/en.ts	Localization	70032	1b5f5283b6be903bcf8e8fa2829ba58e3b6399d188bc8f0e3829677dd80ea1cf	Multilingual translation dictionary or loader: en.ts
+src/i18n/translations/gu.ts	Localization	119723	95636ca98c4231755b468a1cd087432987316e4b177c931d4ea9e5b165cb6ceb	Multilingual translation dictionary or loader: gu.ts
+src/i18n/translations/hi.ts	Localization	121264	1e302ab6b0c7069ee5c65d844930ba35ca36a6e3be986644d2478104db234bf6	Multilingual translation dictionary or loader: hi.ts
+src/i18n/translations/index.ts	Localization	316	03f23efda94ee2e8120edf303ff9a4136979828110d52d3c19a2b1c3c8e4d3f4	Multilingual translation dictionary or loader: index.ts
+src/i18n/translations/mr.ts	Localization	119712	0b14fa57c03b02585cebe23db7dc241990b9cacd67ab4f4f704819f94fd6498b	Multilingual translation dictionary or loader: mr.ts
+src/i18n/types.ts	Localization	36032	1a73b6f96d22c2c309b608f0c9681cb5783ef3ac9a19782850f871f8f6fdcbbf	Multilingual translation dictionary or loader: types.ts
+src/index.css	Tailwind CSS	6016	c46b9797d097a5726b456d66f3250634e90fc4d665ec03c9836b407bfb52cd03	Global CSS styles, font imports, and utility rules
+src/main.tsx	React Entrypoint	892	1fd07f59c02e6544a372d2c99ee7eb6d1b6f407c8f4e315a56eb9ecf2295f253	DOM root mounting and application bootstrap
+src/outageMap/geoValidation.ts	GIS Outage Module	10050	52fc614863f238b499273073f2d9b868384c5af62da293cb84bd022862fa6748	GIS outage mapping component or service: geoValidation
+src/outageMap/permissionsAndAdapter.ts	GIS Outage Module	38967	d38c7fe56699ce9d59ab589e5876c4a5631a5d6fee30443ce5f373a7ceadd9ca	GIS outage mapping component or service: permissionsAndAdapter
+src/outageMap/types.ts	GIS Outage Module	4794	15105ddc89c6501555f1314033d66d18f1bf04dc9dd77dcf3d3a08695a4c7200	GIS outage mapping component or service: types
+src/server/agenticPersonas.ts	Frontend Dev/Prod Server	16099	a624da57de466f3592c171e10f59f5025d1ffc3b76ee3319259fc3525b3ca32c	Express mock server or runtime middleware: agenticPersonas.ts
+src/server/agenticTools.ts	Frontend Dev/Prod Server	37634	6e0c795b5d2780b564f56b9a3afc8fe705714ef9067a67c4240383412cef190d	Express mock server or runtime middleware: agenticTools.ts
+src/server/aiCache.ts	Frontend Dev/Prod Server	11739	01293feeda0aacc3cfcaa024175e72357502169b6124575ffca59cd84bdb7983	Express mock server or runtime middleware: aiCache.ts
+src/server/authRoutes.ts	Frontend Dev/Prod Server	33128	4219b39e13822eb135c22c1677e10c3b0e8781dade8c72c69e8428df26826f49	Express mock server or runtime middleware: authRoutes.ts
+src/server/authService.ts	Frontend Dev/Prod Server	24286	ae0cd27a801175ac9bd926344b26bdd0dcc98a9b82e00426a9f6aefd1ce26731	Express mock server or runtime middleware: authService.ts
+src/server/consumerProfileRoutes.ts	Frontend Dev/Prod Server	13630	7a20636a0dbea3ff6ea45337797d3b65d9a55619678c9f9d2897a49228a5e72a	Express mock server or runtime middleware: consumerProfileRoutes.ts
+src/server/dataStore.ts	Frontend Dev/Prod Server	94245	f85ccbb5f1a7a4d23b3ad1409edcd1d5e483e541a621bf93fa6c0dfe7761f0cc	Express mock server or runtime middleware: dataStore.ts
+src/server/directoryRoutes.ts	Frontend Dev/Prod Server	25306	100066dd8bdced59564748929e498071b88c9fb897c8d32d3368df5b9e03d0ac	Express mock server or runtime middleware: directoryRoutes.ts
+src/server/meterReadingRoutes.ts	Frontend Dev/Prod Server	14578	27c2b930e03fa60763074bbb6b0d4a9127a6d374b5f5ecdc788dd9a929111133	Express mock server or runtime middleware: meterReadingRoutes.ts
+src/server/prodServer.ts	Frontend Dev/Prod Server	7356	770ab0bcbe957aa6618fdb3c4f1671dc6919d8fa5c9f13b079fe7433d0acc33d	Express mock server or runtime middleware: prodServer.ts
+src/server/runtimeMiddleware.ts	Frontend Dev/Prod Server	26150	6ebe93bd04401a30cca39e1c1c2236de87fcf81325ec4d6ef50f2d54834bf86b	Express mock server or runtime middleware: runtimeMiddleware.ts
+src/services/apiClient.ts	Frontend Service	14217	b74e45ce81657e7e48e4110bea330050b99b8ec9f57728159335baef138e78b4	Client-side domain logic or API client service: apiClient
+src/services/billingValidation.ts	Frontend Service	9126	4a7fb80afa33baefde04d7cf207320441614490333fd216b206988cee26ab45a	Client-side domain logic or API client service: billingValidation
+src/services/directoryService.ts	Frontend Service	4824	c4a770cc0b2e33f4730ee995dc40c5b41ba1d4a9bc9caf132fc7328d83656624	Client-side domain logic or API client service: directoryService
+src/services/erpAdapter.ts	Frontend Service	23865	6e43f93d2cb4a4ffdee993e35dbf26894a388f5d30d010920ea9c76314b2b250	Client-side domain logic or API client service: erpAdapter
+src/services/erpApiContracts.ts	Frontend Service	14596	0fb1331b0715ae3c7908e62d720bee8116a809ef7832d43f956edc3ed6909b4f	Client-side domain logic or API client service: erpApiContracts
+src/services/evidenceService.ts	Frontend Service	12082	cda151adc6cc8282bb139114a20e8548bf458b26f66c8ef573d5af1626fb0292	Client-side domain logic or API client service: evidenceService
+src/services/meterOcr.ts	Frontend Service	10907	913afb8ea1c5669a2736c903b838b9abebbdf812d1fe9629e1957fb205cd1c72	Client-side domain logic or API client service: meterOcr
+src/services/meterReading.ts	Frontend Service	16885	de0bd0a5e427cb3ede4fde162fc063de32ff88e6a2ba7d5a474587d629b818cf	Client-side domain logic or API client service: meterReading
+src/services/repositories.ts	Frontend Service	93265	b5026982eaa755dbe1bd64f2102f8f0f0072fdd9850afac470b901d469034df3	Client-side domain logic or API client service: repositories
+src/types/index.ts	TypeScript Types	18251	3386394d7b1d499ef2a8f42056d8bae01f41452643789c6c228026b256ac02de	Type definitions and interfaces: index.ts
+src/utils/aiRecommendationEngine.ts	Frontend Utility	15133	c171bf611fb7339ed85c476145fda806299341a4bc82aa504c9d57a07ecf81ff	Client-side helper or offline store utility: aiRecommendationEngine
+src/utils/analyticsTransparency.ts	Frontend Utility	41513	568e30a05c99a9665a189847cfc951e3d358939d9666365076281788f5c766c9	Client-side helper or offline store utility: analyticsTransparency
+src/utils/anomalyDetector.ts	Frontend Utility	51159	f580b996386b4ac66df2fb8255f060beb9ba1ac6d4baec99179c765ac49c4e1e	Client-side helper or offline store utility: anomalyDetector
+src/utils/audioAlerts.ts	Frontend Utility	4255	77a31099e4f347be04596bd067df18ba6d6be0f9ed371f5ad0d10b55e66f3531	Client-side helper or offline store utility: audioAlerts
+src/utils/authClient.ts	Frontend Utility	22415	3c62f5ec3eb5eb6081144ad6f3d95710e786cd4e1c178176496754c4996dac1a	Client-side helper or offline store utility: authClient
+src/utils/avatarUtils.ts	Frontend Utility	5979	8afa06e8548023a1391597ef52a42e002e51689293c761ee43170dfa78de8a23	Client-side helper or offline store utility: avatarUtils
+src/utils/backendSession.ts	Frontend Utility	17793	9240c30cd0cb39c85cad2f63d5f36f3691a53fcae4e6d83c33e5b3f8cd68a085	Client-side helper or offline store utility: backendSession
+src/utils/barcodeEngine.ts	Frontend Utility	12488	1bad0c3af21ddb630665bcfe6d88b477495eb73100825e004e0864a82138d7fd	Client-side helper or offline store utility: barcodeEngine
+src/utils/billingEngine.ts	Frontend Utility	202010	5db8623f03a6a2dd69f29724052efc1b2bea777eabb42c2cc960aae091c3e39a	Client-side helper or offline store utility: billingEngine
+src/utils/businessClockEngine.ts	Frontend Utility	48706	add32ec965aaaaf66bc8d33c06ac485bec16a50fd28044616c6ddc7b6dc41d2f	Client-side helper or offline store utility: businessClockEngine
+src/utils/canonicalAnalytics.ts	Frontend Utility	95311	35ff591d2a8335694eaea94a48526acf792dd01582e39e34811f6dbce1d590d6	Client-side helper or offline store utility: canonicalAnalytics
+src/utils/consumerServicePrefill.ts	Frontend Utility	41470	715d75be5492f181c3a1b84c4f67587355bdfce98498e8bcf56b20613e137b4e	Client-side helper or offline store utility: consumerServicePrefill
+src/utils/dateUtils.ts	Frontend Utility	10798	1986f9b2d78a57f8ee0f7d44d62072bc41b8bebe5450e2f4a0a892d7ef34404a	Client-side helper or offline store utility: dateUtils
+src/utils/demoBackupEngine.ts	Frontend Utility	165011	6b9ccb9482e91ce48e391ff92caf37c112dbc9a9e05da7fff610782f92cab166	Client-side helper or offline store utility: demoBackupEngine
+src/utils/demoLoadPolicy.ts	Frontend Utility	7496	8085e0e0ab8c024a14c6e095324f9b49b1f92367cdb4caa6706dc34be7f1d00c	Client-side helper or offline store utility: demoLoadPolicy
+src/utils/designTokens.ts	Frontend Utility	6110	5f0433d2b8c418d0c8d05c0f4aa4f84867ad5379e0b035bb111cb87a4bac875b	Client-side helper or offline store utility: designTokens
+src/utils/documentEngine.ts	Frontend Utility	259539	9c08ef46a3ad4a6f2222f75dba63630d59a60922af94fe0d138c3272aa6c08f7	Client-side helper or offline store utility: documentEngine
+src/utils/documentUpload.ts	Frontend Utility	6970	c8e9da97b8e4d3d67dc0404fa1297615a5d34d28c29f08be7e6950c4c8f238ee	Client-side helper or offline store utility: documentUpload
+src/utils/exportEngine.ts	Frontend Utility	60082	3b34ca972762e2bc6ba51c4fd6be7961e52e515e36d7b638f4efb446f97f4102	Client-side helper or offline store utility: exportEngine
+src/utils/fastApiClient.ts	Frontend Utility	3523	9e338ca61cc31d07af84e231355ae2e744e3ef51aa38714d44220bf6d1db23f6	Client-side helper or offline store utility: fastApiClient
+src/utils/fieldNotificationEngine.ts	Frontend Utility	31304	dc0e18c04926fc5e3f63127082ab008b53a700af9e56cbdbe851831c7c4aa9f9	Client-side helper or offline store utility: fieldNotificationEngine
+src/utils/fieldOfflineQueue.ts	Frontend Utility	22690	21669d25e1d345ac87d242a25b167a74b5263b356804746c0a53db750781876e	Client-side helper or offline store utility: fieldOfflineQueue
+src/utils/formalNoticeEngine.ts	Frontend Utility	126435	21d21592218006861b322c654c93f1fe35c924864a10d2bbda7fbd54402d7185	Client-side helper or offline store utility: formalNoticeEngine
+src/utils/lateChargeEngine.ts	Frontend Utility	33352	d0be60743dc7b14acc8e41344bc4c878e8581d984d1e6544a9d1d0901abb413b	Client-side helper or offline store utility: lateChargeEngine
+src/utils/liveData.ts	Frontend Utility	23491	a42b22a6b0c7c1a793d77667fd588a31329ec92b2b618e4daaacd64dba9d63bb	Client-side helper or offline store utility: liveData
+src/utils/offlineFieldSync.ts	Frontend Utility	28870	32d3d4737dd082fdf78511e4c8c76844bd7d709f7fc73719a720d54e4f5529ae	Client-side helper or offline store utility: offlineFieldSync
+src/utils/paymentCalendarEngine.ts	Frontend Utility	49801	c92a692d1fa9f6884c01098c2ced0e55ce7f01dc2233a9b752c084ec82c2993c	Client-side helper or offline store utility: paymentCalendarEngine
+src/utils/pdfDocumentBuilder.ts	Frontend Utility	106673	fd4acb1286ceec9b44aca0b26e3aa33f71bf5c06c571e3f8296830285798fa6c	Client-side helper or offline store utility: pdfDocumentBuilder
+src/utils/pwaServiceWorker.ts	Frontend Utility	20427	22c3f51bca89897bf75ef50260ba2c6aad1bd0302f2623ff11c6cabce6d07821	Client-side helper or offline store utility: pwaServiceWorker
+src/utils/qrCodeEngine.ts	Frontend Utility	6011	b22665f0a34813d29a029d38a66d967a3d18b1b8f2d846ecd723bfdc95f651d4	Client-side helper or offline store utility: qrCodeEngine
+src/utils/requestSubmissionStatus.ts	Frontend Utility	4289	663389d6491567e55cdf375ee46ed0b7ed71af873dfe4f117395860e5bfb2d3f	Client-side helper or offline store utility: requestSubmissionStatus
+src/utils/safeStorage.ts	Frontend Utility	7928	d992fb777608c7fa8b7941e29df22d6c7fe89a110e980ac8dbecf9440249278a	Client-side helper or offline store utility: safeStorage
+src/utils/securityHardening.ts	Frontend Utility	8608	56b7c7a0758f58963e587e9595122afd639c3631dca720875b7faf2b3ef50bd2	Client-side helper or offline store utility: securityHardening
+src/utils/serviceWorkerRegistration.ts	Frontend Utility	1751	6fdac52b97388b62e3f0141710b288242bd771031977161a32a632d032f75bf6	Client-side helper or offline store utility: serviceWorkerRegistration
+src/utils/slaEngine.ts	Frontend Utility	43557	941f08653f55c8af2ba6ccb3fe459df9fa289fd3ae7c9f249a9e46c5ba59f6c1	Client-side helper or offline store utility: slaEngine
+src/utils/typographyTokens.ts	Frontend Utility	7520	cb634a0bc5b9884e0053388e88fef2faa9e769fc4ee1de9534102bf2256a9617	Client-side helper or offline store utility: typographyTokens
+src/utils/utilityAiEngine.ts	Frontend Utility	128305	9f99e03edf7c2509edb8121aeb13a8ac3876673b84d8e46a7145da59af77e6f8	Client-side helper or offline store utility: utilityAiEngine
+src/vite-env.d.ts	TS Asset	39	424faf9241dd699dda995b367ed36665732da1e6ec1f33b2fd40394488ecac92	Repository asset file: vite-env.d.ts
+tests/admin-demo-backup-recovery.test.ts	Frontend Test	34544	1cc0091762d9fb0373ce4e1fd9d990795e16177cfc624049b9114174d4fe029a	Node/TSX unit, integration, or accessibility test: admin-demo-backup-recovery.test.ts
+tests/admin-portal-complete-localization.test.ts	Frontend Test	17853	d1aa23a566afa7c565bd8dcb20c4c2d0d68c19f6072b6337787983f9fbb4dce9	Node/TSX unit, integration, or accessibility test: admin-portal-complete-localization.test.ts
+tests/agentic-ai-tools.test.ts	Frontend Test	15580	4e59da905843c3ccf82aa375fca167852c3a648e6638b316805dd96f5d26b013	Node/TSX unit, integration, or accessibility test: agentic-ai-tools.test.ts
+tests/ai-assistant-resilience.test.ts	Frontend Test	20038	0a7f7728df8639f333e5ee53f10b335a73c990c445f7eaba0c52f85f0c419c82	Node/TSX unit, integration, or accessibility test: ai-assistant-resilience.test.ts
+tests/ai-governance.test.ts	Frontend Test	4450	7ea20c1fc921e0ddce39ffafe0827125fe4e1dfaa96462d4fd76694b7a1dbaaf	Node/TSX unit, integration, or accessibility test: ai-governance.test.ts
+tests/ai-story-alignment.test.ts	Frontend Test	5070	c73245ad3d1fe1eb3cc014fa53efc69deab3f6b08be58b6c9a89c9a99eed9fce	Node/TSX unit, integration, or accessibility test: ai-story-alignment.test.ts
+tests/alert-engine.test.ts	Frontend Test	4085	5afbb7bddf43e40a856fa2b36e1a9f3a21c60f05858bfa07e9081af25e2c639b	Node/TSX unit, integration, or accessibility test: alert-engine.test.ts
+tests/analytics-forecasting-transparency.test.ts	Frontend Test	17861	70ef4b88dfc8a9bf4ed97268f49fd1ddc0ce66a4b68cdecec5b5aa0bd423a9a9	Node/TSX unit, integration, or accessibility test: analytics-forecasting-transparency.test.ts
+tests/auth-access.test.ts	Frontend Test	12121	67e3c4234ec18eb1f9a681d80c4f1c6e0025406ace8caa11d83ce6a4d06c7ca8	Node/TSX unit, integration, or accessibility test: auth-access.test.ts
+tests/backend-readiness.test.ts	Frontend Test	11736	3ddf35ff0e35a88a1e930f4fddea99d94f67a3b4fadbe42f3d62341a6442bc3b	Node/TSX unit, integration, or accessibility test: backend-readiness.test.ts
+tests/backend-session-boundary.test.ts	Frontend Test	13549	563d235e6f38393e0831bd53d062a79495cde6afe50351f1ae6d0406455d5569	Node/TSX unit, integration, or accessibility test: backend-session-boundary.test.ts
+tests/billing-consistency-repair.test.ts	Frontend Test	45780	767eccc1745a0fa1cd9ceaf769d61256c5737a3fcc60bd281c99aa3429cee658	Node/TSX unit, integration, or accessibility test: billing-consistency-repair.test.ts
+tests/consumer-portal-multilingual.test.ts	Frontend Test	27394	47493eeb5d2e752bb247ffd540ad31d633fc49c635700f4a97355355a32a70e2	Node/TSX unit, integration, or accessibility test: consumer-portal-multilingual.test.ts
+tests/consumer-portal-security.test.ts	Frontend Test	21267	1d6087b582ee7b234d149b887441717698bebcc2ed14ab49bafae27acd1e9509	Node/TSX unit, integration, or accessibility test: consumer-portal-security.test.ts
+tests/consumer-profile.test.ts	Frontend Test	11806	2bd5ad8f9913bf7b07959aaacc4d6d35a38d7d7feda05b47b43047a1d652f63a	Node/TSX unit, integration, or accessibility test: consumer-profile.test.ts
+tests/consumer-service-request-prefill.test.ts	Frontend Test	23542	2c33648041f0dfa1836f55bacee763bd047ccd7e1d0f7b4325d48538fb2d3fbf	Node/TSX unit, integration, or accessibility test: consumer-service-request-prefill.test.ts
+tests/critical-incidents.test.ts	Frontend Test	12485	e9220b32b433320294cb3d74014f37071ebbc3ae057c52a94dc6c5f7e74543c5	Node/TSX unit, integration, or accessibility test: critical-incidents.test.ts
+tests/demo-data-integrity.test.ts	Frontend Test	28626	55ead38a8ec6970b741f453840b9b683ba7bb63c4765faa99e306985c54aaee3	Node/TSX unit, integration, or accessibility test: demo-data-integrity.test.ts
+tests/demo-load-policy.test.ts	Frontend Test	1830	f90b2bd68e1021cbd88327043c090adddb33d1c06f90e6a4f700abe7bd23016f	Node/TSX unit, integration, or accessibility test: demo-load-policy.test.ts
+tests/document-upload.test.ts	Frontend Test	4708	f043d658bdf3756eb7149e14b3ef9289eaca42b24befd205228e2f68751ec549	Node/TSX unit, integration, or accessibility test: document-upload.test.ts
+tests/dynamic-sla-automation.test.ts	Frontend Test	29340	bda935fd87e7afa2afae21f9767e66e36e4247458b403635a381bb1266221dc9	Node/TSX unit, integration, or accessibility test: dynamic-sla-automation.test.ts
+tests/e2e-hackathon-readiness.test.ts	Frontend Test	21136	503b6067e2937d17d33876415381cb6dfc5d1f7849aa91427e79c9d9a4e9a8b2	Node/TSX unit, integration, or accessibility test: e2e-hackathon-readiness.test.ts
+tests/employee-incident-multilingual.test.ts	Frontend Test	7437	214b6a86ced8b62efdfc17545527af6007186d1a2ebdf6506627089de37e2414	Node/TSX unit, integration, or accessibility test: employee-incident-multilingual.test.ts
+tests/employee-portal-complete-localization.test.ts	Frontend Test	25303	15dc7ffc968ece9291f83540fe4fb91a39aaeab81080403c3fe78678acb45e08	Node/TSX unit, integration, or accessibility test: employee-portal-complete-localization.test.ts
+tests/enterprise-dashboard-canonical-kpis.test.ts	Frontend Test	35194	321134875efa7d313b0c966b37d7590c7ef37901e5db40ca4e10a3a366bad291	Node/TSX unit, integration, or accessibility test: enterprise-dashboard-canonical-kpis.test.ts
+tests/enterprise-document-system.test.ts	Frontend Test	30734	df0b54bccfafc0a8a61be8d12847f795a92435ce639eb50f7a864545bfd5324c	Node/TSX unit, integration, or accessibility test: enterprise-document-system.test.ts
+tests/enterprise-export-system.test.ts	Frontend Test	24769	3cc7178aa096ba932fecf401e171ef2d12c99e44c90df762e0b5eab3635457e1	Node/TSX unit, integration, or accessibility test: enterprise-export-system.test.ts
+tests/enterprise-ui-typography-account-menu.test.ts	Frontend Test	17100	e4cf04dcf8fe6a95d004999701d0918b0be86036af1847a2c8548542230aec7e	Node/TSX unit, integration, or accessibility test: enterprise-ui-typography-account-menu.test.ts
+tests/erp-adapter.test.ts	Frontend Test	5928	3a0bdb624ac52884cf25c764d4e6d9a3513e15e16ec9ec7652ad6a3d7b5f06cf	Node/TSX unit, integration, or accessibility test: erp-adapter.test.ts
+tests/erp-multilingual-navigation.test.ts	Frontend Test	13943	71dc5901c7b482c62a3eda29f4d5a3219b4196fe9da661a446ae09e1161ba42a	Node/TSX unit, integration, or accessibility test: erp-multilingual-navigation.test.ts
+tests/erp-workflows.test.ts	Frontend Test	23201	a1fce0ceccb105d53a08cd9a0d955d5ee6806d074632995e7441bae1054ec070	Node/TSX unit, integration, or accessibility test: erp-workflows.test.ts
+tests/executive-analytics.test.ts	Frontend Test	4194	5aa0eea356a0b92fa981a5fe5600dc270dc7a07e717bc36dd84ec8e3454afd5f	Node/TSX unit, integration, or accessibility test: executive-analytics.test.ts
+tests/field-auto-connectivity-sync.test.ts	Frontend Test	21628	d272bda4e8d8ce732550b3ca11d5407333a13744f1b3d5235980231be014f7c9	Node/TSX unit, integration, or accessibility test: field-auto-connectivity-sync.test.ts
+tests/field-engineer-notifications.test.ts	Frontend Test	22200	75a74c73d12d1cc28ceec81d49d1d248593319b9b2b1a8704ca2b070c2370c7b	Node/TSX unit, integration, or accessibility test: field-engineer-notifications.test.ts
+tests/field-offline-queue.test.ts	Frontend Test	25215	420e57158ad1fa9ebd034f7ec7f67412d3b8097ff9dca69c96ec3680c8b6d186	Node/TSX unit, integration, or accessibility test: field-offline-queue.test.ts
+tests/field-portal-complete-localization.test.ts	Frontend Test	34068	8554694822ccf3f017cae13e94709b5f0b3287a19341d3c34e5f744513557c73	Node/TSX unit, integration, or accessibility test: field-portal-complete-localization.test.ts
+tests/final-five-portal-qa-security-audit.test.ts	Frontend Test	20193	d1168bfea1000cceb1dacb732e7b933ba5120c2d1af1f69c5e4ac2fd747338ca	Node/TSX unit, integration, or accessibility test: final-five-portal-qa-security-audit.test.ts
+tests/fixtures/demo-data-baseline.json	Frontend Test	46668	a050900e1b3e15d5fb5e2ef6ad085adf51d3dbb094a81b0e60fbb4a3e3fd740f	Node/TSX unit, integration, or accessibility test: demo-data-baseline.json
+tests/human-in-the-loop.test.ts	Frontend Test	7410	0af9337a5d8bf8a26d0fc30f794f2abfb86c0ff7546a288d7cd7e146458e5ad4	Node/TSX unit, integration, or accessibility test: human-in-the-loop.test.ts
+tests/incident-notifications-lifecycle.test.ts	Frontend Test	27490	438837a1c9f6fe88d9169890d1f183e36c74c9cdd829e99a25440055ca1e3726	Node/TSX unit, integration, or accessibility test: incident-notifications-lifecycle.test.ts
+tests/incident-routing-escalation.test.ts	Frontend Test	62468	d3da6c3d03864c6abaf2afaea0986515e14126b4e4cda3a47643663617ecb4b4	Node/TSX unit, integration, or accessibility test: incident-routing-escalation.test.ts
+tests/incident-workflow-authorization.test.ts	Frontend Test	34619	1409b43d8f8fc11e4e3f8cc8410945b774c475b970307268f0bc9e70d14717af	Node/TSX unit, integration, or accessibility test: incident-workflow-authorization.test.ts
+tests/infra-and-workload-evidence.test.ts	Frontend Test	1672	7401cc568b9542a533d8cbf4f1ef46e257ad3646e2097f19dcd4948bbd8ec96b	Node/TSX unit, integration, or accessibility test: infra-and-workload-evidence.test.ts
+tests/judge-gap-closure.test.ts	Frontend Test	5930	59af55e4e4742a1615bd41f6e351c63f2ff3804ae3e83c247d7e85fadf418e13	Node/TSX unit, integration, or accessibility test: judge-gap-closure.test.ts
+tests/live-api-wiring.test.ts	Frontend Test	4796	e22397f66aed992afa49e3706efaa4128990f0c0defabcd48010cc1f3b153481	Node/TSX unit, integration, or accessibility test: live-api-wiring.test.ts
+tests/management-portal-complete-localization.test.ts	Frontend Test	21034	e2849e32ac192ad8b96d1eb6fbb42d8a86fdc04c833629836bb7436ce01585e1	Node/TSX unit, integration, or accessibility test: management-portal-complete-localization.test.ts
+tests/meter-reading.test.ts	Frontend Test	79614	99cafbeb3248f5b4cbc13c4915f80f04c5cd6540110f42bf8b32d59d3fc8a4d3	Node/TSX unit, integration, or accessibility test: meter-reading.test.ts
+tests/multilingual-ai-assistant.test.ts	Frontend Test	18791	97860e2cc98bb58211ae2485f0002daba17d8956abea50844bf5d43cbbc43356	Node/TSX unit, integration, or accessibility test: multilingual-ai-assistant.test.ts
+tests/multilingual-cards-repair.test.ts	Frontend Test	20424	7dfc074afbefff535e926170cd26722aa9da49c386cd14dd9d9388fec5f68632	Node/TSX unit, integration, or accessibility test: multilingual-cards-repair.test.ts
+tests/multilingual-infrastructure.test.ts	Frontend Test	12102	7a00bc1003ebfc64bbb377e702f23908dac9cb2763a02de1917ebecec6b68f9d	Node/TSX unit, integration, or accessibility test: multilingual-infrastructure.test.ts
+tests/navigation-views.test.ts	Frontend Test	16461	a2245d3969297512bfbf3e4616d3aa1adc8f6d13dff7b8dd447db9e1687f70c1	Node/TSX unit, integration, or accessibility test: navigation-views.test.ts
+tests/notification-application-queue.test.ts	Frontend Test	16126	94e022afecb5f254dfdaab269f456e650f19967292e2e3f01197e3a6aaf84e74	Node/TSX unit, integration, or accessibility test: notification-application-queue.test.ts
+tests/notification-workflow-verification.test.ts	Frontend Test	35002	ead5ad47f58623da9c1271829c90ded1918ac97c466e0785ab07d5b10e203a10	Node/TSX unit, integration, or accessibility test: notification-workflow-verification.test.ts
+tests/offline-field-sync.test.ts	Frontend Test	8794	d9ce33d0fe49093f2c76ac338ade798879c787b5d170eac524fa2a077f1131f2	Node/TSX unit, integration, or accessibility test: offline-field-sync.test.ts
+tests/page-weight-and-five-portal-qa.test.ts	Frontend Test	6339	e8b0b93fa2c1658d8c46161704016fd76e7cd7715123f35cc71fda4595037f1c	Node/TSX unit, integration, or accessibility test: page-weight-and-five-portal-qa.test.ts
+tests/performance-monitoring.test.ts	Frontend Test	4646	fac48b64722eac25221a00e4f4679893e7c837746989d12448abb1937ea3fae1	Node/TSX unit, integration, or accessibility test: performance-monitoring.test.ts
+tests/phase10-outage-map-and-timeline.test.ts	Frontend Test	36011	3cf477e3c791b3d0611273e9891be0098d8ee8ed06a47d5ce6469298313c9e35	Node/TSX unit, integration, or accessibility test: phase10-outage-map-and-timeline.test.ts
+tests/phase13-verified-field-completion.test.ts	Frontend Test	9122	8ea455a4891a03c6ed411b51fa5fc1e681dfc338fa651cf48137a14a2ad7d4a1	Node/TSX unit, integration, or accessibility test: phase13-verified-field-completion.test.ts
+tests/phase7-performance-reliability.test.ts	Frontend Test	12288	eee625bdd48304f685f1757b1ba5a68b70c6ea51642b61b70b2f871d84964664	Node/TSX unit, integration, or accessibility test: phase7-performance-reliability.test.ts
+tests/phase8a-e2e-verification.test.ts	Frontend Test	33662	65afd2a0e44267afe444ebf7991da3a8c81cec29e72d6eef73deefbb8cca2e02	Node/TSX unit, integration, or accessibility test: phase8a-e2e-verification.test.ts
+tests/phase8b-workflow-integration.test.ts	Frontend Test	31894	9f35689484a6ca08adb5217f0ec3a147a076c25099cbd2e07cc013522b20d8c1	Node/TSX unit, integration, or accessibility test: phase8b-workflow-integration.test.ts
+tests/phase8c-billing-pdf-backup.test.ts	Frontend Test	31443	78319924efa59acc2fd5053c0a0290e93e91854c333494ae38bf7ac28aa74aa5	Node/TSX unit, integration, or accessibility test: phase8c-billing-pdf-backup.test.ts
+tests/phase8d-enterprise-verification.test.ts	Frontend Test	22962	b9ceb912488af939ee3e2dcce48582a512998d716230352a2497a34724de3487	Node/TSX unit, integration, or accessibility test: phase8d-enterprise-verification.test.ts
+tests/phase8e-final-release-readiness.test.ts	Frontend Test	30842	56105c3cbe5e85a6a5cc1c5b0c39422537da5edacb5799668da144837acc8071	Node/TSX unit, integration, or accessibility test: phase8e-final-release-readiness.test.ts
+tests/phase9-step1-bimonthly-billing.test.ts	Frontend Test	32199	9c10a09f7a65ceb80937146ef3e0ebfef17257f5ea0cf7eee36233138daf1156	Node/TSX unit, integration, or accessibility test: phase9-step1-bimonthly-billing.test.ts
+tests/phase9-step2-multilingual-bimonthly-pdf.test.ts	Frontend Test	34280	335272cb2cf0ca746045e965917079709900566036a8d356343bac7722b3bbb2	Node/TSX unit, integration, or accessibility test: phase9-step2-multilingual-bimonthly-pdf.test.ts
+tests/phase9-step3-payments-calendar-consistency.test.ts	Frontend Test	33973	1c94b57311ce8f254742e0ad4dfd2eb6936afe522cdb54a24da2e4b5cf1e7019	Node/TSX unit, integration, or accessibility test: phase9-step3-payments-calendar-consistency.test.ts
+tests/premium-payment-document-upgrade.test.ts	Frontend Test	47529	2ea56fc047ba03b8e1cdcac0e41367d12539deceaf03a8782c2374f6ac6be632	Node/TSX unit, integration, or accessibility test: premium-payment-document-upgrade.test.ts
+tests/pwa-offline-shell.test.ts	Frontend Test	20778	d49aa1b3d21ef7661a9dfe6348d691374cf64a92c29bcc1163d47eafe958ba24	Node/TSX unit, integration, or accessibility test: pwa-offline-shell.test.ts
+tests/realistic-ugvcl-bill-smart-calendar.test.ts	Frontend Test	31813	c7e88408da5360fdd9a1f3c4ccf462bb799d574e2aac4a309b5e986a11d9e2bf	Node/TSX unit, integration, or accessibility test: realistic-ugvcl-bill-smart-calendar.test.ts
+tests/request-submission-status.test.ts	Frontend Test	1633	072a42d06870136aa4212cc3f7db29a8fd5aa82dfc3c664dfb0dccddc7bafedb	Node/TSX unit, integration, or accessibility test: request-submission-status.test.ts
+tests/security-resilience-stress.test.ts	Frontend Test	16426	2d2e5f52d90552273947c41c699a5dd623bebdb55c75f900267734dd6c3fe28a	Node/TSX unit, integration, or accessibility test: security-resilience-stress.test.ts
+tests/server-auth-api.test.ts	Frontend Test	36154	a6c200636d647c266d7da281f90bb442616ef3a6eccfb39945bdcf8b02ad962a	Node/TSX unit, integration, or accessibility test: server-auth-api.test.ts
+tests/server-auth-foundation.test.ts	Frontend Test	21655	ebb3f8bef8b52d2bde8ace1319c6987908e0d4aea6c697e7f3a9afc5cf1fc3f1	Node/TSX unit, integration, or accessibility test: server-auth-foundation.test.ts
+tests/site-inspection-workorder-automation.test.ts	Frontend Test	18048	3d1dd11f72f8c96f147043be4114819083df0b02d6acc20c8d8710d5ddffe304	Node/TSX unit, integration, or accessibility test: site-inspection-workorder-automation.test.ts
+tests/step4a-overdue-late-charges.test.ts	Frontend Test	33258	10c25f9228b6c3324d71da660e838b18caa704b543f2d94ddd6bef620b727dde	Node/TSX unit, integration, or accessibility test: step4a-overdue-late-charges.test.ts
+tests/step4b-notifications-calendar-notices.test.ts	Frontend Test	35972	bd5e733aeea8a3eb978d9d950e74142d7ec84ca0e97f60e1b9eef952049cd2c0	Node/TSX unit, integration, or accessibility test: step4b-notifications-calendar-notices.test.ts
+tests/step4c-live-rollover-sync.test.ts	Frontend Test	50348	45ecaadae1e83f201ef779569962222a417facfe159e6fbe277ca3b6e7f6a61f	Node/TSX unit, integration, or accessibility test: step4c-live-rollover-sync.test.ts
+tests/step4d-settlement-receipts-aging-separation.test.ts	Frontend Test	64219	a468bcbd0e3731d859c8ff33efec4fa3e4f641ad7fcf07ae197fd524ceac115f	Node/TSX unit, integration, or accessibility test: step4d-settlement-receipts-aging-separation.test.ts
+tests/teammate-backlog-completion.test.ts	Frontend Test	15783	f8abd9ed0ab8fff4da01c6b412d0029b3f09c45a81e1ee313076d5146076f589	Node/TSX unit, integration, or accessibility test: teammate-backlog-completion.test.ts
+tests/two-page-ugvcl-bill-barcode-qr.test.ts	Frontend Test	17793	00a67226062f4e572a6c6b4f87e83b34a486cd814953b4647bfdcaf8ad2c2d24	Node/TSX unit, integration, or accessibility test: two-page-ugvcl-bill-barcode-qr.test.ts
+tests/ugvcl-directory.test.ts	Frontend Test	16658	a6eca0363c62944176aa1129eb515b6643417e82b6f50bee005ac5e5800d7667	Node/TSX unit, integration, or accessibility test: ugvcl-directory.test.ts
+tests/ui-ux-accessibility.test.ts	Frontend Test	6677	ad29759efd3a5ae21cd95192aa97d29fa943fc6b2cbf90428f5f829a7d4f71a7	Node/TSX unit, integration, or accessibility test: ui-ux-accessibility.test.ts
+tests/unified-login-security.test.ts	Frontend Test	17750	9bb9b1efdfa10f3442a174c53206cec1e94da778093da4185b4c25951ebc3a16	Node/TSX unit, integration, or accessibility test: unified-login-security.test.ts
+tests/workflow-templates.test.ts	Frontend Test	4654	38d7358e1d2f53e550a6558041ffea5af813c019f0437fb40f3699ea58f4c08b	Node/TSX unit, integration, or accessibility test: workflow-templates.test.ts
+tsconfig.json	TypeScript Config	759	ee5f7c40d42387662048e80f7af8fb92220dc5519da58f1d45b46a87fcadbef5	TypeScript compiler options and project settings
+vercel.json	JSON Asset	238	0e468c93b4c2b959202d2752e4167ba658e3fa7b1ca512c335359cde35a3a3f5	Repository asset file: vercel.json
+vite.config.ts	Vite Config	7282	3331f7b5557bce5a42717db34928d66a88faa76ca4e75755931d5e4ae7af5ae0	Vite build and dev server configuration with proxy and middleware integration
+backend/app/billing_engine.py	file	17433	25eab5971253882913dcdce7422175b6d080286d5c555bf766bf61c227dea2e5	Phase 9 calculation engine: progressive slabs, Asia/Kolkata DPS accrual, 9-field statement, aging, and RFC 5545 export
+backend/app/routers/billing.py	file	25665	e638c9c65190fd155e24bc16821e429390a970d09b622f859b63406ba3934446	Authoritative FastAPI billing endpoints: /v1/billing/*
+backend/alembic/versions/a7b8c9d0e1f2_005_phase9_billing_surcharge_system.py	file	7763	eb1c1ee254ea2dec676e3b5b5f2c029c8ee65193d97f65c2d15d8bd98de2d55b	Dual-dialect Alembic migration for Phase 9 billing domain tables
+backend/tests/test_billing_lifecycle.py	file	10026	8d0dd2f6ccb10d994ab5436de0ec3af7b881bcc2466fc14276c5d45940899c5f	Comprehensive pytest integration suite for Phase 9 billing lifecycle

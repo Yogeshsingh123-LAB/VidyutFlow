@@ -43,6 +43,11 @@ def get_db():
     try:
         yield db
     finally:
+        try:
+            from .audit import _release_session_audit_lock
+            _release_session_audit_lock(db)
+        except Exception:
+            pass
         db.close()
 
 def check_database_health() -> dict:

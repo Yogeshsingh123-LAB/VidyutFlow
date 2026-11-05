@@ -583,3 +583,99 @@ class ConsumerAuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
     user = relationship("User")
+
+
+class ElectricityBill(Base):
+    """Authoritative electricity bill ledger supporting monthly and bi-monthly progressive tariffs."""
+    __tablename__ = "electricity_bills"
+    __table_args__ = (
+        Index("ix_electricity_bills_consumer_due", "consumer_no", "due_date"),
+        Index("ix_electricity_bills_status", "status"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    bill_no: Mapped[str] = mapped_column(String, unique=True, index=True)
+    consumer_no: Mapped[str] = mapped_column(String, index=True)
+    bill_month: Mapped[str] = mapped_column(String)
+    bill_date: Mapped[str] = mapped_column(String)
+    due_date: Mapped[str] = mapped_column(String)
+    billing_cycle_type: Mapped[str] = mapped_column(String, default="MONTHLY")
+    period_start_date: Mapped[str] = mapped_column(String)
+    period_end_date: Mapped[str] = mapped_column(String)
+    previous_reading_date: Mapped[str | None] = mapped_column(String, nullable=True)
+    current_reading_date: Mapped[str | None] = mapped_column(String, nullable=True)
+    previous_reading_kwh: Mapped[float] = mapped_column(Float, default=0.0)
+    current_reading_kwh: Mapped[float] = mapped_column(Float, default=0.0)
+    reading_provenance: Mapped[str] = mapped_column(String, default="AMR_SMART_METER")
+    units_consumed: Mapped[float] = mapped_column(Float, default=0.0)
+    energy_charges: Mapped[float] = mapped_column(Float, default=0.0)
+    fixed_charges: Mapped[float] = mapped_column(Float, default=0.0)
+    fuel_price_adjustment: Mapped[float] = mapped_column(Float, default=0.0)
+    electricity_duty: Mapped[float] = mapped_column(Float, default=0.0)
+    rebate_or_subsidy: Mapped[float] = mapped_column(Float, default=0.0)
+    total_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    status: Mapped[str] = mapped_column(String, default="Unpaid")
+    slab_breakdown_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+
+class PaymentTransaction(Base):
+    """Authoritative payment receipts ledger with 11-field financial settlement audit trail."""
+    __tablename__ = "payment_transactions"
+    __table_args__ = (
+        Index("ix_payment_transactions_bill_status", "bill_no", "status"),
+        Index("ix_payment_transactions_consumer", "consumer_no"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    transaction_id: Mapped[str] = mapped_column(String, unique=True, index=True)
+    bill_no: Mapped[str] = mapped_column(String, index=True)
+    consumer_no: Mapped[str] = mapped_column(String, index=True)
+    amount: Mapped[float] = mapped_column(Float)
+    payment_date: Mapped[str] = mapped_column(String)
+    payment_method: Mapped[str] = mapped_column(String, default="UPI")
+    status: Mapped[str] = mapped_column(String, default="Successful")
+    principal_settled: Mapped[float] = mapped_column(Float, default=0.0)
+    late_charges_settled: Mapped[float] = mapped_column(Float, default=0.0)
+    reference_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    settlement_breakdown_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class FormalNotice(Base):
+    """Simulated Section 56 statutory demand notice with 15-day payment countdown."""
+    __tablename__ = "formal_notices"
+    __table_args__ = (
+        Index("ix_formal_notices_consumer_status", "consumer_no", "status"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uid)
+    bill_no: Mapped[str] = mapped_column(String, index=True)
+    consumer_no: Mapped[str] = mapped_column(String, index=True)
+    status: Mapped[str] = mapped_column(String, default="SERVED")
+    issue_date: Mapped[str] = mapped_column(String)
+    service_date: Mapped[str] = mapped_column(String)
+    payment_deadline: Mapped[str] = mapped_column(String)
+    disconnection_review_status: Mapped[str] = mapped_column(String, default="PENDING_REVIEW")
+    snapshot_at_issuance_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+
+
+class LateChargePolicy(Base):
+    """Configurable, versioned Delayed Payment Surcharge (DPS) policy."""
+    __tablename__ = "late_charge_policies"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    version: Mapped[str] = mapped_column(String, default="2026.1-DEMO")
+    effective_from: Mapped[str] = mapped_column(String, default="2026-01-01")
+    is_demo_simulation: Mapped[bool] = mapped_column(Boolean, default=True)
+    tariff_authority: Mapped[str] = mapped_column(String)
+    calculation_method: Mapped[str] = mapped_column(String, default="DAILY_SIMPLE")
+    annual_rate_percent: Mapped[float] = mapped_column(Float, default=15.0)
+    grace_period_days: Mapped[int] = mapped_column(Integer, default=0)
+    days_in_year_basis: Mapped[int] = mapped_column(Integer, default=365)
+    minimum_charge_inr: Mapped[float] = mapped_column(Float, default=0.0)
+    rounding_method: Mapped[str] = mapped_column(String, default="ROUND_HALF_UP_2DEC")
+    category_overrides_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    statutory_reference: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+

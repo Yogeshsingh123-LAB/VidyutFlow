@@ -96,6 +96,11 @@ export default defineConfig(() => {
           changeOrigin: true,
           rewrite: path => path.replace(/^\/api/, '')
         },
+        '/api/billing': {
+          target: FASTAPI_TARGET,
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/api/, '')
+        },
         '/api/assistant': {
           target: FASTAPI_TARGET,
           changeOrigin: true,

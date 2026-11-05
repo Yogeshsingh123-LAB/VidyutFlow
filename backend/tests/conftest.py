@@ -73,3 +73,13 @@ def isolated_login_throttle(monkeypatch):
             error_message="Account temporarily locked due to excessive failed attempts. Please try again later.",
         ),
     )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def dispose_engine_between_modules():
+    yield
+    try:
+        from app.db import engine
+        engine.dispose()
+    except Exception:
+        pass

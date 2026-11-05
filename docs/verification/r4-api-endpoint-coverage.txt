@@ -1,20 +1,34 @@
 ========================================================================
 VIDYUTFLOW OPENAPI HTTP ENDPOINT TEST COVERAGE AUDIT
 ========================================================================
-OpenAPI Paths              : 61
-Total HTTP Operations      : 66
-Operations Tested in Pytest: 66 / 66 (100.0%)
-Untested Operations        : 0
+OpenAPI Paths              : 167
+Total HTTP Operations      : 191
+Operations Tested in Pytest: 93 / 191 (48.69%)
+Untested Operations        : 98
 
 Verified Operations:
+  [COVERED] DELETE /api/v1/consumer/addresses/{address_id}
   [COVERED] DELETE /auth/premises/{premise_id}
+  [COVERED] GET    /api/v1/consumer/activity
+  [COVERED] GET    /api/v1/consumer/addresses
+  [COVERED] GET    /api/v1/consumer/connections
+  [COVERED] GET    /api/v1/consumer/preferences
+  [COVERED] GET    /api/v1/consumer/profile
   [COVERED] GET    /assistant/ai-governance
   [COVERED] GET    /assistant/load-forecast
   [COVERED] GET    /assistant/ml-metrics
+  [COVERED] GET    /auth/captcha
   [COVERED] GET    /auth/me
   [COVERED] GET    /auth/premises
   [COVERED] GET    /auth/sso/providers
   [COVERED] GET    /auth/users
+  [COVERED] GET    /billing/aging
+  [COVERED] GET    /billing/bills
+  [COVERED] GET    /billing/calendar
+  [COVERED] GET    /billing/calendar/export.ics
+  [COVERED] GET    /billing/notices
+  [COVERED] GET    /billing/overdue-statement
+  [COVERED] GET    /billing/payments
   [COVERED] GET    /erp/logs
   [COVERED] GET    /erp/mappings
   [COVERED] GET    /erp/reconcile
@@ -40,11 +54,21 @@ Verified Operations:
   [COVERED] GET    /system/siem-events
   [COVERED] GET    /system/status
   [COVERED] GET    /workflows/templates
+  [COVERED] PATCH  /api/v1/consumer/addresses/{address_id}
+  [COVERED] PATCH  /api/v1/consumer/preferences
+  [COVERED] PATCH  /api/v1/consumer/profile
   [COVERED] PATCH  /requests/{request_id}/status
   [COVERED] PATCH  /staff/members/{user_id}
   [COVERED] PATCH  /workflows/templates/{template_code}
+  [COVERED] POST   /api/v1/consumer/addresses
+  [COVERED] POST   /api/v1/consumer/connections/link/initiate
+  [COVERED] POST   /api/v1/consumer/connections/link/verify
+  [COVERED] POST   /api/v1/consumer/security/change-password
+  [COVERED] POST   /api/v1/consumer/security/sessions/logout-all
   [COVERED] POST   /assistant/billing-anomaly
   [COVERED] POST   /assistant/chat
+  [COVERED] POST   /auth/consumer/otp/send
+  [COVERED] POST   /auth/consumer/otp/verify
   [COVERED] POST   /auth/forgot-password
   [COVERED] POST   /auth/login
   [COVERED] POST   /auth/logout
@@ -56,6 +80,9 @@ Verified Operations:
   [COVERED] POST   /auth/register
   [COVERED] POST   /auth/reset-password
   [COVERED] POST   /auth/sso/login
+  [COVERED] POST   /billing/calculate
+  [COVERED] POST   /billing/notices
+  [COVERED] POST   /billing/settle
   [COVERED] POST   /erp/gateway/propagate/{request_id}
   [COVERED] POST   /erp/logs/{log_id}/retry
   [COVERED] POST   /erp/reconcile/{request_id}
@@ -73,3 +100,103 @@ Verified Operations:
   [COVERED] POST   /staff/zones
   [COVERED] POST   /system/dr-failover-drill
   [COVERED] POST   /workflows/templates
+
+Missing Operations:
+  [MISSING] DELETE /api/auth/premises/{premise_id}
+  [MISSING] DELETE /api/consumer/addresses/{address_id}
+  [MISSING] DELETE /api/consumer/connections/{connection_id}
+  [MISSING] DELETE /api/consumer/security/sessions/{session_id}
+  [MISSING] DELETE /api/v1/consumer/connections/{connection_id}
+  [MISSING] DELETE /api/v1/consumer/security/sessions/{session_id}
+  [MISSING] DELETE /consumer/addresses/{address_id}
+  [MISSING] DELETE /consumer/connections/{connection_id}
+  [MISSING] DELETE /consumer/security/sessions/{session_id}
+  [MISSING] GET    /api/auth/captcha
+  [MISSING] GET    /api/auth/me
+  [MISSING] GET    /api/auth/premises
+  [MISSING] GET    /api/auth/sso/providers
+  [MISSING] GET    /api/auth/users
+  [MISSING] GET    /api/billing/aging
+  [MISSING] GET    /api/billing/bills
+  [MISSING] GET    /api/billing/calendar
+  [MISSING] GET    /api/billing/calendar/export.ics
+  [MISSING] GET    /api/billing/notices
+  [MISSING] GET    /api/billing/overdue-statement
+  [MISSING] GET    /api/billing/payments
+  [MISSING] GET    /api/consumer/activity
+  [MISSING] GET    /api/consumer/addresses
+  [MISSING] GET    /api/consumer/connections
+  [MISSING] GET    /api/consumer/preferences
+  [MISSING] GET    /api/consumer/profile
+  [MISSING] GET    /api/consumer/security/sessions
+  [MISSING] GET    /api/directory/consumer-mapping/{consumer_no}
+  [MISSING] GET    /api/directory/counts
+  [MISSING] GET    /api/directory/hierarchy
+  [MISSING] GET    /api/directory/search
+  [MISSING] GET    /api/health/db
+  [MISSING] GET    /api/v1/billing/aging
+  [MISSING] GET    /api/v1/billing/bills
+  [MISSING] GET    /api/v1/billing/calendar
+  [MISSING] GET    /api/v1/billing/calendar/export.ics
+  [MISSING] GET    /api/v1/billing/notices
+  [MISSING] GET    /api/v1/billing/overdue-statement
+  [MISSING] GET    /api/v1/billing/payments
+  [MISSING] GET    /api/v1/consumer/security/sessions
+  [MISSING] GET    /consumer/activity
+  [MISSING] GET    /consumer/addresses
+  [MISSING] GET    /consumer/connections
+  [MISSING] GET    /consumer/preferences
+  [MISSING] GET    /consumer/profile
+  [MISSING] GET    /consumer/security/sessions
+  [MISSING] GET    /directory/consumer-mapping/{consumer_no}
+  [MISSING] GET    /directory/counts
+  [MISSING] GET    /directory/hierarchy
+  [MISSING] GET    /directory/search
+  [MISSING] GET    /health/db
+  [MISSING] PATCH  /api/consumer/addresses/{address_id}
+  [MISSING] PATCH  /api/consumer/preferences
+  [MISSING] PATCH  /api/consumer/profile
+  [MISSING] PATCH  /consumer/addresses/{address_id}
+  [MISSING] PATCH  /consumer/preferences
+  [MISSING] PATCH  /consumer/profile
+  [MISSING] POST   /api/auth/consumer/otp/send
+  [MISSING] POST   /api/auth/consumer/otp/verify
+  [MISSING] POST   /api/auth/forgot-password
+  [MISSING] POST   /api/auth/login
+  [MISSING] POST   /api/auth/logout
+  [MISSING] POST   /api/auth/mfa/enable
+  [MISSING] POST   /api/auth/mfa/setup
+  [MISSING] POST   /api/auth/mfa/verify
+  [MISSING] POST   /api/auth/premises
+  [MISSING] POST   /api/auth/refresh
+  [MISSING] POST   /api/auth/register
+  [MISSING] POST   /api/auth/reset-password
+  [MISSING] POST   /api/auth/signup
+  [MISSING] POST   /api/auth/sso/login
+  [MISSING] POST   /api/billing/bills
+  [MISSING] POST   /api/billing/calculate
+  [MISSING] POST   /api/billing/notices
+  [MISSING] POST   /api/billing/pay
+  [MISSING] POST   /api/billing/settle
+  [MISSING] POST   /api/consumer/addresses
+  [MISSING] POST   /api/consumer/connections/link/initiate
+  [MISSING] POST   /api/consumer/connections/link/verify
+  [MISSING] POST   /api/consumer/security/change-password
+  [MISSING] POST   /api/consumer/security/sessions/logout-all
+  [MISSING] POST   /api/directory/import-csv
+  [MISSING] POST   /api/directory/offices
+  [MISSING] POST   /api/v1/billing/bills
+  [MISSING] POST   /api/v1/billing/calculate
+  [MISSING] POST   /api/v1/billing/notices
+  [MISSING] POST   /api/v1/billing/pay
+  [MISSING] POST   /api/v1/billing/settle
+  [MISSING] POST   /auth/signup
+  [MISSING] POST   /billing/bills
+  [MISSING] POST   /billing/pay
+  [MISSING] POST   /consumer/addresses
+  [MISSING] POST   /consumer/connections/link/initiate
+  [MISSING] POST   /consumer/connections/link/verify
+  [MISSING] POST   /consumer/security/change-password
+  [MISSING] POST   /consumer/security/sessions/logout-all
+  [MISSING] POST   /directory/import-csv
+  [MISSING] POST   /directory/offices

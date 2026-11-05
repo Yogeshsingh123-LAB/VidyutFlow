@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from .models import AuditChainHead, AuditLog
 
-_AUDIT_TX_LOCK = threading.RLock()
+_AUDIT_TX_LOCK = threading.Semaphore(1)
 _LOCK_KEY = "_vidyutflow_holds_audit_chain_lock"
 
 
@@ -31,7 +31,7 @@ def _release_session_audit_lock(session: Session) -> None:
     if session.info.pop(_LOCK_KEY, False):
         try:
             _AUDIT_TX_LOCK.release()
-        except RuntimeError:
+        except (RuntimeError, ValueError):
             pass
 
 
@@ -118,7 +118,7 @@ def audit(
 ):
     """Append one chained audit row. Serialized across concurrent writers until `db.commit()`."""
     if not db.info.get(_LOCK_KEY):
-        _AUDIT_TX_LOCK.acquire()
+        _AUDIT_TX_LOCK.acquire(timeout=10.0)
         db.info[_LOCK_KEY] = True
 
     try:

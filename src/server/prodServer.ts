@@ -43,6 +43,7 @@ const FASTAPI_PREFIXES = [
   '/api/erp',
   '/api/workflows',
   '/api/staff',
+  '/api/billing',
   '/api/assistant'
 ];
 
