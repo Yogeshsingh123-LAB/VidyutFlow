@@ -1,14 +1,19 @@
 import type { ElectricityBill, ElectricityConnection, PaymentTransaction } from '../types';
-import { calculateDetailedUgvclBill } from '../data/ugvclTariffSchedule';
 import {
-  tariffCategoryId,
+  calculateConfigurableCycleTariffBreakdown
+} from '../utils/billingEngine';
+import {
   type BillCheckResult,
   type BillValidationFinding,
   type BillLineComparisonItem,
   type MeterReadingRecord
 } from './meterReading';
 
-/** Read-only comparison against the project's existing tariff calculator. It never changes bills or payment records. */
+/**
+ * Authoritative Read-Only Bill Verification against Phase 9's canonical calculations.
+ * Checks slabs, fixed charges, FPPPA, duty, subsidies, adjustments, payments,
+ * approved reading linkage, and period consistency without mutating any ledger records.
+ */
 export function validateExistingBill(input: {
   bill: ElectricityBill;
   connection: ElectricityConnection;
@@ -44,21 +49,24 @@ export function validateExistingBill(input: {
     });
   };
 
-  // Missing or inconsistent inputs check
+  // 1. Inconsistent / negative units check
   if (!Number.isFinite(bill.unitsConsumed) || bill.unitsConsumed < 0) {
     const msg = `Inconsistent units consumed (${bill.unitsConsumed}); must be a non-negative number.`;
     evidence.push(msg);
     addFinding('INCONSISTENT_INPUTS', 'HIGH', msg, String(bill.unitsConsumed), 'Review original meter readings and interval calculation.', '>= 0');
   }
 
-  // Duplicate checks
-  const duplicatePeriods = allBills.filter(item => item.consumerNo === bill.consumerNo && item.billMonth === bill.billMonth);
+  // 2. Duplicate bill & period overlap checks
+  const duplicatePeriods = allBills.filter(
+    item => item.consumerNo === bill.consumerNo && item.billMonth === bill.billMonth
+  );
   if (duplicatePeriods.length > 1) {
     const dupBills = duplicatePeriods.map(item => item.billNo).join(', ');
     const msg = `More than one bill exists for ${bill.billMonth} (${dupBills}).`;
     evidence.push(msg);
     addFinding('DUPLICATE_BILL', 'HIGH', msg, dupBills, 'Retain authorized original bill and review duplicate billing cycle.', '1 bill per month');
   }
+
   const sameBillIds = allBills.filter(item => item.billNo === bill.billNo);
   if (sameBillIds.length > 1) {
     const msg = `Bill number ${bill.billNo} is duplicated.`;
@@ -66,9 +74,34 @@ export function validateExistingBill(input: {
     addFinding('DUPLICATE_BILL', 'HIGH', msg, `${sameBillIds.length} copies`, 'Enforce unique bill identifier constraint on billing ledger.', '1 instance');
   }
 
-  // Reading linkage check if meterReadings are supplied
+  // Overlapping period check
+  if (bill.periodStartDate && bill.periodEndDate) {
+    const billStart = new Date(bill.periodStartDate).getTime();
+    const billEnd = new Date(bill.periodEndDate).getTime();
+    for (const other of allBills) {
+      if (other.billNo === bill.billNo || other.consumerNo !== bill.consumerNo) continue;
+      if (!other.periodStartDate || !other.periodEndDate) continue;
+      const otherStart = new Date(other.periodStartDate).getTime();
+      const otherEnd = new Date(other.periodEndDate).getTime();
+      if (!isNaN(billStart) && !isNaN(billEnd) && !isNaN(otherStart) && !isNaN(otherEnd)) {
+        // Strict overlap: start < otherEnd && end > otherStart
+        if (billStart < otherEnd && billEnd > otherStart) {
+          const msg = `Billing period (${bill.periodStartDate} to ${bill.periodEndDate}) overlaps with bill ${other.billNo} (${other.periodStartDate} to ${other.periodEndDate}).`;
+          evidence.push(msg);
+          addFinding('DUPLICATE_BILL', 'HIGH', msg, `${bill.billNo} overlaps ${other.billNo}`, 'Verify billing cycle schedule to prevent double-charging.', 'Non-overlapping periods');
+          break;
+        }
+      }
+    }
+  }
+
+  // 3. Approved meter reading linkage check
   if (meterReadings.length > 0) {
-    const linkedReading = meterReadings.find(r => r.consumerNo === bill.consumerNo && r.status === 'APPROVED');
+    let linkedReading = meterReadings.find(r => r.id === bill.readingId);
+    if (!linkedReading) {
+      // Fallback search by consumer number and approved status
+      linkedReading = meterReadings.find(r => r.consumerNo === bill.consumerNo && r.status === 'APPROVED');
+    }
     if (linkedReading && linkedReading.consumedUnits !== undefined) {
       if (Math.abs(linkedReading.consumedUnits - bill.unitsConsumed) > 0.01) {
         const msg = `Billed units (${bill.unitsConsumed} kWh) do not match approved meter reading units (${linkedReading.consumedUnits} kWh).`;
@@ -86,53 +119,50 @@ export function validateExistingBill(input: {
     }
   }
 
-  // Payment linkage checks
+  // 4. Payment reconciliation & split/partial payments check (Phase 9 payment reconciliation)
   const billPayments = payments.filter(item => item.billNo === bill.billNo);
   const successfulPayments = billPayments.filter(item => item.status === 'Successful');
-  if (bill.status === 'Paid' && successfulPayments.length !== 1) {
-    const msg = `Paid bill has ${successfulPayments.length} successful payment records; expected exactly one.`;
-    evidence.push(msg);
-    addFinding('PAYMENT_LINKAGE_MISMATCH', 'REVIEW', msg, `${successfulPayments.length} records`, 'Audit payment gateway settlement transaction receipts.', '1 successful payment');
+  const totalPaidThroughPayments = successfulPayments.reduce((sum, p) => sum + p.amount, 0);
+
+  if (bill.status === 'Paid') {
+    if (successfulPayments.length === 0) {
+      const msg = `Bill is marked 'Paid' but has 0 verified successful payment transaction records.`;
+      evidence.push(msg);
+      addFinding('PAYMENT_LINKAGE_MISMATCH', 'HIGH', msg, '0 payment records', 'Verify payment gateway settlement receipts.', '>= 1 payment record');
+    } else if (Math.abs(totalPaidThroughPayments - bill.totalAmount) > 1.0) {
+      const msg = `Successful payment total (₹${totalPaidThroughPayments.toFixed(2)}) differs from stored bill total (₹${bill.totalAmount.toFixed(2)}).`;
+      evidence.push(msg);
+      addFinding('PAYMENT_LINKAGE_MISMATCH', 'HIGH', msg, `₹${totalPaidThroughPayments.toFixed(2)}`, 'Reconcile partial payments and update remaining ledger balance.', `₹${bill.totalAmount.toFixed(2)}`);
+    }
   }
-  if (successfulPayments.some(payment => Math.abs(payment.amount - bill.totalAmount) > 0.01)) {
-    const msg = 'Successful payment amount does not match the stored bill total.';
+
+  if (bill.status !== 'Paid' && totalPaidThroughPayments >= bill.totalAmount && bill.totalAmount > 0) {
+    const msg = `An unpaid or overdue bill has full settlement payments recorded (₹${totalPaidThroughPayments.toFixed(2)}).`;
     evidence.push(msg);
-    const paidAmt = successfulPayments.map(p => `₹${p.amount}`).join(', ');
-    addFinding('PAYMENT_LINKAGE_MISMATCH', 'HIGH', msg, paidAmt, 'Verify payment receipt discrepancy and adjust outstanding ledger balance.', `₹${bill.totalAmount}`);
+    addFinding('PAYMENT_LINKAGE_MISMATCH', 'HIGH', msg, `Status: ${bill.status}, Paid: ₹${totalPaidThroughPayments.toFixed(2)}`, 'Transition bill status to Paid upon verified settlement.', 'Status: Paid');
   }
+
   if (bill.transactionRef && successfulPayments.length === 1 && successfulPayments[0].bankReference !== bill.transactionRef) {
-    const msg = 'Bill transaction reference does not match its successful payment.';
+    const msg = 'Bill transaction reference does not match its successful payment bank reference.';
     evidence.push(msg);
     addFinding('PAYMENT_LINKAGE_MISMATCH', 'REVIEW', msg, bill.transactionRef, 'Cross-check bank UTR/transaction reference against gateway records.', successfulPayments[0].bankReference);
   }
-  if (bill.status !== 'Paid' && successfulPayments.length > 0) {
-    const msg = 'An unpaid bill has a successful payment record.';
-    evidence.push(msg);
-    addFinding('PAYMENT_LINKAGE_MISMATCH', 'HIGH', msg, `Status: ${bill.status}`, 'Update bill status to Paid upon verified bank settlement.', 'Status: Paid');
-  }
 
-  const supported = connection.tariffCategory.includes('Residential') || connection.tariffCategory.includes('Commercial');
-  if (!supported) {
-    evidence.push(`Tariff category ${connection.tariffCategory} is not covered by the current educational tariff calculator.`);
-    addFinding('TARIFF_SLAB_MISMATCH', 'INFO', `Tariff category ${connection.tariffCategory} requires custom industrial tariff schedule.`, connection.tariffCategory, 'Refer to industrial MYT schedule.');
-    return {
-      status: 'REVIEW',
-      expectedAmount: 0,
-      recordedAmount: bill.totalAmount,
-      difference: 0,
-      evidence,
-      billNo: bill.billNo,
-      findings,
-      comparison
-    };
-  }
-
-  const expected = calculateDetailedUgvclBill(
-    bill.unitsConsumed,
-    tariffCategoryId(connection.tariffCategory),
-    'bimonthly',
+  // 5. Authoritative Phase 9 Tariff Recalculation
+  const cycleType = bill.billingCycleType === 'MONTHLY' ? 'MONTHLY' : 'BI_MONTHLY';
+  const canonical = calculateConfigurableCycleTariffBreakdown(
+    connection.tariffCategory,
     connection.sanctionedLoadKw,
-    connection.phase
+    bill.unitsConsumed,
+    {
+      billingCycleType: cycleType,
+      policyMode: bill.tariffCyclePolicyMode || (cycleType === 'BI_MONTHLY' ? 'BI_MONTHLY_PROPORTIONAL_2X_DEMO' : 'MONTHLY_STANDARD'),
+      isPartialPeriod: bill.isPartialPeriod,
+      billedDaysCount: bill.billedDaysCount,
+      standardCycleDaysCount: bill.standardCycleDaysCount,
+      rebateOrSubsidyInr: bill.rebateOrSubsidy,
+      otherAdjustmentsInr: bill.otherAdjustmentsInr
+    }
   );
 
   const lineChecks: Array<{
@@ -141,10 +171,10 @@ export function validateExistingBill(input: {
     recorded: number;
     category: BillValidationFinding['category'];
   }> = [
-    { label: 'Energy charges', expected: expected.totalEnergyCharges, recorded: bill.energyCharges, category: 'TARIFF_SLAB_MISMATCH' },
-    { label: 'Fixed charges', expected: expected.fixedCharges.amount, recorded: bill.fixedCharges, category: 'FIXED_CHARGE_MISMATCH' },
-    { label: 'FPPPA', expected: expected.fpppaCharges.amount, recorded: bill.fuelPriceAdjustment, category: 'FPPPA_MISMATCH' },
-    { label: 'Electricity duty', expected: expected.electricityDuty.amount, recorded: bill.electricityDuty, category: 'ELECTRICITY_DUTY_MISMATCH' }
+    { label: 'Energy charges', expected: canonical.energyCharges, recorded: bill.energyCharges, category: 'TARIFF_SLAB_MISMATCH' },
+    { label: 'Fixed charges', expected: canonical.fixedCharges, recorded: bill.fixedCharges, category: 'FIXED_CHARGE_MISMATCH' },
+    { label: 'FPPPA', expected: canonical.fuelPriceAdjustment, recorded: bill.fuelPriceAdjustment, category: 'FPPPA_MISMATCH' },
+    { label: 'Electricity duty', expected: canonical.electricityDuty, recorded: bill.electricityDuty, category: 'ELECTRICITY_DUTY_MISMATCH' }
   ];
 
   for (const item of lineChecks) {
@@ -158,7 +188,7 @@ export function validateExistingBill(input: {
       status: hasDiscrepancy ? 'DISCREPANCY' : 'MATCH'
     });
     if (hasDiscrepancy) {
-      const msg = `${item.label} differs from the tariff calculator by ₹${diff.toFixed(2)}.`;
+      const msg = `${item.label} differs from Phase 9 canonical tariff calculation by ₹${diff.toFixed(2)}.`;
       evidence.push(msg);
       addFinding(
         item.category,
@@ -171,7 +201,8 @@ export function validateExistingBill(input: {
     }
   }
 
-  const expectedPayable = Math.max(0, expected.netPayableAmount - bill.rebateOrSubsidy);
+  // Final payable check
+  const expectedPayable = canonical.totalAmount;
   const difference = bill.totalAmount - expectedPayable;
   const netDiscrepancy = Math.abs(difference) > 1;
 
@@ -184,7 +215,7 @@ export function validateExistingBill(input: {
   });
 
   if (netDiscrepancy) {
-    const msg = `Stored final payable differs from the tariff calculator by ₹${Math.abs(difference).toFixed(2)}; ledger adjustments may explain this.`;
+    const msg = `Stored final payable differs from Phase 9 canonical calculations by ₹${Math.abs(difference).toFixed(2)}; authorized ledger adjustments may explain this.`;
     evidence.push(msg);
     addFinding(
       'TARIFF_SLAB_MISMATCH',
@@ -201,7 +232,7 @@ export function validateExistingBill(input: {
     expectedAmount: expectedPayable,
     recordedAmount: bill.totalAmount,
     difference,
-    evidence: evidence.length ? evidence : ['Bill line items, final amount and payment linkage match this read-only demo check.'],
+    evidence: evidence.length ? evidence : ['Bill line items, final amount and payment linkage match Phase 9 canonical calculations.'],
     billNo: bill.billNo,
     findings,
     comparison

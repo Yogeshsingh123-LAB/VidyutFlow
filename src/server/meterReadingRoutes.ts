@@ -48,6 +48,7 @@ export const METER_READING_ROUTE_PREFIXES = [
   '/api/meter-metrics',
   '/api/meter-thresholds',
   '/api/meter-config',
+  '/api/meter-ocr-health',
   '/api/bills/validate'
 ];
 
@@ -85,6 +86,9 @@ function normalizeMeterPathname(pathname: string): string {
   if (pathname === '/api/meter-config' || pathname === '/api/meter-config/') {
     return '/api/meter-readings/config';
   }
+  if (pathname === '/api/meter-ocr-health' || pathname === '/api/meter-ocr-health/') {
+    return '/api/meter-readings/ocr-health';
+  }
   if (pathname === '/api/bills/validate' || pathname === '/api/bills/validate/') {
     return '/api/meter-readings/validate-bill';
   }
@@ -118,8 +122,33 @@ export async function handleMeterReadingRoute(
     return true;
   }
   try {
+    const fastApiBase = process.env.FASTAPI_BACKEND_URL?.trim();
+    if (fastApiBase && store === defaultServerDataStore) {
+      const targetPath = pathname.replace(/^\/api\/meter-readings/, '/v1/meter-readings');
+      const targetUrl = `${fastApiBase.replace(/\/$/, '')}${targetPath}${url.search}`;
+      const bodyPayload = req.method !== 'GET' && req.method !== 'HEAD' ? await readJson(req) : undefined;
+      const upstreamRes = await fetch(targetUrl, {
+        method: req.method || 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(req.headers.cookie ? { Cookie: req.headers.cookie } : {}),
+          ...(req.headers.authorization ? { Authorization: String(req.headers.authorization) } : {}),
+          'X-VidyutFlow-CSRF': '1'
+        },
+        ...(bodyPayload ? { body: JSON.stringify(bodyPayload) } : {})
+      });
+      const responseJson = await upstreamRes.json().catch(() => ({}));
+      json(res, upstreamRes.status, responseJson);
+      return true;
+    }
+
     if (pathname === '/api/meter-readings' && req.method === 'GET') {
       json(res, 200, { readings: store.getMeterReadings(token) });
+      return true;
+    }
+    if (pathname === '/api/meter-readings/photos' && req.method === 'POST') {
+      const body = await readJson(req);
+      json(res, 201, { photo: store.uploadMeterPhoto(token, body as never) });
       return true;
     }
     if (pathname === '/api/meter-readings/notifications' && req.method === 'GET') {
@@ -133,6 +162,10 @@ export async function handleMeterReadingRoute(
     }
     if (pathname === '/api/meter-readings/metrics' && req.method === 'GET') {
       json(res, 200, store.getMeterMetrics(token));
+      return true;
+    }
+    if (pathname === '/api/meter-readings/ocr-health' && req.method === 'GET') {
+      json(res, 200, { health: store.getOcrIntegrationHealth(token) });
       return true;
     }
     if (pathname === '/api/meter-readings/thresholds' && req.method === 'GET') {
@@ -212,12 +245,17 @@ export async function handleMeterReadingRoute(
       return true;
     }
 
-    const reviewMatch = pathname.match(/^\/api\/meter-readings\/billing-reviews\/([A-Za-z0-9_-]+)(\/transition)?$/);
+    const reviewMatch = pathname.match(/^\/api\/meter-readings\/billing-reviews\/([A-Za-z0-9_-]+)(\/transition|\/photo)?$/);
     if (reviewMatch) {
       const id = reviewMatch[1];
       const isTransition = reviewMatch[2] === '/transition';
-      if (!isTransition && req.method === 'GET') {
+      const isPhoto = reviewMatch[2] === '/photo';
+      if (!isTransition && !isPhoto && req.method === 'GET') {
         json(res, 200, { review: store.getConsumerBillingReviewById(token, id) });
+        return true;
+      }
+      if (isPhoto && req.method === 'GET') {
+        json(res, 200, { photo: store.getBillingReviewPhoto(token, id) });
         return true;
       }
       if (isTransition && (req.method === 'PATCH' || req.method === 'POST')) {
@@ -248,11 +286,20 @@ export async function handleMeterReadingRoute(
       return true;
     }
 
-    const adjMatch = pathname.match(/^\/api\/meter-readings\/adjustments\/([A-Za-z0-9_-]+)(\/review)?$/);
+    if (pathname === '/api/meter-readings/issue-bill' && req.method === 'POST') {
+      const body = await readJson(req);
+      const readingId = typeof body.readingId === 'string' ? body.readingId : '';
+      if (!readingId) throw new AuthSecurityError(400, 'READING_ID_REQUIRED', 'Specify an approved meter reading ID.');
+      json(res, 201, store.issueBillFromApprovedReading(token, readingId));
+      return true;
+    }
+
+    const adjMatch = pathname.match(/^\/api\/meter-readings\/adjustments\/([A-Za-z0-9_-]+)(\/review|\/apply)?$/);
     if (adjMatch) {
       const id = adjMatch[1];
       const isReview = adjMatch[2] === '/review';
-      if (!isReview && req.method === 'GET') {
+      const isApply = adjMatch[2] === '/apply';
+      if (!isReview && !isApply && req.method === 'GET') {
         json(res, 200, { adjustment: store.getFinancialAdjustmentById(token, id) });
         return true;
       }
@@ -266,6 +313,12 @@ export async function handleMeterReadingRoute(
         json(res, 200, { adjustment: store.reviewFinancialAdjustment(token, id, action, note) });
         return true;
       }
+      if (isApply && (req.method === 'PATCH' || req.method === 'POST')) {
+        const body = await readJson(req);
+        const note = typeof body.note === 'string' ? body.note : '';
+        json(res, 200, { adjustment: store.applyFinancialAdjustmentToLedger(token, id, note) });
+        return true;
+      }
     }
 
     const match = pathname.match(/^\/api\/meter-readings\/([A-Za-z0-9_-]+)\/(review|photo)$/);
@@ -273,7 +326,8 @@ export async function handleMeterReadingRoute(
       const body = await readJson(req);
       const action = body.action;
       if (action !== 'APPROVE' && action !== 'REJECT' && action !== 'REREAD') throw new AuthSecurityError(400, 'INVALID_REVIEW_ACTION', 'Choose approve, reject, or request re-reading.');
-      json(res, 200, { reading: store.reviewMeterReading(token, match[1], action, typeof body.note === 'string' ? body.note : '') });
+      const correctedReading = typeof body.correctedReading === 'number' ? body.correctedReading : undefined;
+      json(res, 200, { reading: store.reviewMeterReading(token, match[1], action, typeof body.note === 'string' ? body.note : '', correctedReading) });
       return true;
     }
     if (match?.[2] === 'photo' && req.method === 'GET') {
@@ -283,14 +337,17 @@ export async function handleMeterReadingRoute(
 
     const isKnownEndpoint =
       pathname === '/api/meter-readings' ||
+      pathname === '/api/meter-readings/photos' ||
       pathname === '/api/meter-readings/notifications' ||
       pathname === '/api/meter-readings/metrics' ||
+      pathname === '/api/meter-readings/ocr-health' ||
       pathname === '/api/meter-readings/thresholds' ||
       pathname === '/api/meter-readings/config' ||
       pathname === '/api/meter-readings/validate-bill' ||
       pathname === '/api/meter-readings/anomalies' ||
       pathname === '/api/meter-readings/billing-reviews' ||
       pathname === '/api/meter-readings/adjustments' ||
+      pathname === '/api/meter-readings/issue-bill' ||
       Boolean(anomalyMatch) ||
       Boolean(reviewMatch) ||
       Boolean(adjMatch) ||

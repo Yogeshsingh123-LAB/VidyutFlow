@@ -28,6 +28,12 @@ interface MetricsPayload {
   openAnomalies: number;
   byCategory: Record<string, number>;
   thresholdVersion: number;
+  ocrQuality?: {
+    ocrSubmissions: number;
+    manualOverrides: number;
+    lowConfidenceCount: number;
+    averageConfidencePct: number;
+  };
   cases?: {
     total: number;
     pendingReview: number;
@@ -53,6 +59,7 @@ interface MetricsPayload {
     total: number;
     pendingApproval: number;
     approved: number;
+    appliedToLedger?: number;
     rejected: number;
     totalAdjustedAmount: number;
   };
@@ -150,7 +157,7 @@ export const ManagementMeterIntegritySection: React.FC = () => {
       </div>
 
       {/* AGGREGATE KPI CARDS (STRICTLY NO CONSUMER PII) */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 text-xs">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3.5 sm:gap-4 text-xs">
         <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-1">
           <span className="text-[10px] uppercase font-bold text-slate-400 block">{mp.mgtTotalReadings}</span>
           <div className="text-2xl font-extrabold font-mono text-slate-900 dark:text-white">
@@ -158,6 +165,16 @@ export const ManagementMeterIntegritySection: React.FC = () => {
           </div>
           <span className="text-[11px] text-emerald-600 font-semibold">
             {metrics?.approved ?? 0} {mp.mgtApprovedReadings} ({metrics?.totalReadings ? Math.round(((metrics.approved) / metrics.totalReadings) * 100) : 0}%)
+          </span>
+        </div>
+
+        <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-1">
+          <span className="text-[10px] uppercase font-bold text-slate-400 block">{mp.wsOcrConfidence}</span>
+          <div className="text-2xl font-extrabold font-mono text-cyan-600">
+            {metrics?.ocrQuality?.averageConfidencePct ?? 0}%
+          </div>
+          <span className="text-[11px] text-slate-500">
+            {metrics?.ocrQuality?.ocrSubmissions ?? 0} OCR · {metrics?.ocrQuality?.manualOverrides ?? 0} {mp.catOcrManualOverride}
           </span>
         </div>
 
@@ -187,7 +204,7 @@ export const ManagementMeterIntegritySection: React.FC = () => {
             ₹{(metrics?.financialAdjustments?.totalAdjustedAmount ?? 0).toLocaleString()}
           </div>
           <span className="text-[11px] text-purple-700 dark:text-purple-300">
-            {metrics?.financialAdjustments?.approved ?? 0} {mp.statusApproved}
+            {metrics?.financialAdjustments?.approved ?? 0} {mp.statusApproved} · {metrics?.financialAdjustments?.appliedToLedger ?? 0} {localizePhase11Status('APPLIED_TO_LEDGER', language)}
           </span>
         </div>
 
@@ -265,3 +282,4 @@ export const ManagementMeterIntegritySection: React.FC = () => {
     </div>
   );
 };
+

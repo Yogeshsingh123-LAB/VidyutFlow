@@ -469,9 +469,10 @@ verify(16, 'Arrears / outstanding balance aggregation across mixed monthly and t
     summary.selectedConnectionSummary?.totalOutstandingAmount,
     2185 + genBiMonthly.bill.totalAmount
   );
-  // Latest bill should be the newest Oct–Nov 2026 bi-monthly bill
-  assert.equal(summary.selectedConnectionSummary?.latestBill?.billNo, genBiMonthly.bill.billNo);
-  assert.equal(summary.selectedConnectionSummary?.latestBill?.billingCycleType, 'BI_MONTHLY');
+  // Most recent generated bill is the newest Oct–Nov 2026 bi-monthly bill, while latestBill surfaces the overdue Sep 2026 bill
+  assert.equal(summary.selectedConnectionSummary?.mostRecentGeneratedBill?.billNo, genBiMonthly.bill.billNo);
+  assert.equal(summary.selectedConnectionSummary?.mostRecentGeneratedBill?.billingCycleType, 'BI_MONTHLY');
+  assert.equal(summary.selectedConnectionSummary?.latestBill?.billNo, 'BILL-UG-2026-10-8821');
 });
 
 // 17. Full payment reconciliation

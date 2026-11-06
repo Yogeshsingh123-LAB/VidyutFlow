@@ -815,3 +815,517 @@ class LateChargePolicy(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
 
+
+# ==============================================================================
+# PHASE 11A — PERSISTENT AI METER READING & BILL ANOMALY DETECTION MODELS
+# ==============================================================================
+
+
+class MeterConfigurationModel(Base):
+    """Active meter configuration per connection with version tracking."""
+
+    __tablename__ = "meter_configurations"
+
+    connection_no: Mapped[str] = mapped_column(String(32), primary_key=True)
+    serial_number: Mapped[str] = mapped_column(String(64), index=True)
+    digit_count: Mapped[int] = mapped_column(Integer, default=6)
+    integral_digits: Mapped[int] = mapped_column(Integer, default=5)
+    fractional_digits: Mapped[int] = mapped_column(Integer, default=1)
+    multiplier: Mapped[float] = mapped_column(Float, default=1.0)
+    allow_rollover: Mapped[bool] = mapped_column(Boolean, default=True)
+    max_rollover_value: Mapped[float] = mapped_column(Float, default=99999.9)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, onupdate=now
+    )
+    updated_by_id: Mapped[str] = mapped_column(String(64), default="SYSTEM")
+    updated_by_name: Mapped[str] = mapped_column(String(128), default="System Seed")
+
+
+class MeterConfigurationVersionModel(Base):
+    """Append-only version history for meter configuration updates."""
+
+    __tablename__ = "meter_configuration_versions"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    connection_no: Mapped[str] = mapped_column(
+        String(32), ForeignKey("meter_configurations.connection_no"), index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, index=True)
+    serial_number: Mapped[str] = mapped_column(String(64))
+    digit_count: Mapped[int] = mapped_column(Integer)
+    integral_digits: Mapped[int] = mapped_column(Integer)
+    fractional_digits: Mapped[int] = mapped_column(Integer)
+    multiplier: Mapped[float] = mapped_column(Float)
+    allow_rollover: Mapped[bool] = mapped_column(Boolean)
+    max_rollover_value: Mapped[float] = mapped_column(Float)
+    reason: Mapped[str] = mapped_column(Text, default="Initial configuration")
+    changed_by_id: Mapped[str] = mapped_column(String(64))
+    changed_by_name: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+
+
+class MeterPrivatePhotoRecord(Base):
+    """Encrypted private photograph reference stored via uploads.py vault (never exposed via public URLs)."""
+
+    __tablename__ = "meter_private_photos"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_type: Mapped[str] = mapped_column(
+        String(32), index=True
+    )  # METER_READING | BILLING_REVIEW
+    owner_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    connection_no: Mapped[str] = mapped_column(String(32), index=True)
+    consumer_no: Mapped[str] = mapped_column(String(32), index=True)
+    uploaded_by_id: Mapped[str] = mapped_column(String(64), index=True)
+    uploaded_by_name: Mapped[str] = mapped_column(String(128))
+    uploaded_by_role: Mapped[str] = mapped_column(String(32))
+    storage_key: Mapped[str] = mapped_column(String(256), unique=True)
+    mime_type: Mapped[str] = mapped_column(String(64), default="image/jpeg")
+    byte_length: Mapped[int] = mapped_column(Integer, default=0)
+    sha256: Mapped[str] = mapped_column(String(64), index=True)
+    encryption_key_id: Mapped[str] = mapped_column(
+        String(64), default="aes-256-gcm-hkdf-v1"
+    )
+    metadata_stripped: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+
+
+class MeterReadingSubmissionRecord(Base):
+    """Persistent meter reading submission record linked to OCR, photo vault, and Phase 9 tariff breakdown."""
+
+    __tablename__ = "meter_reading_submissions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    client_uuid: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    connection_no: Mapped[str] = mapped_column(String(32), index=True)
+    consumer_no: Mapped[str] = mapped_column(String(32), index=True)
+    consumer_name: Mapped[str] = mapped_column(String(128))
+    subdivision: Mapped[str] = mapped_column(
+        String(64), default="Sabarmati Subdivision", index=True
+    )
+    submitted_by_id: Mapped[str] = mapped_column(String(64), index=True)
+    submitted_by_name: Mapped[str] = mapped_column(String(128))
+    submitted_by_role: Mapped[str] = mapped_column(String(32), index=True)
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+    capture_mode: Mapped[str] = mapped_column(
+        String(32), default="CONSUMER_PHOTO"
+    )  # CONSUMER_PHOTO | FIELD_OVERDUE_CAPTURE | STAFF_MANUAL
+    work_order_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True
+    )
+    previous_reading: Mapped[float] = mapped_column(Float)
+    previous_reading_date: Mapped[str] = mapped_column(String(32))
+    submitted_reading: Mapped[float] = mapped_column(Float)
+    reading_date: Mapped[str] = mapped_column(String(32))
+    cycle_days: Mapped[int] = mapped_column(Integer)
+    multiplier: Mapped[float] = mapped_column(Float, default=1.0)
+    effective_consumption: Mapped[float] = mapped_column(Float)
+    ocr_raw_text: Mapped[str] = mapped_column(Text, default="")
+    ocr_normalized_reading: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ocr_confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    ocr_engine_version: Mapped[str] = mapped_column(
+        String(64), default="tesseract.js-7.0.0-local-v1"
+    )
+    manual_override: Mapped[bool] = mapped_column(Boolean, default=False)
+    override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quality_passed: Mapped[bool] = mapped_column(Boolean, default=True)
+    quality_warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    photo_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("meter_private_photos.id"), nullable=True
+    )
+    anomalies_json: Mapped[str] = mapped_column(Text, default="[]")
+    status: Mapped[str] = mapped_column(
+        String(32), default="APPROVED", index=True
+    )  # PENDING_REVIEW | APPROVED | REJECTED | REREAD_REQUESTED
+    provisional_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    provisional_breakdown_json: Mapped[str] = mapped_column(Text, default="{}")
+    meter_config_version: Mapped[int] = mapped_column(Integer, default=1)
+    threshold_version: Mapped[int] = mapped_column(Integer, default=1)
+    reviewed_by_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reviewed_by_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    corrected_reading: Mapped[float | None] = mapped_column(Float, nullable=True)
+    demo: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class MeterEventRecord(Base):
+    """Append-only meter rollover and meter replacement event log."""
+
+    __tablename__ = "meter_events"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    reading_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("meter_reading_submissions.id"), index=True
+    )
+    connection_no: Mapped[str] = mapped_column(String(32), index=True)
+    event_type: Mapped[str] = mapped_column(
+        String(32), index=True
+    )  # NONE | METER_ROLLOVER | METER_REPLACEMENT
+    old_meter_final_reading: Mapped[float | None] = mapped_column(Float, nullable=True)
+    new_meter_start_reading: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rollover_max_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    effective_consumption: Mapped[float] = mapped_column(Float, default=0.0)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recorded_by_id: Mapped[str] = mapped_column(String(64))
+    recorded_by_name: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+
+
+class MeterOcrExtractionRecord(Base):
+    """Append-only local OCR extraction telemetry and normalized reading output."""
+
+    __tablename__ = "meter_ocr_results"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    reading_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("meter_reading_submissions.id"), unique=True, index=True
+    )
+    meter_id: Mapped[str] = mapped_column(String(64), index=True)
+    engine_version: Mapped[str] = mapped_column(
+        String(64), default="tesseract.js-7.0.0-local-v1"
+    )
+    raw_text: Mapped[str] = mapped_column(Text, default="")
+    candidate_reading: Mapped[float | None] = mapped_column(Float, nullable=True)
+    normalized_reading: Mapped[float | None] = mapped_column(Float, nullable=True)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    requires_review: Mapped[bool] = mapped_column(Boolean, default=False)
+    manual_override: Mapped[bool] = mapped_column(Boolean, default=False)
+    override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quality_passed: Mapped[bool] = mapped_column(Boolean, default=True)
+    quality_warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    extracted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+
+
+class MeterAmbiguousDigitRecord(Base):
+    """Append-only per-digit ambiguity records produced during local OCR inspection."""
+
+    __tablename__ = "meter_ambiguous_digits"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    ocr_result_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("meter_ocr_results.id"), index=True
+    )
+    reading_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("meter_reading_submissions.id"), index=True
+    )
+    position: Mapped[int] = mapped_column(Integer)
+    char_value: Mapped[str] = mapped_column(String(8))
+    alternatives_json: Mapped[str] = mapped_column(Text, default="[]")
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    reason: Mapped[str] = mapped_column(Text)
+
+
+class MeterReadingReviewHistoryRecord(Base):
+    """Append-only audit trail for every staff review action on a meter reading."""
+
+    __tablename__ = "meter_reading_review_history"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    reading_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("meter_reading_submissions.id"), index=True
+    )
+    action: Mapped[str] = mapped_column(
+        String(32)
+    )  # SUBMITTED | APPROVE | REJECT | REQUEST_REREAD
+    previous_status: Mapped[str] = mapped_column(String(32))
+    new_status: Mapped[str] = mapped_column(String(32))
+    actor_id: Mapped[str] = mapped_column(String(64), index=True)
+    actor_name: Mapped[str] = mapped_column(String(128))
+    actor_role: Mapped[str] = mapped_column(String(32))
+    note: Mapped[str] = mapped_column(Text)
+    corrected_reading: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+
+
+class MeterAnomalyCaseRecord(Base):
+    """Structured anomaly case record linked to a meter reading and 7-status workflow."""
+
+    __tablename__ = "meter_anomaly_cases"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    reading_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("meter_reading_submissions.id"), index=True
+    )
+    connection_no: Mapped[str] = mapped_column(String(32), index=True)
+    consumer_no: Mapped[str] = mapped_column(String(32), index=True)
+    consumer_name: Mapped[str] = mapped_column(String(128))
+    subdivision: Mapped[str] = mapped_column(
+        String(64), default="Sabarmati Subdivision", index=True
+    )
+    category: Mapped[str] = mapped_column(String(64), index=True)
+    severity: Mapped[str] = mapped_column(String(16), index=True)  # INFO | REVIEW | HIGH
+    status: Mapped[str] = mapped_column(
+        String(32), default="PENDING_REVIEW", index=True
+    )  # DETECTED | PENDING_REVIEW | UNDER_INVESTIGATION | APPROVED | REJECTED | ADJUSTED | CLOSED
+    summary: Mapped[str] = mapped_column(Text)
+    reasons_json: Mapped[str] = mapped_column(Text, default="[]")
+    evidence_json: Mapped[str] = mapped_column(Text, default="{}")
+    expected_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    recorded_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    review_action: Mapped[str | None] = mapped_column(Text, nullable=True)
+    threshold_version: Mapped[int] = mapped_column(Integer, default=1)
+    recommended_action: Mapped[str] = mapped_column(Text, default="")
+    assigned_role: Mapped[str] = mapped_column(String(32), default="EMPLOYEE")
+    resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    adjusted_units: Mapped[float | None] = mapped_column(Float, nullable=True)
+    adjusted_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    resolved_by_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    resolved_by_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, onupdate=now
+    )
+    demo: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class MeterAnomalyStatusHistoryRecord(Base):
+    """Append-only status history for every transition on a meter anomaly case."""
+
+    __tablename__ = "meter_anomaly_status_history"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    anomaly_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("meter_anomaly_cases.id"), index=True
+    )
+    from_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    to_status: Mapped[str] = mapped_column(String(32), index=True)
+    actor_id: Mapped[str] = mapped_column(String(64))
+    actor_name: Mapped[str] = mapped_column(String(128))
+    actor_role: Mapped[str] = mapped_column(String(32))
+    note: Mapped[str] = mapped_column(Text)
+    adjusted_units: Mapped[float | None] = mapped_column(Float, nullable=True)
+    adjusted_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+
+
+class ConsumerBillingReviewRecord(Base):
+    """Persistent consumer billing review request linked to Phase 9 bill validation snapshot."""
+
+    __tablename__ = "consumer_billing_reviews"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    client_uuid: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    bill_no: Mapped[str] = mapped_column(String(64), index=True)
+    connection_no: Mapped[str] = mapped_column(String(32), index=True)
+    consumer_no: Mapped[str] = mapped_column(String(32), index=True)
+    consumer_name: Mapped[str] = mapped_column(String(128))
+    subdivision: Mapped[str] = mapped_column(
+        String(64), default="Sabarmati Subdivision", index=True
+    )
+    category: Mapped[str] = mapped_column(String(64), index=True)
+    description: Mapped[str] = mapped_column(Text)
+    preferred_reading: Mapped[float | None] = mapped_column(Float, nullable=True)
+    evidence_photo_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("meter_private_photos.id"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(32), default="PENDING_REVIEW", index=True
+    )  # PENDING_REVIEW | UNDER_INVESTIGATION | APPROVED | REJECTED | ADJUSTED | CLOSED
+    linked_reading_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    linked_anomaly_case_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    validation_snapshot_json: Mapped[str] = mapped_column(Text, default="{}")
+    resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolved_by_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    resolved_by_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, onupdate=now
+    )
+    demo: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class ConsumerBillingReviewHistoryRecord(Base):
+    """Append-only status and note history for consumer billing review requests."""
+
+    __tablename__ = "consumer_billing_review_history"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    review_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("consumer_billing_reviews.id"), index=True
+    )
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    actor_id: Mapped[str] = mapped_column(String(64))
+    actor_name: Mapped[str] = mapped_column(String(128))
+    actor_role: Mapped[str] = mapped_column(String(32))
+    note: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+
+
+class MeterThresholdPolicyVersionRecord(Base):
+    """Append-only anomaly threshold policy versions (minimum_history >= 2 enforced)."""
+
+    __tablename__ = "meter_threshold_policy_versions"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    version: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    minimum_history: Mapped[int] = mapped_column(Integer, default=2)
+    high_daily_ratio: Mapped[float] = mapped_column(Float, default=2.5)
+    low_daily_ratio: Mapped[float] = mapped_column(Float, default=0.35)
+    high_daily_units: Mapped[float] = mapped_column(Float, default=80.0)
+    reason: Mapped[str] = mapped_column(Text)
+    changed_by_id: Mapped[str] = mapped_column(String(64))
+    changed_by_name: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+
+
+class FinancialAdjustmentProposalRecord(Base):
+    """Append-only financial adjustment proposal preserving historical bills untouched."""
+
+    __tablename__ = "financial_adjustment_proposals"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    anomaly_case_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True
+    )
+    billing_review_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True
+    )
+    bill_no: Mapped[str] = mapped_column(String(64), index=True)
+    connection_no: Mapped[str] = mapped_column(String(32), index=True)
+    consumer_no: Mapped[str] = mapped_column(String(32), index=True)
+    consumer_name: Mapped[str] = mapped_column(String(128))
+    subdivision: Mapped[str] = mapped_column(
+        String(64), default="Sabarmati Subdivision", index=True
+    )
+    original_units: Mapped[float] = mapped_column(Float)
+    original_billed_amount: Mapped[float] = mapped_column(Float)
+    proposed_adjusted_units: Mapped[float] = mapped_column(Float)
+    proposed_adjustment_amount: Mapped[float] = mapped_column(Float)
+    proposed_revised_amount: Mapped[float] = mapped_column(Float)
+    adjustment_type: Mapped[str] = mapped_column(
+        String(32)
+    )  # CREDIT_MEMO | DEBIT_MEMO | REBILL_PROPOSAL
+    reason: Mapped[str] = mapped_column(Text)
+    calculation_basis: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(
+        String(32), default="PENDING_APPROVAL", index=True
+    )  # DRAFT | PENDING_APPROVAL | APPROVED | REJECTED
+    ledger_application_status: Mapped[str] = mapped_column(
+        String(32), default="PENDING_AUTHORIZATION", index=True
+    )  # PENDING_AUTHORIZATION | APPLIED_AS_ADJUSTMENT_NOTE | REJECTED_NOT_APPLIED
+    ledger_reference_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ledger_applied_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    proposed_by_id: Mapped[str] = mapped_column(String(64), index=True)
+    proposed_by_name: Mapped[str] = mapped_column(String(128))
+    proposed_by_role: Mapped[str] = mapped_column(String(32))
+    proposed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+    approved_by_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    approved_by_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    approved_by_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    approval_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    demo: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class FinancialAdjustmentHistoryRecord(Base):
+    """Append-only history log for financial adjustment proposals and ledger applications."""
+
+    __tablename__ = "financial_adjustment_history"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    adjustment_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("financial_adjustment_proposals.id"), index=True
+    )
+    from_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    to_status: Mapped[str] = mapped_column(String(32))
+    ledger_application_status: Mapped[str] = mapped_column(String(32))
+    actor_id: Mapped[str] = mapped_column(String(64))
+    actor_name: Mapped[str] = mapped_column(String(128))
+    actor_role: Mapped[str] = mapped_column(String(32))
+    note: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+
+
+class MeterNotificationDedupRecord(Base):
+    """Persistent notification deduplication registry across server restarts."""
+
+    __tablename__ = "meter_notification_dedup"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    dedupe_key: Mapped[str] = mapped_column(String(256), unique=True, index=True)
+    recipient_key: Mapped[str] = mapped_column(String(128), index=True)
+    category: Mapped[str] = mapped_column(String(64))
+    reference_id: Mapped[str] = mapped_column(String(64), index=True)
+    notification_id: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+
+
+class ActorIdempotencyRecord(Base):
+    """Actor + endpoint + payload-hash scoped idempotency record.
+    Identical retries return the original record; UUID reuse with a different actor or payload returns 409.
+    """
+
+    __tablename__ = "actor_idempotency_records"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    client_uuid: Mapped[str] = mapped_column(String(128), index=True)
+    endpoint: Mapped[str] = mapped_column(String(128), index=True)
+    actor_id: Mapped[str] = mapped_column(String(64), index=True)
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    resource_type: Mapped[str] = mapped_column(String(64))
+    resource_id: Mapped[str] = mapped_column(String(64), index=True)
+    response_status: Mapped[int] = mapped_column(Integer, default=201)
+    response_body_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=now, index=True
+    )
+
+

@@ -320,9 +320,9 @@ export const MeterReadingWorkspace: React.FC<MeterReadingWorkspaceProps> = ({
     setError('');
     try {
       const sanitized = sanitizeCropBox(cropBox);
-      const croppedBlob = await prepareMeterPhoto(file, rotation, sanitized);
+      const croppedResult = await prepareMeterPhoto(file, rotation, sanitized);
       if (croppedPreview) URL.revokeObjectURL(croppedPreview);
-      const url = URL.createObjectURL(croppedBlob);
+      const url = URL.createObjectURL(croppedResult.blob);
       setCroppedPreview(url);
       setIsCropApplied(true);
       setIsCropMode(false);
@@ -402,13 +402,13 @@ export const MeterReadingWorkspace: React.FC<MeterReadingWorkspaceProps> = ({
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result));
         reader.onerror = () => reject(new Error('Photo could not be prepared.'));
-        reader.readAsDataURL(fullPrepared);
+        reader.readAsDataURL(fullPrepared.blob);
       });
       setPhotoPayload(preparedDataUrl);
 
       // 3. Run local Tesseract Web Worker OCR
       const result = await extractMeterReading(
-        preparedForOcr,
+        preparedForOcr.blob,
         (value) => setProgress(Math.round(value * 100)),
         isCropApplied
       );
@@ -436,7 +436,10 @@ export const MeterReadingWorkspace: React.FC<MeterReadingWorkspaceProps> = ({
       closeCamera();
       if (currentRole === 'field' && isFieldEffectivelyOffline(isOfflineSimulated)) {
         let offlinePhoto: Blob | undefined;
-        if (file) offlinePhoto = await prepareMeterPhoto(file, rotation);
+        if (file) {
+          const res = await prepareMeterPhoto(file, rotation);
+          offlinePhoto = res.blob;
+        }
         await enqueueOfflineMeterReading({
           requestId: selectedConnection.consumerNo, title: `Meter reading · ${selectedConnection.consumerNo}`,
           actorEmail: demoSession?.user.email || activeUser.email || '',
@@ -450,7 +453,7 @@ export const MeterReadingWorkspace: React.FC<MeterReadingWorkspaceProps> = ({
       let submittedPhotoPayload = photoPayload;
       if (file && !submittedPhotoPayload) {
         const prepared = await prepareMeterPhoto(file, rotation);
-        submittedPhotoPayload = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Photo could not be prepared.')); reader.readAsDataURL(prepared); });
+        submittedPhotoPayload = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = () => reject(new Error('Photo could not be prepared.')); reader.readAsDataURL(prepared.blob); });
         setPhotoPayload(submittedPhotoPayload);
       }
       await request('/api/meter-readings', 'POST', {

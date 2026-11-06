@@ -6,6 +6,7 @@ import {
   Sliders,
   DollarSign,
   RotateCw,
+  Settings,
   X
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -16,6 +17,7 @@ import {
 } from '../../i18n/meterPhase11Translations';
 import type {
   MeterThresholds,
+  MeterConfiguration as MeterSpec,
   FinancialAdjustmentProposal
 } from '../../services/meterReading';
 
@@ -29,6 +31,30 @@ interface ThresholdPayload extends MeterThresholds {
   }>;
 }
 
+interface OcrHealthPayload {
+  engine: string;
+  workerMode: string;
+  allSelfHostedAssetsPresent: boolean;
+  assets: Array<{
+    file: string;
+    present: boolean;
+    sizeBytes: number;
+  }>;
+  metadataSanitization: string;
+  maxUploadBytes: number;
+  encryptedVaultPhotoCount: number;
+  encryptedVaultBytes: number;
+  maxVaultBytes: number;
+  telemetry: {
+    totalReadings: number;
+    ocrAssistedReadings: number;
+    manualCorrectionCount: number;
+    lowConfidenceCount: number;
+    averageConfidencePct: number;
+  };
+  checkedAt: string;
+}
+
 export const AdminMeterOcrHealthSection: React.FC = () => {
   const { showToast, activeUser } = useApp();
   const { language, t } = useLanguage();
@@ -36,6 +62,8 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [thresholds, setThresholds] = useState<ThresholdPayload | null>(null);
+  const [ocrHealth, setOcrHealth] = useState<OcrHealthPayload | null>(null);
+  const [meterConfigs, setMeterConfigs] = useState<Record<string, MeterSpec>>({});
   const [adjustments, setAdjustments] = useState<FinancialAdjustmentProposal[]>([]);
 
   // Threshold form edit state
@@ -46,17 +74,37 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
   const [thresholdReason, setThresholdReason] = useState('');
   const [isSavingThresholds, setIsSavingThresholds] = useState(false);
 
+  // Meter Format Config edit state
+  const [selectedConsumerNo, setSelectedConsumerNo] = useState<string>('');
+  const [editMultiplier, setEditMultiplier] = useState<number>(1);
+  const [editDecimalPlaces, setEditDecimalPlaces] = useState<number>(1);
+  const [editRolloverAt, setEditRolloverAt] = useState<number>(100000);
+  const [meterConfigReason, setMeterConfigReason] = useState<string>('');
+  const [isSavingMeterConfig, setIsSavingMeterConfig] = useState(false);
+
   // Financial Adjustment Review Modal State
   const [reviewingAdjustment, setReviewingAdjustment] = useState<FinancialAdjustmentProposal | null>(null);
   const [approvalNote, setApprovalNote] = useState('');
   const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && reviewingAdjustment) {
+        setReviewingAdjustment(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [reviewingAdjustment]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [thresholdsRes, adjustmentsRes] = await Promise.all([
+      const [thresholdsRes, adjustmentsRes, ocrHealthRes, meterConfigRes] = await Promise.all([
         fetch('/api/meter-readings/thresholds', { credentials: 'same-origin' }),
-        fetch('/api/meter-readings/adjustments', { credentials: 'same-origin' })
+        fetch('/api/meter-readings/adjustments', { credentials: 'same-origin' }),
+        fetch('/api/meter-readings/ocr-health', { credentials: 'same-origin' }),
+        fetch('/api/meter-readings/config', { credentials: 'same-origin' })
       ]);
 
       if (thresholdsRes.ok) {
@@ -72,6 +120,26 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
         const d = await adjustmentsRes.json();
         setAdjustments(d.adjustments || []);
       }
+      if (ocrHealthRes.ok) {
+        const d = await ocrHealthRes.json();
+        setOcrHealth(d.health as OcrHealthPayload);
+      }
+      if (meterConfigRes.ok) {
+        const d = await meterConfigRes.json();
+        const configs = (d.configs || {}) as Record<string, MeterSpec>;
+        setMeterConfigs(configs);
+        const firstKey = Object.keys(configs)[0] || '';
+        setSelectedConsumerNo(prev => {
+          const target = prev && configs[prev] ? prev : firstKey;
+          const spec = configs[target];
+          if (spec) {
+            setEditMultiplier(spec.multiplier);
+            setEditDecimalPlaces(spec.decimalPlaces);
+            setEditRolloverAt(spec.rolloverAt ?? 100000);
+          }
+          return target;
+        });
+      }
     } catch {
       showToast(mp.empNoRecordsFound, 'error');
     } finally {
@@ -82,6 +150,52 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
   useEffect(() => {
     void fetchData();
   }, [fetchData]);
+
+  const handleSelectConsumerForConfig = (consumerNo: string) => {
+    setSelectedConsumerNo(consumerNo);
+    const spec = meterConfigs[consumerNo];
+    if (spec) {
+      setEditMultiplier(spec.multiplier);
+      setEditDecimalPlaces(spec.decimalPlaces);
+      setEditRolloverAt(spec.rolloverAt ?? 100000);
+    }
+  };
+
+  // Handle Meter Format Spec Update
+  const handleSaveMeterConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedConsumerNo || !meterConfigReason.trim()) {
+      showToast(mp.admThresholdReasonLabel, 'warning');
+      return;
+    }
+    setIsSavingMeterConfig(true);
+    try {
+      const res = await fetch('/api/meter-readings/config', {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-VidyutFlow-CSRF': '1'
+        },
+        body: JSON.stringify({
+          consumerNo: selectedConsumerNo,
+          multiplier: Number(editMultiplier),
+          decimalPlaces: Number(editDecimalPlaces),
+          rolloverAt: Number(editRolloverAt),
+          reason: meterConfigReason.trim()
+        })
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Failed to update meter configuration.');
+      showToast(`${selectedConsumerNo}: v${payload.config.version}`, 'success');
+      setMeterConfigReason('');
+      await fetchData();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Save failed', 'error');
+    } finally {
+      setIsSavingMeterConfig(false);
+    }
+  };
 
   // Handle Threshold Policy Update
   const handleSaveThresholds = async (e: React.FormEvent) => {
@@ -130,7 +244,6 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
       return;
     }
 
-    // Client-side guard check for separation of duties
     if (reviewingAdjustment.proposedBy.toLowerCase() === activeUser.name.toLowerCase()) {
       showToast(mp.admSeparationBlockedBadge, 'error');
       return;
@@ -164,6 +277,32 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
       setIsSubmittingApproval(false);
     }
   };
+
+  // Apply APPROVED adjustment to ledger
+  const handleApplyAdjustment = async (adjustmentId: string) => {
+    setIsSubmittingApproval(true);
+    try {
+      const res = await fetch(`/api/meter-readings/adjustments/${encodeURIComponent(adjustmentId)}/apply`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-VidyutFlow-CSRF': '1'
+        }
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Ledger application failed.');
+      showToast(`${adjustmentId}: ${localizePhase11Status('APPLIED_TO_LEDGER', language)}`, 'success');
+      await fetchData();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Ledger application failed', 'error');
+    } finally {
+      setIsSubmittingApproval(false);
+    }
+  };
+
+  const totalAssetBytes = (ocrHealth?.assets || []).reduce((acc, a) => acc + a.sizeBytes, 0);
+  const presentAssetCount = (ocrHealth?.assets || []).filter(a => a.present).length;
 
   return (
     <div className="space-y-6">
@@ -199,7 +338,7 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
         </button>
       </div>
 
-      {/* OCR ENGINE & WORKER TELEMETRY */}
+      {/* OCR ENGINE & MEASURED SELF-HOSTED ASSET TELEMETRY */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
         <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
@@ -207,7 +346,7 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-base font-bold text-slate-900 dark:text-white font-mono">
-            Tesseract.js v7.0.0
+            {ocrHealth?.engine ?? 'Tesseract.js v7.0.0'}
           </div>
           <p className="text-[11px] text-slate-500">
             {mp.admOcrWorkerMode}
@@ -217,10 +356,12 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
         <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[10px] uppercase font-bold text-slate-400">{mp.admWasmCoreStatus}</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <CheckCircle2 className={`w-4 h-4 ${ocrHealth?.allSelfHostedAssetsPresent ? 'text-emerald-600' : 'text-amber-500'}`} />
           </div>
           <div className="text-base font-bold text-emerald-600 font-mono">
-            WASM Core Ready
+            {ocrHealth
+              ? `${presentAssetCount}/${ocrHealth.assets.length} Assets (${(totalAssetBytes / (1024 * 1024)).toFixed(2)} MiB)`
+              : '—'}
           </div>
           <p className="text-[11px] text-slate-500">
             {mp.admMetadataStripping}
@@ -233,10 +374,14 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
             <ShieldCheck className="w-4 h-4 text-blue-600" />
           </div>
           <div className="text-base font-bold text-slate-900 dark:text-white font-mono">
-            100% SLA
+            {ocrHealth
+              ? `${ocrHealth.telemetry.averageConfidencePct}% Avg (${ocrHealth.telemetry.ocrAssistedReadings} OCR)`
+              : '5.00 MiB Limit'}
           </div>
           <p className="text-[11px] text-slate-500">
-            {mp.wsOcrAmbiguousTitle}
+            {ocrHealth
+              ? `Vault: ${ocrHealth.encryptedVaultPhotoCount} photos (${(ocrHealth.encryptedVaultBytes / 1024).toFixed(1)} KiB / 50 MiB)`
+              : mp.wsOcrAmbiguousTitle}
           </p>
         </div>
       </div>
@@ -375,6 +520,114 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
         )}
       </div>
 
+      {/* SECTION 2B: VERSIONED METER FORMAT SPECIFICATION CONFIGURATION */}
+      <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <Settings className="w-4 h-4 text-cyan-600" />
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              {mp.wsConnectionLabel} / {mp.wsMeterLabel} ({selectedConsumerNo || '—'})
+            </h3>
+          </div>
+          {selectedConsumerNo && meterConfigs[selectedConsumerNo] && (
+            <span className="text-[11px] font-mono text-slate-500">
+              {meterConfigs[selectedConsumerNo].meterNo} · v{meterConfigs[selectedConsumerNo].version}
+            </span>
+          )}
+        </div>
+
+        <form onSubmit={handleSaveMeterConfig} className="space-y-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+              <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                {mp.wsConnectionLabel}
+              </label>
+              <select
+                value={selectedConsumerNo}
+                onChange={e => handleSelectConsumerForConfig(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
+              >
+                {Object.entries(meterConfigs).map(([consumerNo, cfg]) => (
+                  <option key={consumerNo} value={consumerNo}>
+                    {consumerNo} ({cfg.meterNo})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                CT/PT Multiplier
+              </label>
+              <input
+                type="number"
+                step="0.5"
+                min={0.5}
+                max={1000}
+                value={editMultiplier}
+                onChange={e => setEditMultiplier(Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                Decimal Places
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={3}
+                value={editDecimalPlaces}
+                onChange={e => setEditDecimalPlaces(Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                Dial Rollover Ceiling (kWh)
+              </label>
+              <input
+                type="number"
+                min={1000}
+                max={10000000}
+                value={editRolloverAt}
+                onChange={e => setEditRolloverAt(Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+              {mp.admThresholdReasonLabel}
+            </label>
+            <input
+              type="text"
+              value={meterConfigReason}
+              onChange={e => setMeterConfigReason(e.target.value)}
+              placeholder={mp.admThresholdReasonPlaceholder}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+              required
+            />
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={isSavingMeterConfig}
+              className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-semibold disabled:opacity-50 transition-colors"
+            >
+              {isSavingMeterConfig ? mp.admSavingThresholds : mp.admSaveThresholdsBtn}
+            </button>
+          </div>
+        </form>
+      </div>
+
       {/* SECTION 3: FINANCIAL ADJUSTMENT AUTHORIZATION DESK */}
       <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -431,7 +684,7 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
                         </td>
                         <td className="p-3.5 text-center">
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                            adj.status === 'APPROVED'
+                            adj.status === 'APPROVED' || adj.status === 'APPLIED_TO_LEDGER'
                               ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                               : adj.status === 'REJECTED'
                               ? 'bg-rose-100 text-rose-800 border-rose-300'
@@ -455,6 +708,15 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
                                 {mp.admApproveAdjustmentBtn}
                               </button>
                             )
+                          ) : adj.status === 'APPROVED' ? (
+                            <button
+                              type="button"
+                              disabled={isSubmittingApproval}
+                              onClick={() => void handleApplyAdjustment(adj.id)}
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs disabled:opacity-50"
+                            >
+                              {mp.empMarkAdjusted}
+                            </button>
                           ) : (
                             <span className="text-slate-400 text-[11px]">{localizePhase11Status(adj.status, language)}</span>
                           )}
@@ -477,11 +739,16 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
 
       {/* MODAL: ADMIN FINANCIAL ADJUSTMENT AUTHORIZATION */}
       {reviewingAdjustment && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="adm-adjustment-modal-title"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-white dark:bg-[#101C35] rounded-2xl max-w-lg w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white font-mono">
+                <h3 id="adm-adjustment-modal-title" className="text-base font-bold text-slate-900 dark:text-white font-mono">
                   {reviewingAdjustment.id}
                 </h3>
                 <p className="text-xs text-slate-500">
@@ -491,6 +758,7 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setReviewingAdjustment(null)}
+                aria-label={t.common.close}
                 className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
@@ -570,3 +838,4 @@ export const AdminMeterOcrHealthSection: React.FC = () => {
     </div>
   );
 };
+

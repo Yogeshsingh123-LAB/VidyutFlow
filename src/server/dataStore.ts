@@ -1,3 +1,6 @@
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   UserRole,
   ConsumerProfile,
@@ -34,9 +37,18 @@ import {
   type ConsumerBillingReviewRequest,
   type FinancialAdjustmentStatus,
   type FinancialAdjustmentProposal,
-  type MeterAnomaly
+  type MeterAnomaly,
+  type AuditableMeterReplacementEvent
 } from '../services/meterReading';
-import { calculateDetailedUgvclBill } from '../data/ugvclTariffSchedule';
+import {
+  validateReadingTimestamps,
+  validateMeterReplacement,
+  canApproveMeterReading
+} from '../utils/meterValidation';
+import {
+  calculateConfigurableCycleTariffBreakdown,
+  generateDeterministicBiMonthlyBillForConnection
+} from '../utils/billingEngine';
 import {
   INITIAL_CONSUMERS,
   INITIAL_CONNECTIONS,
@@ -84,7 +96,18 @@ export class ServerDataStore {
   private notifications: AppNotification[];
   private auditLogs: AuditLogItem[];
   private meterReadings: MeterReadingRecord[] = [];
-  private meterPhotos = new Map<string, string>();
+  private meterPhotos = new Map<
+    string,
+    {
+      photoId: string;
+      ivHex: string;
+      authTagHex: string;
+      ciphertextHex: string;
+      sha256: string;
+      byteLength: number;
+      createdAt: string;
+    }
+  >();
   private meterPhotoBytes = 0;
   private meterSubmissionTimes = new Map<string, number[]>();
   private meterThresholds: MeterThresholds = { ...DEFAULT_METER_THRESHOLDS };
@@ -96,6 +119,36 @@ export class ServerDataStore {
     thresholds: MeterThresholds;
   }> = [];
   private meterConfigurations = new Map<string, MeterConfiguration>();
+  private meterConfigurationVersions = new Map<
+    string,
+    Array<MeterConfiguration & { changedAt: string; changedBy: string }>
+  >();
+  private readingReviewHistory = new Map<
+    string,
+    Array<{
+      id: string;
+      readingId: string;
+      action: string;
+      previousStatus: string;
+      newStatus: string;
+      actorId: string;
+      actorName: string;
+      actorRole: string;
+      note: string;
+      timestamp: string;
+    }>
+  >();
+  private actorIdempotencyRecords = new Map<
+    string,
+    {
+      clientUuid: string;
+      endpoint: string;
+      actorId: string;
+      payloadHash: string;
+      resourceId: string;
+      createdAt: string;
+    }
+  >();
   private accountLinkedConnections = new Map<string, Set<string>>();
   private anomalyCases = new Map<string, StructuredAnomalyCase>();
   private consumerBillingReviews = new Map<string, ConsumerBillingReviewRequest>();
@@ -133,19 +186,20 @@ export class ServerDataStore {
       thresholds: { ...DEFAULT_METER_THRESHOLDS }
     });
 
-    // Seed realistic demo readings for cross-portal workflows
+    // Seed realistic synthetic DEMO readings for cross-portal workflows (local browser OCR; not connected to production UGVCL systems)
+    // Judge Scenario 1: Clear photo showing 015180 with successful local OCR and immediate approval
     const r1: MeterReadingRecord = {
       id: 'MR-20261028-99231',
       clientUuid: 'seed-uuid-99231-oct',
       consumerNo: '04281-99231',
       connectionId: 'CONN-04281-99231',
       meterNo: 'UGVCL-MTR-004281',
-      displayedReading: '004450',
-      readingKwh: 4450,
+      displayedReading: '015180',
+      readingKwh: 15180,
       multiplier: 1,
       meterEvent: 'ordinary',
       readingAt: '2026-10-28T09:30:00.000Z',
-      previousReadingKwh: 4210,
+      previousReadingKwh: 14940,
       consumedUnits: 240,
       intervalDays: 58,
       status: 'APPROVED',
@@ -154,12 +208,25 @@ export class ServerDataStore {
       submittedAt: '2026-10-28T09:32:00.000Z',
       reviewedBy: 'Rajesh V. Trivedi',
       reviewedAt: '2026-10-28T11:15:00.000Z',
-      reviewNote: 'Verified display digits against optical scan photo. Normal consumption pattern.',
+      reviewNote: 'SYNTHETIC DEMO: Verified clear display 015180 against local optical scan photo. Normal consumption pattern.',
+      ocr: {
+        meterId: 'UGVCL-MTR-004281',
+        rawText: '015180',
+        candidateReading: '015180',
+        normalizedReading: 15180,
+        confidence: 96.4,
+        ambiguousDigits: [],
+        requiresReview: false,
+        engineVersion: 'Tesseract 5 / tesseract.js 7.0.0',
+        extractedAt: '2026-10-28T09:30:00.000Z',
+        engine: 'tesseract.js'
+      },
       anomalies: [],
       demo: true
     };
     this.meterReadings.push(r1);
 
+    // Judge Scenario 4: Unexpected bi-monthly consumption increase triggering Billing Anomaly review
     const r2Anom: MeterAnomaly = {
       id: 'ANOM-20261101-77190',
       category: 'HIGH_CONSUMPTION',
@@ -193,6 +260,89 @@ export class ServerDataStore {
       demo: true
     };
     this.meterReadings.push(r2);
+
+    // Judge Scenario 2: Blurry/glare photo requiring manual human confirmation
+    const r3Anom: MeterAnomaly = {
+      id: 'ANOM-20261102-BLUR01',
+      category: 'OCR_LOW_CONFIDENCE',
+      severity: 'REVIEW',
+      evidence: 'SYNTHETIC DEMO: Local OCR marked this result for manual confirmation (58.2% confidence; glare ambiguity B->8, O->0).',
+      expectedValue: '015820',
+      recordedValue: '015B2O',
+      recommendedAction: 'Compare the proposed digits with the original meter photo and confirm manual correction.',
+      detectedAt: '2026-11-02T08:45:00.000Z',
+      status: 'OPEN'
+    };
+    const r3: MeterReadingRecord = {
+      id: 'MR-20261102-BLUR01',
+      clientUuid: 'seed-uuid-blur-nov02',
+      consumerNo: '04281-99231',
+      connectionId: 'CONN-04281-99231',
+      meterNo: 'UGVCL-MTR-004283',
+      displayedReading: '015820',
+      readingKwh: 15820,
+      multiplier: 1,
+      meterEvent: 'ordinary',
+      readingAt: '2026-11-02T08:40:00.000Z',
+      previousReadingKwh: 15540,
+      consumedUnits: 280,
+      intervalDays: 60,
+      status: 'PENDING_REVIEW',
+      submittedBy: 'Smt. Meenaben Patel',
+      submittedRole: 'consumer',
+      submittedAt: '2026-11-02T08:45:00.000Z',
+      ocr: {
+        meterId: 'UGVCL-MTR-004283',
+        rawText: '015B2O',
+        candidateReading: '015820',
+        normalizedReading: 15820,
+        confidence: 58.2,
+        ambiguousDigits: [
+          { position: 3, rawChar: 'B', proposedDigit: '8', alternatives: ['8', '3'], reason: 'Character B resembles digit 8 under glare' },
+          { position: 5, rawChar: 'O', proposedDigit: '0', alternatives: ['0', '9'], reason: 'Character O resembles digit 0' }
+        ],
+        requiresReview: true,
+        engineVersion: 'Tesseract 5 / tesseract.js 7.0.0',
+        extractedAt: '2026-11-02T08:40:00.000Z',
+        engine: 'tesseract.js'
+      },
+      anomalies: [r3Anom],
+      demo: true
+    };
+    this.meterReadings.push(r3);
+
+    // Judge Scenario 3: Reading below the previous verified reading (flagging rollover/anomaly)
+    const r4Anom: MeterAnomaly = {
+      id: 'ANOM-20261102-ROLL01',
+      category: 'DECREASING_READING',
+      severity: 'HIGH',
+      evidence: 'SYNTHETIC DEMO: Submitted reading 12000 kWh is below the previous verified reading 14820 kWh without an authorized rollover or replacement event.',
+      expectedValue: '>= 14820 kWh',
+      recordedValue: '12000 kWh',
+      recommendedAction: 'Hold for an authorized reviewer to verify meter rollover limit or physical replacement work order.',
+      detectedAt: '2026-11-02T09:15:00.000Z',
+      status: 'OPEN'
+    };
+    const r4: MeterReadingRecord = {
+      id: 'MR-20261102-ROLL01',
+      clientUuid: 'seed-uuid-roll-nov02',
+      consumerNo: '04281-99231',
+      connectionId: 'CONN-04281-99231',
+      meterNo: 'UGVCL-MTR-004284',
+      displayedReading: '012000',
+      readingKwh: 12000,
+      multiplier: 1,
+      meterEvent: 'ordinary',
+      readingAt: '2026-11-02T09:10:00.000Z',
+      previousReadingKwh: 14820,
+      status: 'PENDING_REVIEW',
+      submittedBy: 'Vikramaditya Solanki',
+      submittedRole: 'field',
+      submittedAt: '2026-11-02T09:15:00.000Z',
+      anomalies: [r4Anom],
+      demo: true
+    };
+    this.meterReadings.push(r4);
 
     const case2: StructuredAnomalyCase = {
       id: 'ANO-20261101-77190',
@@ -891,14 +1041,209 @@ export class ServerDataStore {
     return { ...this.meterThresholds, history: deepClone(this.thresholdHistory) };
   }
 
-  public getMeterConfiguration(signedToken: string, consumerNo: string, nowMs?: number): MeterConfiguration {
+  private derivePhotoKey(photoId: string): Buffer {
+    const masterSecret = process.env.VIDYUTFLOW_UPLOAD_KEY || 'vidyutflow-phase11a-encrypted-photo-vault-key-v1';
+    return Buffer.from(
+      crypto.hkdfSync(
+        'sha256',
+        Buffer.from(masterSecret, 'utf8'),
+        Buffer.from(photoId, 'utf8'),
+        Buffer.from('vidyutflow-meter-photo-aes-256-gcm', 'utf8'),
+        32
+      )
+    );
+  }
+
+  private storeEncryptedPhotoDataUrl(photoId: string, dataUrl: string): void {
+    const key = this.derivePhotoKey(photoId);
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    cipher.setAAD(Buffer.from(photoId, 'utf8'));
+    const plaintext = Buffer.from(dataUrl, 'utf8');
+    const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+    const sha256 = crypto.createHash('sha256').update(plaintext).digest('hex');
+
+    this.meterPhotos.set(photoId, {
+      photoId,
+      ivHex: iv.toString('hex'),
+      authTagHex: authTag.toString('hex'),
+      ciphertextHex: encrypted.toString('hex'),
+      sha256,
+      byteLength: plaintext.length,
+      createdAt: new Date().toISOString()
+    });
+  }
+
+  private readDecryptedPhotoDataUrl(photoId: string): string | undefined {
+    const entry = this.meterPhotos.get(photoId);
+    if (!entry) return undefined;
+    const key = this.derivePhotoKey(photoId);
+    const decipher = crypto.createDecipheriv(
+      'aes-256-gcm',
+      key,
+      Buffer.from(entry.ivHex, 'hex')
+    );
+    decipher.setAAD(Buffer.from(photoId, 'utf8'));
+    decipher.setAuthTag(Buffer.from(entry.authTagHex, 'hex'));
+    const decrypted = Buffer.concat([
+      decipher.update(Buffer.from(entry.ciphertextHex, 'hex')),
+      decipher.final()
+    ]);
+    return decrypted.toString('utf8');
+  }
+
+  public getEncryptedPhotoVaultMetadata(photoId: string) {
+    const entry = this.meterPhotos.get(photoId);
+    return entry ? { ...entry } : undefined;
+  }
+
+  public uploadMeterPhoto(
+    signedToken: string,
+    input: {
+      consumerNo: string;
+      meterNo: string;
+      photoDataUrl: string;
+      clientUuid?: string;
+    },
+    nowMs?: number
+  ): {
+    photoId: string;
+    consumerNo: string;
+    meterNo: string;
+    mimeType: string;
+    sizeBytes: number;
+    sha256: string;
+    encryptionMode: string;
+    storageProvider: string;
+    createdAt: string;
+  } {
+    const session = requireServerRole(
+      this.authService,
+      signedToken,
+      ['consumer', 'employee', 'field', 'admin'],
+      nowMs
+    );
+    const conn = this.getConnectionByNumber(signedToken, input.consumerNo, nowMs);
+    if (session.role === 'field' && !this.isFieldAssignedToConnection(session, conn.consumerNo)) {
+      throw new AuthSecurityError(
+        403,
+        'METER_ASSIGNMENT_REQUIRED',
+        'Field engineers may upload photos only for a meter assigned to them.'
+      );
+    }
+    const photoMatch =
+      typeof input.photoDataUrl === 'string'
+        ? input.photoDataUrl.match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/)
+        : null;
+    if (!photoMatch) {
+      throw new AuthSecurityError(400, 'INVALID_PHOTO', 'Photo must be a JPEG, PNG, or WebP image.');
+    }
+    const bytes = Buffer.from(photoMatch[2], 'base64');
+    const signatureOk =
+      photoMatch[1] === 'jpeg'
+        ? bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+        : photoMatch[1] === 'png'
+        ? bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+        : bytes.subarray(0, 4).toString('ascii') === 'RIFF' &&
+          bytes.subarray(8, 12).toString('ascii') === 'WEBP';
+    if (bytes.length > 5 * 1024 * 1024 || bytes.length === 0 || !signatureOk) {
+      throw new AuthSecurityError(
+        400,
+        'INVALID_PHOTO',
+        'Photo content is invalid or exceeds the 5 MiB limit.'
+      );
+    }
+
+    const clientUuid = (input.clientUuid || `photo-${crypto.randomUUID()}`).trim();
+    const idempotencyKey = `POST:/api/meter-readings/photos:${clientUuid}`;
+    const payloadHash = this.computeCanonicalPayloadHash({
+      consumerNo: conn.consumerNo,
+      meterNo: input.meterNo.trim(),
+      photoSha256: crypto.createHash('sha256').update(bytes).digest('hex')
+    });
+    const prior = this.actorIdempotencyRecords.get(idempotencyKey);
+    if (prior) {
+      if (prior.actorId !== session.userId || prior.payloadHash !== payloadHash) {
+        throw new AuthSecurityError(
+          409,
+          'IDEMPOTENCY_CONFLICT',
+          'Idempotency conflict: clientUuid was already used by a different actor or with a different payload.'
+        );
+      }
+      const existingEntry = this.meterPhotos.get(prior.resourceId);
+      if (existingEntry) {
+        return {
+          photoId: existingEntry.photoId,
+          consumerNo: conn.consumerNo,
+          meterNo: input.meterNo.trim(),
+          mimeType: `image/${photoMatch[1]}`,
+          sizeBytes: bytes.length,
+          sha256: existingEntry.sha256,
+          encryptionMode: 'AES-256-GCM',
+          storageProvider: 'encrypted_vault',
+          createdAt: existingEntry.createdAt
+        };
+      }
+    }
+
+    const photoId = `MPH-${crypto.randomUUID().slice(0, 12)}`;
+    this.storeEncryptedPhotoDataUrl(photoId, input.photoDataUrl);
+    this.meterPhotoBytes += bytes.length;
+    const stored = this.meterPhotos.get(photoId)!;
+    this.actorIdempotencyRecords.set(idempotencyKey, {
+      clientUuid,
+      actorId: session.userId,
+      endpoint: 'POST /api/meter-readings/photos',
+      payloadHash,
+      resourceId: photoId,
+      createdAt: stored.createdAt
+    });
+    return {
+      photoId,
+      consumerNo: conn.consumerNo,
+      meterNo: input.meterNo.trim(),
+      mimeType: `image/${photoMatch[1]}`,
+      sizeBytes: bytes.length,
+      sha256: stored.sha256,
+      encryptionMode: 'AES-256-GCM',
+      storageProvider: 'encrypted_vault',
+      createdAt: stored.createdAt
+    };
+  }
+
+  private computeCanonicalPayloadHash(payload: Record<string, unknown>): string {
+    const keys = Object.keys(payload).sort();
+    const normalized: Record<string, unknown> = {};
+    for (const k of keys) {
+      normalized[k] = payload[k];
+    }
+    return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+  }
+
+  public getMeterConfiguration(
+    signedToken: string,
+    consumerNo: string,
+    nowMs?: number
+  ): MeterConfiguration & {
+    history?: Array<MeterConfiguration & { changedAt: string; changedBy: string }>;
+  } {
     const connection = this.getConnectionByNumber(signedToken, consumerNo, nowMs);
     const config = this.meterConfigurations.get(connection.connectionId);
     if (!config) throw new AuthSecurityError(400, 'METER_CONFIG_NOT_FOUND', 'No meter configuration exists for this connection.');
-    return { ...config };
+    const history = this.meterConfigurationVersions.get(connection.connectionId) || [
+      { ...config, changedAt: new Date(0).toISOString(), changedBy: 'System Seed' }
+    ];
+    return { ...config, history: deepClone(history) };
   }
 
-  public setMeterConfiguration(signedToken: string, input: { consumerNo: string; multiplier: number; decimalPlaces: number; rolloverAt?: number }, nowMs?: number): MeterConfiguration {
+  public setMeterConfiguration(
+    signedToken: string,
+    input: { consumerNo: string; multiplier: number; decimalPlaces: number; rolloverAt?: number },
+    nowMs?: number
+  ): MeterConfiguration & {
+    history?: Array<MeterConfiguration & { changedAt: string; changedBy: string }>;
+  } {
     const session = requireServerRole(this.authService, signedToken, ['admin'], nowMs);
     if (!input || typeof input !== 'object' || typeof input.consumerNo !== 'string' || !input.consumerNo.trim()) {
       throw new AuthSecurityError(400, 'CONNECTION_REQUIRED', 'Choose a connection to update its meter configuration.');
@@ -911,8 +1256,17 @@ export class ServerDataStore {
     const old = this.meterConfigurations.get(connection.connectionId)!;
     const next: MeterConfiguration = { connectionId: connection.connectionId, meterNo: connection.meterNo, multiplier: input.multiplier, decimalPlaces: input.decimalPlaces, ...(input.rolloverAt ? { rolloverAt: input.rolloverAt } : {}), version: old.version + 1, source: 'ADMIN_CONFIGURED' };
     this.meterConfigurations.set(connection.connectionId, next);
+    const prevHistory = this.meterConfigurationVersions.get(connection.connectionId) || [
+      { ...old, changedAt: new Date(0).toISOString(), changedBy: 'System Seed' }
+    ];
+    prevHistory.push({
+      ...next,
+      changedAt: new Date().toISOString(),
+      changedBy: session.user.name
+    });
+    this.meterConfigurationVersions.set(connection.connectionId, prevHistory);
     this.appendServerAuditLog(session, 'METER_CONFIGURATION_UPDATED', connection.connectionId, `meter=${connection.meterNo}; version=${next.version}; multiplier=${next.multiplier}; decimals=${next.decimalPlaces}`);
-    return { ...next };
+    return { ...next, history: deepClone(prevHistory) };
   }
 
   public setMeterThresholds(
@@ -990,8 +1344,45 @@ export class ServerDataStore {
       );
       if (!assigned) throw new AuthSecurityError(403, 'METER_ASSIGNMENT_REQUIRED', 'Field engineers may submit readings only for a meter assigned to them.');
     }
+    const idempotencyKey = `POST:/api/meter-readings:${input.clientUuid}`;
+    const submissionPayloadHash = this.computeCanonicalPayloadHash({
+      consumerNo: input.consumerNo.trim(),
+      meterNo: input.meterNo.trim(),
+      displayedReading: input.displayedReading.trim(),
+      readingKwh: Number(input.readingKwh),
+      readingAt: input.readingAt.trim(),
+      meterEvent: input.meterEvent || 'ordinary',
+      multiplier: Number(input.multiplier)
+    });
+    const priorIdempotency = this.actorIdempotencyRecords.get(idempotencyKey);
     const priorClient = this.meterReadings.find(r => r.clientUuid === input.clientUuid);
-    if (priorClient) return deepClone(priorClient);
+    if (priorIdempotency || priorClient) {
+      if (
+        priorIdempotency &&
+        (priorIdempotency.actorId !== session.userId ||
+          priorIdempotency.payloadHash !== submissionPayloadHash)
+      ) {
+        throw new AuthSecurityError(
+          409,
+          'IDEMPOTENCY_CONFLICT',
+          'Idempotency conflict: clientUuid was already used by a different actor or with a different payload.'
+        );
+      }
+      if (
+        priorClient &&
+        !priorIdempotency &&
+        (priorClient.submittedBy.toLowerCase() !== session.user.name.toLowerCase() ||
+          priorClient.consumerNo !== input.consumerNo.trim() ||
+          Math.abs(priorClient.readingKwh - input.readingKwh) > 0.0001)
+      ) {
+        throw new AuthSecurityError(
+          409,
+          'IDEMPOTENCY_CONFLICT',
+          'Idempotency conflict: clientUuid was already used by a different actor or with a different payload.'
+        );
+      }
+      if (priorClient) return deepClone(priorClient);
+    }
     if (input.meterEvent && !['ordinary', 'rollover', 'replacement'].includes(input.meterEvent)) throw new AuthSecurityError(400, 'INVALID_METER_EVENT', 'Choose an ordinary reading, rollover, or meter replacement.');
     if (input.meterEvent === 'rollover' && (!meterConfig.rolloverAt || meterConfig.rolloverAt <= 0)) throw new AuthSecurityError(400, 'INVALID_ROLLOVER_LIMIT', 'No rollover limit is configured for this meter. Ask an administrator to verify the meter specification.');
     if (input.multiplier !== meterConfig.multiplier) throw new AuthSecurityError(409, 'METER_MULTIPLIER_MISMATCH', 'Submitted multiplier does not match the administrator-configured meter multiplier.');
@@ -1015,14 +1406,14 @@ export class ServerDataStore {
       if (this.meterPhotoBytes + bytes.length > 50 * 1024 * 1024) throw new AuthSecurityError(429, 'DEMO_PHOTO_CAPACITY', 'The demo photo store is full. Preserve the review record and restart with an archived demo backup before accepting more photos.');
     }
 
-    const anomalies = this.meterReadings.flatMap(r => r.consumerNo === conn.consumerNo && r.meterNo === input.meterNo && r.status === 'APPROVED' ? r.anomalies.filter(a => a.status === 'CLOSED') : []);
+    const anomalies: MeterAnomaly[] = [];
     const identity = input.meterNo === conn.meterNo ? null : detectIdentityMismatch(conn.meterNo, input.meterNo);
     if (identity) anomalies.push(identity);
     if (input.photoDataUrl && !input.ocr?.meterId) anomalies.push(unreadableMeterIdentity());
     if (input.ocr) {
       const photoIdentity = input.ocr.meterId ? detectIdentityMismatch(conn.meterNo, input.ocr.meterId) : input.photoDataUrl ? null : unreadableMeterIdentity();
       if (photoIdentity) anomalies.push(photoIdentity);
-      if (input.ocr.requiresReview) anomalies.push({ id: `MAN-${crypto.randomUUID()}`, category: 'OCR_LOW_CONFIDENCE', severity: 'REVIEW', evidence: `OCR marked this result for review${input.ocr.confidence === undefined ? ' without a confidence score' : ` (${input.ocr.confidence}% confidence)`}.`, recommendedAction: 'Compare the proposed digits with the original meter photo.', recordedValue: input.ocr.candidateReading, detectedAt: new Date().toISOString(), status: 'OPEN' });
+      if (input.ocr.requiresReview) anomalies.push({ id: `MAN-${crypto.randomUUID()}`, category: 'OCR_LOW_CONFIDENCE', severity: 'REVIEW', evidence: `OCR marked this result for review${input.ocr.confidence === undefined ? ' without a confidence score' : ` (${input.ocr.confidence}% confidence)`}.`, recommendedAction: 'Compare the proposed digits with the original meter photo.', recordedValue: String(input.ocr.candidateReading), detectedAt: new Date().toISOString(), status: 'OPEN' });
     }
     if (detectDuplicateReading(this.meterReadings, input)) {
       this.appendServerAuditLog(session, 'DUPLICATE_METER_READING_BLOCKED', `${conn.consumerNo}:${input.meterNo}`, `reading=${input.displayedReading}; date=${input.readingAt}`);
@@ -1033,30 +1424,95 @@ export class ServerDataStore {
     const previous = latest ? { value: latest.readingKwh, at: latest.readingAt } : { value: conn.currentReadingKwh, at: conn.lastReadingDate };
     let consumedUnits: number | undefined;
     let intervalDays: number | undefined;
+
+    // Check future timestamp drift (with 30-day window for demo timeline simulation)
+    const effectiveNowMs = nowMs ?? Date.now();
+    const timeValidation = validateReadingTimestamps({
+      currentReadingAt: input.readingAt,
+      previousReadingAt: previous.at,
+      submissionAt: new Date(effectiveNowMs).toISOString(),
+      maxFutureDriftMinutes: 30 * 24 * 60
+    });
+    if (!timeValidation.valid && timeValidation.code === 'FUTURE_TIMESTAMP_DRIFT') {
+      throw new AuthSecurityError(400, 'FUTURE_TIMESTAMP_DRIFT', timeValidation.error || 'Reading date is in the future.');
+    }
+
     try {
-      if (input.meterEvent === 'rollover' && input.readingKwh >= previous.value) throw new MeterReadingError('A rollover event is only valid when the new reading is lower than the previous reading.', 'INVALID_ROLLOVER_EVENT');
-      const calculation = calculateMeterConsumption({ current: input.readingKwh, previous: previous.value, previousAt: previous.at, currentAt: input.readingAt, multiplier: meterConfig.multiplier, rolloverAt: input.meterEvent === 'rollover' ? meterConfig.rolloverAt : undefined, replacement: input.meterEvent === 'replacement' });
-      consumedUnits = calculation.units;
-      intervalDays = calculation.days;
-      const history = this.meterReadings.filter(r => r.consumerNo === conn.consumerNo && r.status === 'APPROVED' && r.consumedUnits !== undefined && r.intervalDays !== undefined).map(r => ({ units: r.consumedUnits!, days: r.intervalDays! }));
-      anomalies.push(...detectConsumptionAnomalies({ units: calculation.units, days: calculation.days, verifiedHistory: history, thresholds: this.meterThresholds, event: calculation.event }));
+      if (input.replacementEvent) {
+        const replCheck = validateMeterReplacement(input.replacementEvent, {
+          multiplier: meterConfig.multiplier,
+          previousReadingAt: previous.at,
+          currentReadingAt: input.readingAt
+        });
+        if (!replCheck.valid) {
+          throw new AuthSecurityError(400, 'INVALID_REPLACEMENT', replCheck.error || 'Invalid meter replacement record.');
+        }
+        consumedUnits = replCheck.units;
+        intervalDays = timeValidation.days;
+        anomalies.push({
+          id: `MAN-${crypto.randomUUID()}`,
+          category: 'METER_REPLACEMENT',
+          severity: 'REVIEW',
+          evidence: `Meter replacement recorded: old meter ${input.replacementEvent.oldMeterNumber} (${input.replacementEvent.oldPreviousReading} -> ${input.replacementEvent.oldFinalReading}), new meter ${input.replacementEvent.newMeterNumber} (${input.replacementEvent.newInitialReading} -> ${input.replacementEvent.newCurrentReading}). Authorized by ${input.replacementEvent.authorizedActor}.`,
+          recommendedAction: 'Verify physical replacement work order and meter serial evidence.',
+          expectedValue: input.replacementEvent.newMeterNumber,
+          recordedValue: String(replCheck.units),
+          detectedAt: new Date().toISOString(),
+          status: 'OPEN'
+        });
+      } else {
+        if (input.meterEvent === 'rollover' && input.readingKwh >= previous.value) throw new MeterReadingError('A rollover event is only valid when the new reading is lower than the previous reading.', 'INVALID_ROLLOVER_EVENT');
+        const calculation = calculateMeterConsumption({ current: input.readingKwh, previous: previous.value, previousAt: previous.at, currentAt: input.readingAt, multiplier: meterConfig.multiplier, rolloverAt: input.meterEvent === 'rollover' ? meterConfig.rolloverAt : undefined, replacement: input.meterEvent === 'replacement' });
+        consumedUnits = calculation.units;
+        intervalDays = calculation.days;
+        const history = this.meterReadings.filter(r => r.consumerNo === conn.consumerNo && r.status === 'APPROVED' && r.consumedUnits !== undefined && r.intervalDays !== undefined).map(r => ({ units: r.consumedUnits!, days: r.intervalDays! }));
+        anomalies.push(...detectConsumptionAnomalies({ units: calculation.units, days: calculation.days, verifiedHistory: history, thresholds: this.meterThresholds, event: calculation.event }));
+      }
     } catch (error) {
       const issue = error instanceof MeterReadingError ? error : null;
       anomalies.push({ id: `MAN-${crypto.randomUUID()}`, category: issue?.code === 'OUT_OF_ORDER' ? 'OUT_OF_ORDER' : 'DECREASING_READING', severity: 'HIGH', evidence: issue?.message || 'Reading could not be compared with a valid prior reading.', recommendedAction: 'Hold for an authorized reviewer to verify the interval, meter replacement or rollover.', expectedValue: `>= ${previous.value}`, recordedValue: String(input.readingKwh), detectedAt: new Date().toISOString(), status: 'OPEN' });
     }
     const id = `MR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     const photoId = input.photoDataUrl ? `MP-${crypto.randomUUID()}` : undefined;
-    if (photoId && input.photoDataUrl) { this.meterPhotos.set(photoId, input.photoDataUrl); this.meterPhotoBytes += photoSize; }
+    if (photoId && input.photoDataUrl) {
+      this.storeEncryptedPhotoDataUrl(photoId, input.photoDataUrl);
+      this.meterPhotoBytes += photoSize;
+    }
+    const initialReviewHistory = [
+      {
+        id: `MRH-${crypto.randomUUID().slice(0, 8)}`,
+        readingId: id,
+        action: 'SUBMITTED',
+        previousStatus: 'NONE',
+        newStatus: 'PENDING_REVIEW',
+        actorId: session.userId,
+        actorName: session.user.name,
+        actorRole: session.role,
+        note: 'Initial meter reading submission',
+        timestamp: new Date().toISOString()
+      }
+    ];
+    this.readingReviewHistory.set(id, initialReviewHistory);
     const record: MeterReadingRecord = {
       id, clientUuid: input.clientUuid, consumerNo: conn.consumerNo, connectionId: conn.connectionId,
       meterNo: input.meterNo, displayedReading: input.displayedReading, readingKwh: input.readingKwh,
-      multiplier: meterConfig.multiplier, meterEvent: input.meterEvent || 'ordinary', ...(meterConfig.rolloverAt ? { rolloverAt: meterConfig.rolloverAt } : {}), readingAt: input.readingAt, previousReadingKwh: previous.value,
+      multiplier: meterConfig.multiplier, meterEvent: input.meterEvent || 'ordinary', ...(meterConfig.rolloverAt ? { rolloverAt: meterConfig.rolloverAt } : {}),
+      ...(input.replacementEvent ? { replacementEvent: input.replacementEvent } : {}),
+      readingAt: input.readingAt, previousReadingKwh: previous.value,
       ...(consumedUnits === undefined ? {} : { consumedUnits }), ...(intervalDays === undefined ? {} : { intervalDays }),
-      status: 'PENDING_REVIEW', submittedBy: session.user.name, submittedRole: session.role,
+      status: 'PENDING_REVIEW', submittedById: session.userId, submittedBy: session.user.name, submittedRole: session.role,
       submittedAt: new Date().toISOString(), ...(input.ocr ? { ocr: input.ocr } : {}), ...(photoId ? { photoId } : {}),
       anomalies, demo: true
     };
     this.meterReadings.unshift(record);
+    this.actorIdempotencyRecords.set(idempotencyKey, {
+      clientUuid: input.clientUuid,
+      endpoint: 'POST:/api/meter-readings',
+      actorId: session.userId,
+      payloadHash: submissionPayloadHash,
+      resourceId: id,
+      createdAt: new Date().toISOString()
+    });
 
     // Register persistent structured anomaly cases (Phase 11C Section 4)
     for (const anom of anomalies) {
@@ -1102,24 +1558,111 @@ export class ServerDataStore {
       category: 'Inspection',
       consumerNo: conn.consumerNo
     });
+    if (anomalies.length > 0) {
+      this.emitMeterNotification({
+        eventKey: `NOT-MR-REQ-REV-${id}`,
+        title: 'Meter reading requires review',
+        message: `Reading ${id} on Connection ${conn.consumerNo} flagged ${anomalies.length} anomaly check(s) for review.`,
+        targetRole: 'employee',
+        type: 'warning',
+        category: 'Inspection',
+        consumerNo: conn.consumerNo
+      });
+      this.emitMeterNotification({
+        eventKey: `NOT-MR-ANO-DET-CNS-${id}`,
+        title: 'Anomaly detected on meter reading',
+        message: `Reading ${id} on Connection ${conn.consumerNo} is queued for technical review.`,
+        targetRole: 'consumer',
+        type: 'info',
+        category: 'Inspection',
+        consumerNo: conn.consumerNo
+      });
+    }
     return deepClone(record);
   }
 
-  public reviewMeterReading(signedToken: string, readingId: string, action: 'APPROVE' | 'REJECT' | 'REREAD', note: string, nowMs?: number): MeterReadingRecord {
+  public reviewMeterReading(
+    signedToken: string,
+    readingId: string,
+    action: 'APPROVE' | 'REJECT' | 'REREAD',
+    note: string,
+    nowMsOrCorrected?: number,
+    explicitNowMs?: number
+  ): MeterReadingRecord {
+    const isTimestamp = typeof nowMsOrCorrected === 'number' && nowMsOrCorrected > 1_000_000_000_000;
+    const correctedReading = !isTimestamp && typeof nowMsOrCorrected === 'number' && Number.isFinite(nowMsOrCorrected) ? nowMsOrCorrected : undefined;
+    const nowMs = isTimestamp ? nowMsOrCorrected : explicitNowMs;
     const session = requireServerRole(this.authService, signedToken, ['employee', 'admin'], nowMs);
     const record = this.meterReadings.find(r => r.id === readingId);
     if (!record) throw new AuthSecurityError(400, 'METER_READING_NOT_FOUND', 'Meter reading was not found.');
-    if (record.submittedBy.toLowerCase() === session.user.name.toLowerCase() && session.role !== 'admin') {
+
+    const isSubmitter =
+      (record.submittedById && record.submittedById === session.userId) ||
+      record.submittedBy.toLowerCase() === session.user.name.toLowerCase();
+    if (isSubmitter && session.role !== 'admin') {
       throw new AuthSecurityError(403, 'SELF_REVIEW_FORBIDDEN', 'Submitters cannot review their own meter reading.');
     }
+
+    const conn = this.connections.find(c => c.consumerNo === record.consumerNo);
+    if (session.role === 'employee' && session.user.division && conn) {
+      const userSub = session.user.division.toLowerCase().trim();
+      const connSub = conn.subdivision.toLowerCase().trim();
+      if (userSub && connSub && userSub !== connSub && !userSub.includes('circle') && !userSub.includes('headquarters')) {
+        throw new AuthSecurityError(403, 'SUBDIVISION_UNAUTHORIZED', `Employee is authorized for "${session.user.division}" but connection is in "${conn.subdivision}".`);
+      }
+    }
+
     if (record.status !== 'PENDING_REVIEW') throw new AuthSecurityError(409, 'METER_READING_ALREADY_REVIEWED', 'Only pending readings can be reviewed.');
-    if (action === 'APPROVE' && record.anomalies.length > 0 && !note.trim()) throw new AuthSecurityError(409, 'REVIEW_NOTE_REQUIRED', 'Add a review note that records how the flagged evidence was checked.');
-    if (action === 'APPROVE' && (record.anomalies.some(a => a.severity === 'HIGH') || record.consumedUnits === undefined)) throw new AuthSecurityError(409, 'METER_READING_REQUIRES_REVIEW', 'Resolve high severity identity, duplicate or arithmetic issues before approval.');
+    if (action === 'APPROVE') {
+      if (record.anomalies.some(a => a.severity === 'HIGH' && a.status !== 'CLOSED')) {
+        throw new AuthSecurityError(409, 'METER_READING_REQUIRES_REVIEW', 'Resolve high severity identity, duplicate or arithmetic issues before approval.');
+      }
+      const linkedCases = Array.from(this.anomalyCases.values()).filter(c => c.readingId === readingId);
+      const unresolvedHigh = linkedCases.filter(c => c.severity === 'HIGH' && c.status !== 'CLOSED' && c.status !== 'APPROVED');
+      if (unresolvedHigh.length > 0) {
+        throw new AuthSecurityError(409, 'METER_READING_REQUIRES_REVIEW', 'Resolve high severity identity, duplicate or arithmetic issues before approval.');
+      }
+      if (record.anomalies.length > 0 && !note.trim()) {
+        throw new AuthSecurityError(409, 'REVIEW_NOTE_REQUIRED', 'Add a review note that records how the flagged evidence was checked.');
+      }
+      if (record.consumedUnits === undefined) {
+        throw new AuthSecurityError(409, 'METER_READING_REQUIRES_REVIEW', 'Resolve high severity identity, duplicate or arithmetic issues before approval.');
+      }
+    }
+
+    const previousStatus = record.status;
     record.status = action === 'APPROVE' ? 'APPROVED' : action === 'REJECT' ? 'REJECTED' : 'REREAD_REQUESTED';
+    if (correctedReading !== undefined && correctedReading >= 0) {
+      record.correctedReading = correctedReading;
+    }
+    record.reviewedById = session.userId;
     record.reviewedBy = session.user.name;
     record.reviewedAt = new Date().toISOString();
     record.reviewNote = note.slice(0, 1000);
+    const revHist = this.readingReviewHistory.get(readingId) || [];
+    revHist.push({
+      id: `MRH-${crypto.randomUUID().slice(0, 8)}`,
+      readingId,
+      action,
+      previousStatus,
+      newStatus: record.status,
+      actorId: session.userId,
+      actorName: session.user.name,
+      actorRole: session.role,
+      note: record.reviewNote,
+      timestamp: record.reviewedAt
+    });
+    this.readingReviewHistory.set(readingId, revHist);
+    record.reviewHistory = deepClone(revHist);
     for (const item of record.anomalies) item.status = action === 'APPROVE' ? 'CLOSED' : 'OPEN';
+
+    if (action === 'APPROVE' && conn) {
+      const finalReading = record.correctedReading !== undefined ? record.correctedReading : record.readingKwh;
+      if (!conn.lastReadingDate || record.readingAt >= conn.lastReadingDate) {
+        conn.currentReadingKwh = finalReading;
+        conn.lastReadingDate = record.readingAt;
+      }
+    }
 
     // Synchronize structured anomaly cases associated with this reading
     const nextCaseStatus: AnomalyReviewStatus = action === 'APPROVE' ? 'APPROVED' : action === 'REJECT' ? 'REJECTED' : 'UNDER_INVESTIGATION';
@@ -1184,7 +1727,7 @@ export class ServerDataStore {
     } else {
       assertConsumerRecordOwnership({ session, recordOwnerAccountId: undefined, recordConsumerNo: record.consumerNo, ownedConsumerNos: this.getOwnedConsumerNumbers(session.userId), allowedStaffRoles: ['employee', 'admin'] });
     }
-    const photo = record.photoId ? this.meterPhotos.get(record.photoId) : undefined;
+    const photo = record.photoId ? this.readDecryptedPhotoDataUrl(record.photoId) : undefined;
     if (!photo) throw new AuthSecurityError(400, 'METER_PHOTO_NOT_AVAILABLE', 'This demo photo is not available in the current server session.');
     return photo;
   }
@@ -1268,13 +1811,126 @@ export class ServerDataStore {
       financialAdjustments: {
         total: adjustments.length,
         pendingApproval: adjustments.filter(a => a.status === 'PENDING_APPROVAL').length,
-        approved: adjustments.filter(a => a.status === 'APPROVED').length,
+        approved: adjustments.filter(a => a.status === 'APPROVED' || a.status === 'APPLIED_TO_LEDGER').length,
+        appliedToLedger: adjustments.filter(a => a.status === 'APPLIED_TO_LEDGER').length,
         rejected: adjustments.filter(a => a.status === 'REJECTED').length,
         totalAdjustedAmount: adjustments
-          .filter(a => a.status === 'APPROVED')
+          .filter(a => a.status === 'APPROVED' || a.status === 'APPLIED_TO_LEDGER')
           .reduce((sum, a) => sum + a.proposedAdjustmentAmount, 0)
       },
+      ocrQuality: (() => {
+        const ocrReadings = readings.filter(r => Boolean(r.ocr));
+        const confScores = ocrReadings
+          .map(r => r.ocr?.confidence)
+          .filter((c): c is number => typeof c === 'number' && Number.isFinite(c));
+        const avgConf = confScores.length > 0
+          ? Math.round((confScores.reduce((s, c) => s + c, 0) / confScores.length) * 10) / 10
+          : null;
+        return {
+          ocrSubmissions: ocrReadings.length,
+          manualOverrides: readings.filter(r => r.correctedReading !== undefined).length,
+          lowConfidenceCount: ocrReadings.filter(r => r.ocr?.requiresReview).length,
+          averageConfidencePct: avgConf
+        };
+      })(),
       averageTurnaroundHours: avgTurnaroundHours
+    };
+  }
+
+  public getBillingReviewPhoto(signedToken: string, reviewId: string, nowMs?: number): string {
+    const session = requireServerRole(this.authService, signedToken, ['consumer', 'employee', 'admin'], nowMs);
+    const review = this.consumerBillingReviews.get(reviewId);
+    if (!review) {
+      throw new AuthSecurityError(400, 'BILLING_REVIEW_NOT_FOUND', `Billing review ${reviewId} not found.`);
+    }
+    if (session.role === 'consumer') {
+      assertConsumerRecordOwnership({
+        session,
+        recordOwnerAccountId: undefined,
+        recordConsumerNo: review.consumerNo,
+        ownedConsumerNos: this.getOwnedConsumerNumbers(session.userId),
+        allowedStaffRoles: ['employee', 'admin']
+      });
+    } else if (session.role === 'employee' && session.user.division) {
+      const conn = this.connections.find(c => c.consumerNo === review.consumerNo);
+      if (conn) {
+        const userSub = session.user.division.toLowerCase().trim();
+        const connSub = conn.subdivision.toLowerCase().trim();
+        if (userSub && connSub && userSub !== connSub && !userSub.includes('circle') && !userSub.includes('headquarters')) {
+          throw new AuthSecurityError(403, 'SUBDIVISION_UNAUTHORIZED', 'You are not authorized for this connection subdivision.');
+        }
+      }
+    }
+    const photo = review.evidencePhotoId ? this.readDecryptedPhotoDataUrl(review.evidencePhotoId) : undefined;
+    if (!photo) {
+      throw new AuthSecurityError(400, 'EVIDENCE_PHOTO_NOT_AVAILABLE', 'No evidence photo is attached or available in the current session.');
+    }
+    return photo;
+  }
+
+  public getOcrIntegrationHealth(signedToken: string, nowMs?: number) {
+    requireServerRole(this.authService, signedToken, ['admin', 'management'], nowMs);
+    const tesseractDir = path.resolve(process.cwd(), 'public', 'vendor', 'tesseract');
+    const requiredAssets = [
+      { key: 'worker', filename: 'worker.min.js', purpose: 'Local Web Worker Script' },
+      { key: 'wasmLstm', filename: 'tesseract-core-lstm.wasm.js', purpose: 'LSTM WASM Core Bundle' },
+      { key: 'wasmSimd', filename: 'tesseract-core-simd-lstm.wasm.js', purpose: 'SIMD LSTM WASM Core Bundle' },
+      { key: 'trainedData', filename: 'eng.traineddata', purpose: 'English Traineddata Model' }
+    ];
+
+    const assets = requiredAssets.map(asset => {
+      const fullPath = path.join(tesseractDir, asset.filename);
+      try {
+        const stat = fs.statSync(fullPath);
+        return {
+          key: asset.key,
+          filename: asset.filename,
+          purpose: asset.purpose,
+          present: stat.isFile() && stat.size > 0,
+          sizeBytes: stat.size
+        };
+      } catch {
+        return {
+          key: asset.key,
+          filename: asset.filename,
+          purpose: asset.purpose,
+          present: false,
+          sizeBytes: 0
+        };
+      }
+    });
+
+    const allSelfHostedPresent = assets.every(a => a.present);
+    const totalAssetBytes = assets.reduce((sum, a) => sum + a.sizeBytes, 0);
+
+    const ocrReadings = this.meterReadings.filter(r => Boolean(r.ocr));
+    const confidences = ocrReadings
+      .map(r => r.ocr?.confidence)
+      .filter((c): c is number => typeof c === 'number' && Number.isFinite(c));
+    const averageConfidencePct =
+      confidences.length > 0
+        ? Math.round((confidences.reduce((sum, c) => sum + c, 0) / confidences.length) * 10) / 10
+        : null;
+
+    return {
+      engine: 'tesseract.js',
+      executionMode: 'BROWSER_LOCAL_WORKER',
+      cloudProviderUsed: false,
+      allSelfHostedAssetsPresent: allSelfHostedPresent,
+      totalSelfHostedAssetBytes: totalAssetBytes,
+      assets,
+      telemetry: {
+        totalReadingsLogged: this.meterReadings.length,
+        ocrAssistedReadings: ocrReadings.length,
+        averageConfidencePct,
+        ambiguousFlaggedCount: ocrReadings.filter(r => (r.ocr?.ambiguousDigits?.length || 0) > 0).length,
+        manualCorrectionCount: this.meterReadings.filter(r => r.correctedReading !== undefined).length,
+        encryptedVaultPhotoCount: this.meterPhotos.size,
+        encryptedVaultBytes: this.meterPhotoBytes,
+        maxPhotoUploadBytes: 5 * 1024 * 1024,
+        maxVaultCapacityBytes: 50 * 1024 * 1024
+      },
+      checkedAt: new Date().toISOString()
     };
   }
 
@@ -1441,17 +2097,45 @@ export class ServerDataStore {
       };
     }
 
-    // Synchronize linked reading record status if applicable
+    // Synchronize linked reading record status if applicable (only if all other anomalies are cleared)
     if (anomalyCase.readingId) {
       const reading = this.meterReadings.find(r => r.id === anomalyCase.readingId);
       if (reading && reading.status === 'PENDING_REVIEW') {
-        if (nextStatus === 'APPROVED') {
-          reading.status = 'APPROVED';
-          reading.reviewedBy = session.user.name;
-          reading.reviewedAt = new Date().toISOString();
-          reading.reviewNote = note.trim();
+        if (nextStatus === 'APPROVED' || nextStatus === 'CLOSED') {
+          // Check if any other anomalies or anomaly cases on this reading remain unresolved
+          const otherCases = Array.from(this.anomalyCases.values()).filter(
+            c => c.readingId === anomalyCase.readingId && c.id !== anomalyCase.id
+          );
+          const hasUnresolvedCases = otherCases.some(
+            c => c.status !== 'CLOSED' && c.status !== 'APPROVED'
+          );
+          const hasUnresolvedHigh = otherCases.some(
+            c => c.severity === 'HIGH' && c.status !== 'CLOSED' && c.status !== 'APPROVED'
+          );
+          const otherReadingAnomalies = reading.anomalies.filter(
+            a => a.id !== anomalyCase.id && a.severity === 'HIGH' && a.status !== 'CLOSED'
+          );
+
+          if (!hasUnresolvedCases && !hasUnresolvedHigh && otherReadingAnomalies.length === 0 && reading.consumedUnits !== undefined) {
+            reading.status = 'APPROVED';
+            reading.reviewedById = session.userId;
+            reading.reviewedBy = session.user.name;
+            reading.reviewedAt = new Date().toISOString();
+            reading.reviewNote = note.trim();
+            for (const item of reading.anomalies) item.status = 'CLOSED';
+
+            const conn = this.connections.find(c => c.consumerNo === reading.consumerNo);
+            if (conn) {
+              const finalReading = reading.correctedReading !== undefined ? reading.correctedReading : reading.readingKwh;
+              if (!conn.lastReadingDate || reading.readingAt >= conn.lastReadingDate) {
+                conn.currentReadingKwh = finalReading;
+                conn.lastReadingDate = reading.readingAt;
+              }
+            }
+          }
         } else if (nextStatus === 'REJECTED') {
           reading.status = 'REJECTED';
+          reading.reviewedById = session.userId;
           reading.reviewedBy = session.user.name;
           reading.reviewedAt = new Date().toISOString();
           reading.reviewNote = note.trim();
@@ -1568,12 +2252,32 @@ export class ServerDataStore {
     const bill = this.getBillByNumber(signedToken, input.billNo, nowMs);
     const conn = this.getConnectionByNumber(signedToken, bill.consumerNo, nowMs);
 
-    // Idempotency: return existing request if clientUuid was already processed
+    // Actor + endpoint + payload-hash scoped idempotency check
+    const cbrIdempotencyKey = `POST:/api/meter-readings/billing-reviews:${input.clientUuid}`;
+    const cbrPayloadHash = this.computeCanonicalPayloadHash({
+      billNo: input.billNo.trim(),
+      category: input.category,
+      description: input.description.trim()
+    });
+    const priorCbrIdempotency = this.actorIdempotencyRecords.get(cbrIdempotencyKey);
     const existingByUuid = Array.from(this.consumerBillingReviews.values()).find(
       r => r.clientUuid === input.clientUuid
     );
-    if (existingByUuid) {
-      return this.sanitizeReviewForConsumer(existingByUuid);
+    if (priorCbrIdempotency || existingByUuid) {
+      if (
+        priorCbrIdempotency &&
+        (priorCbrIdempotency.actorId !== session.userId ||
+          priorCbrIdempotency.payloadHash !== cbrPayloadHash)
+      ) {
+        throw new AuthSecurityError(
+          409,
+          'IDEMPOTENCY_CONFLICT',
+          'Idempotency conflict: clientUuid was already used by a different actor or with a different payload.'
+        );
+      }
+      if (existingByUuid) {
+        return this.sanitizeReviewForConsumer(existingByUuid);
+      }
     }
 
     // Duplicate active review check: cannot open multiple concurrent active reviews on same bill
@@ -1601,7 +2305,7 @@ export class ServerDataStore {
         throw new AuthSecurityError(400, 'INVALID_PHOTO', 'Photo exceeds 5 MiB or contains invalid image data.');
       }
       photoId = `EP-${crypto.randomUUID()}`;
-      this.meterPhotos.set(photoId, input.photoDataUrl);
+      this.storeEncryptedPhotoDataUrl(photoId, input.photoDataUrl);
       this.meterPhotoBytes += bytes.length;
     }
 
@@ -1636,6 +2340,14 @@ export class ServerDataStore {
       demo: true
     };
     this.consumerBillingReviews.set(reviewId, review);
+    this.actorIdempotencyRecords.set(cbrIdempotencyKey, {
+      clientUuid: input.clientUuid,
+      endpoint: 'POST:/api/meter-readings/billing-reviews',
+      actorId: session.userId,
+      payloadHash: cbrPayloadHash,
+      resourceId: reviewId,
+      createdAt: new Date().toISOString()
+    });
 
     // Also register a structured anomaly case in operations queue
     const anomCaseId = `ANO-CBR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
@@ -1905,15 +2617,17 @@ export class ServerDataStore {
         throw new AuthSecurityError(400, 'INVALID_REVISED_UNITS', 'Revised units must be zero or a positive finite number.');
       }
       // Source of truth: Phase 9 canonical tariff calculation engine
-      const recalc = calculateDetailedUgvclBill(
-        input.revisedUnits,
-        tariffCategoryId(conn.tariffCategory),
-        'bimonthly',
+      const recalc = calculateConfigurableCycleTariffBreakdown(
+        conn.tariffCategory,
         conn.sanctionedLoadKw,
-        conn.phase
+        input.revisedUnits,
+        {
+          billingCycleType: bill.billingCycleType || 'BI_MONTHLY',
+          policyMode: bill.tariffCyclePolicyMode || 'BI_MONTHLY_PROPORTIONAL_2X_DEMO'
+        }
       );
-      proposedRevisedAmount = Math.max(0, recalc.netPayableAmount - bill.rebateOrSubsidy);
-      calculationBasis = `Phase 9 Canonical Recalculation: ${input.revisedUnits} units @ ${recalc.category.code} (${conn.sanctionedLoadKw} kW ${conn.phase}) => Energy ₹${recalc.totalEnergyCharges.toFixed(2)} + Fixed ₹${recalc.fixedCharges.amount.toFixed(2)} + FPPPA ₹${recalc.fpppaCharges.amount.toFixed(2)} + Duty ₹${recalc.electricityDuty.amount.toFixed(2)} = Net ₹${recalc.netPayableAmount.toFixed(2)}.`;
+      proposedRevisedAmount = Math.max(0, recalc.totalAmount - bill.rebateOrSubsidy);
+      calculationBasis = `Phase 9 Canonical Recalculation: ${input.revisedUnits} units @ ${conn.tariffCategory} (${conn.sanctionedLoadKw} kW) => Energy ₹${recalc.energyCharges.toFixed(2)} + Fixed ₹${recalc.fixedCharges.toFixed(2)} + FPPPA ₹${recalc.fuelPriceAdjustment.toFixed(2)} + Duty ₹${recalc.electricityDuty.toFixed(2)} = Net ₹${recalc.totalAmount.toFixed(2)}.`;
     } else {
       const explicitAmount = input.proposedAdjustmentAmount!;
       if (input.adjustmentType === 'SUPPLEMENTARY_CHARGE') {
@@ -2107,8 +2821,8 @@ export class ServerDataStore {
       });
       this.emitMeterNotification({
         eventKey: `NOT-MR-ADJ-REV-CNS-${adj.id}-APPROVED`,
-        title: 'Bill adjustment applied',
-        message: `An authorized adjustment of ₹${adj.proposedAdjustmentAmount} was applied to Bill ${adj.billNo}. Revised payable amount: ₹${adj.proposedRevisedAmount}.`,
+        title: 'Bill adjustment approved',
+        message: `An authorized adjustment of ₹${adj.proposedAdjustmentAmount} for Bill ${adj.billNo} has been approved and is queued for ledger application.`,
         targetRole: 'consumer',
         type: 'success',
         category: 'Billing',
@@ -2160,6 +2874,204 @@ export class ServerDataStore {
     }
 
     return deepClone(adj);
+  }
+
+  public applyFinancialAdjustmentToLedger(
+    signedToken: string,
+    id: string,
+    note?: string,
+    nowMs?: number
+  ): FinancialAdjustmentProposal {
+    const session = requireServerRole(this.authService, signedToken, ['admin', 'employee'], nowMs);
+    const adj = this.financialAdjustments.get(id);
+    if (!adj) {
+      throw new AuthSecurityError(400, 'ADJUSTMENT_NOT_FOUND', `Adjustment ${id} not found.`);
+    }
+
+    if (adj.status === 'APPLIED_TO_LEDGER') {
+      throw new AuthSecurityError(409, 'ADJUSTMENT_ALREADY_APPLIED', `Adjustment ${id} has already been applied to the ledger.`);
+    }
+
+    if (adj.status !== 'APPROVED') {
+      throw new AuthSecurityError(
+        409,
+        'ADJUSTMENT_NOT_APPROVED',
+        `Only approved adjustments can be applied to the ledger. Current status is ${adj.status}.`
+      );
+    }
+
+    adj.status = 'APPLIED_TO_LEDGER';
+    adj.statusHistory.push({
+      status: 'APPLIED_TO_LEDGER',
+      actor: session.user.name,
+      role: session.role,
+      timestamp: new Date().toISOString(),
+      note: note?.trim() || `Applied adjustment ${id} to billing ledger.`
+    });
+
+    // Update target bill's otherAdjustmentsInr and totalAmount without deleting history
+    const targetBill = this.bills.find(b => b.billNo === adj.billNo);
+    if (targetBill) {
+      if (adj.adjustmentType === 'SUPPLEMENTARY_CHARGE') {
+        targetBill.otherAdjustmentsInr = (targetBill.otherAdjustmentsInr || 0) + adj.proposedAdjustmentAmount;
+        targetBill.totalAmount = Math.max(0, targetBill.totalAmount + adj.proposedAdjustmentAmount);
+      } else {
+        targetBill.otherAdjustmentsInr = (targetBill.otherAdjustmentsInr || 0) - adj.proposedAdjustmentAmount;
+        targetBill.totalAmount = Math.max(0, targetBill.totalAmount - adj.proposedAdjustmentAmount);
+      }
+      targetBill.remainingBalance = Math.max(0, targetBill.totalAmount - (targetBill.paidAmount || 0));
+      targetBill.outstandingBalance = targetBill.remainingBalance;
+    }
+
+    // Update consumer review notice
+    if (adj.reviewRequestId) {
+      const review = this.consumerBillingReviews.get(adj.reviewRequestId);
+      if (review) {
+        review.consumerVisibleNote = `Financial adjustment of ₹${adj.proposedAdjustmentAmount} applied to billing ledger. Revised payable amount: ₹${adj.proposedRevisedAmount}.`;
+      }
+    }
+
+    this.appendServerAuditLog(
+      session,
+      'FINANCIAL_ADJUSTMENT_APPLIED_TO_LEDGER',
+      adj.id,
+      `bill=${adj.billNo} amount=₹${adj.proposedAdjustmentAmount} actor=${session.user.name}`
+    );
+
+    this.emitMeterNotification({
+      eventKey: `NOT-MR-ADJ-APPLIED-${adj.id}`,
+      title: 'Adjustment applied to billing ledger',
+      message: `Adjustment ${adj.id} for Bill ${adj.billNo} has been applied to the official billing ledger.`,
+      targetRole: 'consumer',
+      type: 'success',
+      category: 'Billing',
+      consumerNo: adj.consumerNo
+    });
+
+    return deepClone(adj);
+  }
+
+  public issueBillFromApprovedReading(
+    signedToken: string,
+    readingId: string,
+    options?: { forceIssue?: boolean },
+    nowMs?: number
+  ): { created: boolean; bill: ElectricityBill; message: string } {
+    const session = requireServerRole(this.authService, signedToken, ['employee', 'admin'], nowMs);
+    const reading = this.meterReadings.find(r => r.id === readingId);
+    if (!reading) {
+      throw new AuthSecurityError(400, 'METER_READING_NOT_FOUND', `Meter reading ${readingId} was not found.`);
+    }
+
+    if (reading.status !== 'APPROVED') {
+      throw new AuthSecurityError(
+        409,
+        'READING_NOT_APPROVED',
+        `Bills can only be generated from verified and APPROVED meter readings. Reading ${readingId} is currently in '${reading.status}' status.`
+      );
+    }
+
+    const conn = this.connections.find(c => c.consumerNo === reading.consumerNo);
+    if (!conn) {
+      throw new AuthSecurityError(400, 'CONNECTION_NOT_FOUND', `Connection for consumer ${reading.consumerNo} not found.`);
+    }
+
+    // Role subdivision scoping
+    if (session.role === 'employee' && session.user.division) {
+      const userSub = session.user.division.toLowerCase().trim();
+      const connSub = conn.subdivision.toLowerCase().trim();
+      if (userSub && connSub && userSub !== connSub && !userSub.includes('circle') && !userSub.includes('headquarters')) {
+        throw new AuthSecurityError(
+          403,
+          'SUBDIVISION_UNAUTHORIZED',
+          `Employee is authorized for "${session.user.division}" but connection is in "${conn.subdivision}".`
+        );
+      }
+    }
+
+    // Idempotency: Check if a bill is already linked to this reading ID
+    const existingLinkedBill = this.bills.find(
+      b => b.readingId === readingId || b.auditMetadata?.linkedReadingId === readingId
+    );
+    if (existingLinkedBill) {
+      return {
+        created: false,
+        bill: deepClone(existingLinkedBill),
+        message: `A canonical bill (${existingLinkedBill.billNo}) has already been issued for this approved reading.`
+      };
+    }
+
+    // Call Phase 9 deterministic bi-monthly bill generator
+    const genResult = generateDeterministicBiMonthlyBillForConnection({
+      connection: conn,
+      existingBills: this.bills,
+      autoResolveNonOverlappingPeriod: true,
+      previousReadingKwh: reading.previousReadingKwh,
+      currentReadingKwh: reading.correctedReading !== undefined ? reading.correctedReading : reading.readingKwh,
+      meterMultiplier: reading.multiplier || 1,
+      meterResetOrReplacement: reading.replacementEvent
+        ? {
+            oldMeterNo: reading.replacementEvent.oldMeterNumber,
+            newMeterNo: reading.replacementEvent.newMeterNumber,
+            oldMeterPreviousReadingKwh: reading.replacementEvent.oldPreviousReading,
+            oldMeterFinalReadingKwh: reading.replacementEvent.oldFinalReading,
+            newMeterInitialReadingKwh: reading.replacementEvent.newInitialReading,
+            newMeterCurrentReadingKwh: reading.replacementEvent.newCurrentReading,
+            replacementDate: reading.replacementEvent.replacementDate,
+            reason: reading.replacementEvent.supportingEvidence
+          }
+        : null,
+      createdByRole: session.role,
+      createdByActor: `${session.user.name} (Approved Reading ${reading.id})`
+    });
+
+    if (!genResult.created || !genResult.bill) {
+      throw new AuthSecurityError(
+        409,
+        'BILL_GENERATION_FAILED',
+        genResult.reason || 'Phase 9 bill generation could not proceed.'
+      );
+    }
+
+    const issuedBill = genResult.bill;
+    issuedBill.readingId = reading.id;
+    issuedBill.readingProvenance = 'RECORDED';
+    if (!issuedBill.auditMetadata) {
+      issuedBill.auditMetadata = {
+        createdByRole: session.role,
+        createdByActor: session.user.name,
+        isDemoTariffAssumption: true
+      };
+    }
+    issuedBill.auditMetadata.linkedReadingId = reading.id;
+    issuedBill.auditMetadata.approvedBy = reading.reviewedBy;
+    issuedBill.auditMetadata.approvalNote = reading.reviewNote;
+
+    this.bills.unshift(issuedBill);
+    conn.lastBilledDate = issuedBill.billDate;
+
+    this.appendServerAuditLog(
+      session,
+      'BILL_ISSUED_FROM_APPROVED_READING',
+      issuedBill.billNo,
+      `consumer=${conn.consumerNo} reading=${reading.id} amount=₹${issuedBill.totalAmount}`
+    );
+
+    this.emitMeterNotification({
+      eventKey: `NOT-MR-BILL-${issuedBill.billNo}`,
+      title: 'Electricity bill issued',
+      message: `Bill ${issuedBill.billNo} for ₹${issuedBill.totalAmount} was issued from approved reading ${reading.id}.`,
+      targetRole: 'consumer',
+      type: 'info',
+      category: 'Billing',
+      consumerNo: conn.consumerNo
+    });
+
+    return {
+      created: true,
+      bill: deepClone(issuedBill),
+      message: `Idempotent Phase 9 bill ${issuedBill.billNo} issued successfully from approved reading.`
+    };
   }
 
   public getFinancialAdjustments(

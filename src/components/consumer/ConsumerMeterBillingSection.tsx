@@ -7,6 +7,7 @@ import {
   RefreshCw,
   Camera,
   Bell,
+  ShieldCheck,
   X
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -21,9 +22,10 @@ import type {
   MeterReadingRecord,
   StructuredAnomalyCase,
   ConsumerBillingReviewRequest,
-  BillingReviewCategory
+  BillingReviewCategory,
+  BillCheckResult
 } from '../../services/meterReading';
-import { validateDocumentUpload } from '../../utils/documentUpload';
+import { validateMeterPhoto, prepareMeterPhoto } from '../../services/meterOcr';
 
 interface Props {
   selectedConnection: ElectricityConnection | null;
@@ -48,6 +50,11 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Read-only Phase 9 Bill Validation State
+  const [validationBillNo, setValidationBillNo] = useState<string>(consumerBills[0]?.billNo || '');
+  const [billValidation, setBillValidation] = useState<BillCheckResult | null>(null);
+  const [isValidatingBill, setIsValidatingBill] = useState(false);
+
   // Modal State for New Billing Review Request
   const [isNewReviewModalOpen, setIsNewReviewModalOpen] = useState(false);
   const [selectedBillNo, setSelectedBillNo] = useState<string>(consumerBills[0]?.billNo || '');
@@ -57,8 +64,30 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
   const [attachedPhotoName, setAttachedPhotoName] = useState<string | null>(null);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
-  // Modal State for Inspecting an Existing Review
+  // Modal State for Inspecting an Existing Review + Private Evidence Photo
   const [inspectedReview, setInspectedReview] = useState<ConsumerBillingReviewRequest | null>(null);
+  const [inspectedReviewPhoto, setInspectedReviewPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!validationBillNo && consumerBills[0]?.billNo) {
+      setValidationBillNo(consumerBills[0].billNo);
+    }
+    if (!selectedBillNo && consumerBills[0]?.billNo) {
+      setSelectedBillNo(consumerBills[0].billNo);
+    }
+  }, [consumerBills, validationBillNo, selectedBillNo]);
+
+  // Escape key handler for modals
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (inspectedReview) setInspectedReview(null);
+        else if (isNewReviewModalOpen) setIsNewReviewModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [inspectedReview, isNewReviewModalOpen]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -98,6 +127,29 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
     void fetchData();
   }, [fetchData]);
 
+  // Fetch private evidence photo when consumer inspects an owned review
+  useEffect(() => {
+    setInspectedReviewPhoto(null);
+    if (!inspectedReview?.evidencePhotoId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/meter-readings/billing-reviews/${encodeURIComponent(inspectedReview.id)}/photo`, {
+          credentials: 'same-origin'
+        });
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          if (data.photo) setInspectedReviewPhoto(data.photo);
+        }
+      } catch {
+        // Ignore photo retrieval error
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [inspectedReview]);
+
   // Scoped readings for current selected connection
   const connectionReadings = useMemo(() => {
     if (!selectedConnection) return readings;
@@ -115,21 +167,50 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
     return anomalies.filter(a => a.consumerNo === selectedConnection.consumerNo);
   }, [anomalies, selectedConnection]);
 
-  // Handle Photo Attachment for Billing Review
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Read-only Phase 9 Canonical Bill Validation
+  const handleValidateBill = async () => {
+    if (!validationBillNo) return;
+    setIsValidatingBill(true);
+    try {
+      const res = await fetch(`/api/meter-readings/validate-bill?billNo=${encodeURIComponent(validationBillNo)}`, {
+        credentials: 'same-origin'
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        throw new Error(payload.error || mp.statusDiscrepancy);
+      }
+      setBillValidation(payload.validation);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : mp.statusDiscrepancy, 'error');
+    } finally {
+      setIsValidatingBill(false);
+    }
+  };
+
+  // Handle Photo Attachment for Billing Review (JPEG/PNG/WebP + Canvas EXIF/Metadata stripping)
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const validation = validateDocumentUpload(file);
-    if (!validation.valid) {
-      showToast(validation.reason || 'Invalid file', 'error');
+    const validationError = validateMeterPhoto(file);
+    if (validationError) {
+      showToast(validationError, 'error');
+      e.target.value = '';
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setAttachedPhotoDataUrl(String(reader.result));
+    try {
+      const prepared = await prepareMeterPhoto(file, 0);
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('Failed to read sanitized evidence photo.'));
+        reader.readAsDataURL(prepared.blob);
+      });
+      setAttachedPhotoDataUrl(dataUrl);
       setAttachedPhotoName(file.name);
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to sanitize evidence photo.', 'error');
+      e.target.value = '';
+    }
   };
 
   // Submit Billing Review
@@ -184,6 +265,7 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'APPROVED':
+      case 'APPLIED_TO_LEDGER':
         return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300';
       case 'PENDING_REVIEW':
         return 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300';
@@ -200,8 +282,13 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
     }
   };
 
+  const adjustedBills = useMemo(
+    () => consumerBills.filter(b => b.otherAdjustmentsInr !== undefined && b.otherAdjustmentsInr !== 0),
+    [consumerBills]
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" aria-live="polite">
       {/* SECTION HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-gradient-to-r from-cyan-50 via-white to-blue-50 dark:from-[#0f1f3d] dark:via-[#101c35] dark:to-[#0d1829] border border-cyan-200 dark:border-cyan-900/40 shadow-2xs">
         <div className="flex items-center gap-3">
@@ -260,7 +347,7 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
         </div>
       )}
 
-      {/* ANOMALY ALERTS (IF ANY FOR CURRENT CONSUMER) */}
+      {/* ANOMALY ALERTS (SAFE EXPLANATIONS ONLY, NO INTERNAL STAFF NOTES) */}
       {connectionAnomalies.length > 0 && (
         <div className="p-4 rounded-xl bg-amber-50/90 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 space-y-3">
           <div className="flex items-center gap-2">
@@ -297,9 +384,40 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
         </div>
       )}
 
+      {/* APPLIED BILL ADJUSTMENTS BANNER (IF ANY BILL HAS APPLIED ADJUSTMENTS) */}
+      {adjustedBills.length > 0 && (
+        <div className="p-4 rounded-xl bg-purple-50/80 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900/50 space-y-2 text-xs">
+          <div className="flex items-center gap-2 font-bold text-purple-900 dark:text-purple-200">
+            <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
+            <span>{localizePhase11Status('CORRECTED_THROUGH_ADJUSTMENT', language)}</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {adjustedBills.map(b => (
+              <div
+                key={b.billNo}
+                className="p-2.5 rounded-lg bg-white dark:bg-[#101C35] border border-purple-200/70 dark:border-purple-900/40 flex items-center justify-between gap-2"
+              >
+                <div>
+                  <span className="font-mono font-bold text-purple-700 dark:text-purple-300">{b.billNo}</span>
+                  <span className="text-slate-500 ml-2">({b.billMonth})</span>
+                </div>
+                <div className="text-right font-mono">
+                  <span className="text-emerald-600 font-bold">
+                    {b.otherAdjustmentsInr! < 0 ? `-₹${Math.abs(b.otherAdjustmentsInr!)}` : `+₹${b.otherAdjustmentsInr}`}
+                  </span>
+                  <span className="text-slate-600 dark:text-slate-300 ml-2">
+                    {mp.cnsBilledAmount}: ₹{b.totalAmount}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* GRID: METER OVERVIEW & ACTIVE BILLING REVIEWS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* CARD A: LATEST METER READING OVERVIEW */}
+        {/* CARD A: LATEST METER READING OVERVIEW & READING HISTORY */}
         <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
             <div className="flex items-center gap-2">
@@ -353,9 +471,27 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
                 </div>
               </div>
 
-              {latestReading.reviewNote && (
-                <div className="p-2.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/20 text-blue-900 dark:text-blue-200 text-[11px]">
-                  <strong>{mp.cnsPublicResolutionNote}:</strong> {latestReading.reviewNote}
+              {connectionReadings.length > 1 && (
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    {mp.wsRecentSubmissions} ({connectionReadings.length})
+                  </span>
+                  <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                    {connectionReadings.slice(0, 6).map(r => (
+                      <div
+                        key={r.id}
+                        className="p-2 rounded-lg bg-slate-50/70 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]"
+                      >
+                        <div className="font-mono">
+                          <span className="font-bold text-slate-800 dark:text-slate-200">{r.displayedReading} kWh</span>
+                          <span className="text-slate-400 ml-2">{new Date(r.readingAt).toLocaleDateString()}</span>
+                        </div>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getStatusBadge(r.status)}`}>
+                          {localizePhase11Status(r.status, language)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -391,7 +527,15 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
               {reviews.map(rev => (
                 <div
                   key={rev.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setInspectedReview(rev)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setInspectedReview(rev);
+                    }
+                  }}
                   className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-600 cursor-pointer transition-colors space-y-2 text-xs"
                 >
                   <div className="flex items-center justify-between">
@@ -425,6 +569,118 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
         </div>
       </div>
 
+      {/* READ-ONLY PHASE 9 CANONICAL BILL VALIDATION CARD */}
+      {consumerBills.length > 0 && (
+        <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                {mp.cnsTabBillValidation}
+              </h3>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <select
+                value={validationBillNo}
+                onChange={e => setValidationBillNo(e.target.value)}
+                aria-label={mp.cnsSelectBill}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
+              >
+                {consumerBills.map(b => (
+                  <option key={b.billNo} value={b.billNo}>
+                    {b.billNo} — {b.billMonth} (₹{b.totalAmount})
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => void handleValidateBill()}
+                disabled={isValidatingBill}
+                className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                {isValidatingBill ? mp.cnsValidating : mp.cnsValidateBillBtn}
+              </button>
+            </div>
+          </div>
+
+          {billValidation && (
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase">{mp.cnsValidationStatus}</span>
+                  <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded border mt-0.5 ${
+                    billValidation.status === 'CLEAR'
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-amber-100 text-amber-800 border-amber-300'
+                  }`}>
+                    {localizePhase11Status(billValidation.status, language)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase">{mp.cnsBilledAmount}</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-white">
+                    ₹{billValidation.recordedAmount}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase">{mp.cnsExpectedCanonical}</span>
+                  <span className="font-mono font-bold text-emerald-600">
+                    ₹{billValidation.expectedAmount}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase">{mp.cnsVariance}</span>
+                  <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                    ₹{Math.abs(Number((billValidation.recordedAmount - billValidation.expectedAmount).toFixed(2)))}
+                  </span>
+                </div>
+              </div>
+
+              {billValidation.comparison && billValidation.comparison.length > 0 && (
+                <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase text-[10px] border-b border-slate-200 dark:border-slate-800">
+                      <tr>
+                        <th className="p-2.5">{mp.cnsLineItem}</th>
+                        <th className="p-2.5 font-mono">{mp.cnsBilledCol}</th>
+                        <th className="p-2.5 font-mono">{mp.cnsCanonicalCol}</th>
+                        <th className="p-2.5 font-mono">{mp.cnsDiffCol}</th>
+                        <th className="p-2.5 text-center">{mp.cnsStatusCol}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {billValidation.comparison.map(item => (
+                        <tr key={item.lineItem}>
+                          <td className="p-2.5 font-medium text-slate-800 dark:text-slate-200">{item.lineItem}</td>
+                          <td className="p-2.5 font-mono">₹{item.recorded}</td>
+                          <td className="p-2.5 font-mono">₹{item.expected}</td>
+                          <td className="p-2.5 font-mono">₹{item.difference}</td>
+                          <td className="p-2.5 text-center">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              item.status === 'MATCH'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                            }`}>
+                              {localizePhase11Status(item.status, language)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {(billValidation.findings || []).length === 0 && (
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium">
+                  {mp.cnsNoDiscrepancies}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* METER & BILLING VERIFICATION NOTIFICATIONS */}
       {notifications.length > 0 && (
         <div className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
@@ -456,11 +712,16 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
 
       {/* MODAL: SUBMIT NEW BILLING REVIEW */}
       {isNewReviewModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cns-new-review-modal-title"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-white dark:bg-[#101C35] rounded-2xl max-w-lg w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                <h3 id="cns-new-review-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
                   {mp.cnsRequestBillingReviewTitle}
                 </h3>
                 <p className="text-xs text-slate-500">
@@ -470,6 +731,7 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => setIsNewReviewModalOpen(false)}
+                aria-label={t.common.close}
                 className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
@@ -535,7 +797,7 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
-                  onChange={handlePhotoSelect}
+                  onChange={e => void handlePhotoSelect(e)}
                   className="block w-full text-xs text-slate-700 dark:text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
                 />
                 {attachedPhotoName && (
@@ -568,12 +830,17 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
 
       {/* MODAL: INSPECT EXISTING BILLING REVIEW */}
       {inspectedReview && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cns-inspect-review-modal-title"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-white dark:bg-[#101C35] rounded-2xl max-w-lg w-full p-5 sm:p-6 border border-slate-200 dark:border-slate-800 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white font-mono">
+                  <h3 id="cns-inspect-review-modal-title" className="text-base font-bold text-slate-900 dark:text-white font-mono">
                     {inspectedReview.id}
                   </h3>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getStatusBadge(inspectedReview.status)}`}>
@@ -587,6 +854,7 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => setInspectedReview(null)}
+                aria-label={t.common.close}
                 className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
@@ -600,6 +868,17 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
                   {inspectedReview.description}
                 </p>
               </div>
+
+              {inspectedReviewPhoto && (
+                <div>
+                  <span className="text-[10px] uppercase text-slate-400 block font-semibold mb-1">{mp.wsLoadPhoto}</span>
+                  <img
+                    src={inspectedReviewPhoto}
+                    alt={inspectedReview.id}
+                    className="max-h-48 rounded-lg border border-slate-200 dark:border-slate-800 object-contain bg-slate-950"
+                  />
+                </div>
+              )}
 
               {inspectedReview.consumerVisibleNote && (
                 <div>
@@ -649,3 +928,4 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
     </div>
   );
 };
+

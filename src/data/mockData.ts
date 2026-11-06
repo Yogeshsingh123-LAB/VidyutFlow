@@ -967,3 +967,228 @@ export const INITIAL_FIELD_ENGINEERS: FieldEngineerRecord[] = [
   }
 ];
 
+export interface Phase11DemoScenarioSpec {
+  scenarioNumber: number;
+  id: string;
+  title: string;
+  category:
+    | 'CLEAR_OCR_APPROVAL'
+    | 'BLURRY_GLARE_MANUAL_CONFIRMATION'
+    | 'DECREASING_ROLLOVER_ANOMALY'
+    | 'UNEXPECTED_CONSUMPTION_SPIKE'
+    | 'DUPLICATE_AND_IDEMPOTENT_RETRY'
+    | 'METER_IDENTITY_MISMATCH'
+    | 'EMPLOYEE_APPROVAL'
+    | 'EMPLOYEE_REJECT_AND_REREAD'
+    | 'OFFLINE_FIELD_SYNC'
+    | 'PHASE9_CANONICAL_BILL_HANDOFF'
+    | 'BILL_CALCULATION_DISCREPANCY'
+    | 'BILLING_REVIEW_FINANCIAL_ADJUSTMENT';
+  consumerNo: string;
+  meterNo: string;
+  displayedReading: string;
+  readingKwh: number;
+  previousReadingKwh: number;
+  expectedOutcome: string;
+  synthetic: true;
+  demo: true;
+  ocrEngine: 'local-browser-tesseract';
+  disclaimer: string;
+}
+
+export const PHASE11_DEMO_SCENARIOS: Phase11DemoScenarioSpec[] = [
+  {
+    scenarioNumber: 1,
+    id: 'DEMO-P11-SCEN-01',
+    title: 'Clear photo showing 015180 with successful local OCR and immediate approval',
+    category: 'CLEAR_OCR_APPROVAL',
+    consumerNo: '04281-99231',
+    meterNo: 'UGVCL-MTR-004281',
+    displayedReading: '015180',
+    readingKwh: 15180,
+    previousReadingKwh: 14940,
+    expectedOutcome: 'Leading zero preserved (015180 -> 15180 kWh), 96.4% local OCR confidence, zero anomalies, APPROVED.',
+    synthetic: true,
+    demo: true,
+    ocrEngine: 'local-browser-tesseract',
+    disclaimer: 'DEMO / synthetic scenario using local browser OCR — not connected to production UGVCL systems.'
+  },
+  {
+    scenarioNumber: 2,
+    id: 'DEMO-P11-SCEN-02',
+    title: 'Blurry/glare photo requiring manual human confirmation',
+    category: 'BLURRY_GLARE_MANUAL_CONFIRMATION',
+    consumerNo: '04281-99231',
+    meterNo: 'UGVCL-MTR-004283',
+    displayedReading: '015820',
+    readingKwh: 15820,
+    previousReadingKwh: 15540,
+    expectedOutcome: 'Raw OCR 015B2O (58.2% confidence) flags ambiguous B->8 and O->0 digits and OCR_LOW_CONFIDENCE for human confirmation.',
+    synthetic: true,
+    demo: true,
+    ocrEngine: 'local-browser-tesseract',
+    disclaimer: 'DEMO / synthetic scenario using local browser OCR — not connected to production UGVCL systems.'
+  },
+  {
+    scenarioNumber: 3,
+    id: 'DEMO-P11-SCEN-03',
+    title: 'Reading below the previous verified reading (flagging rollover/anomaly)',
+    category: 'DECREASING_ROLLOVER_ANOMALY',
+    consumerNo: '04281-99231',
+    meterNo: 'UGVCL-MTR-004284',
+    displayedReading: '012000',
+    readingKwh: 12000,
+    previousReadingKwh: 14820,
+    expectedOutcome: 'Flags HIGH severity DECREASING_READING anomaly and blocks approval until rollover or meter replacement is verified.',
+    synthetic: true,
+    demo: true,
+    ocrEngine: 'local-browser-tesseract',
+    disclaimer: 'DEMO / synthetic scenario using local browser OCR — not connected to production UGVCL systems.'
+  },
+  {
+    scenarioNumber: 4,
+    id: 'DEMO-P11-SCEN-04',
+    title: 'Unexpected bi-monthly consumption increase triggering Billing Anomaly review',
+    category: 'UNEXPECTED_CONSUMPTION_SPIKE',
+    consumerNo: '04281-99231',
+    meterNo: 'UGVCL-MTR-004282',
+    displayedReading: '004120',
+    readingKwh: 4120,
+    previousReadingKwh: 3180,
+    expectedOutcome: '940 kWh in 60 days (15.67 kWh/day vs 5.40 kWh/day baseline) flags HIGH_CONSUMPTION without accusing consumer of fraud.',
+    synthetic: true,
+    demo: true,
+    ocrEngine: 'local-browser-tesseract',
+    disclaimer: 'DEMO / synthetic scenario using local browser OCR — not connected to production UGVCL systems.'
+  },
+  {
+    scenarioNumber: 5,
+    id: 'DEMO-P11-SCEN-05',
+    title: 'Duplicate submission blocked (409) and actor-scoped idempotent retry',
+    category: 'DUPLICATE_AND_IDEMPOTENT_RETRY',
+    consumerNo: '04281-99231',
+    meterNo: 'MTR-2024-884102',
+    displayedReading: '015180',
+    readingKwh: 15180,
+    previousReadingKwh: 14820,
+    expectedOutcome: 'Same clientUuid + actor + payload returns original reading idempotently; new UUID with identical reading/timestamp returns 409 DUPLICATE_READING.',
+    synthetic: true,
+    demo: true,
+    ocrEngine: 'local-browser-tesseract',
+    disclaimer: 'DEMO / synthetic scenario using local browser OCR — not connected to production UGVCL systems.'
+  },
+  {
+    scenarioNumber: 6,
+    id: 'DEMO-P11-SCEN-06',
+    title: 'Meter identity mismatch between photographed serial and connection record',
+    category: 'METER_IDENTITY_MISMATCH',
+    consumerNo: '04281-99231',
+    meterNo: 'MTR-9999-MISMATCH',
+    displayedReading: '015200',
+    readingKwh: 15200,
+    previousReadingKwh: 14820,
+    expectedOutcome: 'Flags HIGH severity IDENTITY_MISMATCH anomaly and blocks approval until resolved.',
+    synthetic: true,
+    demo: true,
+    ocrEngine: 'local-browser-tesseract',
+    disclaimer: 'DEMO / synthetic scenario using local browser OCR — not connected to production UGVCL systems.'
+  },
+  {
+    scenarioNumber: 7,
+    id: 'DEMO-P11-SCEN-07',
+    title: 'Employee maker-checker approval with audit trail',
+    category: 'EMPLOYEE_APPROVAL',
+    consumerNo: '04281-99231',
+    meterNo: 'MTR-2024-884102',
+    displayedReading: '015180',
+    readingKwh: 15180,
+    previousReadingKwh: 14820,
+    expectedOutcome: 'Authorized subdivision employee approves pending reading, appends immutable reviewHistory entry, and notifies consumer.',
+    synthetic: true,
+    demo: true,
+    ocrEngine: 'local-browser-tesseract',
+    disclaimer: 'DEMO / synthetic scenario using local browser OCR — not connected to production UGVCL systems.'
+  },
+  {
+    scenarioNumber: 8,
+    id: 'DEMO-P11-SCEN-08',
+    title: 'Employee rejection and re-reading request to assigned Field Engineer',
+    category: 'EMPLOYEE_REJECT_AND_REREAD',
+    consumerNo: '04281-99231',
+    meterNo: 'MTR-2024-884102',
+    displayedReading: '015310',
+    readingKwh: 15310,
+    previousReadingKwh: 14820,
+    expectedOutcome: 'REREAD decision transitions reading to REREAD_REQUESTED and dispatches deduplicated notification to assigned Field Engineer.',
+    synthetic: true,
+    demo: true,
+    ocrEngine: 'local-browser-tesseract',
+    disclaimer: 'DEMO / synthetic scenario using local browser OCR — not connected to production UGVCL systems.'
+  },
+  {
+    scenarioNumber: 9,
+    id: 'DEMO-P11-SCEN-09',
+    title: 'Offline Field Engineer submission and duplicate-safe synchronization',
+    category: 'OFFLINE_FIELD_SYNC',
+    consumerNo: '04281-99231',
+    meterNo: 'MTR-2024-884102',
+    displayedReading: '015310',
+    readingKwh: 15310,
+    previousReadingKwh: 14820,
+    expectedOutcome: 'Queues metadata in localStorage and photo blob in IndexedDB (meter_reading_photos), then replays idempotently with client_uuid on reconnect.',
+    synthetic: true,
+    demo: true,
+    ocrEngine: 'local-browser-tesseract',
+    disclaimer: 'DEMO / synthetic scenario using local browser OCR — not connected to production UGVCL systems.'
+  },
+  {
+    scenarioNumber: 10,
+    id: 'DEMO-P11-SCEN-10',
+    title: 'Correct Phase 9 canonical bi-monthly bill generation after authorized approval',
+    category: 'PHASE9_CANONICAL_BILL_HANDOFF',
+    consumerNo: '04281-99231',
+    meterNo: 'MTR-2024-884102',
+    displayedReading: '015400',
+    readingKwh: 15400,
+    previousReadingKwh: 14820,
+    expectedOutcome: 'Generates deterministic bi-monthly bill via Phase 9 generateDeterministicBiMonthlyBillForConnection with readingProvenance RECORDED.',
+    synthetic: true,
+    demo: true,
+    ocrEngine: 'local-browser-tesseract',
+    disclaimer: 'DEMO / synthetic scenario using local browser OCR — not connected to production UGVCL systems.'
+  },
+  {
+    scenarioNumber: 11,
+    id: 'DEMO-P11-SCEN-11',
+    title: 'Read-only bill calculation discrepancy detection against Phase 9 tariff engine',
+    category: 'BILL_CALCULATION_DISCREPANCY',
+    consumerNo: '04281-99231',
+    meterNo: 'MTR-2024-884102',
+    displayedReading: '015120',
+    readingKwh: 15120,
+    previousReadingKwh: 14820,
+    expectedOutcome: 'Detects TARIFF_SLAB_MISMATCH / FIXED_CHARGE_MISMATCH / DUPLICATE_BILL without mutating historical bills or payments.',
+    synthetic: true,
+    demo: true,
+    ocrEngine: 'local-browser-tesseract',
+    disclaimer: 'DEMO / synthetic scenario using local browser OCR — not connected to production UGVCL systems.'
+  },
+  {
+    scenarioNumber: 12,
+    id: 'DEMO-P11-SCEN-12',
+    title: 'Billing review completed with an append-only financial adjustment',
+    category: 'BILLING_REVIEW_FINANCIAL_ADJUSTMENT',
+    consumerNo: '04281-99231',
+    meterNo: 'MTR-2024-884102',
+    displayedReading: '015080',
+    readingKwh: 15080,
+    previousReadingKwh: 14820,
+    expectedOutcome: 'Employee proposes SLAB_CORRECTION credit, Admin approves under separation of duties, and ledger entry is applied without overwriting historical bill.',
+    synthetic: true,
+    demo: true,
+    ocrEngine: 'local-browser-tesseract',
+    disclaimer: 'DEMO / synthetic scenario using local browser OCR — not connected to production UGVCL systems.'
+  }
+];
+
+

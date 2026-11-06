@@ -12,7 +12,8 @@ from sqlalchemy import inspect as sa_inspect, text
 from sqlalchemy.exc import OperationalError
 from .db import Base, engine, SessionLocal, check_database_health
 from . import models  # noqa
-from .routers import auth, requests, assistant, system, notifications, erp, workflows, staff, evidence, directory, consumer_profile, transformers, billing
+from .routers import auth, requests, assistant, system, notifications, erp, workflows, staff, evidence, directory, consumer_profile, transformers, billing, meter_readings
+from .routers.meter_readings import seed_phase11_demo_records
 from .routers.staff import ensure_subdivision_zones
 from .erp_adapter import record_erp_sync
 from .alerts import evaluate_and_dispatch_alerts
@@ -401,6 +402,8 @@ async def lifespan(_app):
         reject_seeded_demo_accounts()
     else:
         seed(); seed_requests()
+        with SessionLocal() as p11_db:
+            seed_phase11_demo_records(p11_db)
 
     scheduler_task = None
     if getattr(settings, "enable_transformer_scheduler", False):
@@ -448,6 +451,23 @@ class ApiVersionPrefixMiddleware:
                 rewritten = path[7:] or "/"
             elif path == "/api" or path.startswith("/api/"):
                 rewritten = path[4:] or "/"
+
+            if rewritten is not None:
+                path = rewritten
+
+            alias_map = (
+                ("/meter-anomalies", "/meter-readings/cases"),
+                ("/billing-reviews", "/meter-readings/billing-reviews"),
+                ("/financial-adjustments", "/meter-readings/adjustments"),
+                ("/meter-metrics", "/meter-readings/metrics"),
+                ("/meter-thresholds", "/meter-readings/thresholds"),
+                ("/meter-config/", "/meter-readings/config/"),
+                ("/bills/validate/", "/meter-readings/validate-bill/"),
+            )
+            for prefix, target in alias_map:
+                if path == prefix or path.startswith(prefix + "/") or (prefix.endswith("/") and path.startswith(prefix)):
+                    rewritten = target + path[len(prefix):]
+                    break
 
             if rewritten is not None:
                 scope = dict(scope)
@@ -547,3 +567,9 @@ app.include_router(transformers.policies_router, prefix="/api", include_in_schem
 app.include_router(billing.router)
 app.include_router(billing.router, prefix="/api", include_in_schema=False)
 app.include_router(billing.router, prefix="/api/v1", include_in_schema=False)
+
+app.include_router(meter_readings.router)
+app.include_router(meter_readings.router, prefix="/api", include_in_schema=False)
+app.include_router(meter_readings.router, prefix="/api/v1", include_in_schema=False)
+app.include_router(meter_readings.router, prefix="/v1", include_in_schema=False)
+

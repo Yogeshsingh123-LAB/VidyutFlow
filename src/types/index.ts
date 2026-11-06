@@ -34,6 +34,9 @@ export interface BillAuditMetadata {
   createdByActor?: string;
   calculationNotes?: string;
   isDemoTariffAssumption?: boolean;
+  linkedReadingId?: string;
+  approvedBy?: string;
+  approvalNote?: string;
 }
 
 export interface ElectricityConnection {
@@ -47,13 +50,17 @@ export interface ElectricityConnection {
   address: string;
   subdivision: string;
   feederName: string;
+  feederId?: string;
   status: 'Active' | 'Disconnection Notice' | 'Suspended' | 'New Installation';
   connectedDate: string;
   lastReadingDate: string;
+  lastBilledDate?: string;
   currentReadingKwh: number;
   previousReadingKwh: number;
   averageMonthlyKwh: number;
   securityDeposit: number;
+  multiplier?: number;
+  decimalPlaces?: number;
   accountId?: string;
   accountEmail?: string;
   billingCycleType?: BillingCycleType;
@@ -75,6 +82,8 @@ export interface ElectricityBill {
   billNo: string;
   consumerNo: string;
   connectionId?: string;
+  readingId?: string;
+  isIssued?: boolean;
   billMonth: string;
   billDate: string;
   dueDate: string;

@@ -191,7 +191,8 @@ export type MeterAnomalyCategory =
   | 'BILL_CALCULATION_MISMATCH'
   | 'PAYMENT_LINKAGE_MISMATCH'
   | 'INCORRECT_READING_LINKAGE'
-  | 'OCR_LOW_CONFIDENCE';
+  | 'OCR_LOW_CONFIDENCE'
+  | 'OCR_MANUAL_OVERRIDE';
 
 export interface AmbiguousDigitNotice {
   position: number;
@@ -215,6 +216,19 @@ export interface MeterOCRResult {
   isCropped?: boolean;
 }
 
+export interface AuditableMeterReplacementEvent {
+  oldMeterNumber: string;
+  oldPreviousReading: number;
+  oldFinalReading: number;
+  replacementDate: string;
+  newMeterNumber: string;
+  newInitialReading: number;
+  newCurrentReading: number;
+  authorizedActor: string;
+  supportingEvidence: string;
+  workOrderId?: string;
+}
+
 export interface MeterReadingRecord {
   id: string;
   clientUuid: string;
@@ -226,17 +240,33 @@ export interface MeterReadingRecord {
   multiplier: number;
   meterEvent?: 'ordinary' | 'rollover' | 'replacement';
   rolloverAt?: number;
+  replacementEvent?: AuditableMeterReplacementEvent;
   readingAt: string;
   previousReadingKwh?: number;
   consumedUnits?: number;
   intervalDays?: number;
   status: MeterReadingStatus;
+  submittedById?: string;
   submittedBy: string;
   submittedRole: string;
   submittedAt: string;
+  reviewedById?: string;
   reviewedBy?: string;
   reviewedAt?: string;
   reviewNote?: string;
+  correctedReading?: number;
+  reviewHistory?: Array<{
+    id: string;
+    readingId: string;
+    action: string;
+    previousStatus: string;
+    newStatus: string;
+    actorId: string;
+    actorName: string;
+    actorRole: string;
+    note: string;
+    timestamp: string;
+  }>;
   ocr?: MeterOCRResult;
   photoId?: string;
   anomalies: MeterAnomaly[];
@@ -267,6 +297,7 @@ export interface MeterReadingSubmission {
   decimalPlaces?: number;
   meterEvent?: 'ordinary' | 'rollover' | 'replacement';
   rolloverAt?: number;
+  replacementEvent?: AuditableMeterReplacementEvent;
   ocr?: MeterOCRResult;
   photoDataUrl?: string;
 }
@@ -326,6 +357,9 @@ export interface MeterConfiguration {
   multiplier: number;
   decimalPlaces: number;
   rolloverAt?: number;
+  digitsBeforeDecimal?: number;
+  leadingZeroLength?: number;
+  displayType?: 'DIGITAL_LCD' | 'ELECTROMECHANICAL_CYCLOMETER' | 'SMART_LED';
   version: number;
   source: 'DEMO_DEFAULT' | 'ADMIN_CONFIGURED';
 }

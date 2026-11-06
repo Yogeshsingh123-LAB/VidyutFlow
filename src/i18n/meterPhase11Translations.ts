@@ -1174,6 +1174,14 @@ export function localizePhase11Status(status: string, lang: LanguageCode): strin
       return dict.statusClosed;
     case 'PENDING_APPROVAL':
       return dict.statusPendingApproval;
+    case 'APPLIED_TO_LEDGER':
+      return lang === 'gu'
+        ? 'લેજરમાં લાગુ'
+        : lang === 'hi'
+          ? 'लेजर में लागू'
+          : lang === 'mr'
+            ? 'लेजरमध्ये लागू'
+            : 'Applied to Ledger';
     case 'CLEAR':
       return dict.statusClear;
     case 'REVIEW':
@@ -1278,6 +1286,16 @@ export function localizeMeterNotification(
       hi: 'मीटर रीडिंग सबमिट की गई',
       mr: 'मीटर रीडिंग सबमिट केले'
     },
+    'Meter reading requires review': {
+      gu: 'મીટર રીડિંગને સમીક્ષાની જરૂર છે',
+      hi: 'मीटर रीडिंग की समीक्षा आवश्यक है',
+      mr: 'मीटर रीडिंगच्या पुनरावलोकनाची आवश्यकता आहे'
+    },
+    'Anomaly detected on meter reading': {
+      gu: 'મીટર રીડિંગ પર વિસંગતતા મળી',
+      hi: 'मीटर रीडिंग पर विसंगति का पता चला',
+      mr: 'मीटर रीडिंगवर विसंगती आढळली'
+    },
     'Meter reading approved': {
       gu: 'મીટર રીડિંગ મંજૂર થયું',
       hi: 'मीटर रीडिंग स्वीकृत हुई',
@@ -1343,15 +1361,30 @@ export function localizeMeterNotification(
       hi: 'वित्तीय समायोजन अस्वीकृत हुआ',
       mr: 'आर्थिक समायोजन नामंजूर झाले'
     },
+    'Bill adjustment approved': {
+      gu: 'બિલ સુધારો મંજૂર થયો',
+      hi: 'बिल समायोजन स्वीकृत हुआ',
+      mr: 'बिल समायोजन मंजूर झाले'
+    },
     'Bill adjustment applied': {
       gu: 'બિલ સુધારો લાગુ કરવામાં આવ્યો',
       hi: 'बिल समायोजन लागू किया गया',
       mr: 'बिल समायोजन लागू केले'
     },
+    'Adjustment applied to billing ledger': {
+      gu: 'બિલિંગ લેજરમાં સુધારો લાગુ કરવામાં આવ્યો',
+      hi: 'बिलिंग लेजर में समायोजन लागू किया गया',
+      mr: 'बिलिंग लेजरमध्ये समायोजन लागू केले'
+    },
     'Bill adjustment review completed': {
       gu: 'બિલ સુધારા સમીક્ષા પૂર્ણ થઈ',
       hi: 'बिल समायोजन समीक्षा पूर्ण हुई',
       mr: 'बिल समायोजन पुनरावलोकन पूर्ण झाले'
+    },
+    'Electricity bill issued': {
+      gu: 'વીજ બિલ જારી કરવામાં આવ્યું',
+      hi: 'बिजली बिल जारी किया गया',
+      mr: 'वीज बिल जारी केले गेले'
     }
   };
 
@@ -1367,6 +1400,36 @@ export function localizeMeterNotification(
         : lang === 'hi'
           ? `रीडिंग ${subMatch[1]} कर्मचारी समीक्षा की प्रतीक्षा में है।`
           : `रीडिंग ${subMatch[1]} कर्मचारी पुनरावलोकनाच्या प्रतीक्षेत आहे.`;
+  }
+
+  const subCnsMatch = message.match(/^Reading ([A-Z0-9-]+) for Connection ([A-Z0-9-]+) has been submitted for verification\.$/);
+  if (subCnsMatch) {
+    localizedMsg =
+      lang === 'gu'
+        ? `જોડાણ ${subCnsMatch[2]} માટે રીડિંગ ${subCnsMatch[1]} ચકાસણી માટે સબમિટ કરવામાં આવ્યું છે.`
+        : lang === 'hi'
+          ? `कनेक्शन ${subCnsMatch[2]} के लिए रीडिंग ${subCnsMatch[1]} सत्यापन हेतु सबमिट की गई है।`
+          : `जोडणी ${subCnsMatch[2]} साठी रीडिंग ${subCnsMatch[1]} पडताळणीसाठी सबमिट केले आहे.`;
+  }
+
+  const reqRevMatch = message.match(/^Reading ([A-Z0-9-]+) on Connection ([A-Z0-9-]+) flagged (\d+) anomaly check\(s\) for review\.$/);
+  if (reqRevMatch) {
+    localizedMsg =
+      lang === 'gu'
+        ? `જોડાણ ${reqRevMatch[2]} પર રીડિંગ ${reqRevMatch[1]} માં સમીક્ષા માટે ${reqRevMatch[3]} વિસંગતતા ચકાસણી ચિહ્નિત થઈ છે.`
+        : lang === 'hi'
+          ? `कनेक्शन ${reqRevMatch[2]} पर रीडिंग ${reqRevMatch[1]} में समीक्षा के लिए ${reqRevMatch[3]} विसंगति जांच चिह्नित की गई।`
+          : `जोडणी ${reqRevMatch[2]} वरील रीडिंग ${reqRevMatch[1]} मध्ये पुनरावलोकनासाठी ${reqRevMatch[3]} विसंगती तपासण्या चिन्हांकित केल्या आहेत.`;
+  }
+
+  const anoDetCnsMatch = message.match(/^Reading ([A-Z0-9-]+) on Connection ([A-Z0-9-]+) is queued for technical review\.$/);
+  if (anoDetCnsMatch) {
+    localizedMsg =
+      lang === 'gu'
+        ? `જોડાણ ${anoDetCnsMatch[2]} પર રીડિંગ ${anoDetCnsMatch[1]} તકનીકી સમીક્ષા માટે કતારમાં છે.`
+        : lang === 'hi'
+          ? `कनेक्शन ${anoDetCnsMatch[2]} पर रीडिंग ${anoDetCnsMatch[1]} तकनीकी समीक्षा के लिए कतार में है।`
+          : `जोडणी ${anoDetCnsMatch[2]} वरील रीडिंग ${anoDetCnsMatch[1]} तांत्रिक पुनरावलोकनासाठी रांगेत आहे.`;
   }
 
   const revMatch = message.match(/^Meter reading ([A-Z0-9-]+) was (.+)\.$/);
@@ -1473,6 +1536,16 @@ export function localizeMeterNotification(
           : `बिल ${adjRevEmpMatch[2]} (जोडणी ${adjRevEmpMatch[3]}) साठी समायोजन ${adjRevEmpMatch[1]} ${statusWord}.`;
   }
 
+  const adjAppQueued = message.match(/^An authorized adjustment of ₹([0-9.]+) for Bill ([A-Z0-9-]+) has been approved and is queued for ledger application\.$/);
+  if (adjAppQueued) {
+    localizedMsg =
+      lang === 'gu'
+        ? `બિલ ${adjAppQueued[2]} માટે ₹${adjAppQueued[1]} નો અધિકૃત સુધારો મંજૂર થયો છે અને લેજર લાગુ કરવા માટે કતારમાં છે.`
+        : lang === 'hi'
+          ? `बिल ${adjAppQueued[2]} के लिए ₹${adjAppQueued[1]} का अधिकृत समायोजन स्वीकृत हो गया है और लेजर में लागू करने हेतु कतार में है।`
+          : `बिल ${adjAppQueued[2]} साठी ₹${adjAppQueued[1]} चे अधिकृत समायोजन मंजूर झाले असून लेजरमध्ये लागू करण्यासाठी रांगेत आहे.`;
+  }
+
   const adjApplied = message.match(/^An authorized adjustment of ₹([0-9.]+) was applied to Bill ([A-Z0-9-]+)\. Revised payable amount: ₹([0-9.]+)\.$/);
   if (adjApplied) {
     localizedMsg =
@@ -1481,6 +1554,16 @@ export function localizeMeterNotification(
         : lang === 'hi'
           ? `बिल ${adjApplied[2]} पर ₹${adjApplied[1]} का अधिकृत समायोजन लागू किया गया। संशोधित देय राशि: ₹${adjApplied[3]}।`
           : `बिल ${adjApplied[2]} वर ₹${adjApplied[1]} चे अधिकृत समायोजन लागू केले गेले. सुधारित देय रक्कम: ₹${adjApplied[3]}.`;
+  }
+
+  const adjLedgerEmp = message.match(/^Adjustment ([A-Z0-9-]+) for Bill ([A-Z0-9-]+) \(Connection ([A-Z0-9-]+)\) has been applied to the official billing ledger\.$/);
+  if (adjLedgerEmp) {
+    localizedMsg =
+      lang === 'gu'
+        ? `બિલ ${adjLedgerEmp[2]} (જોડાણ ${adjLedgerEmp[3]}) માટે સુધારો ${adjLedgerEmp[1]} સત્તાવાર બિલિંગ લેજરમાં લાગુ કરવામાં આવ્યો છે.`
+        : lang === 'hi'
+          ? `बिल ${adjLedgerEmp[2]} (कनेक्शन ${adjLedgerEmp[3]}) के लिए समायोजन ${adjLedgerEmp[1]} आधिकारिक बिलिंग लेजर में लागू किया गया है।`
+          : `बिल ${adjLedgerEmp[2]} (जोडणी ${adjLedgerEmp[3]}) साठी समायोजन ${adjLedgerEmp[1]} अधिकृत बिलिंग लेजरमध्ये लागू केले आहे.`;
   }
 
   const adjRejectedCns = message.match(/^The financial adjustment review for Bill ([A-Z0-9-]+) was completed with no change to the billed amount: ₹([0-9.]+)\.$/);
@@ -1493,5 +1576,16 @@ export function localizeMeterNotification(
           : `बिल ${adjRejectedCns[1]} साठी आर्थिक समायोजन पुनरावलोकन बिलाच्या रकमेत कोणताही बदल न करता पूर्ण झाले: ₹${adjRejectedCns[2]}.`;
   }
 
+  const billIssuedMatch = message.match(/^Bill ([A-Z0-9-]+) for ₹([0-9.]+) was issued from approved reading ([A-Z0-9-]+)\.$/);
+  if (billIssuedMatch) {
+    localizedMsg =
+      lang === 'gu'
+        ? `મંજૂર રીડિંગ ${billIssuedMatch[3]} પરથી ₹${billIssuedMatch[2]} નું બિલ ${billIssuedMatch[1]} જારી કરવામાં આવ્યું છે.`
+        : lang === 'hi'
+          ? `स्वीकृत रीडिंग ${billIssuedMatch[3]} से ₹${billIssuedMatch[2]} का बिल ${billIssuedMatch[1]} जारी किया गया है।`
+          : `मंजूर रीडिंग ${billIssuedMatch[3]} वरून ₹${billIssuedMatch[2]} चे बिल ${billIssuedMatch[1]} जारी केले गेले आहे.`;
+  }
+
   return { title: localizedTitle, message: localizedMsg };
 }
+
