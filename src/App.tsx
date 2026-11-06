@@ -65,7 +65,7 @@ const PortalRouter: React.FC = () => {
 };
 
 const MainExperience: React.FC = () => {
-  const { hasEnteredPlatform, demoSession, currentRole } = useApp();
+  const { hasEnteredPlatform, demoSession, currentRole, activeTab } = useApp();
 
   // Multi-tier client access guard:
   // Access to privileged workspace views requires hasEnteredPlatform AND a valid demo session matching currentRole
@@ -75,6 +75,9 @@ const MainExperience: React.FC = () => {
     isValidDemoSession(demoSession) &&
     demoSession.role === currentRole
   );
+
+  const showMeterReadingWorkspace =
+    (currentRole === 'consumer' || currentRole === 'field') && activeTab === 'outage-map';
 
   return !isAuthorized ? (
     <ErrorBoundary scope="app">
@@ -102,7 +105,7 @@ const MainExperience: React.FC = () => {
     <ErrorBoundary scope="app">
       <Suspense fallback={<PortalLoadingFallback role={currentRole} />}>
         <AppShell>
-          <MeterReadingWorkspace />
+          {showMeterReadingWorkspace && <MeterReadingWorkspace />}
           <PortalRouter />
         </AppShell>
       </Suspense>

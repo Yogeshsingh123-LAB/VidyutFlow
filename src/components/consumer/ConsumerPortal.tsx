@@ -1960,6 +1960,7 @@ export const ConsumerPortal: React.FC = () => {
               selectedConnection={selectedConnection}
               consumerBills={consumerBills}
               onRequestSelfReading={() => {
+                setActiveTab('outage-map');
                 showToast('Open the top-bar Meter Reading & Bill Review workspace to perform optical scan.', 'info');
               }}
             />
