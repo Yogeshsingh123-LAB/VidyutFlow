@@ -5,7 +5,7 @@ import {
   clearBackendSession,
 } from '../utils/backendSession';
 import { clearOfflineFieldQueue } from '../utils/offlineFieldSync';
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import {
   UserRole,
   NewConnectionApplication,
@@ -177,7 +177,8 @@ import {
   reassignTransformerMaintenanceOrder,
   startTransformerMaintenanceWorkOrder,
   submitTransformerInspectionOrderForReview,
-  completeTransformerMaintenanceOrder
+  completeTransformerMaintenanceOrder,
+  syncFieldEngineersWorkload
 } from '../utils/transformerMaintenanceEngine';
 import {
   ConsumerAccountBillingSummary,
@@ -1834,6 +1835,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { saveStorage('vidyutflow_late_charge_waivers', lateChargeWaivers); }, [lateChargeWaivers]);
   useEffect(() => { saveStorage('vidyutflow_payment_reversals', paymentReversals); }, [paymentReversals]);
 
+  // Enterprise-wide dynamic active workload synchronization
+  useEffect(() => {
+    setFieldEngineers(prev => syncFieldEngineersWorkload(prev, workOrders));
+  }, [workOrders]);
+
   useEffect(() => {
     fieldOfflineQueueRef.current = fieldOfflineQueue;
   }, [fieldOfflineQueue]);
@@ -1903,11 +1909,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Theme standardized to clean light theme with dark navy sidebar
   };
 
-  const dismissToast = (id: string) => {
+  const dismissToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
-  };
+  }, []);
 
-  const showToast = (message: string, type: ToastMessage['type'] = 'info') => {
+  const showToast = useCallback((message: string, type: ToastMessage['type'] = 'info') => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts(prev => {
       const deduplicated = prev.filter(t => t.message !== message);
@@ -1916,7 +1922,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTimeout(() => {
       dismissToast(id);
     }, 3500);
-  };
+  }, [dismissToast]);
 
   // Authenticated session role is the authorization source of truth
   const effectiveRole: UserRole = demoSession ? demoSession.role : currentRole;

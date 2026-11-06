@@ -28,6 +28,7 @@ import {
   UGVCL_CORPORATE_IDENTITY,
 } from './UgvclBrandIdentity';
 import { UgvclElectricityBillTwoPage } from '../consumer/UgvclElectricityBillTwoPage';
+import { UgvclApplicationAcknowledgmentA4 } from '../consumer/UgvclApplicationAcknowledgmentA4';
 
 interface OfficialDocumentModalProps {
   document: GeneratedOfficialDocument | null;
@@ -240,6 +241,14 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                       )
                   : undefined
               }
+            />
+          ) : (document.documentType === 'application_acknowledgment' ||
+              document.documentType === 'service_request_acknowledgment') &&
+            document.authorized &&
+            document.eligible ? (
+            <UgvclApplicationAcknowledgmentA4
+              document={document}
+              language={document.language}
             />
           ) : (
             <>

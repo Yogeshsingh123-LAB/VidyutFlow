@@ -4569,6 +4569,21 @@ export function generateApplicationAcknowledgmentDocument(
       isMono: true,
     });
   }
+  if (rawApp.phone) {
+    applicantFields.push({
+      key: 'phone',
+      label: language === 'gu' ? 'મોબાઇલ નંબર' : language === 'hi' ? 'मोबाइल नंबर' : language === 'mr' ? 'मोबाईल क्र.' : 'Registered Mobile',
+      value: rawApp.phone,
+      isMono: true,
+    });
+  }
+  if (rawApp.email) {
+    applicantFields.push({
+      key: 'email',
+      label: language === 'gu' ? 'ઇમેઇલ' : language === 'hi' ? 'ईमेल' : language === 'mr' ? 'ईमेल' : 'Registered Email',
+      value: rawApp.email,
+    });
+  }
   if (rawApp.address) {
     applicantFields.push({
       key: 'address',
@@ -4638,6 +4653,40 @@ export function generateApplicationAcknowledgmentDocument(
     });
   }
 
+  const submittedDocs = Array.isArray(rawApp.documentsSubmitted) && rawApp.documentsSubmitted.length > 0
+    ? rawApp.documentsSubmitted
+    : [
+        'Premises Ownership Deed / Property Tax Receipt',
+        'Aadhaar Card (Applicant Identity Verification)',
+        'Electrical Contractor Test Report (Form A)'
+      ];
+
+  const docTableRows = submittedDocs.map((docName, idx) => {
+    const isVerified = (rawApp.workflowStep || 1) >= 2 && !rawApp.clarificationRequested && rawApp.status !== 'Rejected';
+    return {
+      srNo: String(idx + 1),
+      docName: localizeDocumentName(docName, language),
+      status: isVerified
+        ? (language === 'gu' ? 'ચકાસાયેલ (Verified)' : language === 'hi' ? 'सत्यापित (Verified)' : language === 'mr' ? 'सत्यापित (Verified)' : 'Submitted & Verified')
+        : (language === 'gu' ? 'ચકાસણી હેઠળ (Under Scrutiny)' : language === 'hi' ? 'जांच के अधीन (Under Scrutiny)' : language === 'mr' ? 'छाननी सुरू (Under Scrutiny)' : 'Submitted - Under Scrutiny'),
+      mandatory: (language === 'gu' ? 'ફરજિયાત KYC' : language === 'hi' ? 'अनिवार्य KYC' : language === 'mr' ? 'अनिवार्य KYC' : 'Mandatory KYC'),
+      submissionMode: (language === 'gu' ? 'ડિજિટલ પોર્ટલ અપલોડ' : language === 'hi' ? 'डिजिटल पोर्टल अपलोड' : language === 'mr' ? 'डिजिटल पोर्टल अपलोड' : 'Digital Upload (Portal)')
+    };
+  });
+
+  const docTable: PdfDocumentTable = {
+    id: 'submitted-documents',
+    title: language === 'gu' ? 'સબમિટ કરેલ દસ્તાવેજો અને ચકાસણી સ્થિતિ' : language === 'hi' ? 'प्रस्तुत दस्तावेज़ और सत्यापन स्थिति' : language === 'mr' ? 'सादर केलेली कागदपत्रे आणि पडताळणी स्थिती' : 'Schedule of Submitted Documents & Verification Status',
+    columns: [
+      { key: 'srNo', header: '#', align: 'center' },
+      { key: 'docName', header: language === 'gu' ? 'દસ્તાવેજ વિગત' : language === 'hi' ? 'दस्तावेज़ विवरण' : language === 'mr' ? 'कागदपत्र तपशील' : 'Document Description', align: 'left' },
+      { key: 'status', header: language === 'gu' ? 'ચકાસણી સ્થિતિ' : language === 'hi' ? 'सत्यापन स्थिति' : language === 'mr' ? 'पडताळणी स्थिती' : 'Verification Status', align: 'center' },
+      { key: 'submissionMode', header: language === 'gu' ? 'મોડ' : language === 'hi' ? 'माध्यम' : language === 'mr' ? 'माध्यम' : 'Submission Mode', align: 'left' },
+    ],
+    rows: docTableRows,
+    footerNote: language === 'gu' ? 'સબ-ડિવિઝનલ કચેરી દ્વારા ડિજિટલ સ્ક્રુટિની પૂર્ણ થયા પછી સ્થળ તપાસણી હાથ ધરવામાં આવશે.' : language === 'hi' ? 'सब-डिवीजनल कार्यालय द्वारा डिजिटल जांच पूर्ण होने के बाद स्थल निरीक्षण किया जाएगा।' : language === 'mr' ? 'सब-डिव्हिजन कार्यालयाकडून डिजिटल तपासणी पूर्ण झाल्यानंतर स्थळ पाहणी केली जाईल.' : 'Physical verification of original documents will be conducted during the Junior Engineer site inspection.'
+  };
+
   return {
     documentType: docType,
     displayMode: 'official_document',
@@ -4677,6 +4726,7 @@ export function generateApplicationAcknowledgmentDocument(
         fields: techFields,
       },
     ],
+    tables: [docTable],
   };
 }
 

@@ -33,6 +33,10 @@ import {
   parseDateSafe,
   parseNotificationStoredDate
 } from '../../utils/dateUtils';
+import {
+  getEngineerActiveWorkload,
+  getEligibleEngineersForSubdivision
+} from '../../utils/transformerMaintenanceEngine';
 import { LanguageSelector } from './LanguageSelector';
 import {
   Bell,
@@ -774,18 +778,36 @@ export const NotificationDrawer: React.FC = () => {
                                   <label className="block text-[10px] font-semibold text-amber-800 dark:text-amber-300 mb-0.5">
                                     {t.incident.modalSelectEligibleEngineer}
                                   </label>
-                                  <select
-                                    value={selectedEngineerId}
-                                    onChange={e => setSelectedEngineerId(e.target.value)}
-                                    aria-label={t.incident.modalSelectEligibleEngineer}
-                                    className="w-full text-xs p-1.5 rounded border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
-                                  >
-                                    {fieldEngineers.map(fe => (
-                                      <option key={fe.id} value={fe.id}>
-                                        {fe.name} ({fe.id}) — {localizeSubdivision(fe.subdivision, language)} [{localizeFieldEngineerStatus(fe.status, language)}]
-                                      </option>
-                                    ))}
-                                  </select>
+                                  {(() => {
+                                    const eligible = inc.subdivision
+                                      ? getEligibleEngineersForSubdivision(inc.subdivision, fieldEngineers)
+                                      : fieldEngineers;
+                                    if (eligible.length === 0) {
+                                      return (
+                                        <div className="text-[11px] p-2 bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 rounded font-medium">
+                                          No eligible field engineers are currently available for this subdivision.
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <select
+                                        value={selectedEngineerId}
+                                        onChange={e => setSelectedEngineerId(e.target.value)}
+                                        aria-label={t.incident.modalSelectEligibleEngineer}
+                                        className="w-full text-xs p-1.5 rounded border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
+                                      >
+                                        {eligible.map(fe => {
+                                          const activeCount = getEngineerActiveWorkload(fe.id, workOrders, fieldEngineers);
+                                          const taskLabel = activeCount === 1 ? 'Active Task' : 'Active Tasks';
+                                          return (
+                                            <option key={fe.id} value={fe.id}>
+                                              {fe.name} ({fe.id}) — {localizeSubdivision(fe.subdivision, language)} — {activeCount} {taskLabel} [{localizeFieldEngineerStatus(fe.status, language)}]
+                                            </option>
+                                          );
+                                        })}
+                                      </select>
+                                    );
+                                  })()}
                                 </div>
                               )}
 

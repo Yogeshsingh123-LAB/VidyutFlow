@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Cpu,
   AlertTriangle,
@@ -60,7 +60,10 @@ import {
   getWorkOrdersForTransformer,
   sortTransformersByMaintenancePriority,
   computeTransformerMaintenanceCounts,
-  isEngineerEligibleForTransformerZone
+  isEngineerEligibleForTransformerZone,
+  getEngineerActiveWorkload,
+  getEligibleEngineersForSubdivision,
+  isEngineerAuthorizedForSubdivision
 } from '../../utils/transformerMaintenanceEngine';
 
 export const EmployeeTransformersView: React.FC = () => {
@@ -89,11 +92,10 @@ export const EmployeeTransformersView: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'IN_SERVICE' | 'OFFLINE' | 'MAINTENANCE'>('ALL');
   const [maintenanceFilter, setMaintenanceFilter] = useState<'ALL' | TransformerMaintenanceStatus | 'ACTIVE_PROGRESS'>('ALL');
   const [isSseConnected, setIsSseConnected] = useState(false);
-  const [isLoadingWorklist, setIsLoadingWorklist] = useState(false);
-  const [isRefreshingTelemetry, setIsRefreshingTelemetry] = useState(false);
-  const [lastTelemetryRefreshTime, setLastTelemetryRefreshTime] = useState<string>(
-    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-  );
+  const [isRefreshingData, setIsRefreshingData] = useState(false);
+  const isRefreshingRef = useRef(false);
+  const [lastDataRefreshTime, setLastDataRefreshTime] = useState<string | null>(null);
+  const lastTelemetryRefreshTime = lastDataRefreshTime;
 
   // Modals state
   const [isConnectivityModalOpen, setIsConnectivityModalOpen] = useState(false);
@@ -157,13 +159,26 @@ export const EmployeeTransformersView: React.FC = () => {
     return computeTransformerMaintenanceCounts(zoneScopedTransformers, workOrders);
   }, [zoneScopedTransformers, workOrders]);
 
-  // Eligible engineers for this zone
+  // Eligible engineers strictly authorized for target asset / zone
   const eligibleZoneEngineers = useMemo(() => {
-    const list = fieldEngineers.filter((fe) =>
-      isEngineerEligibleForTransformerZone(fe.subdivision, fe.id, userZone)
+    const targetSubdivision = selectedAsset?.zone || userZone;
+    return getEligibleEngineersForSubdivision(targetSubdivision, fieldEngineers);
+  }, [fieldEngineers, userZone, selectedAsset]);
+
+  // Currently reassigning work order object
+  const reassignTargetWo = useMemo(() => {
+    if (!reassignTargetWoId) return null;
+    return workOrders.find((w) => w.id === reassignTargetWoId) || null;
+  }, [reassignTargetWoId, workOrders]);
+
+  // Eligible engineers for reassignment modal (strictly filtered and excluding current assignee)
+  const eligibleReassignEngineers = useMemo(() => {
+    if (!reassignTargetWo) return [];
+    const targetSubdivision = reassignTargetWo.subdivision || userZone;
+    return getEligibleEngineersForSubdivision(targetSubdivision, fieldEngineers).filter(
+      (fe) => fe.id !== reassignTargetWo.assignedEngineerId && fe.name !== reassignTargetWo.assignedTo
     );
-    return list.length > 0 ? list : fieldEngineers;
-  }, [fieldEngineers, userZone]);
+  }, [reassignTargetWo, fieldEngineers, userZone]);
 
   // KPI Metrics
   const kpis = useMemo(() => {
@@ -183,92 +198,104 @@ export const EmployeeTransformersView: React.FC = () => {
     return { total, inService, offlineCount, highRisk, activeAlerts, avgUtilization, fleetHealth };
   }, [zoneScopedTransformers, alerts, userZone]);
 
-  // Distinct Action 1: Refresh Worklist (re-fetches catalog from backend or fallback)
-  const handleRefreshWorklist = useCallback(async () => {
-    setIsLoadingWorklist(true);
-    try {
-      const res = await fetch(`/api/v1/transformers?zone=${encodeURIComponent(userZone)}`, {
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.items && data.items.length > 0) {
-          const mapped: DemoTransformerAsset[] = data.items.map((item: any) => ({
-            id: item.id,
-            utility_asset_code: item.utility_asset_code,
-            feeder_id: item.feeder_id,
-            substation_id: item.substation_id,
-            zone: item.zone,
-            rated_kva: item.rated_kva,
-            phases: item.phases,
-            voltage_class: item.voltage_class,
-            commissioning_date: item.commissioning_date || '2020-01-01',
-            manufacturer: item.manufacturer || 'Voltamp',
-            serial_number: item.serial_number || 'SN-UNKNOWN',
-            latitude: item.latitude || 23.58,
-            longitude: item.longitude || 72.36,
-            coordinate_source: item.coordinate_source || 'GIS',
-            status: item.status || 'IN_SERVICE',
-            load_utilization_pct: item.rated_kva ? Math.round((280 / item.rated_kva) * 100) : 80,
-            oil_temp_c: 82.4,
-            winding_temp_c: 91.0,
-            vibration_mms: 3.8,
-            active_alerts_count: 1,
-            risk_level: 'HIGH',
-            prediction_horizon: '7D',
-            telemetry_status: 'LIVE',
-            last_updated_at: new Date().toISOString(),
-          }));
-          setTransformers(mapped);
-          showToast?.(`Transformer worklist refreshed: ${mapped.length} assets from gateway`, 'success');
-          return;
-        }
-      }
-    } catch {
-      // Fallback to local demo fixtures
-    } finally {
-      setIsLoadingWorklist(false);
-    }
-    setTransformers(DEMO_TRANSFORMERS);
-    showToast?.(`Transformer worklist refreshed (${zoneScopedTransformers.length} assets in ${userZone} Subdivision)`, 'info');
-  }, [userZone, showToast, zoneScopedTransformers.length]);
-
-  // Distinct Action 2: Refresh Telemetry Data (recalculates live readings, updates timestamp)
-  const handleRefreshTelemetry = useCallback(() => {
-    setIsRefreshingTelemetry(true);
+  // Unified Manual Action: Refresh Catalog, Maintenance Worklist, and Calibrated/Live Telemetry
+  const handleRefreshData = useCallback(async () => {
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
+    setIsRefreshingData(true);
     const newTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    setTimeout(() => {
-      setTransformers((prev) =>
-        prev.map((item) => {
-          const deltaLoad = item.status === 'OFFLINE' ? 0 : (Math.random() * 1.2 - 0.6);
-          const deltaTemp = item.status === 'OFFLINE' ? 0 : (Math.random() * 0.6 - 0.3);
-          return {
-            ...item,
-            load_utilization_pct: Math.round(Math.min(105, Math.max(10, item.load_utilization_pct + deltaLoad)) * 10) / 10,
-            oil_temp_c: Math.round((item.oil_temp_c + deltaTemp) * 10) / 10,
-            winding_temp_c: Math.round((item.winding_temp_c + deltaTemp * 1.1) * 10) / 10,
-            last_updated_at: item.status === 'OFFLINE' ? item.last_updated_at : new Date().toISOString(),
-          };
-        })
-      );
-      setLastTelemetryRefreshTime(newTimestamp);
-      setIsRefreshingTelemetry(false);
-      showToast?.(`Live telemetry readings refreshed at ${newTimestamp}`, 'success');
-    }, 450);
-  }, [showToast]);
+    try {
+      let liveGatewayRefreshed = false;
+      let liveCount = 0;
 
-  // Initial load
-  useEffect(() => {
-    handleRefreshWorklist();
-  }, []);
+      try {
+        const res = await fetch(`/api/v1/transformers?zone=${encodeURIComponent(userZone)}`, {
+          credentials: 'include',
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data?.items) && data.items.length > 0) {
+            const mapped: DemoTransformerAsset[] = data.items.map((item: any) => {
+              const baseline = DEMO_TRANSFORMERS.find(
+                (d) => d.id === item.id || d.utility_asset_code === item.utility_asset_code
+              );
+              return {
+                id: item.id,
+                utility_asset_code: item.utility_asset_code,
+                feeder_id: item.feeder_id,
+                substation_id: item.substation_id,
+                zone: item.zone,
+                rated_kva: item.rated_kva,
+                phases: item.phases,
+                voltage_class: item.voltage_class,
+                commissioning_date: item.commissioning_date || baseline?.commissioning_date || '2020-01-01',
+                manufacturer: item.manufacturer || baseline?.manufacturer || 'Voltamp',
+                serial_number: item.serial_number || baseline?.serial_number || 'SN-UNKNOWN',
+                latitude: item.latitude ?? baseline?.latitude ?? 23.58,
+                longitude: item.longitude ?? baseline?.longitude ?? 72.36,
+                coordinate_source: item.coordinate_source || baseline?.coordinate_source || 'GIS',
+                status: item.status || baseline?.status || 'IN_SERVICE',
+                load_utilization_pct: item.load_utilization_pct ?? baseline?.load_utilization_pct ?? 80,
+                oil_temp_c: item.oil_temp_c ?? baseline?.oil_temp_c ?? 82.4,
+                winding_temp_c: item.winding_temp_c ?? baseline?.winding_temp_c ?? 91.0,
+                vibration_mms: item.vibration_mms ?? baseline?.vibration_mms ?? 3.8,
+                active_alerts_count: item.active_alerts_count ?? baseline?.active_alerts_count ?? 1,
+                risk_level: item.risk_level || baseline?.risk_level || 'HIGH',
+                prediction_horizon: item.prediction_horizon || baseline?.prediction_horizon || '7D',
+                telemetry_status: 'LIVE',
+                last_updated_at: item.last_updated_at || new Date().toISOString(),
+                recommended_action: item.recommended_action ?? baseline?.recommended_action,
+                explainable_risk_factors: item.explainable_risk_factors ?? baseline?.explainable_risk_factors,
+              };
+            });
+            setTransformers(mapped);
+            liveGatewayRefreshed = true;
+            liveCount = mapped.length;
+          }
+        }
+      } catch {
+        // Live gateway unavailable; retain calibrated DEMO snapshot without random mutation
+      }
 
-  // Connect to SSE event stream
+      if (!liveGatewayRefreshed) {
+        // Retain current calibrated DEMO snapshot intact without randomly modifying telemetry values
+        setTransformers((prev) => (prev.length > 0 ? prev : DEMO_TRANSFORMERS));
+        setAlerts((prev) => (prev.length > 0 ? prev : DEMO_TRANSFORMER_ALERTS));
+      }
+
+      setLastDataRefreshTime(newTimestamp);
+
+      const scopedCount = liveGatewayRefreshed
+        ? liveCount
+        : DEMO_TRANSFORMERS.filter((item) => item.zone.toLowerCase() === userZone.toLowerCase()).length;
+
+      if (liveGatewayRefreshed) {
+        showToast?.(
+          `Transformer data and maintenance worklist refreshed at ${newTimestamp} (${scopedCount} live assets in ${userZone} Subdivision)`,
+          'success'
+        );
+      } else {
+        showToast?.(
+          `Transformer data refreshed at ${newTimestamp} (Calibrated DEMO telemetry • ${scopedCount} assets in ${userZone} Subdivision)`,
+          'info'
+        );
+      }
+    } finally {
+      isRefreshingRef.current = false;
+      setIsRefreshingData(false);
+    }
+  }, [userZone, showToast]);
+
+  // Connect to SSE event stream when available (closes cleanly if gateway is standby)
   useEffect(() => {
     if (typeof EventSource !== 'undefined') {
       const es = new EventSource('/api/v1/transformers/stream', { withCredentials: true });
       es.onopen = () => setIsSseConnected(true);
-      es.onerror = () => setIsSseConnected(false);
+      es.onerror = () => {
+        setIsSseConnected(false);
+        es.close();
+      };
 
       es.addEventListener('telemetry', (e: MessageEvent) => {
         try {
@@ -398,11 +425,6 @@ export const EmployeeTransformersView: React.FC = () => {
     return workOrders.find((w) => w.id === trackingWorkOrderId) || null;
   }, [trackingWorkOrderId, workOrders]);
 
-  // Currently reassigning work order object
-  const reassignTargetWo = useMemo(() => {
-    if (!reassignTargetWoId) return null;
-    return workOrders.find((w) => w.id === reassignTargetWoId) || null;
-  }, [reassignTargetWoId, workOrders]);
 
   // Alerts associated with the selected asset
   const assetAlerts = useMemo(() => {
@@ -487,8 +509,11 @@ export const EmployeeTransformersView: React.FC = () => {
           : 'Standard Preventive Diagnostic & Oil Sample'
     );
     setDispatchAction(asset.recommended_action || 'Thermal camera scan & tap changer adjustment');
-    if (eligibleZoneEngineers.length > 0) {
-      setAssignedEngineerName(eligibleZoneEngineers[0].name);
+    const eligible = getEligibleEngineersForSubdivision(asset.zone || userZone, fieldEngineers);
+    if (eligible.length > 0) {
+      setAssignedEngineerName(eligible[0].name);
+    } else {
+      setAssignedEngineerName('');
     }
     setIsDispatchModalOpen(true);
   };
@@ -496,10 +521,15 @@ export const EmployeeTransformersView: React.FC = () => {
   // Open Reassign Modal for a rejected or awaiting work order
   const handleOpenReassignModal = (wo: WorkOrder) => {
     setReassignTargetWoId(wo.id);
-    const alternateEng = eligibleZoneEngineers.find(
-      (fe) => !wo.assignedTo.toLowerCase().includes(fe.name.toLowerCase())
+    const targetSubdivision = wo.subdivision || userZone;
+    const eligible = getEligibleEngineersForSubdivision(targetSubdivision, fieldEngineers).filter(
+      (fe) => fe.id !== wo.assignedEngineerId && !wo.assignedTo.toLowerCase().includes(fe.name.toLowerCase())
     );
-    setNewAssigneeName(alternateEng ? alternateEng.name : eligibleZoneEngineers[0]?.name || 'Hitesh N. Vaghela');
+    if (eligible.length > 0) {
+      setNewAssigneeName(eligible[0].name);
+    } else {
+      setNewAssigneeName('');
+    }
     setReassignNotes(
       wo.rejectionReason
         ? `Reassigned after rejection by ${wo.assignedTo} ("${wo.rejectionReason}")`
@@ -509,7 +539,13 @@ export const EmployeeTransformersView: React.FC = () => {
 
   // Execute Reassignment
   const handleConfirmReassign = () => {
-    if (!reassignTargetWo) return;
+    if (!reassignTargetWo || !newAssigneeName) return;
+    const targetSubdivision = reassignTargetWo.subdivision || userZone;
+    const chosenEng = fieldEngineers.find(fe => fe.name === newAssigneeName);
+    if (chosenEng && !isEngineerAuthorizedForSubdivision(chosenEng.subdivision, chosenEng.id, targetSubdivision)) {
+      showToast?.(`Unauthorized: ${chosenEng.name} is stationed in ${chosenEng.subdivision} and cannot be assigned to ${targetSubdivision}`, 'error');
+      return;
+    }
     const res = reassignTransformerWorkOrder(reassignTargetWo.id, newAssigneeName, reassignNotes);
     if (res.success) {
       setReassignTargetWoId(null);
@@ -527,7 +563,13 @@ export const EmployeeTransformersView: React.FC = () => {
 
   // Execute Dispatch Maintenance Work Order
   const handleConfirmDispatch = async () => {
-    if (!selectedAsset) return;
+    if (!selectedAsset || !assignedEngineerName) return;
+    const targetSubdivision = selectedAsset.zone || userZone;
+    const chosenEng = fieldEngineers.find(fe => fe.name === assignedEngineerName);
+    if (chosenEng && !isEngineerAuthorizedForSubdivision(chosenEng.subdivision, chosenEng.id, targetSubdivision)) {
+      showToast?.(`Unauthorized: ${chosenEng.name} is stationed in ${chosenEng.subdivision} and cannot be assigned to ${targetSubdivision}`, 'error');
+      return;
+    }
     setIsSubmittingWo(true);
 
     try {
@@ -608,23 +650,20 @@ export const EmployeeTransformersView: React.FC = () => {
           </button>
 
           <button
-            onClick={handleRefreshWorklist}
-            disabled={isLoadingWorklist}
-            aria-label="Refresh Worklist Catalog"
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors"
+            type="button"
+            onClick={() => void handleRefreshData()}
+            disabled={isRefreshingData}
+            aria-label="Refresh Transformer Catalog and Telemetry Data"
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-colors shadow-2xs disabled:opacity-50"
           >
-            <RefreshCw aria-hidden="true" className={`w-3.5 h-3.5 ${isLoadingWorklist ? 'animate-spin' : ''}`} />
-            Refresh Worklist
-          </button>
-
-          <button
-            onClick={handleRefreshTelemetry}
-            disabled={isRefreshingTelemetry}
-            aria-label="Refresh Live Telemetry Sensor Data"
-            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-colors shadow-2xs"
-          >
-            <Activity aria-hidden="true" className={`w-3.5 h-3.5 ${isRefreshingTelemetry ? 'animate-spin' : ''}`} />
-            Refresh Telemetry ({lastTelemetryRefreshTime})
+            <RefreshCw aria-hidden="true" className={`w-3.5 h-3.5 ${isRefreshingData ? 'animate-spin' : ''}`} />
+            <span>
+              {isRefreshingData
+                ? (tr.refreshing || 'Refreshing...')
+                : lastDataRefreshTime
+                  ? `${tr.refreshData || 'Refresh Data'} (${lastDataRefreshTime})`
+                  : (tr.refreshData || 'Refresh Data')}
+            </span>
           </button>
         </div>
       </div>
@@ -1883,45 +1922,55 @@ export const EmployeeTransformersView: React.FC = () => {
               </div>
             )}
 
-            <div className="space-y-3">
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Select New Eligible Field Engineer *</label>
-                <select
-                  aria-label="Select New Eligible Field Engineer"
-                  value={newAssigneeName}
-                  onChange={(e) => setNewAssigneeName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-medium text-slate-800"
-                >
-                  {eligibleZoneEngineers.map((fe) => (
-                    <option key={fe.id} value={fe.name}>
-                      {fe.name} ({fe.subdivision}) — {fe.activeWorkOrders} Active Tasks
-                    </option>
-                  ))}
-                  <option value="Vikram Zala">Vikram Zala (North Circle Radial Ops)</option>
-                </select>
+            {eligibleReassignEngineers.length === 0 ? (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-medium">
+                {tr.noEligibleEngineers || 'No eligible field engineers are currently available for this subdivision.'}
               </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Select New Eligible Field Engineer *</label>
+                  <select
+                    aria-label="Select New Eligible Field Engineer"
+                    value={newAssigneeName}
+                    onChange={(e) => setNewAssigneeName(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-medium text-slate-800"
+                  >
+                    {eligibleReassignEngineers.map((fe) => {
+                      const activeCount = getEngineerActiveWorkload(fe.id, workOrders, fieldEngineers);
+                      const taskLabel = activeCount === 1 ? (tr.activeTaskSingular || 'Active Task') : (tr.activeTasksLabel || 'Active Tasks');
+                      return (
+                        <option key={fe.id} value={fe.name}>
+                          {fe.name} ({fe.subdivision}) — {activeCount} {taskLabel}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
 
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Reassignment Instructions / Notes</label>
-                <textarea
-                  rows={2}
-                  value={reassignNotes}
-                  onChange={(e) => setReassignNotes(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-800"
-                />
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Reassignment Instructions / Notes</label>
+                  <textarea
+                    rows={2}
+                    value={reassignNotes}
+                    onChange={(e) => setReassignNotes(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-800"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
               <button
                 onClick={() => setReassignTargetWoId(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmReassign}
-                className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-2xs"
+                disabled={eligibleReassignEngineers.length === 0 || !newAssigneeName}
+                className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-2xs text-xs disabled:opacity-50"
               >
                 <Send className="w-3.5 h-3.5" />
                 Confirm Reassignment
@@ -1983,20 +2032,27 @@ export const EmployeeTransformersView: React.FC = () => {
 
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Assigned Field Engineer *</label>
-                <select
-                  value={assignedEngineerName}
-                  onChange={(e) => setAssignedEngineerName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-medium text-slate-800"
-                >
-                  {eligibleZoneEngineers.map((fe) => (
-                    <option key={fe.id} value={fe.name}>
-                      {fe.name} ({fe.subdivision}) — {fe.activeWorkOrders} Active Tasks
-                    </option>
-                  ))}
-                  {eligibleZoneEngineers.length === 0 && (
-                    <option value="Vikramaditya Solanki">Vikramaditya Solanki (Mehsana City North)</option>
-                  )}
-                </select>
+                {eligibleZoneEngineers.length === 0 ? (
+                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs font-medium">
+                    {tr.noEligibleEngineers || 'No eligible field engineers are currently available for this subdivision.'}
+                  </div>
+                ) : (
+                  <select
+                    value={assignedEngineerName}
+                    onChange={(e) => setAssignedEngineerName(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-medium text-slate-800"
+                  >
+                    {eligibleZoneEngineers.map((fe) => {
+                      const activeCount = getEngineerActiveWorkload(fe.id, workOrders, fieldEngineers);
+                      const taskLabel = activeCount === 1 ? (tr.activeTaskSingular || 'Active Task') : (tr.activeTasksLabel || 'Active Tasks');
+                      return (
+                        <option key={fe.id} value={fe.name}>
+                          {fe.name} ({fe.subdivision}) — {activeCount} {taskLabel}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
               </div>
 
               <div>
@@ -2029,7 +2085,7 @@ export const EmployeeTransformersView: React.FC = () => {
               </button>
               <button
                 onClick={handleConfirmDispatch}
-                disabled={isSubmittingWo}
+                disabled={isSubmittingWo || eligibleZoneEngineers.length === 0 || !assignedEngineerName}
                 className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-2xs disabled:opacity-50"
               >
                 <Send className="w-3.5 h-3.5" />
@@ -2081,8 +2137,10 @@ export const EmployeeTransformersView: React.FC = () => {
                   <span className="font-bold text-slate-800">{userZone} Subdivision</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Last Telemetry Refresh:</span>
-                  <span className="font-mono text-slate-800">{lastTelemetryRefreshTime}</span>
+                  <span className="text-slate-500">Last Manual Refresh:</span>
+                  <span className="font-mono text-slate-800">
+                    {lastTelemetryRefreshTime || 'Not manually refreshed (Calibrated Demo Snapshot)'}
+                  </span>
                 </div>
               </div>
 

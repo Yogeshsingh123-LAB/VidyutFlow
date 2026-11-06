@@ -156,6 +156,13 @@ export interface TransformerPhase12Dictionary {
   modalTrackWoTitle: string;
   modalReassignTitle: string;
   lblRejectionReason: string;
+  activeTasksLabel: string;
+  activeTaskSingular: string;
+  noEligibleEngineers: string;
+  subdivisionMismatch: string;
+  assignmentNotAllowed: string;
+  refreshData: string;
+  refreshing: string;
 }
 
 export const TRANSFORMER_TRANSLATIONS: Record<LanguageCode, TransformerPhase12Dictionary> = {
@@ -303,7 +310,14 @@ export const TRANSFORMER_TRANSLATIONS: Record<LanguageCode, TransformerPhase12Di
     btnCompleteMaintenance: 'Complete Maintenance',
     modalTrackWoTitle: 'Work Order Lifecycle & Audit Timeline',
     modalReassignTitle: 'Reassign Maintenance Work Order',
-    lblRejectionReason: 'Reason for Rejection'
+    lblRejectionReason: 'Reason for Rejection',
+    activeTasksLabel: 'Active Tasks',
+    activeTaskSingular: 'Active Task',
+    noEligibleEngineers: 'No eligible field engineers are currently available for this subdivision.',
+    subdivisionMismatch: 'Subdivision Mismatch',
+    assignmentNotAllowed: 'Assignment not allowed for this subdivision',
+    refreshData: 'Refresh Data',
+    refreshing: 'Refreshing...'
   },
   gu: {
     cockpitTitle: 'ડિસ્ટ્રિબ્યુશન ટ્રાન્સફોર્મર્સ (ડીટીઆર) કોકપિટ',
@@ -449,7 +463,14 @@ export const TRANSFORMER_TRANSLATIONS: Record<LanguageCode, TransformerPhase12Di
     btnCompleteMaintenance: 'જાળવણી પૂર્ણ કરો',
     modalTrackWoTitle: 'વર્ક ઓર્ડર જીવનચક્ર અને ઓડિટ ટાઇમલાઇન',
     modalReassignTitle: 'જાળવણી વર્ક ઓર્ડર ફરી સોંપો',
-    lblRejectionReason: 'નકારવાનું કારણ'
+    lblRejectionReason: 'નકારવાનું કારણ',
+    activeTasksLabel: 'સક્રિય કાર્યો',
+    activeTaskSingular: 'સક્રિય કાર્ય',
+    noEligibleEngineers: 'આ પેટાવિભાગ માટે હાલમાં કોઈ યોગ્ય ફિલ્ડ એન્જિનિયર ઉપલબ્ધ નથી.',
+    subdivisionMismatch: 'પેટાવિભાગ મેળ ખાતો નથી',
+    assignmentNotAllowed: 'આ પેટાવિભાગ માટે સોંપણી માન્ય નથી',
+    refreshData: 'ડેટા તાજું કરો',
+    refreshing: 'તાજું થઈ રહ્યું છે...'
   },
   hi: {
     cockpitTitle: 'वितरण ट्रांसफॉर्मर (डीटीआर) कॉकपिट',
@@ -595,7 +616,14 @@ export const TRANSFORMER_TRANSLATIONS: Record<LanguageCode, TransformerPhase12Di
     btnCompleteMaintenance: 'रखरखाव पूर्ण करें',
     modalTrackWoTitle: 'वर्क ऑर्डर जीवनचक्र और ऑडिट समयरेखा',
     modalReassignTitle: 'रखरखाव वर्क ऑर्डर पुनः असाइन करें',
-    lblRejectionReason: 'अस्वीकृति का कारण'
+    lblRejectionReason: 'अस्वीकृति का कारण',
+    activeTasksLabel: 'सक्रिय कार्य',
+    activeTaskSingular: 'सक्रिय कार्य',
+    noEligibleEngineers: 'इस उप-विभाग के लिए वर्तमान में कोई पात्र फ़ील्ड इंजीनियर उपलब्ध नहीं है।',
+    subdivisionMismatch: 'उप-विभाग बेमेल',
+    assignmentNotAllowed: 'इस उप-विभाग के लिए कार्य सौंपने की अनुमति नहीं है',
+    refreshData: 'डेटा रीफ़्रेश करें',
+    refreshing: 'रीफ़्रेश हो रहा है...'
   },
   mr: {
     cockpitTitle: 'वितरण ट्रान्सफॉर्मर्स (डीटीआर) कॉकपिट',
@@ -741,7 +769,14 @@ export const TRANSFORMER_TRANSLATIONS: Record<LanguageCode, TransformerPhase12Di
     btnCompleteMaintenance: 'देखभाल पूर्ण करा',
     modalTrackWoTitle: 'वर्क ऑर्डर जीवनचक्र आणि ऑडिट टाइमलाइन',
     modalReassignTitle: 'देखभाल वर्क ऑर्डर पुन्हा नियुक्त करा',
-    lblRejectionReason: 'नाकारण्याचे कारण'
+    lblRejectionReason: 'नाकारण्याचे कारण',
+    activeTasksLabel: 'सक्रिय कार्ये',
+    activeTaskSingular: 'सक्रिय कार्य',
+    noEligibleEngineers: 'या उपविभागासाठी सध्या कोणताही पात्र फील्ड अभियंता उपलब्ध नाही.',
+    subdivisionMismatch: 'उपविभाग जुळत नाही',
+    assignmentNotAllowed: 'या उपविभागासाठी काम वाटप करण्याची परवानगी नाही',
+    refreshData: 'डेटा रिफ्रेश करा',
+    refreshing: 'रिफ्रेश होत आहे...'
   }
 };
 

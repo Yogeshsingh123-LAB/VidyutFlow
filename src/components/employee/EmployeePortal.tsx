@@ -41,6 +41,11 @@ import {
   SUBDIVISION_PERFORMANCE,
   EXECUTIVE_MONTHLY_METRICS
 } from '../../data/mockData';
+import {
+  getEngineerActiveWorkload,
+  getEligibleEngineersForSubdivision,
+  isEngineerAuthorizedForSubdivision
+} from '../../utils/transformerMaintenanceEngine';
 import { ExportMenu } from '../common/ExportMenu';
 import { OfficialDocumentModal } from '../common/OfficialDocumentModal';
 import {
@@ -286,35 +291,38 @@ export const EmployeePortal: React.FC = () => {
 
   const handleOpenAssignModal = (inc: CriticalIncident) => {
     setAssignModalIncident(inc);
-    const matchingSubdivisionEng = fieldEngineers.find(
-      f =>
-        inc.subdivision &&
-        f.subdivision.toLowerCase() === inc.subdivision.toLowerCase() &&
-        f.id !== inc.assignedToUserId
-    );
-    const defaultEng =
-      matchingSubdivisionEng ||
-      fieldEngineers.find(f => f.id !== inc.assignedToUserId) ||
-      fieldEngineers[0];
-    setTargetEngineerId(defaultEng?.id || 'FLD-UG-201');
+    const eligible = inc.subdivision
+      ? getEligibleEngineersForSubdivision(inc.subdivision, fieldEngineers).filter(
+          f => f.id !== inc.assignedToUserId
+        )
+      : fieldEngineers.filter(f => f.id !== inc.assignedToUserId);
+    setTargetEngineerId(eligible[0]?.id || '');
     setAssignNotes('');
   };
 
   const handleConfirmAssignment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!assignModalIncident || !targetEngineerId) return;
+    const selectedEng = fieldEngineers.find(f => f.id === targetEngineerId);
+    if (!selectedEng) return;
+    if (
+      assignModalIncident.subdivision &&
+      !isEngineerAuthorizedForSubdivision(
+        selectedEng.subdivision,
+        selectedEng.id,
+        assignModalIncident.subdivision
+      )
+    ) {
+      showToast(
+        `Unauthorized: ${selectedEng.name} is stationed in ${selectedEng.subdivision} and cannot be assigned to ${assignModalIncident.subdivision}`,
+        'error'
+      );
+      return;
+    }
     const isReassignment = Boolean(
       assignModalIncident.assignedToUserId &&
         assignModalIncident.assignedToUserId !== targetEngineerId
     );
-    if (isReassignment && !assignNotes.trim()) {
-      showToast(t.incident.modalReasonReassignLabel, 'warning');
-      return;
-    }
-    const selectedEng = fieldEngineers.find(f => f.id === targetEngineerId) || {
-      id: targetEngineerId,
-      name: 'Vikramaditya Solanki'
-    };
     if (isReassignment) {
       reassignIncidentToField(
         assignModalIncident.id,
@@ -2106,24 +2114,40 @@ export const EmployeePortal: React.FC = () => {
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
                     {t.incident.modalSelectEligibleEngineer} *
                   </label>
-                  <select
-                    value={targetEngineerId}
-                    onChange={e => setTargetEngineerId(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
-                  >
-                    {fieldEngineers.map(fe => {
-                      const isJurisdictionMatch =
-                        Boolean(assignModalIncident.subdivision) &&
-                        fe.subdivision.toLowerCase() === assignModalIncident.subdivision!.toLowerCase();
+                  {(() => {
+                    const eligible = assignModalIncident.subdivision
+                      ? getEligibleEngineersForSubdivision(assignModalIncident.subdivision, fieldEngineers).filter(
+                          f => f.id !== assignModalIncident.assignedToUserId
+                        )
+                      : fieldEngineers.filter(f => f.id !== assignModalIncident.assignedToUserId);
+
+                    if (eligible.length === 0) {
                       return (
-                        <option key={fe.id} value={fe.id}>
-                          {fe.name} ({fe.id}) — {localizeSubdivision(fe.subdivision, language)} [{localizeFieldEngineerStatus(fe.status, language)}]
-                          {isJurisdictionMatch ? ` ★ ${t.incident.modalJurisdictionMatchBadge}` : ''}
-                        </option>
+                        <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-medium">
+                          No eligible field engineers are currently available for this subdivision.
+                        </div>
                       );
-                    })}
-                  </select>
+                    }
+
+                    return (
+                      <select
+                        value={targetEngineerId}
+                        onChange={e => setTargetEngineerId(e.target.value)}
+                        required
+                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
+                      >
+                        {eligible.map(fe => {
+                          const activeCount = getEngineerActiveWorkload(fe.id, workOrders, fieldEngineers);
+                          const taskLabel = activeCount === 1 ? 'Active Task' : 'Active Tasks';
+                          return (
+                            <option key={fe.id} value={fe.id}>
+                              {fe.name} ({fe.id}) — {localizeSubdivision(fe.subdivision, language)} — {activeCount} {taskLabel} [{localizeFieldEngineerStatus(fe.status, language)}]
+                            </option>
+                          );
+                        })}
+                      </select>
+                    );
+                  })()}
                   <p className="text-[11px] text-slate-400 mt-1">
                     {t.incident.modalAssignHelpNotice}
                   </p>
@@ -2159,7 +2183,8 @@ export const EmployeePortal: React.FC = () => {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-teal-600 hover:bg-teal-700 text-white shadow-xs cursor-pointer flex items-center gap-1.5"
+                    disabled={!targetEngineerId}
+                    className="px-4 py-2 text-xs font-semibold rounded-lg bg-teal-600 hover:bg-teal-700 text-white shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                   >
                     <Check className="w-3.5 h-3.5" />
                     <span>

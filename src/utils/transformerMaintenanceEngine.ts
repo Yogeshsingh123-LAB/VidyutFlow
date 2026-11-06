@@ -33,40 +33,191 @@ import { formatErpDateTime } from './dateUtils';
 import { DemoTransformerAsset } from '../data/transformerDemoData';
 
 /**
- * Checks whether a field engineer is eligible for assignment in the given transformer zone.
- * North Zone (Mehsana Circle) covers Mehsana City North (FLD-UG-201), Mehsana Industrial GIDC (FLD-UG-209),
- * and North Circle Radial Ops (FLD-UG-212). Out-of-zone subdivisions (e.g. Kadi Division, South, Central)
- * are blocked for North Zone assignments.
+ * Normalizes subdivision and zone string for robust matching.
+ */
+export function normalizeSubdivisionKey(subdiv: string | undefined): string {
+  if (!subdiv) return '';
+  return subdiv
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-_·.]+/g, ' ');
+}
+
+/**
+ * Checks whether an engineer is genuinely authorized for the specified subdivision or zone.
+ * Enforces strict subdivision boundaries:
+ *   - Mehsana City North / North Subdivision: FLD-UG-201 (Vikramaditya Solanki).
+ *     Hitesh from GIDC and Vikram Zala from Himatnagar are strictly excluded.
+ *   - Mehsana Industrial GIDC: FLD-UG-209 (Hitesh N. Vaghela).
+ *   - Kadi Division: FLD-UG-204 (Dharmesh P. Chaudhari).
+ *   - Himatnagar Circle · 11kV Radial Feeder Ops: FLD-UG-212 (Vikram Zala).
+ *   - Subdivisions with no stationed demo crew (e.g. Gandhinagar): returns false (0 eligible).
+ */
+export function isEngineerAuthorizedForSubdivision(
+  engineerSubdivision: string | undefined,
+  engineerId: string | undefined,
+  targetSubdivisionOrZone: string | undefined
+): boolean {
+  if (!targetSubdivisionOrZone) return false;
+  const target = normalizeSubdivisionKey(targetSubdivisionOrZone);
+  const engSub = normalizeSubdivisionKey(engineerSubdivision);
+  const id = (engineerId || '').trim().toUpperCase();
+
+  // 1. Direct ID & subdivision match for canonical UGVCL field engineers
+
+  // Target: Mehsana City North / North Subdivision
+  if (target.includes('mehsana city north') || target.includes('city north')) {
+    return id === 'FLD-UG-201' || engSub.includes('city north');
+  }
+
+  // Target: Mehsana Industrial GIDC
+  if (
+    target.includes('mehsana industrial gidc') ||
+    target.includes('industrial gidc') ||
+    target.includes('gidc')
+  ) {
+    return id === 'FLD-UG-209' || engSub.includes('gidc');
+  }
+
+  // Target: Kadi Division
+  if (target.includes('kadi')) {
+    return id === 'FLD-UG-204' || engSub.includes('kadi');
+  }
+
+  // Target: Himatnagar Circle · 11kV Radial Feeder Ops
+  if (target.includes('himatnagar') || target.includes('radial feeder')) {
+    return id === 'FLD-UG-212' || engSub.includes('himatnagar') || engSub.includes('radial');
+  }
+
+  // Target: Subdivisions with no demo field crew (e.g., Gandhinagar Sub-Division 2, South, Central)
+  if (
+    target.includes('gandhinagar') ||
+    target.includes('south') ||
+    target.includes('central')
+  ) {
+    return false;
+  }
+
+  // Target: Generic North Zone / North Subdivision
+  // In Mehsana North Circle, FLD-UG-201 (City North) and FLD-UG-209 (Industrial GIDC) are North crew.
+  // FLD-UG-212 (Himatnagar Circle) and FLD-UG-204 (Kadi Division) are NOT North crew.
+  if (target.includes('north')) {
+    return (
+      id === 'FLD-UG-201' ||
+      id === 'FLD-UG-209' ||
+      engSub.includes('mehsana city north') ||
+      engSub.includes('mehsana industrial gidc')
+    );
+  }
+
+  // Fallback string matching for custom or newly registered engineers
+  if (!engSub) return false;
+  if (engSub === target) return true;
+  if (target.includes(engSub) || engSub.includes(target)) {
+    const isTargetGidc = target.includes('gidc');
+    const isEngGidc = engSub.includes('gidc');
+    if (isTargetGidc !== isEngGidc) return false;
+
+    const isTargetNorth = target.includes('north') || target.includes('city north');
+    const isEngNorth = engSub.includes('north') || engSub.includes('city north');
+    if (isTargetNorth !== isEngNorth) return false;
+
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Filters a list of field engineers to only those authorized for the target subdivision/zone.
+ */
+export function getEligibleEngineersForSubdivision(
+  subdivisionOrZone: string | undefined,
+  engineers: FieldEngineerRecord[]
+): FieldEngineerRecord[] {
+  if (!subdivisionOrZone || !engineers || engineers.length === 0) return [];
+  return engineers.filter(fe =>
+    isEngineerAuthorizedForSubdivision(fe.subdivision, fe.id, subdivisionOrZone)
+  );
+}
+
+/**
+ * Backward-compatible zone eligibility check that delegates to authoritative subdivision rules.
  */
 export function isEngineerEligibleForTransformerZone(
   engineerSubdivision: string | undefined,
   engineerId: string | undefined,
   transformerZone: string
 ): boolean {
-  const zoneLower = (transformerZone || 'North').trim().toLowerCase();
-  const subdivLower = (engineerSubdivision || '').trim().toLowerCase();
-  const idUpper = (engineerId || '').trim().toUpperCase();
+  return isEngineerAuthorizedForSubdivision(engineerSubdivision, engineerId, transformerZone);
+}
 
-  if (!subdivLower) return true;
-  if (subdivLower.includes(zoneLower)) return true;
+/**
+ * Evaluates whether a work order represents an active, ongoing task for a field engineer.
+ * Returns false for completed, cancelled, or rejected work orders.
+ */
+export function isWorkOrderActiveStatus(wo: WorkOrder): boolean {
+  if (!wo) return false;
+  if (wo.status === 'Completed' || wo.maintenanceStatus === 'COMPLETED') return false;
+  if (wo.maintenanceStatus === 'CANCELLED' || wo.maintenanceStatus === 'REJECTED') return false;
+  if (wo.status === 'Deferred') return false;
 
-  if (zoneLower === 'north') {
-    // In UGVCL Mehsana North subdivision/circle, FLD-UG-201 (Mehsana City North),
-    // FLD-UG-209 (Mehsana Industrial GIDC), and FLD-UG-212 (Vikram Zala) are authorized North crew.
-    // FLD-UG-204 (Dharmesh P. Chaudhari - Kadi Division) is outside North Subdivision.
-    if (
-      idUpper === 'FLD-UG-201' ||
-      idUpper === 'FLD-UG-209' ||
-      idUpper === 'FLD-UG-212' ||
-      subdivLower.includes('mehsana city north') ||
-      subdivLower.includes('mehsana industrial gidc')
-    ) {
-      return true;
-    }
-    return false;
+  if (wo.maintenanceStatus) {
+    return (
+      wo.maintenanceStatus === 'AWAITING_ACCEPTANCE' ||
+      wo.maintenanceStatus === 'ACCEPTED' ||
+      wo.maintenanceStatus === 'IN_PROGRESS' ||
+      wo.maintenanceStatus === 'PENDING_REVIEW'
+    );
   }
 
-  return subdivLower.includes(zoneLower);
+  return (
+    wo.status === 'Pending' ||
+    wo.status === 'Assigned' ||
+    wo.status === 'En Route' ||
+    wo.status === 'On Site' ||
+    wo.status === 'In Progress'
+  );
+}
+
+/**
+ * Computes the real-time active task workload count for a specific field engineer
+ * by inspecting the active work order backlog and respecting previous reassignments.
+ */
+export function getEngineerActiveWorkload(
+  engineerIdOrName: string,
+  workOrders: WorkOrder[],
+  fieldEngineers?: FieldEngineerRecord[]
+): number {
+  if (!engineerIdOrName || !workOrders || workOrders.length === 0) return 0;
+  const canonical = resolveCanonicalFieldEngineerIdentity(engineerIdOrName, fieldEngineers);
+
+  return workOrders.filter(wo => {
+    if (!isWorkOrderActiveStatus(wo)) return false;
+    return isAssignedEngineerForWorkOrder(
+      wo,
+      { id: canonical.id, name: canonical.name },
+      fieldEngineers
+    );
+  }).length;
+}
+
+/**
+ * Synchronizes the activeWorkOrders field on all field engineer records
+ * according to current workOrders backlog state.
+ */
+export function syncFieldEngineersWorkload(
+  engineers: FieldEngineerRecord[],
+  workOrders: WorkOrder[]
+): FieldEngineerRecord[] {
+  if (!engineers || engineers.length === 0) return [];
+  return engineers.map(eng => {
+    const activeCount = getEngineerActiveWorkload(eng.id, workOrders, engineers);
+    return {
+      ...eng,
+      activeWorkOrders: activeCount
+    };
+  });
 }
 
 /**
@@ -359,7 +510,15 @@ export function dispatchTransformerMaintenanceOrder(params: {
     };
   }
 
-  if (effectiveRole === 'employee' && actorUser.zone && zone.toLowerCase() !== actorUser.zone.toLowerCase()) {
+  const userZoneLower = (actorUser.zone || '').toLowerCase().trim();
+  const zoneLower = (zone || '').toLowerCase().trim();
+  const isZonePermitted =
+    !userZoneLower ||
+    zoneLower === userZoneLower ||
+    zoneLower.includes(userZoneLower) ||
+    userZoneLower.includes(zoneLower);
+
+  if (effectiveRole === 'employee' && !isZonePermitted) {
     return {
       success: false,
       error: `Access Denied: Cannot dispatch work order for ${zone} zone outside assigned ${actorUser.zone} zone.`,

@@ -4,6 +4,10 @@ import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { getEvidenceThumbnailUrl } from '../../services/evidenceService';
 import {
+  getEngineerActiveWorkload,
+  getEligibleEngineersForSubdivision
+} from '../../utils/transformerMaintenanceEngine';
+import {
   ShieldCheck,
   AlertTriangle,
   X,
@@ -37,18 +41,33 @@ export const WorkOrderVerificationReviewModal: React.FC<WorkOrderVerificationRev
     activeUser,
     currentRole,
     fieldEngineers,
+    workOrders,
     complaints,
     showToast
   } = useApp();
   const { language } = useLanguage();
 
+  const eligibleReassignEngineers = React.useMemo(() => {
+    return getEligibleEngineersForSubdivision(workOrder.subdivision, fieldEngineers).filter(
+      eng => !workOrder.assignedTo?.toLowerCase().includes(eng.name.toLowerCase())
+    );
+  }, [workOrder.subdivision, workOrder.assignedTo, fieldEngineers]);
+
   const [decision, setDecision] = useState<'approve' | 'request_more_info' | 'reject' | 'reassign'>('approve');
   const [reason, setReason] = useState('');
   const [selectedReassignEngineer, setSelectedReassignEngineer] = useState(
-    fieldEngineers[0]?.name || 'Ramesh Patel'
+    eligibleReassignEngineers[0]?.name || ''
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (eligibleReassignEngineers.length > 0) {
+      setSelectedReassignEngineer(eligibleReassignEngineers[0].name);
+    } else {
+      setSelectedReassignEngineer('');
+    }
+  }, [eligibleReassignEngineers]);
 
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
 
@@ -471,17 +490,27 @@ export const WorkOrderVerificationReviewModal: React.FC<WorkOrderVerificationRev
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Reassign to Field Engineer
                 </label>
-                <select
-                  value={selectedReassignEngineer}
-                  onChange={e => setSelectedReassignEngineer(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white"
-                >
-                  {fieldEngineers.map(eng => (
-                    <option key={eng.id} value={eng.name}>
-                      {eng.name} ({eng.subdivision} • {eng.designation})
-                    </option>
-                  ))}
-                </select>
+                {eligibleReassignEngineers.length === 0 ? (
+                  <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-medium">
+                    No eligible field engineers are currently available for this subdivision.
+                  </div>
+                ) : (
+                  <select
+                    value={selectedReassignEngineer}
+                    onChange={e => setSelectedReassignEngineer(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white"
+                  >
+                    {eligibleReassignEngineers.map(eng => {
+                      const activeCount = getEngineerActiveWorkload(eng.id, workOrders, fieldEngineers);
+                      const taskLabel = activeCount === 1 ? 'Active Task' : 'Active Tasks';
+                      return (
+                        <option key={eng.id} value={eng.name}>
+                          {eng.name} ({eng.subdivision} • {eng.designation}) — {activeCount} {taskLabel}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
               </div>
             )}
 
@@ -520,7 +549,7 @@ export const WorkOrderVerificationReviewModal: React.FC<WorkOrderVerificationRev
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || !isAuthorized}
+                  disabled={isSubmitting || !isAuthorized || (decision === 'reassign' && (!selectedReassignEngineer || eligibleReassignEngineers.length === 0))}
                   className={`px-5 py-2 rounded-lg font-semibold text-white shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
                     decision === 'approve'
                       ? 'bg-emerald-600 hover:bg-emerald-700'

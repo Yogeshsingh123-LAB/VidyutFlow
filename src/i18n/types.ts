@@ -797,6 +797,12 @@ export interface TranslationDictionary {
     securityDeposit: string;
     viewInvoicesLink: string;
     selectActiveAccountBtn: string;
+    selectedAccountBadge: string;
+    activeAccountStatus: string;
+    tabProgressAndStatus: string;
+    tabDocuments: string;
+    tabActivityTimeline: string;
+    tabRemarksAndNextSteps: string;
     activatedAccountToastPrefix: string;
     activatedAccountToastSuffix: string;
     noConnectionsEmptyTitle: string;

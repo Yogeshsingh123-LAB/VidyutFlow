@@ -2006,78 +2006,111 @@ export const ConsumerPortal: React.FC = () => {
 
             {consumerConnections.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {consumerConnections.map(conn => (
-                  <div
-                    key={conn.consumerNo}
-                    className={`p-5 rounded-xl border transition-all duration-150 space-y-4 ${
-                      selectedConnection?.consumerNo === conn.consumerNo
-                        ? 'border-blue-600 dark:border-blue-500 bg-white dark:bg-[#101C35] ring-2 ring-blue-500/20 shadow-md'
-                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#101C35] hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                          {localizeTariffCategory(conn.tariffCategory, language)}
-                        </span>
-                        <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                          {conn.consumerName}
-                        </h3>
-                        <span className="font-mono text-xs text-blue-600 dark:text-blue-400 font-semibold">
-                          {tc.consumerNoLabel} {conn.consumerNo}
-                        </span>
-                      </div>
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                        {localizeConnectionStatus(conn.status, language)}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 text-xs pt-3 border-t border-slate-100 dark:border-slate-800">
-                      <div>
-                        <span className="text-slate-400 block text-[11px]">{tc.sanctionedLoad}</span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">{conn.sanctionedLoadKw} kW ({localizePhase(conn.phase, language)})</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[11px]">{tc.meterSerial}</span>
-                        <span className="font-mono text-slate-800 dark:text-slate-200">{conn.meterNo}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[11px]">{tc.currentReading}</span>
-                        <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{conn.currentReadingKwh} kWh</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[11px]">{tc.securityDeposit}</span>
-                        <span className="font-mono text-slate-800 dark:text-slate-200">₹{conn.securityDeposit.toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 text-xs text-slate-500 dark:text-slate-400 flex items-start gap-1.5 leading-relaxed">
-                      <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                      <span className="break-words">{localizeConsumerAddress(conn.address, language)}</span>
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                      <button
-                        onClick={() => {
-                          setSelectedConnectionNo(conn.consumerNo);
-                          setActiveTab('bills');
-                        }}
-                        className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline"
-                      >
-                        {tc.viewInvoicesLink}
-                      </button>
-                      <button
-                        onClick={() => {
+                {consumerConnections.map(conn => {
+                  const isSelected = selectedConnection?.consumerNo === conn.consumerNo;
+                  return (
+                    <div
+                      key={conn.consumerNo}
+                      data-testid={`connection-card-${conn.consumerNo}`}
+                      data-selected={isSelected ? 'true' : 'false'}
+                      onClick={() => {
+                        if (!isSelected) {
                           setSelectedConnectionNo(conn.consumerNo);
                           showToast(`${tc.activatedAccountToastPrefix} ${conn.consumerNo} ${tc.activatedAccountToastSuffix}`, 'info');
-                        }}
-                        className="text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 font-medium"
-                      >
-                        {tc.selectActiveAccountBtn}
-                      </button>
+                        }
+                      }}
+                      className={`p-5 rounded-xl border transition-all duration-150 space-y-4 ${
+                        isSelected
+                          ? 'border-blue-500 ring-2 ring-blue-500/20 dark:border-blue-500 bg-white dark:bg-[#101C35] shadow-md'
+                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#101C35] hover:border-slate-300 dark:hover:border-slate-700 shadow-2xs cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                            {localizeTariffCategory(conn.tariffCategory, language)}
+                          </span>
+                          <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                            {conn.consumerName}
+                          </h3>
+                          <span className="font-mono text-xs text-blue-600 dark:text-blue-400 font-semibold">
+                            {tc.consumerNoLabel} {conn.consumerNo}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                          {isSelected && (
+                            <span
+                              data-testid="selected-account-badge"
+                              className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-700 flex items-center gap-1"
+                            >
+                              <CheckCircle2 className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                              <span>{tc.selectedAccountBadge}</span>
+                            </span>
+                          )}
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            {localizeConnectionStatus(conn.status, language)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <div>
+                          <span className="text-slate-400 block text-[11px]">{tc.sanctionedLoad}</span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">{conn.sanctionedLoadKw} kW ({localizePhase(conn.phase, language)})</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[11px]">{tc.meterSerial}</span>
+                          <span className="font-mono text-slate-800 dark:text-slate-200">{conn.meterNo}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[11px]">{tc.currentReading}</span>
+                          <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{conn.currentReadingKwh} kWh</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-[11px]">{tc.securityDeposit}</span>
+                          <span className="font-mono text-slate-800 dark:text-slate-200">₹{conn.securityDeposit.toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 text-xs text-slate-500 dark:text-slate-400 flex items-start gap-1.5 leading-relaxed">
+                        <MapPin className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        <span className="break-words">{localizeConsumerAddress(conn.address, language)}</span>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedConnectionNo(conn.consumerNo);
+                            setActiveTab('bills');
+                          }}
+                          className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer"
+                        >
+                          {tc.viewInvoicesLink}
+                        </button>
+                        {isSelected ? (
+                          <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                            <span>{tc.activeAccountStatus}</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedConnectionNo(conn.consumerNo);
+                              showToast(`${tc.activatedAccountToastPrefix} ${conn.consumerNo} ${tc.activatedAccountToastSuffix}`, 'info');
+                            }}
+                            className="text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-medium hover:underline cursor-pointer"
+                          >
+                            {tc.selectActiveAccountBtn}
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="p-8 text-center rounded-xl bg-white dark:bg-[#101C35] border border-dashed border-slate-200 dark:border-slate-800 space-y-3">

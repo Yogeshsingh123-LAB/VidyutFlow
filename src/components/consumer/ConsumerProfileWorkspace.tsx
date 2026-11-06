@@ -1030,10 +1030,18 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
                   return (
                     <div
                       key={conn.id || conn.consumerNo}
+                      data-testid={`profile-connection-card-${conn.consumerNo}`}
+                      data-selected={isSelected ? 'true' : 'false'}
+                      onClick={() => {
+                        if (!isSelected) {
+                          setSelectedConnection(conn);
+                          showToast(`Switched active portal view to ${conn.consumerNo}`, 'info');
+                        }
+                      }}
                       className={`p-5 rounded-2xl bg-white dark:bg-[#101C35] border transition-all ${
                         isSelected
-                          ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-sm'
-                          : 'border-slate-200 dark:border-slate-800 shadow-2xs'
+                          ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md'
+                          : 'border-slate-200 dark:border-slate-800 shadow-2xs hover:border-slate-300 dark:hover:border-slate-700 cursor-pointer'
                       } space-y-4`}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -1050,8 +1058,9 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
                                 {conn.category}
                               </span>
                               {isSelected && (
-                                <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                                  Active Context
+                                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-700 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                                  <span>{language === 'gu' ? 'પસંદ કરેલ ખાતું' : language === 'hi' ? 'चयनित खाता' : language === 'mr' ? 'निवडलेले खाते' : 'Selected Account'}</span>
                                 </span>
                               )}
                             </div>
@@ -1061,10 +1070,16 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
                           </div>
                         </div>
 
-                        {!isSelected && (
+                        {isSelected ? (
+                          <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-1 self-start sm:self-auto">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                            <span>{language === 'gu' ? 'સક્રિય ખાતું' : language === 'hi' ? 'सक्रिय खाता' : language === 'mr' ? 'सक्रिय खाते' : 'Active Account'}</span>
+                          </span>
+                        ) : (
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setSelectedConnection(conn);
                               showToast(`Switched active portal view to ${conn.consumerNo}`, 'info');
                             }}
