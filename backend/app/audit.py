@@ -226,3 +226,25 @@ def verify_chain(db: Session) -> dict:
 
 # Alias log_action to audit for Phase 12 audit tracking
 log_action = audit
+
+
+def log_event(
+    db: Session,
+    *,
+    actor_user_id: str,
+    action: str,
+    entity_type: str = "",
+    entity_id: str = "",
+    metadata: Optional[dict] = None,
+):
+    """Write a structured event through the shared tamper-evident audit chain."""
+    import json
+
+    return audit(
+        db,
+        actor_user_id,
+        action,
+        entity=entity_type,
+        entity_id=entity_id,
+        detail=json.dumps(metadata or {}, sort_keys=True, separators=(",", ":")),
+    )
