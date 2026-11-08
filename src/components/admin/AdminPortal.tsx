@@ -71,7 +71,9 @@ import {
   Percent,
   FileCheck,
   Layers,
-  Clock
+  Clock,
+  Zap,
+  ChevronRight
 } from 'lucide-react';
 
 interface MockUser {
@@ -289,42 +291,84 @@ export const AdminPortal: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6 min-w-0">
-      {/* Admin Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3.5 min-w-0">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white p-1 border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center shrink-0">
+      {/* Admin Cockpit Top Bar (1:1 with Consumer & Officer Portal design) */}
+      <div className="relative overflow-hidden p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Left: UGVCL Icon Box, Title, Badge & Subtitle */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3.5 min-w-0 z-10">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white p-1 border border-slate-200 shadow-xs flex items-center justify-center shrink-0">
             <img src="/assets/ugvcl-logo.png" alt={ad.logoAltText} className="w-full h-full object-contain" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug break-words">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-snug break-words">
                 {ad.topBarTitle}
               </h1>
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                 {ad.topBarBadge}
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-relaxed break-words">
+            <p className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-relaxed break-words">
               <span>{ad.topBarSubtitlePrefix}</span>
-              <span className="font-semibold text-slate-700 dark:text-slate-300">{activeUser.name}</span>
+              <span className="font-semibold text-slate-700">{activeUser.name}</span>
               <span>({localizeEmployeeDesignation(activeUser.designation, language)})</span>
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800/80 shrink-0">
+        {/* Right: Transmission Pylons Artwork & Action Buttons */}
+        <div className="flex items-center gap-3 shrink-0 z-10 self-end sm:self-auto">
+          {/* Catenary Transmission Pylons SVG Vector Art */}
+          <div className="relative w-56 sm:w-64 h-20 hidden md:block shrink-0 pointer-events-none select-none">
+            <svg viewBox="0 0 320 120" fill="none" className="w-full h-full">
+              <path d="M0,105 Q90,65 170,90 T320,55 L320,120 L0,120 Z" fill="#FDF4E7" opacity="0.9" />
+              <path d="M0,112 Q100,80 190,100 T320,75 L320,120 L0,120 Z" fill="#FCE8D3" opacity="0.6" />
+              <path d="M0,62 Q130,95 230,55" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+              <path d="M0,72 Q135,105 230,65" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+              <path d="M230,55 Q265,70 300,30" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+              <path d="M230,65 Q265,80 300,40" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+              <g stroke="#0F2B48" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="230" y1="35" x2="218" y2="115" />
+                <line x1="230" y1="35" x2="242" y2="115" />
+                <line x1="223" y1="55" x2="237" y2="55" />
+                <line x1="220" y1="75" x2="240" y2="75" />
+                <line x1="218" y1="95" x2="242" y2="95" />
+                <line x1="223" y1="55" x2="240" y2="75" />
+                <line x1="237" y1="55" x2="220" y2="75" />
+                <line x1="220" y1="75" x2="242" y2="95" />
+                <line x1="240" y1="75" x2="218" y2="95" />
+                <line x1="210" y1="55" x2="250" y2="55" />
+                <line x1="214" y1="65" x2="246" y2="65" />
+                <line x1="230" y1="28" x2="230" y2="35" />
+              </g>
+              <g stroke="#0F2B48" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="300" y1="12" x2="282" y2="115" />
+                <line x1="300" y1="12" x2="318" y2="115" />
+                <line x1="289" y1="40" x2="311" y2="40" />
+                <line x1="285" y1="65" x2="315" y2="65" />
+                <line x1="282" y1="90" x2="318" y2="90" />
+                <line x1="289" y1="40" x2="315" y2="65" />
+                <line x1="311" y1="40" x2="285" y2="65" />
+                <line x1="285" y1="65" x2="318" y2="90" />
+                <line x1="315" y1="65" x2="282" y2="90" />
+                <line x1="272" y1="40" x2="328" y2="40" />
+                <line x1="276" y1="52" x2="324" y2="52" />
+                <line x1="300" y1="5" x2="300" y2="12" />
+              </g>
+            </svg>
+          </div>
+
           <button
             type="button"
             data-testid="admin-open-backup-center-btn"
             onClick={() => setActiveTab('infra')}
-            className="w-full sm:w-auto min-h-11 sm:min-h-[38px] px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            className="w-full sm:w-auto min-h-11 sm:min-h-9 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
           >
             <Database className="w-3.5 h-3.5" />
             <span>{bkpDict.demoScopeBadge}</span>
           </button>
           <button
             onClick={() => showToast('Simulated zero-downtime certificate renewal', 'success')}
-            className="w-full sm:w-auto min-h-11 sm:min-h-[38px] px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="w-full sm:w-auto min-h-11 sm:min-h-9 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer"
           >
             {ad.checkSslBtn}
           </button>
@@ -332,7 +376,7 @@ export const AdminPortal: React.FC = () => {
       </div>
 
       {/* VIEW 1: SYSTEM OVERVIEW & INTEGRATIONS */}
-      {(activeTab === 'overview' || activeTab === 'integrations') && (
+      {(activeTab === 'overview' || activeTab === 'dashboard' || activeTab === 'integrations') && (
         <div className="space-y-4 sm:space-y-6">
           {activeTab === 'integrations' && (
             <>
@@ -343,44 +387,88 @@ export const AdminPortal: React.FC = () => {
           <LiveWorkflowKpis />
           {/* Bento Health Strip */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                {ad.kpiMicroservicesTitle}
-              </span>
-              <div className="text-2xl font-extrabold text-emerald-600 tabular-nums">
+            <div
+              onClick={() => setActiveTab('integrations')}
+              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition cursor-pointer flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                  <Server className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono ml-2.5">
+                  {ad.kpiMicroservicesTitle}
+                </span>
+                <ChevronRight className="w-4 h-4 text-slate-400 ml-auto shrink-0" />
+              </div>
+              <div className="text-2xl font-black text-emerald-600 mt-3 tabular-nums">
                 {ad.kpiMicroservicesValue}
               </div>
-              <span className="text-xs text-slate-500">{ad.kpiMicroservicesSub}</span>
+              <div className="text-xs font-medium text-emerald-600 mt-2 hover:underline">
+                {ad.kpiMicroservicesSub} →
+              </div>
             </div>
 
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                {ad.kpiGatewayTitle}
-              </span>
-              <div className="text-2xl font-extrabold text-blue-600 tabular-nums">
+            <div
+              onClick={() => setActiveTab('integrations')}
+              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition cursor-pointer flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono ml-2.5">
+                  {ad.kpiGatewayTitle}
+                </span>
+                <ChevronRight className="w-4 h-4 text-slate-400 ml-auto shrink-0" />
+              </div>
+              <div className="text-2xl font-black text-blue-600 mt-3 tabular-nums">
                 {ad.kpiGatewayValue}
               </div>
-              <span className="text-xs text-slate-500">{ad.kpiGatewaySub}</span>
+              <div className="text-xs font-medium text-blue-600 mt-2 hover:underline">
+                {ad.kpiGatewaySub} →
+              </div>
             </div>
 
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                {ad.kpiAmrTitle}
-              </span>
-              <div className="text-2xl font-extrabold text-teal-600 tabular-nums">
+            <div
+              onClick={() => setActiveTab('transformers')}
+              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition cursor-pointer flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600 shrink-0">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono ml-2.5">
+                  {ad.kpiAmrTitle}
+                </span>
+                <ChevronRight className="w-4 h-4 text-slate-400 ml-auto shrink-0" />
+              </div>
+              <div className="text-2xl font-black text-teal-600 mt-3 tabular-nums">
                 {ad.kpiAmrValue}
               </div>
-              <span className="text-xs text-slate-500">{ad.kpiAmrSub}</span>
+              <div className="text-xs font-medium text-teal-600 mt-2 hover:underline">
+                {ad.kpiAmrSub} →
+              </div>
             </div>
 
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                {ad.kpiThreatTitle}
-              </span>
-              <div className="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">
+            <div
+              onClick={() => setActiveTab('access')}
+              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition cursor-pointer flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono ml-2.5">
+                  {ad.kpiThreatTitle}
+                </span>
+                <ChevronRight className="w-4 h-4 text-slate-400 ml-auto shrink-0" />
+              </div>
+              <div className="text-2xl font-black text-slate-900 mt-3 tabular-nums">
                 {ad.kpiThreatValue}
               </div>
-              <span className="text-xs text-emerald-600 font-medium">{ad.kpiThreatSub}</span>
+              <div className="text-xs font-medium text-emerald-600 mt-2 hover:underline">
+                {ad.kpiThreatSub} →
+              </div>
             </div>
           </div>
 
@@ -801,7 +889,7 @@ export const AdminPortal: React.FC = () => {
               </div>
             </div>
           </div>
-          {activeTab === 'overview' && <LiveErpAdapterPanel />}
+          {(activeTab === 'overview' || activeTab === 'dashboard') && <LiveErpAdapterPanel />}
         </div>
       )}
 

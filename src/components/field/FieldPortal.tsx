@@ -78,6 +78,7 @@ import {
   Sliders,
   Flame,
   X,
+  ChevronRight,
 } from 'lucide-react';
 
 const DEFAULT_TECH_REMARKS_SET = new Set(
@@ -426,10 +427,11 @@ export const FieldPortal: React.FC = () => {
 
   return (
     <div className="space-y-5">
-      {/* Field Engineer Top Status Bar */}
-      <div className="bg-white dark:bg-[#111827] rounded-xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-t-4 border-t-emerald-600">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3.5 min-w-0">
-          <div className="w-11 h-11 rounded-lg bg-white p-1.5 border border-slate-200 shadow-xs shrink-0 flex items-center justify-center">
+      {/* Field Engineer Cockpit Top Bar (1:1 with Consumer, Officer & Admin design) */}
+      <div className="relative overflow-hidden p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        {/* Left: UGVCL Emblem Box, Title, Badge & Subtitle */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3.5 min-w-0 z-10">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white p-1 border border-slate-200 shadow-xs flex items-center justify-center shrink-0">
             <img
               src={UGVCL_LOGO_PATH}
               alt={tf.ugvclLogoAlt}
@@ -438,40 +440,32 @@ export const FieldPortal: React.FC = () => {
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-snug break-words">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-snug break-words">
                 {tf.consoleTitle}
               </h1>
-              <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-bold uppercase tracking-wider">
+              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                 {tf.roleBadgeField}
               </span>
             </div>
-            <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">
-              {tf.subtitleOpsPrefix}{' '}
-              <span className="text-slate-800 dark:text-slate-200 font-semibold">
-                {activeUser.name}
-              </span>{' '}
-              •{' '}
-              <span className="text-emerald-700 dark:text-emerald-400 font-mono">
-                {activeUser.id}
-              </span>{' '}
-              (
-              {localizeEmployeeDesignation(
-                activeUser.designation || 'Junior Engineer (Field) / Sr. Lineman',
-                language
-              )}
-              ) · {localizeSubdivision(activeUser.subdivision || 'Feeder Wing Mehsana', language)}
+            <p className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-relaxed break-words">
+              <span>{tf.subtitleOpsPrefix}</span>
+              <span className="font-semibold text-slate-700">{activeUser.name}</span>
+              <span className="text-slate-400">•</span>
+              <span className="text-emerald-700 font-mono font-semibold">{activeUser.id}</span>
+              <span>({localizeEmployeeDesignation(activeUser.designation || 'Junior Engineer (Field) / Sr. Lineman', language)})</span>
+              <span>· {localizeSubdivision(activeUser.subdivision || 'Feeder Wing Mehsana', language)}</span>
             </p>
           </div>
         </div>
 
-        {/* Connectivity Status & Actions Cluster */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Right: Transmission Pylons Artwork & Connectivity Actions Cluster */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 z-10 self-end lg:self-auto flex-wrap">
           {/* Status Badge */}
           <div
             data-testid="field-connectivity-indicator"
             role="status"
             aria-live="polite"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold ${statusBadge.bg} ${statusBadge.text} ${statusBadge.border}`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold ${statusBadge.bg} ${statusBadge.text} ${statusBadge.border}`}
           >
             {statusBadge.icon}
             <span>{statusBadge.label}</span>
@@ -488,7 +482,7 @@ export const FieldPortal: React.FC = () => {
               type="button"
               data-testid="review-conflict-btn"
               onClick={() => setActiveTab('offline')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 shadow-2xs transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 text-rose-800 dark:text-rose-200 border border-rose-300 dark:border-rose-800 shadow-2xs transition-colors cursor-pointer"
             >
               <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" aria-hidden="true" />
               <span>{tf.btnReviewConflict} ({conflictCount || failedOfflineCount})</span>
@@ -499,10 +493,10 @@ export const FieldPortal: React.FC = () => {
           <button
             type="button"
             onClick={() => setShowHazardModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-all cursor-pointer"
           >
             <Flame className="w-3.5 h-3.5" aria-hidden="true" />
-            {tf.btnReportHazard}
+            <span>{tf.btnReportHazard}</span>
           </button>
 
           {/* Simulated Offline Toggle (DEMO Testing Tool) */}
@@ -511,10 +505,10 @@ export const FieldPortal: React.FC = () => {
             onClick={toggleOfflineMode}
             aria-label={isOfflineSimulated ? tf.ariaDisableOffline : tf.ariaEnableOffline}
             aria-pressed={isOfflineSimulated}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
               isOfflineSimulated
                 ? 'bg-amber-100 dark:bg-amber-950/60 border-amber-400 dark:border-amber-700 text-amber-900 dark:text-amber-200'
-                : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-2xs'
             }`}
           >
             <Sliders className="w-3.5 h-3.5" aria-hidden="true" />
@@ -526,7 +520,7 @@ export const FieldPortal: React.FC = () => {
             type="button"
             disabled={isFieldSyncing || isBrowserOffline || isOfflineSimulated || (pendingOfflineCount === 0 && failedOfflineCount === 0)}
             onClick={() => handleSimulateSyncNow()}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold cursor-pointer shadow-xs transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold cursor-pointer shadow-xs transition-all"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isFieldSyncing ? 'animate-spin' : ''}`} aria-hidden="true" />
             <span>{tf.btnManualSyncNow}</span>
@@ -756,59 +750,78 @@ export const FieldPortal: React.FC = () => {
       {/* TAB 1: FIELD DASHBOARD */}
       {activeTab === 'dashboard' && (
         <div className="space-y-6">
+          {/* Bento Health & Operations Strip (1:1 with Consumer, Officer & Admin design) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            <div
+              onClick={() => setActiveTab('workorders')}
+              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition cursor-pointer flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                  <Wrench className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono ml-2.5">
                   {tf.kpiAssignedWorkOrders}
                 </span>
-                <Wrench className="w-4 h-4 text-blue-600" />
+                <ChevronRight className="w-4 h-4 text-slate-400 ml-auto shrink-0" />
               </div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">
+              <div className="text-2xl font-black text-slate-900 mt-3 tabular-nums">
                 {pendingWorkOrders.length}
-              </p>
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                {tf.kpiAssignedWorkOrdersSub}
-              </p>
+              </div>
+              <div className="text-xs font-medium text-blue-600 mt-2 hover:underline">
+                {tf.kpiAssignedWorkOrdersSub} →
+              </div>
             </div>
 
-            <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            <div
+              onClick={() => setActiveTab('dashboard')}
+              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition cursor-pointer flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono ml-2.5">
                   {tf.kpiEmergencyCallouts}
                 </span>
-                <AlertTriangle className="w-4 h-4 text-rose-600" />
+                <ChevronRight className="w-4 h-4 text-slate-400 ml-auto shrink-0" />
               </div>
-              <p
+              <div
                 data-testid="field-kpi-emergency-callouts"
-                className="text-2xl font-bold text-rose-600 dark:text-rose-400 tabular-nums"
+                className="text-2xl font-black text-rose-600 mt-3 tabular-nums"
               >
                 {fieldCanonicalMetrics.totalActiveEmergencyCallouts} {tf.kpiEmergencyActiveSuffix}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                {tf.kpiEmergencySub}
-              </p>
+              </div>
+              <div className="text-xs font-medium text-rose-600 mt-2 hover:underline">
+                {tf.kpiEmergencySub} →
+              </div>
             </div>
 
-            <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            <div
+              onClick={() => setActiveTab('history')}
+              className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition cursor-pointer flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono ml-2.5">
                   {tf.kpiCompletedInspections}
                 </span>
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <ChevronRight className="w-4 h-4 text-slate-400 ml-auto shrink-0" />
               </div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">
+              <div className="text-2xl font-black text-emerald-600 mt-3 tabular-nums">
                 {completedWorkOrders.length}
-              </p>
-              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
-                {tf.kpiCompletedInspectionsSub}
-              </p>
+              </div>
+              <div className="text-xs font-medium text-emerald-600 mt-2 hover:underline">
+                {tf.kpiCompletedInspectionsSub} →
+              </div>
             </div>
           </div>
 
           {/* Assigned Critical Incidents Section */}
           {assignedIncidents.length > 0 && (
-            <div className="bg-white dark:bg-[#111827] rounded-xl border-2 border-rose-300 dark:border-rose-900/70 overflow-hidden shadow-xs">
+            <div className="bg-white rounded-2xl border-2 border-rose-300 dark:border-rose-900/70 overflow-hidden shadow-2xs">
               <div className="px-6 py-3.5 bg-rose-50/80 dark:bg-rose-950/30 border-b border-rose-200 dark:border-rose-900/50 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Flame className="w-4 h-4 text-rose-600 dark:text-rose-400" />

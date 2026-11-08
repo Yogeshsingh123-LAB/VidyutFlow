@@ -228,6 +228,24 @@ async function runUnifiedLoginSecurityTestSuite() {
   assert.equal(adminData.role, 'admin');
   console.log(`   [PASS] Administrator authenticated: ${adminData.user.name}`);
 
+  // 2d. Management Cockpit Login with Executive ID alias
+  const resManagement = await inMemoryFetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: 'ugvcl-mgt-01',
+      password: 'Demo@12345',
+      targetRole: 'management'
+    })
+  });
+  assert.equal(resManagement.status, 200, 'Management Cockpit login must succeed');
+  const managementData = await resManagement.json();
+  assert.equal(managementData.authenticated, true);
+  assert.equal(managementData.role, 'management');
+  assert.equal(managementData.user.role, 'management');
+  assert.ok(managementData.user.designation.includes('Chief Engineer'));
+  console.log(`   [PASS] Management Cockpit authenticated: ${managementData.user.name} (${managementData.user.designation})`);
+
   // =========================================================================
   // 3. ZERO-TRUST AUTHORIZATION & ROLE SPOOFING REJECTION
   // =========================================================================
@@ -337,16 +355,24 @@ async function runUnifiedLoginSecurityTestSuite() {
   }
   console.log('   [PASS] Verified 0 development authentication controls in user-facing login modal');
 
-  // Verify Consumer Number removed from login UI and CAPTCHA is present
+  // Verify Consumer Number & Registered Mobile Number are present in login UI and CAPTCHA is present
   assert.ok(
-    !authModalSource.includes('Electricity Consumer Number'),
-    'Consumer login UI must have Electricity Consumer Number removed'
+    authModalSource.includes('Electricity Consumer Number'),
+    'Consumer login UI must have Electricity Consumer Number input'
+  );
+  assert.ok(
+    authModalSource.includes('Registered Mobile Number'),
+    'Consumer login UI must have Registered Mobile Number input'
   );
   assert.ok(
     authModalSource.includes('Security Verification') && authModalSource.includes('Anti-bot protection'),
     'Consumer login UI must include uncopyable security CAPTCHA verification'
   );
-  console.log('   [PASS] Verified Electricity Consumer Number removed & Anti-bot CAPTCHA present in Login UI');
+  assert.ok(
+    authModalSource.includes('Management Cockpit') && authModalSource.includes('Executive / HOD'),
+    'Login modal must include Management Cockpit account type for executive leadership'
+  );
+  console.log('   [PASS] Verified Electricity Consumer Number & Registered Mobile Number pair, Anti-bot CAPTCHA present, and Management Cockpit account type present');
 
   // Check built HTML/assets if dist exists
   if (fs.existsSync('dist')) {

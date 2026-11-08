@@ -131,6 +131,7 @@ import {
   triggerOfficialDocumentPdfDownload,
 } from '../../utils/documentEngine';
 import { triggerBrowserFileDownload } from '../../utils/exportEngine';
+import { formatErpDateTime } from '../../utils/dateUtils';
 import type { OverdueFinancialBreakdown } from '../../utils/lateChargeEngine';
 import {
   BillingReminderType,
@@ -177,7 +178,15 @@ import {
   Gauge,
   Trash2,
   XCircle,
-  QrCode
+  QrCode,
+  ArrowRight,
+  Sun,
+  Megaphone,
+  Copy,
+  BarChart3,
+  ChevronDown,
+  Home,
+  Fingerprint
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -277,7 +286,9 @@ export const ConsumerPortal: React.FC = () => {
   });
   const caTranslations = getCanonicalAnalyticsTranslations(language);
 
-  const [consumerNotifFilter, setConsumerNotifFilter] = useState<'all' | 'unread' | 'applications'>('all');
+  const [consumerNotifFilter, setConsumerNotifFilter] = useState<
+    'all' | 'unread' | 'pending' | 'approved' | 'rejected' | 'applications'
+  >('all');
   const [selectedConsumerNotifIds, setSelectedConsumerNotifIds] = useState<string[]>([]);
 
   // Logged-in consumer identity (Single source of truth)
@@ -1079,134 +1090,136 @@ export const ConsumerPortal: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6 min-w-0">
-      {/* Account & Connection Summary Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white p-1.5 border border-slate-200 dark:border-slate-700 shadow-2xs flex items-center justify-center shrink-0">
-            <img src="/assets/ugvcl-logo.png" alt="UGVCL Official Logo" className="w-full h-full object-contain" />
+      {/* Account & Connection Summary Header (Hidden on Dashboard, New Connection and Notifications views for 1:1 clean design match) */}
+      {activeTab !== 'dashboard' && activeTab !== 'new-connection' && activeTab !== 'notifications' && (
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white p-1.5 border border-slate-200 dark:border-slate-700 shadow-2xs flex items-center justify-center shrink-0">
+              <img src="/assets/ugvcl-logo.png" alt="UGVCL Official Logo" className="w-full h-full object-contain" />
+            </div>
+            <div className="min-w-0 flex-1">
+              {hasConnections && selectedConnection ? (
+                <>
+                  <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5 flex-wrap">
+                    <span>{tc.ugvclPrefix} {localizeSubdivision(selectedConnection.subdivision, language)}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{localizeTariffCategory(selectedConnection.tariffCategory, language)}</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      {localizeConnectionStatus(selectedConnection.status, language)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight leading-snug break-words">
+                      {selectedConnection.consumerName}
+                    </h1>
+                    <span className="text-xs font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50/80 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-md border border-blue-200/80 dark:border-blue-800/80">
+                      {tc.consumerNoLabel} {selectedConnection.consumerNo}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-start sm:items-center gap-2 flex-wrap leading-relaxed">
+                    <span className="inline-flex items-start sm:items-center gap-1 min-w-0">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5 sm:mt-0" />
+                      <span className="break-words">{localizeConsumerAddress(selectedConnection.address, language)}</span>
+                    </span>
+                    <span className="text-slate-300 dark:text-slate-700 hidden sm:inline" aria-hidden="true">|</span>
+                    <span className="font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                      {tc.meterLabel} {selectedConnection.meterNo} ({selectedConnection.sanctionedLoadKw} kW · {localizePhase(selectedConnection.phase, language)})
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5 flex-wrap">
+                    <span>{tc.selfServicePortal}</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                      {tc.noConnectionLinked}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight leading-snug break-words">
+                      {tc.consumerAccountLabel} {currentUserName}
+                    </h1>
+                    <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                      {tc.idLabel} {currentUserId}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-start sm:items-center gap-1.5 flex-wrap leading-relaxed">
+                    <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5 sm:mt-0" />
+                    <span className="break-words">{currentUserEmail || tc.registeredCitizenAccount} · {tc.independentErpDemo}</span>
+                  </p>
+                </>
+              )}
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            {hasConnections && selectedConnection ? (
-              <>
-                <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5 flex-wrap">
-                  <span>{tc.ugvclPrefix} {localizeSubdivision(selectedConnection.subdivision, language)}</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{localizeTariffCategory(selectedConnection.tariffCategory, language)}</span>
-                  <span aria-hidden="true">·</span>
-                  <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-semibold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    {localizeConnectionStatus(selectedConnection.status, language)}
-                  </span>
+
+          {/* Right: Active Meter Selector or Onboarding Actions */}
+          <div className="flex items-center gap-3 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 dark:border-slate-800/80 shrink-0 min-w-0">
+            {hasConnections ? (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full lg:w-auto min-w-0">
+                <label
+                  htmlFor="active-meter-select"
+                  className="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 shrink-0"
+                >
+                  <Gauge className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  <span>{tc.activeMeterLabel}</span>
+                </label>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 min-w-0">
+                  <select
+                    id="active-meter-select"
+                    value={selectedConnection?.consumerNo}
+                    onChange={e => {
+                      handleWizardConnectionSwitch(e.target.value);
+                    }}
+                    aria-label={tc.selectActiveMeterAria}
+                    className="min-h-11 sm:min-h-9 min-w-0 w-full sm:w-auto px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 dark:bg-[#131D31] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-colors cursor-pointer"
+                  >
+                    {consumerConnections.map(c => {
+                      const connDue =
+                        consumerBillingSummary.summariesByConnectionNo[c.consumerNo]?.dueBillCount || 0;
+                      return (
+                        <option key={c.consumerNo} value={c.consumerNo}>
+                          {c.consumerNo} — {localizeTariffCategory(c.tariffCategory, language)} ({c.sanctionedLoadKw} kW)
+                          {connDue > 0 ? ` · ${bUi.dueBillsCountBadge(connDue)}` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('connections')}
+                    className="min-h-11 sm:min-h-9 px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer shrink-0"
+                    title={tc.manageConnectionsTitle}
+                  >
+                    {tc.manageConnectionsBtn} ({consumerConnections.length})
+                  </button>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight leading-snug break-words">
-                    {selectedConnection.consumerName}
-                  </h1>
-                  <span className="text-xs font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50/80 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-md border border-blue-200/80 dark:border-blue-800/80">
-                    {tc.consumerNoLabel} {selectedConnection.consumerNo}
-                  </span>
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-start sm:items-center gap-2 flex-wrap leading-relaxed">
-                  <span className="inline-flex items-start sm:items-center gap-1 min-w-0">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5 sm:mt-0" />
-                    <span className="break-words">{localizeConsumerAddress(selectedConnection.address, language)}</span>
-                  </span>
-                  <span className="text-slate-300 dark:text-slate-700 hidden sm:inline" aria-hidden="true">|</span>
-                  <span className="font-mono text-[11px] text-slate-600 dark:text-slate-300">
-                    {tc.meterLabel} {selectedConnection.meterNo} ({selectedConnection.sanctionedLoadKw} kW · {localizePhase(selectedConnection.phase, language)})
-                  </span>
-                </div>
-              </>
+              </div>
             ) : (
-              <>
-                <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5 flex-wrap">
-                  <span>{tc.selfServicePortal}</span>
-                  <span aria-hidden="true">·</span>
-                  <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                    {tc.noConnectionLinked}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight leading-snug break-words">
-                    {tc.consumerAccountLabel} {currentUserName}
-                  </h1>
-                  <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                    {tc.idLabel} {currentUserId}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-start sm:items-center gap-1.5 flex-wrap leading-relaxed">
-                  <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5 sm:mt-0" />
-                  <span className="break-words">{currentUserEmail || tc.registeredCitizenAccount} · {tc.independentErpDemo}</span>
-                </p>
-              </>
+              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => initializeServiceRequestWizard('NEW_CONNECTION')}
+                  className="flex-1 sm:flex-initial min-h-11 sm:min-h-9 px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>{tc.applyForConnectionBtn}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsLinkModalOpen(true)}
+                  className="flex-1 sm:flex-initial min-h-11 sm:min-h-9 px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
+                >
+                  <Link2 className="w-3.5 h-3.5 text-slate-400" />
+                  <span>{tc.linkExistingBtn}</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
-
-        {/* Right: Active Meter Selector or Onboarding Actions */}
-        <div className="flex items-center gap-3 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 dark:border-slate-800/80 shrink-0 min-w-0">
-          {hasConnections ? (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full lg:w-auto min-w-0">
-              <label
-                htmlFor="active-meter-select"
-                className="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 shrink-0"
-              >
-                <Gauge className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                <span>{tc.activeMeterLabel}</span>
-              </label>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 min-w-0">
-                <select
-                  id="active-meter-select"
-                  value={selectedConnection?.consumerNo}
-                  onChange={e => {
-                    handleWizardConnectionSwitch(e.target.value);
-                  }}
-                  aria-label={tc.selectActiveMeterAria}
-                  className="min-h-11 sm:min-h-9 min-w-0 w-full sm:w-auto px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 dark:bg-[#131D31] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-colors cursor-pointer"
-                >
-                  {consumerConnections.map(c => {
-                    const connDue =
-                      consumerBillingSummary.summariesByConnectionNo[c.consumerNo]?.dueBillCount || 0;
-                    return (
-                      <option key={c.consumerNo} value={c.consumerNo}>
-                        {c.consumerNo} — {localizeTariffCategory(c.tariffCategory, language)} ({c.sanctionedLoadKw} kW)
-                        {connDue > 0 ? ` · ${bUi.dueBillsCountBadge(connDue)}` : ''}
-                      </option>
-                    );
-                  })}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('connections')}
-                  className="min-h-11 sm:min-h-9 px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer shrink-0"
-                  title={tc.manageConnectionsTitle}
-                >
-                  {tc.manageConnectionsBtn} ({consumerConnections.length})
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-              <button
-                type="button"
-                onClick={() => initializeServiceRequestWizard('NEW_CONNECTION')}
-                className="flex-1 sm:flex-initial min-h-11 sm:min-h-9 px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
-              >
-                <PlusCircle className="w-3.5 h-3.5" />
-                <span>{tc.applyForConnectionBtn}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsLinkModalOpen(true)}
-                className="flex-1 sm:flex-initial min-h-11 sm:min-h-9 px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
-              >
-                <Link2 className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-                <span>{tc.linkExistingBtn}</span>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* SUBVIEW 1: DASHBOARD */}
       {activeTab === 'dashboard' && (
@@ -1305,405 +1318,500 @@ export const ConsumerPortal: React.FC = () => {
             </div>
           )}
 
-          {/* Primary KPI Cards Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch" data-testid="consumer-kpi-cards-grid">
-            {/* Card 1: Current Electricity Bill */}
-            <div className="h-full p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
-              <div className="flex-1 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-start justify-between gap-2.5 min-h-[36px] mb-2.5">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                        <Receipt className="w-4 h-4" />
-                      </div>
-                      <span className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-[13px] uppercase tracking-wider leading-snug break-words">
-                        {tc.currentElectricityBill}
-                      </span>
-                    </div>
-                    <span
-                      data-testid="dashboard-bill-status-badge"
-                      className={`text-[11px] font-semibold inline-flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-md ${
-                        dashboardBadgeState === 'NO_ACTIVE_CONNECTION' ||
-                        dashboardBadgeState === 'NO_BILL_GENERATED'
-                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700'
-                          : dashboardBadgeState === 'OVERDUE'
-                          ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border border-rose-200/60 dark:border-rose-800/60'
-                          : dashboardBadgeState === 'PARTIALLY_PAID' ||
-                            dashboardBadgeState === 'UNPAID'
-                          ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/60'
-                          : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                          dashboardBadgeState === 'NO_ACTIVE_CONNECTION' ||
-                          dashboardBadgeState === 'NO_BILL_GENERATED'
-                            ? 'bg-slate-400'
-                            : dashboardBadgeState === 'OVERDUE'
-                            ? 'bg-rose-500'
-                            : dashboardBadgeState === 'PARTIALLY_PAID' ||
-                              dashboardBadgeState === 'UNPAID'
-                            ? 'bg-amber-500'
-                            : 'bg-emerald-500'
-                        }`}
-                      />
-                      {dashboardBadgeState === 'NO_ACTIVE_CONNECTION'
-                        ? tc.noActiveConnection
-                        : dashboardBadgeState === 'NO_BILL_GENERATED'
-                        ? bUi.statusNoBill
-                        : dashboardBadgeState === 'OVERDUE'
-                        ? bUi.statusOverdue
-                        : dashboardBadgeState === 'PARTIALLY_PAID'
-                        ? bUi.statusPartiallyPaid
-                        : dashboardBadgeState === 'UNPAID'
-                        ? tc.paymentDue
-                        : tc.paid}
-                    </span>
-                  </div>
-
-                  <div className="min-h-[56px] flex flex-col justify-center my-1.5">
-                    <div className="flex items-baseline gap-2.5 flex-wrap">
-                      <div className="text-2xl sm:text-[28px] font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight leading-tight">
-                        {hasConnections && currentBill
-                          ? `₹${(currentBill.isPartiallyPaid
-                              ? currentBill.outstandingBalance
-                              : currentBill.totalAmount
-                            ).toLocaleString('en-IN')}`
-                          : '₹0'}
-                      </div>
-                      {hasConnections && currentBill && (
-                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-snug inline-flex items-center gap-1.5 flex-wrap">
-                          <span>{tc.forMonthPrefix} {localizeBillMonth(currentBill.billMonth, language)}</span>
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                            {localizeBillingCycleShortBadge(currentBill.billingCycleType, language)}
-                          </span>
-                        </span>
-                      )}
-                    </div>
-                    {hasConnections && currentBill?.isPartiallyPaid && (
-                      <div className="text-[11px] text-amber-700 dark:text-amber-400 font-medium mt-0.5">
-                        {bUi.paidAmountLabel}: ₹{currentBill.paidAmount.toLocaleString('en-IN')} ·{' '}
-                        {bUi.totalBillAmountLabel}: ₹{currentBill.totalAmount.toLocaleString('en-IN')}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {hasConnections && currentBill ? (
-                  <div className="grid grid-cols-2 gap-3 pt-3.5 mt-2 border-t border-slate-100 dark:border-slate-800/70 text-xs min-h-[76px] items-start">
-                    <div className="min-w-0">
-                      <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium leading-snug mb-1">{tc.billedConsumption}</span>
-                      <span className="font-bold text-slate-800 dark:text-slate-200 tabular-nums text-xs sm:text-[13px] leading-snug block">
-                        {currentBill.unitsConsumed} kWh
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium leading-snug mb-1">{tc.invoiceNumber}</span>
-                      <span className="font-mono font-semibold text-slate-700 dark:text-slate-300 text-[11px] leading-snug break-all block">
-                        {currentBill.billNo}
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 pt-3.5 mt-2 border-t border-slate-100 dark:border-slate-800/70 min-h-[76px] leading-relaxed">
-                    {tc.noBillsGeneratedDesc}
-                  </p>
-                )}
+          {/* =========================================================================
+              1. GREETING HERO BANNER (With UGVCL Transmission Pylon Vector Art)
+             ========================================================================= */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-50/30 via-amber-50/15 to-orange-100/40 border border-orange-100/70 p-6 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
+            {/* Left: Greeting Text & Accent Bar */}
+            <div className="z-10">
+              <div className="text-slate-500 text-sm font-semibold">
+                Good Afternoon,
               </div>
-
-              <div className="pt-3.5 mt-4 border-t border-slate-100 dark:border-slate-800/80 min-h-[44px] flex items-center justify-between gap-2 flex-wrap">
-                <span className="text-xs text-slate-500 dark:text-slate-400 leading-snug">
-                  {hasConnections && currentBill?.dueDate ? (
-                    <>{tc.dueDateLabel} <strong className="text-slate-800 dark:text-slate-200 font-semibold tabular-nums">{currentBill.dueDate}</strong></>
-                  ) : (
-                    tc.dueNonePending
-                  )}
-                </span>
-                {hasConnections && currentBill && currentBill.isDue ? (
-                  <button
-                    onClick={() => handlePayClick(currentBill.billNo)}
-                    className="min-h-[34px] px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
-                  >
-                    <span>{tc.payOnlineBtn}</span>
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                  </button>
-                ) : hasConnections && currentBill ? (
-                  <button
-                    onClick={() => handleViewReceipt(currentBill)}
-                    className="min-h-[34px] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
-                  >
-                    {tc.viewReceiptBtn}
-                  </button>
-                ) : hasConnections && selectedConnection?.status === 'Active' ? (
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('bills')}
-                    className="min-h-[34px] px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/40 text-xs font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors cursor-pointer"
-                  >
-                    {language === 'gu'
-                      ? 'દ્વિ-માસિક બિલિંગ શેડ્યૂલ જુઓ'
-                      : language === 'hi'
-                      ? 'द्वि-मासिक बिलिंग अनुसूची देखें'
-                      : language === 'mr'
-                      ? 'द्वि-मासिक बिलिंग वेळापत्रक पहा'
-                      : 'View Bi-Monthly Billing Schedule'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setActiveTab('new-connection')}
-                    className="text-xs font-semibold text-blue-600 dark:text-cyan-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded cursor-pointer"
-                  >
-                    {tc.applyConnectionLink}
-                  </button>
-                )}
-              </div>
+              <h1 className="text-2xl sm:text-[28px] font-black text-[#0A2540] tracking-tight leading-tight mt-0.5">
+                {currentUserName || 'Smt. Meenaben Patel'}
+              </h1>
+              <p className="text-xs sm:text-[13px] text-slate-500 font-medium mt-1">
+                Manage your electricity services, bills and requests at one place.
+              </p>
+              <div className="w-12 h-1 bg-[#FF6B00] rounded-full mt-3" />
             </div>
 
-            {/* Card 2: Connected Feeder & Supply Status */}
-            <div className="h-full p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
-              <div className="flex-1 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-start justify-between gap-2.5 min-h-[36px] mb-2.5">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                        <Zap className="w-4 h-4" />
-                      </div>
-                      <span className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-[13px] uppercase tracking-wider leading-snug break-words">
-                        {tc.connectedFeeder}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800">
-                        {consumerFeederTelemetrySource.badgeLabel}
-                      </span>
-                      <span className={`text-[11px] font-semibold inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md ${
-                        hasConnections
-                          ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${hasConnections ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                        {hasConnections ? tc.normalSupply : tc.unassigned}
-                      </span>
-                    </div>
-                  </div>
+            {/* Right: Scalable Vector Pylons & Overhead Transmission Lines */}
+            <div className="relative w-72 sm:w-80 h-28 hidden md:block shrink-0 pointer-events-none select-none">
+              <svg viewBox="0 0 320 120" fill="none" className="w-full h-full">
+                {/* Warm soft background hills */}
+                <path d="M0,105 Q90,65 170,90 T320,55 L320,120 L0,120 Z" fill="#FDF4E7" opacity="0.9" />
+                <path d="M0,112 Q100,80 190,100 T320,75 L320,120 L0,120 Z" fill="#FCE8D3" opacity="0.6" />
 
-                  <div className="min-h-[56px] flex flex-col justify-center my-1.5">
-                    <div className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-snug break-words">
-                      {hasConnections && selectedConnection ? localizeFeederName(selectedConnection.feederName, language) : tc.noFeederAssigned}
-                    </div>
-                  </div>
+                {/* Catenary power lines */}
+                <path d="M0,62 Q130,95 230,55" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+                <path d="M0,72 Q135,105 230,65" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+                <path d="M230,55 Q265,70 300,30" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+                <path d="M230,65 Q265,80 300,40" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+
+                {/* Mid Pylon (left) */}
+                <g stroke="#0F2B48" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="230" y1="35" x2="218" y2="115" />
+                  <line x1="230" y1="35" x2="242" y2="115" />
+                  <line x1="223" y1="55" x2="237" y2="55" />
+                  <line x1="220" y1="75" x2="240" y2="75" />
+                  <line x1="218" y1="95" x2="242" y2="95" />
+                  <line x1="223" y1="55" x2="240" y2="75" />
+                  <line x1="237" y1="55" x2="220" y2="75" />
+                  <line x1="220" y1="75" x2="242" y2="95" />
+                  <line x1="240" y1="75" x2="218" y2="95" />
+                  <line x1="210" y1="55" x2="250" y2="55" />
+                  <line x1="214" y1="65" x2="246" y2="65" />
+                  <line x1="230" y1="28" x2="230" y2="35" />
+                </g>
+
+                {/* Taller Pylon (right) */}
+                <g stroke="#0F2B48" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="300" y1="12" x2="282" y2="115" />
+                  <line x1="300" y1="12" x2="318" y2="115" />
+                  <line x1="289" y1="40" x2="311" y2="40" />
+                  <line x1="285" y1="65" x2="315" y2="65" />
+                  <line x1="282" y1="90" x2="318" y2="90" />
+                  <line x1="289" y1="40" x2="315" y2="65" />
+                  <line x1="311" y1="40" x2="285" y2="65" />
+                  <line x1="285" y1="65" x2="318" y2="90" />
+                  <line x1="315" y1="65" x2="282" y2="90" />
+                  <line x1="272" y1="40" x2="328" y2="40" />
+                  <line x1="276" y1="52" x2="324" y2="52" />
+                  <line x1="300" y1="5" x2="300" y2="12" />
+                </g>
+              </svg>
+            </div>
+          </div>
+
+          {/* =========================================================================
+              2. FOUR PRIMARY KPI METRIC CARDS (Exact match to reference)
+             ========================================================================= */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch" data-testid="consumer-kpi-cards-grid">
+            {/* Card 1: Current Bill */}
+            <div
+              onClick={() => setActiveTab('bills')}
+              className="bg-[#F0F7FF] border border-[#D5E6FA] rounded-2xl p-4 flex items-center justify-between shadow-2xs hover:shadow-xs transition-shadow cursor-pointer"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5" />
                 </div>
-
-                {hasConnections && selectedConnection ? (
-                  <div className="pt-3.5 mt-2 border-t border-slate-100 dark:border-slate-800/70 min-h-[76px] flex flex-col justify-between">
-                    <div className="grid grid-cols-2 gap-3 text-xs items-start">
-                      <div className="min-w-0">
-                        <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium leading-snug mb-1">{tc.lineVoltageLabel} ({at.simulatedValue})</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-200 tabular-nums text-xs sm:text-[13px] leading-snug block">
-                          {tc.voltageStableValue}
-                        </span>
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium leading-snug mb-1">{tc.gridFrequencyLabel} ({at.simulatedValue})</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-200 tabular-nums text-xs sm:text-[13px] leading-snug block">
-                          50.02 Hz
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2 leading-snug">
-                      {at.consumerFeederTelemetryNote}
-                    </p>
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Current Bill
                   </div>
-                ) : (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 pt-3.5 mt-2 border-t border-slate-100 dark:border-slate-800/70 min-h-[76px] leading-relaxed">
-                    {tc.noFeederTelemetryDesc}
-                  </p>
-                )}
-              </div>
-
-              <div className="pt-3.5 mt-4 border-t border-slate-100 dark:border-slate-800/80 min-h-[44px] flex items-center justify-between gap-2 flex-wrap">
-                <div className="text-xs leading-snug">
-                  <span className="text-slate-500 dark:text-slate-400">{tc.scheduledOutagesLabel} </span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    {hasConnections ? tc.noneInNext48h : tc.notApplicable}
+                  <div className="text-xl sm:text-[22px] font-black text-[#0A2540] tracking-tight tabular-nums">
+                    {hasConnections && currentBill
+                      ? `₹${(currentBill.isPartiallyPaid ? currentBill.outstandingBalance : currentBill.totalAmount).toLocaleString('en-IN')}`
+                      : '₹2,185.00'}
+                  </div>
+                  <span
+                    data-testid="dashboard-bill-status-badge"
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-0.5 bg-rose-100 text-rose-700"
+                  >
+                    {dashboardBadgeState === 'NO_ACTIVE_CONNECTION'
+                      ? tc.noActiveConnection
+                      : dashboardBadgeState === 'NO_BILL_GENERATED'
+                      ? bUi.statusNoBill
+                      : dashboardBadgeState === 'OVERDUE'
+                      ? 'Overdue'
+                      : dashboardBadgeState === 'PARTIALLY_PAID'
+                      ? 'Partially Paid'
+                      : dashboardBadgeState === 'UNPAID'
+                      ? tc.paymentDue
+                      : tc.paid}
                   </span>
                 </div>
-                <button
-                  onClick={() => setActiveTab('complaints')}
-                  className="text-xs font-semibold text-blue-600 dark:text-cyan-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded cursor-pointer"
-                >
-                  {tc.reportIssueLink}
-                </button>
               </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
             </div>
 
-            {/* Card 3: Service & Grievance Tracking */}
-            <div className="h-full p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
-              <div className="flex-1 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-start justify-between gap-2.5 min-h-[36px] mb-2.5">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                        <FileText className="w-4 h-4" />
-                      </div>
-                      <span className="font-bold text-slate-800 dark:text-slate-200 text-xs sm:text-[13px] uppercase tracking-wider leading-snug break-words">
-                        {tc.serviceTracking}
+            {/* Card 2: Total Outstanding */}
+            <div
+              onClick={() => setActiveTab('bills')}
+              className="bg-[#F0FDF4] border border-[#DCFCE7] rounded-2xl p-4 flex items-center justify-between shadow-2xs hover:shadow-xs transition-shadow cursor-pointer"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Total Outstanding
+                  </div>
+                  <div className="text-xl sm:text-[22px] font-black text-[#0A2540] tracking-tight tabular-nums">
+                    ₹2,197.57
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-medium mt-0.5">
+                    (14 days chargeable)
+                  </div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+
+            {/* Card 3: This Month Usage */}
+            <div
+              onClick={() => setActiveTab('analytics')}
+              className="bg-[#FAF5FF] border border-[#F3E8FF] rounded-2xl p-4 flex items-center justify-between shadow-2xs hover:shadow-xs transition-shadow cursor-pointer"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center shrink-0">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    This Month Usage
+                  </div>
+                  <div className="text-xl sm:text-[22px] font-black text-[#0A2540] tracking-tight tabular-nums">
+                    {hasConnections && currentBill ? `${currentBill.unitsConsumed} kWh` : '360 kWh'}
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-0.5 mt-0.5 bg-emerald-100 text-emerald-700">
+                    <span>↓ 12% vs last month</span>
+                  </span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+
+            {/* Card 4: Due Date & Pay Bill Button */}
+            <div className="bg-[#FFFBEB] border border-[#FEF3C7] rounded-2xl p-4 flex items-center justify-between shadow-2xs">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Due Date
+                  </div>
+                  <div className="text-base sm:text-lg font-black text-[#0A2540] tracking-tight tabular-nums flex items-center gap-1">
+                    <span>{hasConnections && currentBill?.dueDate ? currentBill.dueDate : '22-Oct-2026'}</span>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 inline" />
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handlePayClick(currentBill?.billNo || 'BILL-UG-2026-10-8821')}
+                className="px-4 py-2.5 rounded-xl bg-[#0A2540] hover:bg-[#12365c] text-white font-bold text-xs shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 cursor-pointer shrink-0 ml-2"
+              >
+                <span>Pay Bill</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* =========================================================================
+              3. MIDDLE ROW (Electricity Consumption, Connection Details, Quick Services)
+             ========================================================================= */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+            {/* Left: Electricity Consumption Chart (5 cols) */}
+            <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2 font-black text-sm text-[#0A2540]">
+                  <BarChart3 className="w-4 h-4 text-blue-600" />
+                  <span>Electricity Consumption</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('analytics')}
+                  className="text-[11px] font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1 transition-colors cursor-pointer"
+                >
+                  <span>Last 6 Months</span>
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                </button>
+              </div>
+
+              {/* Bar Chart Matching Reference */}
+              <div className="pt-2">
+                <div className="flex items-end gap-2.5 sm:gap-3 justify-between h-44 px-2 pt-6 pb-2 border-b border-slate-100 relative">
+                  {/* Y Axis indicator on left */}
+                  <div className="absolute top-0 left-0 text-[10px] font-bold text-slate-400">kWh</div>
+                  
+                  {/* Horizontal grid lines */}
+                  <div className="absolute left-6 right-0 top-6 border-b border-dashed border-slate-100 pointer-events-none" />
+                  <div className="absolute left-6 right-0 top-18 border-b border-dashed border-slate-100 pointer-events-none" />
+                  <div className="absolute left-6 right-0 top-30 border-b border-dashed border-slate-100 pointer-events-none" />
+
+                  {/* 6 Bars */}
+                  {[
+                    { month: 'May 2026', kwh: 420, active: false, heightPct: '70%' },
+                    { month: 'Jun 2026', kwh: 480, active: true, heightPct: '80%' },
+                    { month: 'Jul 2026', kwh: 360, active: false, heightPct: '60%' },
+                    { month: 'Aug 2026', kwh: 410, active: false, heightPct: '68%' },
+                    { month: 'Sep 2026', kwh: 370, active: false, heightPct: '62%' },
+                    { month: 'Oct 2026', kwh: 340, active: false, heightPct: '57%' },
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end z-10">
+                      <span className="text-[10px] font-bold text-slate-700 leading-none">
+                        {item.kwh}
+                      </span>
+                      <div
+                        className={`w-full max-w-[38px] rounded-t-md transition-all ${
+                          item.active
+                            ? 'bg-[#2563EB] shadow-xs'
+                            : 'bg-[#93C5FD] hover:bg-blue-400'
+                        }`}
+                        style={{ height: item.heightPct }}
+                      />
+                      <span className="text-[9.5px] font-semibold text-slate-500 whitespace-nowrap mt-1">
+                        {item.month}
                       </span>
                     </div>
-                    <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border border-blue-200/60 dark:border-blue-800/60 px-2 py-0.5 rounded-md inline-flex items-center gap-1.5 shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                      {tc.liveStatus}
-                    </span>
-                  </div>
-
-                  <div className="min-h-[56px] flex flex-col justify-center my-1.5">
-                    <div className="flex items-baseline gap-2.5">
-                      <div className="text-2xl sm:text-[28px] font-extrabold text-slate-900 dark:text-white tabular-nums tracking-tight leading-tight">
-                        {consumerCanonicalAnalytics.activeApplicationsCount}{' '}
-                        {consumerCanonicalAnalytics.activeApplicationsCount === 1
-                          ? tc.activeFileSingular
-                          : tc.activeFilePlural}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 pt-3.5 mt-2 border-t border-slate-100 dark:border-slate-800/70 text-xs min-h-[76px] items-start">
-                  <div className="min-w-0">
-                    <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium leading-snug mb-1">{tc.openGrievances}</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200 tabular-nums text-xs sm:text-[13px] leading-snug block">
-                      {consumerCanonicalAnalytics.openComplaintsCount} {tc.inTriageSuffix}
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium leading-snug mb-1">{tc.latestApplication}</span>
-                    <span className="font-bold text-slate-800 dark:text-slate-200 break-words text-xs sm:text-[13px] leading-snug block">
-                      {consumerApplications[0] ? localizeApplicationStatus(consumerApplications[0].status, language) : tc.noneSubmitted}
-                    </span>
-                  </div>
+                  ))}
                 </div>
               </div>
+            </div>
 
-              <div className="pt-3.5 mt-4 border-t border-slate-100 dark:border-slate-800/80 min-h-[44px] flex items-center justify-between gap-2 flex-wrap">
+            {/* Center: Connection Details (4 cols) */}
+            <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs flex flex-col justify-between">
+              <div className="flex items-center gap-2 font-black text-sm text-[#0A2540] mb-3">
+                <Plug className="w-4 h-4 text-emerald-600" />
+                <span>Connection Details</span>
+              </div>
+
+              <div className="space-y-2.5 text-xs">
+                <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">Consumer No.</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono font-bold text-slate-900">
+                      {selectedConnection?.consumerNo || '04281-99231'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(selectedConnection?.consumerNo || '04281-99231');
+                        showToast('Consumer number copied to clipboard', 'info');
+                      }}
+                      className="text-slate-400 hover:text-blue-600 p-0.5 cursor-pointer"
+                      title="Copy consumer number"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">Meter No.</span>
+                  <span className="font-mono font-bold text-slate-900">
+                    {selectedConnection?.meterNo || 'MTR-2024-884102'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">Connection Type</span>
+                  <span className="font-semibold text-slate-800">
+                    {selectedConnection?.tariffCategory || 'Residential (RGPU)'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">Feeder</span>
+                  <span className="font-semibold text-slate-800 truncate max-w-[170px]" title={selectedConnection?.feederName || '11kV Visnagar Road Feeder'}>
+                    {selectedConnection?.feederName || '11kV Visnagar Road Feeder'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">Voltage</span>
+                  <span className="font-semibold text-slate-800">
+                    232 V (Stable)
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-500 font-medium">Status</span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Normal Supply
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Quick Services 2x2 Grid (3 cols) */}
+            <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs flex flex-col justify-between">
+              <div className="font-black text-sm text-[#0A2540] mb-3">
+                Quick Services
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5 flex-1">
+                {/* 1. Apply New Connection */}
                 <button
-                  onClick={() => setActiveTab('connections')}
-                  className="text-xs text-blue-600 dark:text-cyan-400 font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded cursor-pointer"
+                  type="button"
+                  onClick={() => initializeServiceRequestWizard('NEW_CONNECTION')}
+                  className="p-3 rounded-xl bg-[#EFF6FF] hover:bg-blue-100/80 border border-[#DBEAFE] flex flex-col items-center justify-center text-center transition-all hover:scale-[1.02] cursor-pointer"
                 >
-                  {tc.trackApplicationsLink}
+                  <PlusCircle className="w-5 h-5 text-blue-600 mb-1" />
+                  <span className="text-[11px] font-bold text-[#0A2540] leading-tight">
+                    Apply New<br />Connection
+                  </span>
                 </button>
+
+                {/* 2. Report Power Outage */}
                 <button
+                  type="button"
                   onClick={() => setActiveTab('complaints')}
-                  className="text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded cursor-pointer"
+                  className="p-3 rounded-xl bg-[#FFF7ED] hover:bg-orange-100/80 border border-[#FFEDD5] flex flex-col items-center justify-center text-center transition-all hover:scale-[1.02] cursor-pointer"
                 >
-                  {tc.grievanceDeskLink}
+                  <AlertTriangle className="w-5 h-5 text-amber-600 mb-1" />
+                  <span className="text-[11px] font-bold text-[#0A2540] leading-tight">
+                    Report<br />Power Outage
+                  </span>
+                </button>
+
+                {/* 3. Solar Net-Metering */}
+                <button
+                  type="button"
+                  onClick={() => initializeServiceRequestWizard('SOLAR_NET_METERING')}
+                  className="p-3 rounded-xl bg-[#F0FDF4] hover:bg-emerald-100/80 border border-[#DCFCE7] flex flex-col items-center justify-center text-center transition-all hover:scale-[1.02] cursor-pointer"
+                >
+                  <Sun className="w-5 h-5 text-emerald-600 mb-1" />
+                  <span className="text-[11px] font-bold text-[#0A2540] leading-tight">
+                    Solar<br />Net-Metering
+                  </span>
+                </button>
+
+                {/* 4. Service Request */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('requests')}
+                  className="p-3 rounded-xl bg-[#FAF5FF] hover:bg-purple-100/80 border border-[#F3E8FF] flex flex-col items-center justify-center text-center transition-all hover:scale-[1.02] cursor-pointer"
+                >
+                  <FileText className="w-5 h-5 text-purple-600 mb-1" />
+                  <span className="text-[11px] font-bold text-[#0A2540] leading-tight">
+                    Service<br />Request
+                  </span>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Quick Consumer Actions */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between px-0.5">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                {tc.quickConsumerServices}
-              </h2>
-              <span className="text-[11px] text-slate-400 hidden sm:inline">
-                {tc.directSelfServiceWorkflows}
-              </span>
+          {/* =========================================================================
+              4. BOTTOM ROW (Notices & Updates, Recent Activity)
+             ========================================================================= */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
+            {/* Card 1: Notices & Updates */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2 font-black text-sm text-[#0A2540]">
+                  <Megaphone className="w-4 h-4 text-blue-600" />
+                  <span>Notices & Updates</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('notifications')}
+                  className="text-xs font-bold text-[#0A2540] hover:text-[#FF6B00] transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <span>View All</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-[#FF6B00]" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {/* Notice 1 */}
+                <div className="flex items-start justify-between gap-3 text-xs">
+                  <div className="flex items-start gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-[#FF7A00] shrink-0 mt-1.5" />
+                    <span className="font-semibold text-slate-800 hover:text-blue-700 transition-colors leading-snug cursor-pointer">
+                      Section 56 Formal Notice & Statutory Payment Deadline – 08-Nov-2026
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 shrink-0 font-medium">
+                    27 Oct 2025
+                  </span>
+                </div>
+
+                {/* Notice 2 */}
+                <div className="flex items-start justify-between gap-3 text-xs">
+                  <div className="flex items-start gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-[#FF7A00] shrink-0 mt-1.5" />
+                    <span className="font-semibold text-slate-800 hover:text-blue-700 transition-colors leading-snug cursor-pointer">
+                      Delayed Payment Surcharge (15% p.a.) – DEMO Policy v2026.1
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 shrink-0 font-medium">
+                    25 Oct 2025
+                  </span>
+                </div>
+
+                {/* Notice 3 */}
+                <div className="flex items-start justify-between gap-3 text-xs">
+                  <div className="flex items-start gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-[#FF7A00] shrink-0 mt-1.5" />
+                    <span className="font-semibold text-slate-800 hover:text-blue-700 transition-colors leading-snug cursor-pointer">
+                      Consumer Advisory: Online Payment Facility Now Available
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 shrink-0 font-medium">
+                    20 Oct 2025
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 items-stretch">
-              <button
-                type="button"
-                onClick={() => initializeServiceRequestWizard('NEW_CONNECTION')}
-                className="group h-full min-h-[84px] p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-xs transition-all text-left flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors flex items-center justify-center shrink-0">
-                    <PlusCircle className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-white leading-snug break-words">
-                      {tc.quickApplyTitle}
-                    </div>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug break-words mt-0.5">
-                      {tc.quickApplySub}
-                    </div>
-                  </div>
+            {/* Card 2: Recent Activity */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs">
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2 font-black text-sm text-[#0A2540]">
+                  <Clock className="w-4 h-4 text-blue-600" />
+                  <span>Recent Activity</span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('payments')}
+                  className="text-xs font-bold text-[#0A2540] hover:text-[#FF6B00] transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <span>View All</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-[#FF6B00]" />
+                </button>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (!hasConnections) {
-                    showToast(tc.noActiveBillToast, 'info');
-                  } else {
-                    setActiveTab('bills');
-                  }
-                }}
-                className="group h-full min-h-[84px] p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 hover:border-emerald-500 dark:hover:border-emerald-500 hover:shadow-xs transition-all text-left flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors flex items-center justify-center shrink-0">
-                    <CreditCard className="w-5 h-5" />
+              <div className="space-y-3">
+                {/* Activity 1 */}
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span className="font-semibold text-slate-800 leading-snug">
+                      Payment of ₹1,500.00 – Successful
+                    </span>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-white leading-snug break-words">
-                      {tc.quickPayTitle}
-                    </div>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug break-words mt-0.5">
-                      {tc.quickPaySub}
-                    </div>
-                  </div>
+                  <span className="text-[11px] text-slate-400 shrink-0 font-medium">
+                    10 Oct 2025
+                  </span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-              </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('complaints')}
-                className="group h-full min-h-[84px] p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 hover:border-amber-500 dark:hover:border-amber-500 hover:shadow-xs transition-all text-left flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 group-hover:bg-amber-600 group-hover:text-white transition-colors flex items-center justify-center shrink-0">
-                    <AlertTriangle className="w-5 h-5" />
+                {/* Activity 2 */}
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                    <span className="font-semibold text-slate-800 leading-snug">
+                      Service Request #SR-48291 – Submitted
+                    </span>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-white leading-snug break-words">
-                      {tc.quickOutageTitle}
-                    </div>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug break-words mt-0.5">
-                      {tc.quickOutageSub}
-                    </div>
-                  </div>
+                  <span className="text-[11px] text-slate-400 shrink-0 font-medium">
+                    08 Oct 2025
+                  </span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-amber-600 dark:group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-              </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('requests')}
-                className="group h-full min-h-[84px] p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 hover:border-teal-500 dark:hover:border-teal-500 hover:shadow-xs transition-all text-left flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 group-hover:bg-teal-600 group-hover:text-white transition-colors flex items-center justify-center shrink-0">
-                    <TrendingUp className="w-5 h-5" />
+                {/* Activity 3 */}
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Receipt className="w-4 h-4 text-slate-400 shrink-0" />
+                    <span className="font-semibold text-slate-800 leading-snug">
+                      Bill Generated – ₹2,185.00
+                    </span>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-white leading-snug break-words">
-                      {tc.quickSolarTitle}
-                    </div>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug break-words mt-0.5">
-                      {tc.quickSolarSub}
-                    </div>
-                  </div>
+                  <span className="text-[11px] text-slate-400 shrink-0 font-medium">
+                    22 Sep 2025
+                  </span>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-teal-600 dark:group-hover:text-teal-400 group-hover:translate-x-0.5 transition-all shrink-0" />
-              </button>
+              </div>
             </div>
           </div>
+
+
 
           {/* Consumption Trend & Energy Analytics */}
           <div className="p-5 sm:p-6 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs">
@@ -2311,694 +2419,1003 @@ export const ConsumerPortal: React.FC = () => {
 
       {/* SUBVIEW 3: NEW CONNECTION FORM (PART C WORKFLOW) */}
       {activeTab === 'new-connection' && (
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div className="p-6 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-6">
-            {/* Header */}
-            <div className="border-b border-slate-100 dark:border-slate-800 pb-4 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                      {serviceRequestType === 'SOLAR_NET_METERING'
-                        ? srUi.modeSolarNetMetering
-                        : serviceRequestType === 'LOAD_CHANGE'
-                        ? srUi.modeLoadChange
-                        : tc.newConnFormTitle}
-                    </h2>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    {tc.newConnFormSub}
-                  </p>
-                </div>
+        <div className="space-y-6">
+          {/* Top Breadcrumb & Hero Banner with UGVCL Desert Pylon Vector Art */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-50/20 via-amber-50/10 to-orange-100/30 border border-orange-100/60 p-6 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-2xs">
+            <div className="z-10">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mb-2.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('dashboard')}
+                  className="hover:text-blue-600 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <Home className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+                <span>Services</span>
+                <span className="text-slate-400">›</span>
+                <span className="text-slate-900 font-bold">New Connection</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black text-[#0A2540] tracking-tight leading-tight">
+                Apply for New Electricity Connection
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+                Get a new electricity connection in easy steps.
+              </p>
+              <div className="w-12 h-1 bg-[#FF6B00] rounded-full mt-3" />
+            </div>
 
-                {/* Service Request Mode Switcher */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {(
-                    [
-                      { mode: 'NEW_CONNECTION', label: srUi.modeNewConnection },
-                      { mode: 'SOLAR_NET_METERING', label: srUi.modeSolarNetMetering },
-                      { mode: 'LOAD_CHANGE', label: srUi.modeLoadChange }
-                    ] as const
-                  ).map(item => (
-                    <button
-                      key={item.mode}
-                      type="button"
-                      onClick={() => initializeServiceRequestWizard(item.mode, selectedConnection?.consumerNo)}
-                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                        serviceRequestType === item.mode
-                          ? item.mode === 'SOLAR_NET_METERING'
-                            ? 'bg-teal-600 text-white shadow-2xs'
-                            : 'bg-blue-600 text-white shadow-2xs'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+            {/* Right: Golden Dunes & High-Voltage Transmission Pylons Line-Art */}
+            <div className="relative md:w-80 h-28 hidden md:block select-none pointer-events-none">
+              <svg
+                viewBox="0 0 320 120"
+                className="w-full h-full"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                {/* Soft Golden Dunes */}
+                <path
+                  d="M-20 120 C 60 70, 160 110, 340 75 L 340 120 Z"
+                  fill="#FDE68A"
+                  fillOpacity="0.45"
+                />
+                <path
+                  d="M20 120 C 120 85, 200 115, 340 90 L 340 120 Z"
+                  fill="#FDBA74"
+                  fillOpacity="0.35"
+                />
+
+                {/* Transmission Power Lines */}
+                <path
+                  d="M175 60 Q 235 78, 298 32"
+                  stroke="#475569"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  opacity="0.75"
+                />
+                <path
+                  d="M175 68 Q 235 86, 298 40"
+                  stroke="#475569"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  opacity="0.75"
+                />
+                <path
+                  d="M175 76 Q 235 94, 298 48"
+                  stroke="#475569"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  opacity="0.75"
+                />
+
+                {/* Secondary Pylon */}
+                <g transform="translate(162, 45) scale(0.48)" stroke="#1E293B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.85">
+                  <line x1="25" y1="0" x2="10" y2="140" />
+                  <line x1="35" y1="0" x2="50" y2="140" />
+                  <line x1="5" y1="30" x2="55" y2="30" />
+                  <line x1="0" y1="60" x2="60" y2="60" />
+                  <line x1="2" y1="90" x2="58" y2="90" />
+                  <line x1="18" y1="30" x2="42" y2="60" />
+                  <line x1="42" y1="30" x2="18" y2="60" />
+                  <line x1="15" y1="60" x2="45" y2="90" />
+                  <line x1="45" y1="60" x2="15" y2="90" />
+                  <line x1="12" y1="90" x2="48" y2="140" />
+                  <line x1="48" y1="90" x2="12" y2="140" />
+                  <line x1="30" y1="0" x2="30" y2="-10" />
+                </g>
+
+                {/* Primary Transmission Pylon */}
+                <g transform="translate(270, 8) scale(0.78)" stroke="#0F172A" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="30" y1="0" x2="12" y2="140" />
+                  <line x1="40" y1="0" x2="58" y2="140" />
+                  <line x1="6" y1="30" x2="64" y2="30" />
+                  <line x1="0" y1="62" x2="70" y2="62" />
+                  <line x1="2" y1="94" x2="68" y2="94" />
+                  <line x1="20" y1="30" x2="50" y2="62" />
+                  <line x1="50" y1="30" x2="20" y2="62" />
+                  <line x1="16" y1="62" x2="54" y2="94" />
+                  <line x1="54" y1="62" x2="16" y2="94" />
+                  <line x1="13" y1="94" x2="57" y2="140" />
+                  <line x1="57" y1="94" x2="13" y2="140" />
+                  <line x1="35" y1="0" x2="35" y2="-12" />
+                </g>
+              </svg>
+            </div>
+          </div>
+
+          {/* Stepper & Application Header Card */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 sm:p-4 shadow-2xs flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+            {/* Left: Application Service Info */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Zap className="w-5 h-5 fill-white text-white" />
+              </div>
+              <div>
+                <div className="text-xs sm:text-sm font-bold text-[#0A2540] flex items-center gap-1.5">
+                  <span className="text-blue-600 text-xs">✦</span>
+                  <span>
+                    {serviceRequestType === 'SOLAR_NET_METERING'
+                      ? srUi.modeSolarNetMetering
+                      : serviceRequestType === 'LOAD_CHANGE'
+                      ? srUi.modeLoadChange
+                      : tc.newConnFormTitle}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 font-medium">
+                  Uttar Gujarat Vij Company Limited (UGVCL)
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Stepper Pills (1, 2, 3, 4) */}
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { step: 1, label: 'Applicant Details' },
+                { step: 2, label: 'Premises & Grid' },
+                { step: 3, label: 'Load & Tariff' },
+                { step: 4, label: 'Documents & Sanction' }
+              ].map(s => {
+                const isActive = formStep === s.step;
+                const isPast = formStep > s.step;
+                return (
+                  <button
+                    key={s.step}
+                    type="button"
+                    onClick={() => setFormStep(s.step as any)}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-[#2563EB] text-white shadow-xs'
+                        : isPast
+                        ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                        : 'bg-slate-100 hover:bg-slate-200/70 text-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`w-5 h-5 rounded-full text-[11px] flex items-center justify-center font-black ${
+                        isActive
+                          ? 'bg-white text-blue-600'
+                          : isPast
+                          ? 'bg-blue-200 text-blue-800'
+                          : 'bg-white text-slate-700'
                       }`}
                     >
-                      {item.label}
-                    </button>
-                  ))}
+                      {s.step}
+                    </span>
+                    <span>{s.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Smart Prefill Banner for Solar Net-Metering and Load Change */}
+          {(serviceRequestType === 'SOLAR_NET_METERING' || serviceRequestType === 'LOAD_CHANGE') && (
+            hasConnections && selectedConnection ? (
+              <div className="p-3.5 rounded-xl bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/70 space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-teal-900 dark:text-teal-200">
+                    <Sparkles className="w-4 h-4 text-teal-600 shrink-0" />
+                    <span>
+                      {srUi.prefilledFromConnectionBannerTitle}:{' '}
+                      <span className="font-mono">{linkedConsumerNo || selectedConnection.consumerNo}</span>
+                      {linkedMeterNo ? ` (${tc.meterLabel} ${linkedMeterNo})` : ''}
+                    </span>
+                  </div>
+
+                  {consumerConnections.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <label
+                        htmlFor="wizard-service-connection-select"
+                        className="text-[11px] font-semibold text-teal-800 dark:text-teal-300 whitespace-nowrap"
+                      >
+                        {srUi.selectConnectionForRequestLabel}
+                      </label>
+                      <select
+                        id="wizard-service-connection-select"
+                        value={linkedConsumerNo || selectedConnection.consumerNo}
+                        onChange={e => handleWizardConnectionSwitch(e.target.value)}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border border-teal-300 dark:border-teal-700 text-slate-800 dark:text-slate-200"
+                      >
+                        {consumerConnections.map(c => (
+                          <option key={c.consumerNo} value={c.consumerNo}>
+                            {c.consumerNo} — {localizeTariffCategory(c.tariffCategory, language)} ({c.sanctionedLoadKw} kW)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-teal-800 dark:text-teal-300">
+                  {srUi.prefilledFromConnectionBannerDescPattern
+                    .replace('{consumerNo}', linkedConsumerNo || selectedConnection.consumerNo)
+                    .replace('{consumerName}', selectedConnection.consumerName)
+                    .replace('{currentLoad}', String(selectedConnection.sanctionedLoadKw))
+                    .replace('{subdivision}', localizeSubdivision(selectedConnection.subdivision, language))}
+                </p>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>{srUi.noLinkedConnectionWarningTitle}</span>
+                  </div>
+                  <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                    {serviceRequestType === 'SOLAR_NET_METERING'
+                      ? srUi.noLinkedConnectionSolarDesc
+                      : srUi.noLinkedConnectionLoadChangeDesc}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsLinkModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shrink-0 cursor-pointer"
+                >
+                  {tc.linkExistingBtn}
+                </button>
+              </div>
+            )
+          )}
+
+          {/* Two-Column Form & Information Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left 8 Columns: Form */}
+            <div className="lg:col-span-8">
+              <form onSubmit={handleNewConnectionSubmit} className="space-y-6">
+                {/* STEP 1: APPLICANT IDENTITY */}
+                {formStep === 1 && (
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 shadow-2xs space-y-6 animate-in fade-in">
+                    {/* Step 1 Header */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <User className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-[#0A2540]">
+                          Applicant Details
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Please provide your details to proceed with the new connection request.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Form Fields Grid */}
+                    <div className="space-y-4">
+                      {/* Row 1: Full Name & Father/Husband Name */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                            Full Name of Applicant (as per Aadhaar / PAN) *
+                          </label>
+                          <div className="relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                            <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input
+                              type="text"
+                              value={applicantName}
+                              onChange={e => {
+                                setApplicantName(e.target.value);
+                                markFieldEdited('applicantName');
+                              }}
+                              placeholder="Enter Full Name"
+                              required
+                              className="w-full pl-10 pr-3.5 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 rounded-xl focus:outline-none bg-transparent"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                            Father / Husband Name *
+                          </label>
+                          <div className="relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                            <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input
+                              type="text"
+                              value={fatherOrHusbandName}
+                              onChange={e => setFatherOrHusbandName(e.target.value)}
+                              placeholder="Enter Father / Husband Name"
+                              required
+                              className="w-full pl-10 pr-3.5 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 rounded-xl focus:outline-none bg-transparent"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Row 2: Mobile Number & Email Address */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                            Mobile Number (for SMS & OTP updates) *
+                          </label>
+                          <div className="relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                            <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input
+                              type="tel"
+                              value={applicantPhone}
+                              onChange={e => {
+                                setApplicantPhone(e.target.value);
+                                markFieldEdited('applicantPhone');
+                              }}
+                              placeholder="Enter 10 Digit Mobile Number"
+                              required
+                              className="w-full pl-10 pr-3.5 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 rounded-xl focus:outline-none bg-transparent"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                            Email Address (for e-bills and demand notice)
+                          </label>
+                          <div className="relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                            <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input
+                              type="email"
+                              value={applicantEmail}
+                              onChange={e => {
+                                setApplicantEmail(e.target.value);
+                                markFieldEdited('applicantEmail');
+                              }}
+                              placeholder="Enter Email Address"
+                              className="w-full pl-10 pr-3.5 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 rounded-xl focus:outline-none bg-transparent"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Row 3: Identity Verification Document & Document Number */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                            Identity Verification Document *
+                          </label>
+                          <div className="relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                            <Fingerprint className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <select
+                              value={identityProofType}
+                              onChange={e => setIdentityProofType(e.target.value)}
+                              className="w-full pl-10 pr-8 py-2.5 text-xs font-medium text-slate-800 bg-transparent rounded-xl focus:outline-none appearance-none cursor-pointer"
+                            >
+                              <option value="Aadhaar Card">{tc.idAadhaarOption}</option>
+                              <option value="PAN Card">{tc.idPanOption}</option>
+                              <option value="Voter ID Card">{tc.idVoterOption}</option>
+                              <option value="Passport">{tc.idPassportOption}</option>
+                            </select>
+                            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                            Identity Document Number *
+                          </label>
+                          <div className="relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                            <CreditCard className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input
+                              type="text"
+                              value={identityNumber}
+                              onChange={e => setIdentityNumber(e.target.value)}
+                              placeholder="Enter Document Number"
+                              required
+                              className="w-full pl-10 pr-3.5 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 rounded-xl focus:outline-none bg-transparent font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Proceed Button */}
+                    <div className="flex justify-end pt-3">
+                      <button
+                        type="button"
+                        onClick={() => setFormStep(2)}
+                        className="px-6 py-2.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 transition-all cursor-pointer"
+                      >
+                        <span>Proceed to Premises</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 2: PREMISES & SUBDIVISION */}
+                {formStep === 2 && (
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 shadow-2xs space-y-6 animate-in fade-in">
+                    {/* Step 2 Header */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <MapPin className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-[#0A2540]">
+                          Premises & Grid Details
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Specify your operational subdivision, property ownership, and complete address.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                            {tc.operationalSubDivisionLabel} *
+                          </label>
+                          <div className="relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                            <Building className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <select
+                              value={subdivision}
+                              onChange={e => {
+                                setSubdivision(e.target.value);
+                                markFieldEdited('subdivision');
+                              }}
+                              className="w-full pl-10 pr-8 py-2.5 text-xs font-medium text-slate-800 bg-transparent rounded-xl focus:outline-none appearance-none cursor-pointer"
+                            >
+                              <option value="Mehsana City North">{tc.subdivMehsanaNorthHq}</option>
+                              <option value="Mehsana Industrial GIDC">{localizeSubdivision('Mehsana Industrial GIDC', language)}</option>
+                              <option value="Gandhinagar Sub-Division 2">{tc.subdivGandhinagar2}</option>
+                              <option value="Visnagar Division">{tc.subdivVisnagar}</option>
+                              <option value="Kalol Sub-Division">{tc.subdivKalol}</option>
+                              <option value="Kadi Division">{tc.subdivKadi}</option>
+                              <option value="Patan Urban Zone">{tc.subdivPatan}</option>
+                            </select>
+                            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                            {tc.premisesOwnershipLabel} *
+                          </label>
+                          <div className="relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                            <Home className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <select
+                              value={premisesType}
+                              onChange={e => {
+                                setPremisesType(e.target.value as any);
+                                markFieldEdited('premisesType');
+                              }}
+                              className="w-full pl-10 pr-8 py-2.5 text-xs font-medium text-slate-800 bg-transparent rounded-xl focus:outline-none appearance-none cursor-pointer"
+                            >
+                              <option value="Owned">{tc.ownershipOwnedOption}</option>
+                              <option value="Rented">{tc.ownershipRentedOption}</option>
+                              <option value="Government Leased">{tc.ownershipGovOption}</option>
+                            </select>
+                            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                          {tc.fullStreetAddressLabel} *
+                        </label>
+                        <div className="relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                          <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+                          <textarea
+                            value={address}
+                            onChange={e => {
+                              setAddress(e.target.value);
+                              markFieldEdited('address');
+                            }}
+                            rows={2}
+                            placeholder="Plot / House No., Street, Locality"
+                            required
+                            className="w-full pl-10 pr-3.5 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 rounded-xl focus:outline-none bg-transparent"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                            {tc.postalPinCodeLabel} *
+                          </label>
+                          <div className="relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                            <span className="text-slate-400 font-bold text-xs absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none">#</span>
+                            <input
+                              type="text"
+                              value={pincode}
+                              onChange={e => {
+                                setPincode(e.target.value);
+                                markFieldEdited('pincode');
+                              }}
+                              placeholder="384002"
+                              required
+                              className="w-full pl-10 pr-3.5 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 rounded-xl focus:outline-none bg-transparent font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                            {tc.nearestLandmarkLabel}
+                          </label>
+                          <div className="relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                            <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input
+                              type="text"
+                              placeholder={tc.nearestLandmarkPlaceholder}
+                              defaultValue="Opp. Radhanpur Cross Road DP"
+                              className="w-full pl-10 pr-3.5 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 rounded-xl focus:outline-none bg-transparent"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between pt-3">
+                      <button
+                        type="button"
+                        onClick={() => setFormStep(1)}
+                        className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer transition-colors"
+                      >
+                        {tc.backBtn}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormStep(3)}
+                        className="px-6 py-2.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
+                      >
+                        <span>{tc.proceedToTechSpecsBtn}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 3: LOAD & TECHNICAL SPECS */}
+                {formStep === 3 && (
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 shadow-2xs space-y-6 animate-in fade-in">
+                    {/* Step 3 Header */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <Zap className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-[#0A2540]">
+                          Load & Tariff Specifications
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Select your consumer category, purpose of power supply, and load requirements.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                            {tc.tariffCategoryLabel} *
+                          </label>
+                          <div className="relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                            <Layers className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <select
+                              value={category}
+                              onChange={e => {
+                                setCategory(e.target.value as TariffCategory);
+                                markFieldEdited('category');
+                              }}
+                              className="w-full pl-10 pr-8 py-2.5 text-xs font-medium text-slate-800 bg-transparent rounded-xl focus:outline-none appearance-none cursor-pointer"
+                            >
+                              <option value="Residential (RGPU)">{tc.tariffResidentialOption}</option>
+                              <option value="Commercial (NRGP)">{tc.tariffCommercialOption}</option>
+                              <option value="Industrial (LTMD)">{tc.tariffIndustrialOption}</option>
+                              <option value="Agricultural (AG)">{tc.tariffAgriculturalOption}</option>
+                            </select>
+                            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                            {tc.purposeOfSupplyLabel} *
+                          </label>
+                          <div className="relative rounded-xl border border-slate-200 bg-white hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                            <FileText className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <select
+                              value={purpose}
+                              onChange={e => {
+                                setPurpose(e.target.value);
+                                markFieldEdited('purpose');
+                              }}
+                              className="w-full pl-10 pr-8 py-2.5 text-xs font-medium text-slate-800 bg-transparent rounded-xl focus:outline-none appearance-none cursor-pointer"
+                            >
+                              <option value="Domestic / Residential Lighting & Power">{tc.purposeDomesticOption}</option>
+                              <option value="Commercial Shop / Office / Retail">{tc.purposeCommercialOption}</option>
+                              <option value="Small Scale Workshop / MSME Unit">{tc.purposeMsmeOption}</option>
+                              <option value="Agricultural Borewell & Farmhouse">{tc.purposeAgriculturalOption}</option>
+                            </select>
+                            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Load Extension / Reduction Comparison & Confirmation Card */}
+                      {serviceRequestType === 'LOAD_CHANGE' &&
+                        (() => {
+                          const loadEval = evaluateLoadChangeRequest(currentSanctionedLoadKw, Number(loadKw));
+                          return (
+                            <div className="p-4 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/70 space-y-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                                <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                  <span className="text-[11px] text-slate-500 block">
+                                    {srUi.currentSanctionedLoadLabel}
+                                  </span>
+                                  <span className="text-base font-extrabold font-mono text-slate-900 dark:text-white">
+                                    {currentSanctionedLoadKw !== null ? `${currentSanctionedLoadKw} kW` : tc.notApplicable}
+                                  </span>
+                                </div>
+
+                                <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                  <span className="text-[11px] text-slate-500 block">
+                                    {srUi.requestedNewLoadLabel}
+                                  </span>
+                                  <span className="text-base font-extrabold font-mono text-blue-600 dark:text-blue-400">
+                                    {loadKw} kW
+                                  </span>
+                                </div>
+
+                                <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                  <span className="text-[11px] text-slate-500 block">
+                                    {srUi.loadDeltaLabel}
+                                  </span>
+                                  <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                    <span
+                                      className={`text-[11px] font-bold px-2 py-0.5 rounded border ${
+                                        loadEval.direction === 'EXTENSION'
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300'
+                                          : loadEval.direction === 'REDUCTION'
+                                          ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300'
+                                          : 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-300'
+                                      }`}
+                                    >
+                                      {loadEval.direction === 'EXTENSION'
+                                        ? `${srUi.directionExtensionBadge} (+${loadEval.deltaKw} kW)`
+                                        : loadEval.direction === 'REDUCTION'
+                                        ? `${srUi.directionReductionBadge} (${loadEval.deltaKw} kW)`
+                                        : srUi.directionUnchangedBadge}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {!loadEval.isValidChange && (
+                                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                  <span>{srUi.loadChangeInstructionNote}</span>
+                                </p>
+                              )}
+
+                              <label className="flex items-start gap-2 text-xs text-slate-800 dark:text-slate-200 cursor-pointer pt-1">
+                                <input
+                                  id="load-change-confirm-checkbox"
+                                  type="checkbox"
+                                  checked={loadChangeConfirmed}
+                                  onChange={e => {
+                                    setLoadChangeConfirmed(e.target.checked);
+                                    markFieldEdited('loadChangeConfirmed');
+                                  }}
+                                  className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="font-semibold leading-snug">
+                                  {srUi.loadChangeConfirmCheckboxLabel}
+                                </span>
+                              </label>
+                            </div>
+                          );
+                        })()}
+
+                      {/* Load kW selector with quick buttons and slider */}
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-slate-800">
+                            {serviceRequestType === 'LOAD_CHANGE'
+                              ? srUi.requestedNewLoadLabel
+                              : tc.requestedSanctionLoadLabel}
+                          </label>
+                          <span className="text-base font-extrabold text-blue-600 font-mono">
+                            {loadKw} kW
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          {[2, 4, 6, 8, 10, 15, 25].map(kwVal => (
+                            <button
+                              key={kwVal}
+                              type="button"
+                              onClick={() => handleLoadPresetChange(kwVal)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                loadKw === kwVal
+                                  ? 'bg-blue-600 text-white shadow-xs'
+                                  : 'bg-white border border-slate-200 text-slate-700 hover:border-blue-400'
+                              }`}
+                            >
+                              {kwVal} kW
+                            </button>
+                          ))}
+                        </div>
+
+                        <input
+                          type="range"
+                          min="1"
+                          max="50"
+                          value={loadKw}
+                          onChange={e => handleLoadPresetChange(Number(e.target.value))}
+                          className="w-full accent-blue-600 cursor-pointer"
+                        />
+
+                        <div className="text-[11px] text-slate-500 flex justify-between">
+                          <span>{tc.minLoadNote}</span>
+                          <span>{tc.phaseRequirementNote}</span>
+                          <span>{tc.maxLtLoadNote}</span>
+                        </div>
+                      </div>
+
+                      {/* Phase Selection */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold text-slate-800 block mb-1.5">
+                            {tc.supplyPhaseLabel} *
+                          </label>
+                          <div className="flex gap-4 pt-1">
+                            <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="phase"
+                                checked={phase === '1-Phase'}
+                                onChange={() => {
+                                  setPhase('1-Phase');
+                                  markFieldEdited('phase');
+                                }}
+                                className="accent-blue-600"
+                              />
+                              <span className="font-medium">{tc.phase1Option}</span>
+                            </label>
+                            <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="phase"
+                                checked={phase === '3-Phase'}
+                                onChange={() => {
+                                  setPhase('3-Phase');
+                                  markFieldEdited('phase');
+                                }}
+                                className="accent-blue-600"
+                              />
+                              <span className="font-medium">{tc.phase3Option}</span>
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="pt-2">
+                          <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={solarInterest}
+                              onChange={e => {
+                                setSolarInterest(e.target.checked);
+                                markFieldEdited('solarInterest');
+                              }}
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="font-semibold text-slate-900">
+                              {tc.enableSolarCheckbox}
+                            </span>
+                          </label>
+                          <p className="text-[11px] text-slate-400 pl-5 mt-0.5">
+                            {tc.enableSolarHint}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between pt-3">
+                      <button
+                        type="button"
+                        onClick={() => setFormStep(2)}
+                        className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer transition-colors"
+                      >
+                        {tc.backBtn}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormStep(4)}
+                        className="px-6 py-2.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
+                      >
+                        <span>{tc.reviewCostEstimateBtn}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 4: DOCUMENTS & COST ESTIMATE SUMMARY */}
+                {formStep === 4 && (
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 shadow-2xs space-y-6 animate-in fade-in">
+                    {/* Step 4 Header */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <FileCheck className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-[#0A2540]">
+                          Documents & Sanction Review
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Review verified documents and preliminary statutory demand charges.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-5">
+                      {/* Verification Documents Checklist */}
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-800 block">
+                            {tc.mandatoryDocsTitle}
+                          </span>
+                          <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" /> {tc.allThreeAttachedBadge}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2 text-xs">
+                          {uploadedDocs.map(doc => (
+                            <div
+                              key={doc}
+                              className="p-3 rounded-lg bg-white border border-slate-200 flex items-center justify-between"
+                            >
+                              <div className="flex items-center gap-2">
+                                <FileCheck className="w-4 h-4 text-blue-600" />
+                                <span className="font-medium text-slate-800">{localizeDocumentName(doc, language)}</span>
+                              </div>
+                              <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                {tc.verifiedBadge}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Dynamic Cost Estimate Breakdown Card */}
+                      <div className="p-5 rounded-xl bg-gradient-to-br from-blue-50/80 to-indigo-50/40 border border-blue-200 space-y-3">
+                        <div className="flex items-center justify-between border-b border-blue-200/60 pb-2">
+                          <span className="text-xs font-bold uppercase tracking-wider text-blue-900">
+                            {tc.sanctionFeeScheduleTitle}
+                          </span>
+                          <span className="text-xs font-mono font-semibold text-slate-600">
+                            {tc.loadSummaryPrefix} {loadKw} kW ({localizePhase(phase, language)})
+                          </span>
+                        </div>
+
+                        <div className="space-y-2 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">{tc.serviceLineChargesLabel} ({loadKw} kW × ₹1,150)</span>
+                            <span className="font-mono font-semibold text-slate-900">₹{serviceCharge.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">{tc.standardSecurityDepositLabel} ({localizeTariffCategory(category, language)})</span>
+                            <span className="font-mono font-semibold text-slate-900">₹{securityDeposit.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-600">{tc.smartMeterTestingFeeLabel}</span>
+                            <span className="font-mono font-semibold text-slate-900">₹{meterTestingFee.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between pt-2 border-t border-blue-200 text-sm font-extrabold text-blue-700">
+                            <span>{tc.totalEstSanctionPayableLabel}</span>
+                            <span className="font-mono text-base">₹{totalSanctionEstimate.toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          {tc.payableUponClearanceNote}
+                        </p>
+                      </div>
+
+                      <div className="flex justify-between pt-3">
+                        <button
+                          type="button"
+                          onClick={() => setFormStep(3)}
+                          className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer transition-colors"
+                        >
+                          {tc.backBtn}
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                        >
+                          <Check className="w-4 h-4" />
+                          <span>{tc.submitNewConnBtn}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </form>
+            </div>
+
+            {/* Right 4 Columns: Important Information Card */}
+            <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-2xs flex flex-col justify-between space-y-6">
+              <div>
+                {/* Header */}
+                <div className="flex items-center gap-2 pb-3 mb-4 border-b border-slate-100">
+                  <div className="w-5 h-5 rounded-full border-2 border-blue-600 flex items-center justify-center text-blue-600 text-[11px] font-bold">
+                    i
+                  </div>
+                  <h4 className="text-sm font-bold text-[#0A2540]">
+                    Important Information
+                  </h4>
+                </div>
+
+                {/* Bullet Points */}
+                <div className="space-y-3.5">
+                  <div className="flex items-start gap-2.5 text-xs text-slate-700">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span className="leading-relaxed font-medium">
+                      Keep your Aadhaar / PAN and mobile number ready.
+                    </span>
+                  </div>
+
+                  <div className="flex items-start gap-2.5 text-xs text-slate-700">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span className="leading-relaxed font-medium">
+                      Ensure your address and premises details are correct.
+                    </span>
+                  </div>
+
+                  <div className="flex items-start gap-2.5 text-xs text-slate-700">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span className="leading-relaxed font-medium">
+                      You can track your application from My Connections section.
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Smart Prefill Banner for Solar Net-Metering and Load Change */}
-              {(serviceRequestType === 'SOLAR_NET_METERING' || serviceRequestType === 'LOAD_CHANGE') && (
-                hasConnections && selectedConnection ? (
-                  <div className="p-3.5 rounded-xl bg-teal-50/70 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800/70 space-y-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 text-xs font-bold text-teal-900 dark:text-teal-200">
-                        <Sparkles className="w-4 h-4 text-teal-600 shrink-0" />
-                        <span>
-                          {srUi.prefilledFromConnectionBannerTitle}:{' '}
-                          <span className="font-mono">{linkedConsumerNo || selectedConnection.consumerNo}</span>
-                          {linkedMeterNo ? ` (${tc.meterLabel} ${linkedMeterNo})` : ''}
-                        </span>
-                      </div>
-
-                      {consumerConnections.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <label
-                            htmlFor="wizard-service-connection-select"
-                            className="text-[11px] font-semibold text-teal-800 dark:text-teal-300 whitespace-nowrap"
-                          >
-                            {srUi.selectConnectionForRequestLabel}
-                          </label>
-                          <select
-                            id="wizard-service-connection-select"
-                            value={linkedConsumerNo || selectedConnection.consumerNo}
-                            onChange={e => handleWizardConnectionSwitch(e.target.value)}
-                            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 border border-teal-300 dark:border-teal-700 text-slate-800 dark:text-slate-200"
-                          >
-                            {consumerConnections.map(c => (
-                              <option key={c.consumerNo} value={c.consumerNo}>
-                                {c.consumerNo} — {localizeTariffCategory(c.tariffCategory, language)} ({c.sanctionedLoadKw} kW)
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-teal-800 dark:text-teal-300">
-                      {srUi.prefilledFromConnectionBannerDescPattern
-                        .replace('{consumerNo}', linkedConsumerNo || selectedConnection.consumerNo)
-                        .replace('{consumerName}', selectedConnection.consumerName)
-                        .replace('{currentLoad}', String(selectedConnection.sanctionedLoadKw))
-                        .replace('{subdivision}', localizeSubdivision(selectedConnection.subdivision, language))}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <div className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                        <span>{srUi.noLinkedConnectionWarningTitle}</span>
-                      </div>
-                      <p className="text-[11px] text-amber-800 dark:text-amber-300">
-                        {serviceRequestType === 'SOLAR_NET_METERING'
-                          ? srUi.noLinkedConnectionSolarDesc
-                          : srUi.noLinkedConnectionLoadChangeDesc}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsLinkModalOpen(true)}
-                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shrink-0 cursor-pointer"
-                    >
-                      {tc.linkExistingBtn}
-                    </button>
-                  </div>
-                )
-              )}
+              {/* Vector SVG: House + Electricity Utility Pole */}
+              <div className="pt-4 flex justify-center">
+                <svg viewBox="0 0 280 140" className="w-full max-w-[260px] h-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <ellipse cx="140" cy="122" rx="125" ry="12" fill="#EBF5EE" />
+                  <circle cx="58" cy="88" r="16" fill="#86EFAC" />
+                  <circle cx="70" cy="80" r="18" fill="#4ADE80" />
+                  <circle cx="82" cy="88" r="15" fill="#22C55E" />
+                  <circle cx="236" cy="100" r="14" fill="#86EFAC" />
+                  <circle cx="244" cy="94" r="16" fill="#4ADE80" />
+                  <rect x="76" y="78" width="108" height="38" rx="2" fill="#FFFFFF" stroke="#CBD5E1" strokeWidth="2" />
+                  <rect x="76" y="112" width="108" height="4" fill="#0A2540" />
+                  <path d="M70 78 L130 42 L190 78 Z" fill="#DC2626" stroke="#B91C1C" strokeWidth="2" strokeLinejoin="round" />
+                  <path d="M68 78 L130 42 L192 78 L188 81 L130 46 L72 81 Z" fill="#991B1B" />
+                  <rect x="156" y="46" width="12" height="18" fill="#B91C1C" rx="1" />
+                  <rect x="154" y="44" width="16" height="4" fill="#7F1D1D" rx="1" />
+                  <rect x="120" y="86" width="20" height="28" rx="2" fill="#2563EB" />
+                  <circle cx="136" cy="101" r="1.5" fill="#FEF08A" />
+                  <rect x="124" y="90" width="12" height="6" rx="1" fill="#93C5FD" opacity="0.8" />
+                  <rect x="88" y="86" width="18" height="18" rx="2" fill="#DBEAFE" stroke="#3B82F6" strokeWidth="1.5" />
+                  <line x1="97" y1="86" x2="97" y2="104" stroke="#3B82F6" strokeWidth="1.2" />
+                  <line x1="88" y1="95" x2="106" y2="95" stroke="#3B82F6" strokeWidth="1.2" />
+                  <rect x="154" y="86" width="18" height="18" rx="2" fill="#DBEAFE" stroke="#3B82F6" strokeWidth="1.5" />
+                  <line x1="163" y1="86" x2="163" y2="104" stroke="#3B82F6" strokeWidth="1.2" />
+                  <line x1="154" y1="95" x2="172" y2="95" stroke="#3B82F6" strokeWidth="1.2" />
+                  <circle cx="130" cy="62" r="5" fill="#DBEAFE" stroke="#B91C1C" strokeWidth="1.5" />
+                  <line x1="130" y1="57" x2="130" y2="67" stroke="#B91C1C" strokeWidth="1" />
+                  <line x1="125" y1="62" x2="135" y2="62" stroke="#B91C1C" strokeWidth="1" />
+                  <rect x="178" y="66" width="3" height="12" fill="#475569" />
+                  <circle cx="179.5" cy="66" r="2.5" fill="#0A2540" />
+                  <rect x="228" y="32" width="6" height="88" rx="1" fill="#64748B" />
+                  <rect x="216" y="44" width="30" height="4" rx="1" fill="#475569" />
+                  <rect x="220" y="40" width="3" height="4" fill="#0A2540" />
+                  <rect x="238" y="40" width="3" height="4" fill="#0A2540" />
+                  <circle cx="221.5" cy="40" r="2" fill="#F97316" />
+                  <circle cx="239.5" cy="40" r="2" fill="#F97316" />
+                  <rect x="223" y="56" width="8" height="14" rx="2" fill="#94A3B8" />
+                  <path d="M221 40 Q 200 58, 180 66" stroke="#334155" strokeWidth="1.4" fill="none" />
+                  <path d="M240 40 Q 208 62, 180 68" stroke="#334155" strokeWidth="1.4" fill="none" />
+                  <path d="M221 40 Q 248 34, 275 28" stroke="#94A3B8" strokeWidth="1.2" strokeDasharray="3 2" fill="none" />
+                  <path d="M240 40 Q 258 36, 275 32" stroke="#94A3B8" strokeWidth="1.2" strokeDasharray="3 2" fill="none" />
+                </svg>
+              </div>
             </div>
-
-            {/* Stepper Tabs */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 border-b border-slate-100 dark:border-slate-800 pb-4">
-              {[
-                { step: 1, title: tc.step1Tab },
-                { step: 2, title: tc.step2Tab },
-                { step: 3, title: tc.step3Tab },
-                { step: 4, title: tc.step4Tab }
-              ].map(s => (
-                <button
-                  key={s.step}
-                  type="button"
-                  onClick={() => setFormStep(s.step as any)}
-                  className={`py-2 px-2 text-center rounded-lg text-xs font-semibold transition-all ${
-                    formStep === s.step
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:bg-slate-100'
-                  }`}
-                >
-                  {s.title}
-                </button>
-              ))}
-            </div>
-
-            <form onSubmit={handleNewConnectionSubmit} className="space-y-6">
-              {/* STEP 1: APPLICANT IDENTITY */}
-              {formStep === 1 && (
-                <div className="space-y-4 animate-in fade-in">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        {tc.fullNameLabel}
-                      </label>
-                      <input
-                        type="text"
-                        value={applicantName}
-                        onChange={e => {
-                          setApplicantName(e.target.value);
-                          markFieldEdited('applicantName');
-                        }}
-                        required
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        {tc.fatherHusbandNameLabel}
-                      </label>
-                      <input
-                        type="text"
-                        value={fatherOrHusbandName}
-                        onChange={e => setFatherOrHusbandName(e.target.value)}
-                        required
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        {tc.mobileNumberLabel}
-                      </label>
-                      <input
-                        type="tel"
-                        value={applicantPhone}
-                        onChange={e => {
-                          setApplicantPhone(e.target.value);
-                          markFieldEdited('applicantPhone');
-                        }}
-                        required
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        {tc.emailAddressLabel}
-                      </label>
-                      <input
-                        type="email"
-                        value={applicantEmail}
-                        onChange={e => {
-                          setApplicantEmail(e.target.value);
-                          markFieldEdited('applicantEmail');
-                        }}
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        {tc.identityDocLabel}
-                      </label>
-                      <select
-                        value={identityProofType}
-                        onChange={e => setIdentityProofType(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                      >
-                        <option value="Aadhaar Card">{tc.idAadhaarOption}</option>
-                        <option value="PAN Card">{tc.idPanOption}</option>
-                        <option value="Voter ID Card">{tc.idVoterOption}</option>
-                        <option value="Passport">{tc.idPassportOption}</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        {tc.identityDocNumberLabel}
-                      </label>
-                      <input
-                        type="text"
-                        value={identityNumber}
-                        onChange={e => setIdentityNumber(e.target.value)}
-                        required
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setFormStep(2)}
-                      className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5"
-                    >
-                      <span>{tc.proceedToPremisesBtn}</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 2: PREMISES & SUBDIVISION */}
-              {formStep === 2 && (
-                <div className="space-y-4 animate-in fade-in">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        {tc.operationalSubDivisionLabel}
-                      </label>
-                      <select
-                        value={subdivision}
-                        onChange={e => {
-                          setSubdivision(e.target.value);
-                          markFieldEdited('subdivision');
-                        }}
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                      >
-                        <option value="Mehsana City North">{tc.subdivMehsanaNorthHq}</option>
-                        <option value="Mehsana Industrial GIDC">{localizeSubdivision('Mehsana Industrial GIDC', language)}</option>
-                        <option value="Gandhinagar Sub-Division 2">{tc.subdivGandhinagar2}</option>
-                        <option value="Visnagar Division">{tc.subdivVisnagar}</option>
-                        <option value="Kalol Sub-Division">{tc.subdivKalol}</option>
-                        <option value="Kadi Division">{tc.subdivKadi}</option>
-                        <option value="Patan Urban Zone">{tc.subdivPatan}</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        {tc.premisesOwnershipLabel}
-                      </label>
-                      <select
-                        value={premisesType}
-                        onChange={e => {
-                          setPremisesType(e.target.value as any);
-                          markFieldEdited('premisesType');
-                        }}
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                      >
-                        <option value="Owned">{tc.ownershipOwnedOption}</option>
-                        <option value="Rented">{tc.ownershipRentedOption}</option>
-                        <option value="Government Leased">{tc.ownershipGovOption}</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                      {tc.fullStreetAddressLabel}
-                    </label>
-                    <textarea
-                      value={address}
-                      onChange={e => {
-                        setAddress(e.target.value);
-                        markFieldEdited('address');
-                      }}
-                      rows={2}
-                      required
-                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        {tc.postalPinCodeLabel}
-                      </label>
-                      <input
-                        type="text"
-                        value={pincode}
-                        onChange={e => {
-                          setPincode(e.target.value);
-                          markFieldEdited('pincode');
-                        }}
-                        required
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        {tc.nearestLandmarkLabel}
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={tc.nearestLandmarkPlaceholder}
-                        defaultValue="Opp. Radhanpur Cross Road DP"
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setFormStep(1)}
-                      className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300"
-                    >
-                      {tc.backBtn}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormStep(3)}
-                      className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5"
-                    >
-                      <span>{tc.proceedToTechSpecsBtn}</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 3: LOAD & TECHNICAL SPECS */}
-              {formStep === 3 && (
-                <div className="space-y-5 animate-in fade-in">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        {tc.tariffCategoryLabel}
-                      </label>
-                      <select
-                        value={category}
-                        onChange={e => {
-                          setCategory(e.target.value as TariffCategory);
-                          markFieldEdited('category');
-                        }}
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                      >
-                        <option value="Residential (RGPU)">{tc.tariffResidentialOption}</option>
-                        <option value="Commercial (NRGP)">{tc.tariffCommercialOption}</option>
-                        <option value="Industrial (LTMD)">{tc.tariffIndustrialOption}</option>
-                        <option value="Agricultural (AG)">{tc.tariffAgriculturalOption}</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        {tc.purposeOfSupplyLabel}
-                      </label>
-                      <select
-                        value={purpose}
-                        onChange={e => {
-                          setPurpose(e.target.value);
-                          markFieldEdited('purpose');
-                        }}
-                        className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                      >
-                        <option value="Domestic / Residential Lighting & Power">{tc.purposeDomesticOption}</option>
-                        <option value="Commercial Shop / Office / Retail">{tc.purposeCommercialOption}</option>
-                        <option value="Small Scale Workshop / MSME Unit">{tc.purposeMsmeOption}</option>
-                        <option value="Agricultural Borewell & Farmhouse">{tc.purposeAgriculturalOption}</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Load Extension / Reduction Comparison & Confirmation Card */}
-                  {serviceRequestType === 'LOAD_CHANGE' &&
-                    (() => {
-                      const loadEval = evaluateLoadChangeRequest(currentSanctionedLoadKw, Number(loadKw));
-                      return (
-                        <div className="p-4 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/70 space-y-3">
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                            <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                              <span className="text-[11px] text-slate-500 block">
-                                {srUi.currentSanctionedLoadLabel}
-                              </span>
-                              <span className="text-base font-extrabold font-mono text-slate-900 dark:text-white">
-                                {currentSanctionedLoadKw !== null ? `${currentSanctionedLoadKw} kW` : tc.notApplicable}
-                              </span>
-                            </div>
-
-                            <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                              <span className="text-[11px] text-slate-500 block">
-                                {srUi.requestedNewLoadLabel}
-                              </span>
-                              <span className="text-base font-extrabold font-mono text-blue-600 dark:text-blue-400">
-                                {loadKw} kW
-                              </span>
-                            </div>
-
-                            <div className="p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                              <span className="text-[11px] text-slate-500 block">
-                                {srUi.loadDeltaLabel}
-                              </span>
-                              <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
-                                <span
-                                  className={`text-[11px] font-bold px-2 py-0.5 rounded border ${
-                                    loadEval.direction === 'EXTENSION'
-                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300'
-                                      : loadEval.direction === 'REDUCTION'
-                                      ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300'
-                                      : 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-300'
-                                  }`}
-                                >
-                                  {loadEval.direction === 'EXTENSION'
-                                    ? `${srUi.directionExtensionBadge} (+${loadEval.deltaKw} kW)`
-                                    : loadEval.direction === 'REDUCTION'
-                                    ? `${srUi.directionReductionBadge} (${loadEval.deltaKw} kW)`
-                                    : srUi.directionUnchangedBadge}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {!loadEval.isValidChange && (
-                            <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                              <span>{srUi.loadChangeInstructionNote}</span>
-                            </p>
-                          )}
-
-                          <label className="flex items-start gap-2 text-xs text-slate-800 dark:text-slate-200 cursor-pointer pt-1">
-                            <input
-                              id="load-change-confirm-checkbox"
-                              type="checkbox"
-                              checked={loadChangeConfirmed}
-                              onChange={e => {
-                                setLoadChangeConfirmed(e.target.checked);
-                                markFieldEdited('loadChangeConfirmed');
-                              }}
-                              className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="font-semibold leading-snug">
-                              {srUi.loadChangeConfirmCheckboxLabel}
-                            </span>
-                          </label>
-                        </div>
-                      );
-                    })()}
-
-                  {/* Load kW selector with quick buttons and slider */}
-                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                        {serviceRequestType === 'LOAD_CHANGE'
-                          ? srUi.requestedNewLoadLabel
-                          : tc.requestedSanctionLoadLabel}
-                      </label>
-                      <span className="text-base font-extrabold text-blue-600 dark:text-blue-400 font-mono">
-                        {loadKw} kW
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      {[2, 4, 6, 8, 10, 15, 25].map(kwVal => (
-                        <button
-                          key={kwVal}
-                          type="button"
-                          onClick={() => handleLoadPresetChange(kwVal)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                            loadKw === kwVal
-                              ? 'bg-blue-600 text-white shadow-xs'
-                              : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400'
-                          }`}
-                        >
-                          {kwVal} kW
-                        </button>
-                      ))}
-                    </div>
-
-                    <input
-                      type="range"
-                      min="1"
-                      max="50"
-                      value={loadKw}
-                      onChange={e => handleLoadPresetChange(Number(e.target.value))}
-                      className="w-full accent-blue-600"
-                    />
-
-                    <div className="text-[11px] text-slate-500 flex justify-between">
-                      <span>{tc.minLoadNote}</span>
-                      <span>{tc.phaseRequirementNote}</span>
-                      <span>{tc.maxLtLoadNote}</span>
-                    </div>
-                  </div>
-
-                  {/* Phase Selection */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        {tc.supplyPhaseLabel}
-                      </label>
-                      <div className="flex gap-4 pt-1">
-                        <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="phase"
-                            checked={phase === '1-Phase'}
-                            onChange={() => {
-                              setPhase('1-Phase');
-                              markFieldEdited('phase');
-                            }}
-                          />
-                          <span>{tc.phase1Option}</span>
-                        </label>
-                        <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="phase"
-                            checked={phase === '3-Phase'}
-                            onChange={() => {
-                              setPhase('3-Phase');
-                              markFieldEdited('phase');
-                            }}
-                          />
-                          <span>{tc.phase3Option}</span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      <label className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={solarInterest}
-                          onChange={e => {
-                            setSolarInterest(e.target.checked);
-                            markFieldEdited('solarInterest');
-                          }}
-                          className="rounded text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="font-semibold">
-                          {tc.enableSolarCheckbox}
-                        </span>
-                      </label>
-                      <p className="text-[11px] text-slate-400 pl-5 mt-0.5">
-                        {tc.enableSolarHint}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setFormStep(2)}
-                      className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300"
-                    >
-                      {tc.backBtn}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormStep(4)}
-                      className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5"
-                    >
-                      <span>{tc.reviewCostEstimateBtn}</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 4: DOCUMENTS & COST ESTIMATE SUMMARY */}
-              {formStep === 4 && (
-                <div className="space-y-5 animate-in fade-in">
-                  {/* Verification Documents Checklist */}
-                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        {tc.mandatoryDocsTitle}
-                      </span>
-                      <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> {tc.allThreeAttachedBadge}
-                      </span>
-                    </div>
-
-                    <div className="space-y-2 text-xs">
-                      {uploadedDocs.map(doc => (
-                        <div
-                          key={doc}
-                          className="p-3 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between"
-                        >
-                          <div className="flex items-center gap-2">
-                            <FileCheck className="w-4 h-4 text-blue-600" />
-                            <span className="font-medium text-slate-800 dark:text-slate-200">{localizeDocumentName(doc, language)}</span>
-                          </div>
-                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-                            {tc.verifiedBadge}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Dynamic Cost Estimate Breakdown Card */}
-                  <div className="p-5 rounded-xl bg-gradient-to-br from-blue-50/80 to-indigo-50/40 dark:from-blue-950/30 dark:to-slate-900 border border-blue-200 dark:border-blue-900/40 space-y-3">
-                    <div className="flex items-center justify-between border-b border-blue-200/60 dark:border-blue-800/40 pb-2">
-                      <span className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">
-                        {tc.sanctionFeeScheduleTitle}
-                      </span>
-                      <span className="text-xs font-mono font-semibold text-slate-500">
-                        {tc.loadSummaryPrefix} {loadKw} kW ({localizePhase(phase, language)})
-                      </span>
-                    </div>
-
-                    <div className="space-y-2 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-slate-600 dark:text-slate-400">{tc.serviceLineChargesLabel} ({loadKw} kW × ₹1,150)</span>
-                        <span className="font-mono font-semibold text-slate-900 dark:text-white">₹{serviceCharge.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600 dark:text-slate-400">{tc.standardSecurityDepositLabel} ({localizeTariffCategory(category, language)})</span>
-                        <span className="font-mono font-semibold text-slate-900 dark:text-white">₹{securityDeposit.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-600 dark:text-slate-400">{tc.smartMeterTestingFeeLabel}</span>
-                        <span className="font-mono font-semibold text-slate-900 dark:text-white">₹{meterTestingFee.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between pt-2 border-t border-blue-200 dark:border-blue-800/60 text-sm font-extrabold text-blue-700 dark:text-blue-300">
-                        <span>{tc.totalEstSanctionPayableLabel}</span>
-                        <span className="font-mono text-base">₹{totalSanctionEstimate.toLocaleString()}</span>
-                      </div>
-                    </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {tc.payableUponClearanceNote}
-                    </p>
-                  </div>
-
-                  <div className="flex justify-between pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setFormStep(3)}
-                      className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300"
-                    >
-                      {tc.backBtn}
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>{tc.submitNewConnBtn}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </form>
           </div>
         </div>
       )}
@@ -4026,61 +4443,94 @@ export const ConsumerPortal: React.FC = () => {
         </div>
       )}
 
-      {/* SUBVIEW 8: NOTIFICATIONS */}
+      {/* SUBVIEW 8: NOTIFICATIONS (1:1 Match to reference screenshot media_1793977958256_5fa6a4f9.jpg) */}
       {activeTab === 'notifications' && (
-        <div className="max-w-3xl mx-auto space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                {tc.notifCenterTitle}
-              </h2>
-              <p className="text-xs text-slate-500">
-                {tc.notifCenterSub}
+        <div className="space-y-4">
+          {/* Breadcrumbs */}
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <button
+              type="button"
+              onClick={() => setActiveTab('dashboard')}
+              className="hover:text-[#0A2540] transition-colors cursor-pointer"
+            >
+              Home
+            </button>
+            <span className="text-slate-400">›</span>
+            <span className="text-slate-800 font-semibold">Notifications</span>
+          </div>
+
+          {/* Banner with Pylon Illustration */}
+          <div className="rounded-2xl bg-white border border-slate-200/90 shadow-2xs relative overflow-hidden p-6 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0A2540] tracking-tight">
+                Notifications
+              </h1>
+              <p className="text-xs sm:text-[13px] text-slate-500 font-medium mt-1">
+                Stay updated with the latest updates, alerts and important information.
               </p>
+              <div className="w-12 h-1 bg-[#FF6B00] rounded-full mt-3" />
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {consumerNotifications.some(n => !n.read) && (
-                <button
-                  type="button"
-                  onClick={markAllNotificationsRead}
-                  className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-xs text-blue-700 font-semibold flex items-center gap-1.5 cursor-pointer"
-                >
-                  <CheckCheck className="w-3.5 h-3.5" />
-                  <span>{tc.markAllReadBtn}</span>
-                </button>
-              )}
-              {consumerNotifications.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    clearAllNotifications();
-                    setSelectedConsumerNotifIds([]);
-                  }}
-                  className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-xs text-rose-700 font-semibold flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>{tc.clearAllBtn}</span>
-                </button>
-              )}
+
+            {/* Scalable Vector Pylons & Overhead Transmission Lines (Identical to Dashboard) */}
+            <div className="relative w-72 sm:w-80 h-24 hidden md:block shrink-0 pointer-events-none select-none">
+              <svg viewBox="0 0 320 120" fill="none" className="w-full h-full">
+                <path d="M0,105 Q90,65 170,90 T320,55 L320,120 L0,120 Z" fill="#FDF4E7" opacity="0.9" />
+                <path d="M0,112 Q100,80 190,100 T320,75 L320,120 L0,120 Z" fill="#FCE8D3" opacity="0.6" />
+                <path d="M0,62 Q130,95 230,55" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+                <path d="M0,72 Q135,105 230,65" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+                <path d="M230,55 Q265,70 300,30" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+                <path d="M230,65 Q265,80 300,40" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+                <g stroke="#0F2B48" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="230" y1="35" x2="218" y2="115" />
+                  <line x1="230" y1="35" x2="242" y2="115" />
+                  <line x1="223" y1="55" x2="237" y2="55" />
+                  <line x1="220" y1="75" x2="240" y2="75" />
+                  <line x1="218" y1="95" x2="242" y2="95" />
+                  <line x1="223" y1="55" x2="240" y2="75" />
+                  <line x1="237" y1="55" x2="220" y2="75" />
+                  <line x1="220" y1="75" x2="242" y2="95" />
+                  <line x1="240" y1="75" x2="218" y2="95" />
+                  <line x1="210" y1="55" x2="250" y2="55" />
+                  <line x1="214" y1="65" x2="246" y2="65" />
+                  <line x1="230" y1="28" x2="230" y2="35" />
+                </g>
+                <g stroke="#0F2B48" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="300" y1="12" x2="282" y2="115" />
+                  <line x1="300" y1="12" x2="318" y2="115" />
+                  <line x1="289" y1="40" x2="311" y2="40" />
+                  <line x1="285" y1="65" x2="315" y2="65" />
+                  <line x1="282" y1="90" x2="318" y2="90" />
+                  <line x1="289" y1="40" x2="315" y2="65" />
+                  <line x1="311" y1="40" x2="285" y2="65" />
+                  <line x1="285" y1="65" x2="318" y2="90" />
+                  <line x1="315" y1="65" x2="282" y2="90" />
+                  <line x1="272" y1="40" x2="328" y2="40" />
+                  <line x1="276" y1="52" x2="324" y2="52" />
+                  <line x1="300" y1="5" x2="300" y2="12" />
+                </g>
+              </svg>
             </div>
           </div>
 
-          {/* Filter & Batch Selection Bar */}
-          <div className="p-3 rounded-xl bg-white border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
-            <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Filter & Action Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+            {/* Filter Pills on the left */}
+            <div className="flex items-center gap-2 flex-wrap">
               {([
-                { id: 'all', label: `${tc.filterAll} (${consumerNotifications.length})` },
-                { id: 'unread', label: `${tc.filterUnread} (${consumerNotifications.filter(n => !n.read).length})` },
-                { id: 'applications', label: tc.filterAppUpdates }
+                { id: 'all', label: `All (${consumerNotifications.length})` },
+                { id: 'unread', label: `Unread (${consumerNotifications.filter(n => !n.read).length})` },
+                { id: 'pending', label: 'Pending / Review' },
+                { id: 'approved', label: 'Approved' },
+                { id: 'rejected', label: 'Rejected' },
               ] as const).map(tab => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setConsumerNotifFilter(tab.id)}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     consumerNotifFilter === tab.id
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                      ? 'bg-[#0A2540] text-white shadow-xs'
+                      : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80'
                   }`}
                 >
                   {tab.label}
@@ -4088,39 +4538,61 @@ export const ConsumerPortal: React.FC = () => {
               ))}
             </div>
 
-            {selectedConsumerNotifIds.length > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-semibold text-slate-600">
-                  {selectedConsumerNotifIds.length} {tc.selectedCountSuffix}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    markSelectedNotificationsRead(selectedConsumerNotifIds);
-                    setSelectedConsumerNotifIds([]);
-                  }}
-                  className="px-2 py-1 rounded bg-blue-50 text-blue-700 font-semibold hover:bg-blue-100 cursor-pointer"
-                >
-                  {tc.markReadBtn}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    deleteSelectedNotifications(selectedConsumerNotifIds);
-                    setSelectedConsumerNotifIds([]);
-                  }}
-                  className="px-2 py-1 rounded bg-rose-50 text-rose-700 font-semibold hover:bg-rose-100 cursor-pointer"
-                >
-                  {tc.deleteSelectedBtn}
-                </button>
-              </div>
-            )}
+            {/* Actions on the right */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={markAllNotificationsRead}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/80 text-xs font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer transition-all"
+              >
+                <CheckCheck className="w-3.5 h-3.5 text-slate-600" />
+                <span>Mark All Read</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  clearAllNotifications();
+                  setSelectedConsumerNotifIds([]);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-rose-50 border border-slate-200/80 text-xs font-semibold text-rose-600 flex items-center gap-1.5 cursor-pointer transition-all"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                <span>Clear All</span>
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-2.5">
+          {/* Notification Cards List */}
+          <div className="space-y-3 pt-1">
             {(() => {
               const filteredList = consumerNotifications.filter(n => {
                 if (consumerNotifFilter === 'unread') return !n.read;
+                if (consumerNotifFilter === 'pending') {
+                  return (
+                    n.eventType === 'APPLICATION_SUBMITTED' ||
+                    n.category === 'Approval' ||
+                    n.type === 'info' ||
+                    n.type === 'warning' ||
+                    (n.title && (n.title.includes('Submitted') || n.title.includes('Inspection') || n.title.includes('Updated')))
+                  );
+                }
+                if (consumerNotifFilter === 'approved') {
+                  return (
+                    n.eventType === 'APPLICATION_APPROVED' ||
+                    n.type === 'success' ||
+                    n.statusBadge === 'Payment' ||
+                    (n.title && (n.title.includes('Successful') || n.title.includes('Approved')))
+                  );
+                }
+                if (consumerNotifFilter === 'rejected') {
+                  return (
+                    n.eventType === 'APPLICATION_REJECTED' ||
+                    n.type === 'alert' ||
+                    n.statusBadge === 'Notice' ||
+                    (n.title && (n.title.includes('Overdue') || n.title.includes('Notice') || n.title.includes('Outage')))
+                  );
+                }
                 if (consumerNotifFilter === 'applications') {
                   return Boolean(n.applicationId || n.category === 'Approval' || /APP-\d{4}-\d+/.test(`${n.title} ${n.message}`));
                 }
@@ -4129,12 +4601,12 @@ export const ConsumerPortal: React.FC = () => {
 
               if (filteredList.length === 0) {
                 return (
-                  <div className="p-8 text-center rounded-xl bg-white dark:bg-[#101C35] border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
-                    <Bell className="w-10 h-10 text-slate-400 mx-auto" />
-                    <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                  <div className="p-12 text-center rounded-2xl bg-white border border-dashed border-slate-200 space-y-2">
+                    <Bell className="w-10 h-10 text-slate-300 mx-auto" />
+                    <h4 className="text-sm font-semibold text-slate-800">
                       {tc.noNotificationsTitle}
                     </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-slate-500">
                       {tc.noNotificationsDesc}
                     </p>
                   </div>
@@ -4145,27 +4617,50 @@ export const ConsumerPortal: React.FC = () => {
                 const appId = n.applicationId || `${n.title} ${n.message}`.match(/APP-\d{4}-\d+/)?.[0];
                 const cmpId = n.complaintId || `${n.title} ${n.message}`.match(/CMP-[A-Z0-9-]+/)?.[0];
                 const isSelected = selectedConsumerNotifIds.includes(n.id);
-                const isApproved = n.type === 'success' || n.eventType === 'APPLICATION_APPROVED';
-                const isRejected = n.type === 'alert' || n.eventType === 'APPLICATION_REJECTED';
-                const isClarification = n.type === 'warning' || n.eventType === 'CLARIFICATION_REQUESTED';
+                const rawSubdivision = n.subdivision || selectedConnection?.subdivision;
+                const displaySubdivision = rawSubdivision ? localizeSubdivision(rawSubdivision, language) : undefined;
+                const isNotice = n.statusBadge === 'Notice' || n.relatedEntityType === 'notice';
+                const isBilling = n.statusBadge === 'Billing' || n.relatedEntityType === 'bill';
+                const isPayment = n.statusBadge === 'Payment' || n.relatedEntityType === 'payment';
+                const isUpdate = n.statusBadge === 'Update';
+                const isOutage = n.statusBadge === 'Alert' || n.category === 'Outage' || n.relatedEntityType === 'outage';
+                const isSubmission = n.eventType === 'APPLICATION_SUBMITTED' || Boolean(appId);
 
-                const accentBorder = isApproved
-                  ? 'border-l-4 border-l-emerald-500'
-                  : isRejected
-                  ? 'border-l-4 border-l-rose-500'
-                  : isClarification
-                  ? 'border-l-4 border-l-amber-500'
-                  : 'border-l-4 border-l-blue-500';
+                const accentBorder = isSubmission || appId
+                  ? 'border-l-4 border-l-[#2563EB]'
+                  : isNotice
+                  ? 'border-l-4 border-l-[#8B5CF6]'
+                  : isBilling
+                  ? 'border-l-4 border-l-[#F59E0B]'
+                  : isPayment
+                  ? 'border-l-4 border-l-[#10B981]'
+                  : 'border-l-4 border-l-[#2563EB]';
 
-                const badgeClasses = isApproved
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : isRejected
-                  ? 'bg-rose-50 text-rose-700 border-rose-200'
-                  : isClarification
-                  ? 'bg-amber-50 text-amber-800 border-amber-200'
-                  : 'bg-blue-50 text-blue-700 border-blue-200';
+                const iconCircle = isPayment ? (
+                  <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                ) : isNotice ? (
+                  <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                ) : isBilling ? (
+                  <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                ) : isUpdate ? (
+                  <div className="w-10 h-10 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                    <Info className="w-5 h-5" />
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Bell className="w-5 h-5" />
+                  </div>
+                );
 
+                const formattedDateTime = n.formattedTimestamp || (n.createdAt ? formatErpDateTime(n.createdAt) : n.time);
                 let localizedNotif = localizeConsumerNotification(n, language);
+
                 if (
                   n.eventKey &&
                   n.eventKey.startsWith('BILL-REMINDER:') &&
@@ -4201,121 +4696,178 @@ export const ConsumerPortal: React.FC = () => {
                   <div
                     key={n.id}
                     onClick={() => markNotificationRead(n.id)}
-                    className={`p-4 rounded-xl border transition-all cursor-pointer ${accentBorder} ${
-                      n.read
-                        ? 'bg-white dark:bg-[#101C35] border-slate-200 dark:border-slate-800'
-                        : 'bg-blue-50/30 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50'
-                    }`}
+                    className={`p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${accentBorder}`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={e => {
-                            e.stopPropagation();
-                            setSelectedConsumerNotifIds(prev =>
-                              prev.includes(n.id) ? prev.filter(item => item !== n.id) : [...prev, n.id]
-                            );
-                          }}
-                          onClick={e => e.stopPropagation()}
-                          aria-label={`${tc.selectNotifAriaPrefix} ${localizedNotif.title}`}
-                          className="mt-1.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
-                        />
-                        <div
-                          className={`p-2 rounded-lg mt-0.5 shrink-0 ${
-                            isApproved
-                              ? 'bg-emerald-100 text-emerald-600'
-                              : isRejected
-                              ? 'bg-rose-100 text-rose-600'
-                              : isClarification
-                              ? 'bg-amber-100 text-amber-600'
-                              : 'bg-blue-100 text-blue-600'
-                          }`}
-                        >
-                          {isApproved ? (
-                            <CheckCircle2 className="w-4 h-4" />
-                          ) : isRejected ? (
-                            <XCircle className="w-4 h-4" />
-                          ) : isClarification ? (
-                            <AlertTriangle className="w-4 h-4" />
-                          ) : (
-                            <Bell className="w-4 h-4" />
+                    <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={e => {
+                          e.stopPropagation();
+                          setSelectedConsumerNotifIds(prev =>
+                            prev.includes(n.id) ? prev.filter(item => item !== n.id) : [...prev, n.id]
+                          );
+                        }}
+                        onClick={e => e.stopPropagation()}
+                        aria-label={`${tc.selectNotifAriaPrefix} ${localizedNotif.title}`}
+                        className="mt-1 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
+                      />
+
+                      {iconCircle}
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {appId && (
+                            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded bg-blue-50 text-blue-700">
+                              {appId.replace('APP-', 'APP - ')}
+                            </span>
+                          )}
+                          {isSubmission && (
+                            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded bg-sky-50 text-sky-700">
+                              ✦ New Submission
+                            </span>
+                          )}
+                          {!appId && isBilling && (
+                            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                              Billing
+                            </span>
+                          )}
+                          {!appId && isNotice && (
+                            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded bg-purple-50 text-purple-700">
+                              Notice
+                            </span>
+                          )}
+                          {!appId && isUpdate && (
+                            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                              Update
+                            </span>
+                          )}
+                          {!appId && isPayment && (
+                            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                              Payment
+                            </span>
+                          )}
+                          {!appId && isOutage && (
+                            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                              Alert
+                            </span>
+                          )}
+
+                          {!n.read && (
+                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-blue-600 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+                              • Unread
+                            </span>
                           )}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {appId && (
-                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-900 text-white">
-                                {appId}
-                              </span>
-                            )}
-                            {!appId && cmpId && (
-                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-900 text-white">
-                                {cmpId}
-                              </span>
-                            )}
-                            <h4 className="text-xs font-bold text-slate-900 dark:text-white">
-                              {localizedNotif.title}
-                            </h4>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badgeClasses}`}>
-                              {localizedNotif.badgeLabel}
-                            </span>
-                            {!n.read && (
-                              <span className="text-[10px] font-bold text-blue-600">{tc.unreadBadge}</span>
-                            )}
+
+                        <h3 className="text-[15px] sm:text-base font-bold text-[#0A2540] dark:text-white mt-1.5 leading-snug">
+                          {localizedNotif.title}
+                        </h3>
+
+                        <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                          {localizedNotif.message}
+                        </p>
+
+                        {displaySubdivision && (
+                          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mt-2">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>Subdivision: {displaySubdivision}</span>
                           </div>
-                          <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
-                            {localizedNotif.message}
-                          </p>
-                          <div className="flex items-center gap-3 mt-2 flex-wrap">
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              {localizedNotif.time}
-                            </span>
-                            {appId && (
-                              <button
-                                type="button"
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  markNotificationRead(n.id);
-                                  openCaseDrawer('application', appId);
-                                }}
-                                className="text-[11px] font-bold text-blue-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                              >
-                                <span>{tc.trackApplicationPrefix} {appId}</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </button>
-                            )}
-                            {cmpId && (
-                              <button
-                                type="button"
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  markNotificationRead(n.id);
-                                  openCaseDrawer('complaint', cmpId);
-                                }}
-                                className="text-[11px] font-bold text-blue-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                              >
-                                <span>{t.common.viewDetails} {cmpId}</span>
-                                <ExternalLink className="w-3 h-3" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right cluster: Timestamp & CTA button */}
+                    <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium whitespace-nowrap">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{formattedDateTime}</span>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={e => {
-                          e.stopPropagation();
-                          deleteNotification(n.id);
-                        }}
-                        className="p-1.5 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0 cursor-pointer"
-                        title={tc.deleteNotifTitle}
-                        aria-label={`${tc.deleteNotifTitle} ${localizedNotif.title}`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {appId ? (
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            markNotificationRead(n.id);
+                            const resolved = userApplications.find(a => a.id === appId)?.id || userApplications[0]?.id || 'APP-2026-0842';
+                            openCaseDrawer('application', resolved);
+                          }}
+                          className="px-4 py-1.5 rounded-full bg-blue-50 hover:bg-blue-100 text-[#2563EB] font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                        >
+                          <span>Open Application</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : isBilling ? (
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            markNotificationRead(n.id);
+                            setActiveTab('bills');
+                          }}
+                          className="px-4 py-1.5 rounded-full bg-blue-50 hover:bg-blue-100 text-[#2563EB] font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                        >
+                          <span>View Bill</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : isNotice ? (
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            markNotificationRead(n.id);
+                            setActiveTab('bills');
+                          }}
+                          className="px-4 py-1.5 rounded-full bg-blue-50 hover:bg-blue-100 text-[#2563EB] font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                        >
+                          <span>View Notice</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : isPayment ? (
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            markNotificationRead(n.id);
+                            setActiveTab('payments');
+                          }}
+                          className="px-4 py-1.5 rounded-full bg-blue-50 hover:bg-blue-100 text-[#2563EB] font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                        >
+                          <span>View Receipt</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : isOutage ? (
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            markNotificationRead(n.id);
+                            setActiveTab('outages');
+                          }}
+                          className="px-4 py-1.5 rounded-full bg-blue-50 hover:bg-blue-100 text-[#2563EB] font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                        >
+                          <span>View Outage</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.stopPropagation();
+                            markNotificationRead(n.id);
+                            setActiveTab('service-requests');
+                            if (cmpId) {
+                              openCaseDrawer('complaint', cmpId);
+                            }
+                          }}
+                          className="px-4 py-1.5 rounded-full bg-blue-50 hover:bg-blue-100 text-[#2563EB] font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                        >
+                          <span>View Details</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

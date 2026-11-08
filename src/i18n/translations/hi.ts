@@ -537,7 +537,7 @@ export const hi: TranslationDictionary = {
     navServiceRequests: 'सेवा अनुरोध',
     navNotifications: 'सूचनाएं',
     navAccountProfile: 'खाता प्रोफ़ाइल',
-    navErpOverview: 'ERP अवलोकन',
+    navErpOverview: 'ऑफिसर डैशबोर्ड',
     navIncidentControlDesk: 'घटना नियंत्रण कक्ष',
     navApplicationQueue: 'आवेदन कतार',
     navConsumerLedger: 'उपभोक्ता खाता बही',

@@ -37,7 +37,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Home,
-  MapPin
+  MapPin,
+  Bot
 } from 'lucide-react';
 import { UgvclBrandIdentity } from '../common/UgvclBrandIdentity';
 
@@ -65,7 +66,8 @@ export const Sidebar: React.FC = () => {
     userNotifications,
     setIsAIAssistantOpen,
     exitToWelcomeScreen,
-    activeUser
+    activeUser,
+    fieldOfflineQueue
   } = useApp();
   const { language, t } = useLanguage();
 
@@ -76,6 +78,7 @@ export const Sidebar: React.FC = () => {
   const activeCmps = complaints.filter(c => c.status !== 'Resolved' && c.status !== 'Closed').length;
   const pendingWos = workOrders.filter(w => w.status !== 'Completed').length;
   const activeEmployeeIncidents = roleIncidents.filter(i => i.status !== 'RESOLVED' && i.status !== 'CLOSED').length;
+  const pendingOfflineCount = (fieldOfflineQueue || []).filter(q => q.status === 'PENDING').length;
 
   // Scoped counts derived strictly from the active consumer account's authorized records
   const consumerConnectionCount = (userConnections || []).length;
@@ -210,6 +213,472 @@ export const Sidebar: React.FC = () => {
   const localizedRoleLabel = roleLabelMap[currentRole] || profile.label;
   const localizedRoleBadge = roleBadgeMap[currentRole] || profile.badge;
 
+  // =========================================================================
+  // CONSUMER PORTAL DEDICATED SIDEBAR (1:1 with reference screenshot)
+  // =========================================================================
+  if (currentRole === 'consumer') {
+    type ConsumerNavItem = 
+      | { id: string; label: string; icon: React.ReactNode; badge?: number | string; isDivider?: false }
+      | { id: string; isDivider: true };
+
+    const consumerNavItems: ConsumerNavItem[] = [
+      {
+        id: 'dashboard',
+        label: 'Dashboard',
+        icon: <Home className="w-4 h-4" />
+      },
+      {
+        id: 'connections',
+        label: 'My Connections',
+        icon: <Plug className="w-4 h-4" />,
+        badge: consumerConnectionCount > 0 ? consumerConnectionCount : 2
+      },
+      {
+        id: 'bills',
+        label: 'Electricity Bills',
+        icon: <Receipt className="w-4 h-4" />
+      },
+      {
+        id: 'payments',
+        label: 'Payments & History',
+        icon: <CreditCard className="w-4 h-4" />
+      },
+      {
+        id: 'requests',
+        label: 'Service Requests',
+        icon: <FileText className="w-4 h-4" />,
+        badge: activeConsumerApps > 0 ? activeConsumerApps : 2
+      },
+      { id: 'div-1', isDivider: true },
+      {
+        id: 'outage-map',
+        label: 'Outage & Alerts',
+        icon: <AlertTriangle className="w-4 h-4" />
+      },
+      {
+        id: 'analytics',
+        label: 'Usage Analytics',
+        icon: <BarChart3 className="w-4 h-4" />
+      },
+      { id: 'div-2', isDivider: true },
+      {
+        id: 'notifications',
+        label: 'Notifications',
+        icon: <Bell className="w-4 h-4" />,
+        badge: unreadConsumerNotifs > 0 ? unreadConsumerNotifs : 2
+      },
+      {
+        id: 'profile',
+        label: 'Account Profile',
+        icon: <User className="w-4 h-4" />
+      }
+    ];
+
+    return (
+      <aside className="hidden md:flex flex-col bg-white text-slate-700 border-r border-slate-200/90 w-60 py-4 px-3 select-none shrink-0 transition-all">
+        <nav aria-label="Consumer Portal Navigation" className="flex-1 space-y-1">
+          {consumerNavItems.map(item => {
+            if (item.isDivider) {
+              return <div key={item.id} className="h-px bg-slate-200/80 my-2 mx-1" />;
+            }
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-[#0A2540] text-white font-bold shadow-xs'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`}>
+                    {item.icon}
+                  </div>
+                  <span className="truncate">{item.label}</span>
+                </div>
+                {item.badge !== undefined && (
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${
+                      isActive
+                        ? 'bg-white/20 text-white'
+                        : 'bg-blue-100 text-blue-700'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
+    );
+  }
+
+  // =========================================================================
+  // EMPLOYEE PORTAL DEDICATED SIDEBAR (1:1 with reference screenshot)
+  // =========================================================================
+  if (currentRole === 'employee') {
+    const employeeNavItems = [
+      {
+        id: 'dashboard',
+        label: 'Dashboard',
+        icon: <Home className="w-4 h-4" />
+      },
+      {
+        id: 'profile',
+        label: 'My Profile',
+        icon: <Plug className="w-4 h-4" />
+      },
+      {
+        id: 'coordination',
+        label: 'Office Employee ERP',
+        icon: <FileText className="w-4 h-4" />
+      },
+      {
+        id: 'transformers',
+        label: 'Distribution Transformers',
+        icon: <Cpu className="w-4 h-4" />
+      },
+      {
+        id: 'incidents',
+        label: 'Incident Control Desk',
+        icon: <AlertTriangle className="w-4 h-4" />,
+        badge: activeEmployeeIncidents > 0 ? activeEmployeeIncidents : 6
+      },
+      {
+        id: 'outage-map',
+        label: 'Outage Map & Timeline',
+        icon: <MapPin className="w-4 h-4" />
+      },
+      {
+        id: 'applications',
+        label: 'Application Queue',
+        icon: <Inbox className="w-4 h-4" />,
+        badge: pendingApps > 0 ? pendingApps : 5
+      },
+      {
+        id: 'consumers',
+        label: 'Consumer Ledger',
+        icon: <Database className="w-4 h-4" />
+      },
+      {
+        id: 'complaints',
+        label: 'Complaint Queue',
+        icon: <MessageSquareWarning className="w-4 h-4" />,
+        badge: activeCmps > 0 ? activeCmps : 3
+      },
+      {
+        id: 'approvals',
+        label: 'Approval Center',
+        icon: <CheckSquare className="w-4 h-4" />,
+        badge: pendingApps > 0 ? pendingApps : 5
+      },
+      {
+        id: 'reports',
+        label: 'Revenue Reports',
+        icon: <BarChart3 className="w-4 h-4" />
+      }
+    ];
+
+    return (
+      <aside className="hidden md:flex flex-col bg-white text-slate-700 border-r border-slate-200/90 w-60 py-4 px-3 select-none shrink-0 transition-all justify-between">
+        <nav aria-label="Employee Portal Navigation" className="space-y-1">
+          {employeeNavItems.map(item => {
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-[#0A2540] text-white font-bold shadow-xs'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`}>
+                    {item.icon}
+                  </div>
+                  <span className="truncate">{item.label}</span>
+                </div>
+                {item.badge !== undefined && (
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${
+                      isActive
+                        ? 'bg-white/20 text-white'
+                        : 'bg-blue-100 text-blue-700'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Bottom Utility Actions */}
+        <div className="pt-3 mt-4 border-t border-slate-200/80 space-y-1">
+          <button
+            type="button"
+            onClick={exitToWelcomeScreen}
+            className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <Home className="w-4 h-4 text-slate-500 shrink-0" />
+            <span className="truncate">Welcome Hub</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsAIAssistantOpen(true)}
+            className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-blue-700 bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200/60 transition-colors cursor-pointer"
+          >
+            <Bot className="w-4 h-4 text-blue-600 shrink-0" />
+            <span className="truncate">Vidyut Mitra AI</span>
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
+
+  // =========================================================================
+  // ADMIN PORTAL DEDICATED SIDEBAR (Matching Consumer & Employee layout)
+  // =========================================================================
+  if (currentRole === 'admin') {
+    const adminNavItems = [
+      {
+        id: 'overview',
+        label: t.erp.navSystemOverview || 'System Overview',
+        icon: <Activity className="w-4 h-4" />
+      },
+      {
+        id: 'users',
+        label: t.erp.navUsersRoles || 'User Management & Roles',
+        icon: <Users className="w-4 h-4" />,
+        badge: 12
+      },
+      {
+        id: 'access',
+        label: t.erp.navAccessMatrix || 'Access Matrix',
+        icon: <KeyRound className="w-4 h-4" />
+      },
+      {
+        id: 'audit',
+        label: t.erp.navAuditTrail || 'Audit Trail & Forensic Logs',
+        icon: <FileSearch className="w-4 h-4" />
+      },
+      {
+        id: 'transformers',
+        label: t.erp.navTransformerAssetRegistry || 'Distribution Transformers',
+        icon: <Cpu className="w-4 h-4" />
+      },
+      {
+        id: 'directory',
+        label: t.erp.navUgvclDirectory || 'UGVCL Directory',
+        icon: <Network className="w-4 h-4" />
+      },
+      {
+        id: 'outage-map',
+        label: t.erp.navOutageMap || 'Outage Map & Timeline',
+        icon: <MapPin className="w-4 h-4" />
+      },
+      {
+        id: 'integrations',
+        label: t.erp.navApiIntegrations || 'API Integrations & Keys',
+        icon: <Server className="w-4 h-4" />
+      },
+      {
+        id: 'infra',
+        label: t.erp.navInfraDb || 'Infrastructure & Database',
+        icon: <ShieldCheck className="w-4 h-4" />
+      },
+      {
+        id: 'settings',
+        label: t.erp.navSystemSettings || 'System Settings',
+        icon: <Settings className="w-4 h-4" />
+      }
+    ];
+
+    return (
+      <aside className="hidden md:flex flex-col bg-white text-slate-700 border-r border-slate-200/90 w-60 py-4 px-3 select-none shrink-0 transition-all justify-between">
+        <nav aria-label="Admin Portal Navigation" className="space-y-1">
+          {adminNavItems.map(item => {
+            const isActive = activeTab === item.id || (item.id === 'overview' && activeTab === 'dashboard');
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-[#0A2540] text-white font-bold shadow-xs'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`}>
+                    {item.icon}
+                  </div>
+                  <span className="truncate">{item.label}</span>
+                </div>
+                {item.badge !== undefined && (
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${
+                      isActive
+                        ? 'bg-white/20 text-white'
+                        : 'bg-blue-100 text-blue-700'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Bottom Utility Actions */}
+        <div className="pt-3 mt-4 border-t border-slate-200/80 space-y-1">
+          <button
+            type="button"
+            onClick={exitToWelcomeScreen}
+            className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <Home className="w-4 h-4 text-slate-500 shrink-0" />
+            <span className="truncate">Welcome Hub</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsAIAssistantOpen(true)}
+            className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-blue-700 bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200/60 transition-colors cursor-pointer"
+          >
+            <Bot className="w-4 h-4 text-blue-600 shrink-0" />
+            <span className="truncate">Vidyut Mitra AI</span>
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
+  // =========================================================================
+  // FIELD ENGINEER PORTAL DEDICATED SIDEBAR (Matching Consumer, Employee & Admin layout)
+  // =========================================================================
+  if (currentRole === 'field') {
+    const fieldNavItems = [
+      {
+        id: 'dashboard',
+        label: t.erp.navFieldConsole || 'Field Console',
+        icon: <Home className="w-4 h-4" />
+      },
+      {
+        id: 'workorders',
+        label: t.erp.navWorkOrders || 'Work Orders',
+        icon: <Wrench className="w-4 h-4" />,
+        badge: pendingWos > 0 ? pendingWos : undefined
+      },
+      {
+        id: 'transformers',
+        label: t.erp.navTransformerInspections || 'DTR Inspections',
+        icon: <Cpu className="w-4 h-4" />
+      },
+      {
+        id: 'inspections',
+        label: t.erp.navSiteFeasibility || 'Site Feasibility',
+        icon: <ClipboardCheck className="w-4 h-4" />
+      },
+      {
+        id: 'maintenance',
+        label: t.erp.navFeederPatrol || 'Feeder Patrol',
+        icon: <HardHat className="w-4 h-4" />
+      },
+      {
+        id: 'outage-map',
+        label: t.erp.navOutageMap || 'Outage Map & Timeline',
+        icon: <MapPin className="w-4 h-4" />
+      },
+      {
+        id: 'offline',
+        label: t.erp.navOfflineQueue || 'Offline Queue',
+        icon: <WifiOff className="w-4 h-4" />,
+        badge: pendingOfflineCount > 0 ? pendingOfflineCount : undefined
+      },
+      {
+        id: 'history',
+        label: t.erp.navCompletedJobs || 'Completed Jobs',
+        icon: <History className="w-4 h-4" />
+      }
+    ];
+
+    return (
+      <aside className="hidden md:flex flex-col bg-white text-slate-700 border-r border-slate-200/90 w-60 py-4 px-3 select-none shrink-0 transition-all justify-between">
+        <nav aria-label="Field Engineer Portal Navigation" className="space-y-1">
+          {fieldNavItems.map(item => {
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-[#0A2540] text-white font-bold shadow-xs'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`}>
+                    {item.icon}
+                  </div>
+                  <span className="truncate">{item.label}</span>
+                </div>
+                {item.badge !== undefined && (
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${
+                      isActive
+                        ? 'bg-white/20 text-white'
+                        : 'bg-blue-100 text-blue-700'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Bottom Utility Actions */}
+        <div className="pt-3 mt-4 border-t border-slate-200/80 space-y-1">
+          <button
+            type="button"
+            onClick={exitToWelcomeScreen}
+            className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <Home className="w-4 h-4 text-slate-500 shrink-0" />
+            <span className="truncate">Welcome Hub</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsAIAssistantOpen(true)}
+            className="w-full flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs font-semibold text-blue-700 bg-blue-50/70 hover:bg-blue-100/70 border border-blue-200/60 transition-colors cursor-pointer"
+          >
+            <Bot className="w-4 h-4 text-blue-600 shrink-0" />
+            <span className="truncate">Vidyut Mitra AI</span>
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <aside
       className={`hidden md:flex flex-col bg-[#0E1A32] text-slate-300 border-r border-slate-800/90 transition-all duration-200 select-none ${
@@ -273,7 +742,7 @@ export const Sidebar: React.FC = () => {
       {!isCollapsed && (
         <div className="px-5 pt-2 pb-1">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            {currentRole === 'consumer' ? t.erp.consumerServices : t.erp.workspaceModules}
+            {t.erp.workspaceModules}
           </span>
         </div>
       )}

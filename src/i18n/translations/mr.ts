@@ -537,7 +537,7 @@ export const mr: TranslationDictionary = {
     navServiceRequests: 'सेवा विनंत्या',
     navNotifications: 'सूचना',
     navAccountProfile: 'खाते प्रोफाइल',
-    navErpOverview: 'ERP आढावा',
+    navErpOverview: 'अधिकारी डॅशबोर्ड',
     navIncidentControlDesk: 'घटना नियंत्रण कक्ष',
     navApplicationQueue: 'अर्ज रांग',
     navConsumerLedger: 'ग्राहक खातेवही',

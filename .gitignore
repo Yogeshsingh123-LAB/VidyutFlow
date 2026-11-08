@@ -21,9 +21,11 @@ dist/
 .vite/
 *.tsbuildinfo
 public/vendor/tesseract/
+.agents/skills/ui-ux-pro-max/
 .DS_Store
 playwright-report/
 test-results/
 frontend/playwright-report/
 frontend/test-results/
 public/vendor/tesseract/
+.agents/skills/ui-ux-pro-max/

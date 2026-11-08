@@ -2193,7 +2193,140 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
       .map(n => (readSet.has(n.id) ? { ...n, read: true } : n));
 
-    return sortNotificationsNewestFirst(filtered);
+    const isDemoConsumerUser =
+      userId === 'demo_consumer' ||
+      userEmail === 'consumer@vidyutflow.demo' ||
+      userEmail === 'meenaben.patel@example.com';
+
+    const CANONICAL_CONSUMER_DEMO_NOTIFICATIONS: AppNotification[] = [
+      {
+        id: 'NOTIF-APP-2026-0847',
+        title: 'Application Submitted: APP-2026-0847',
+        message: 'Your 6kW Residential (RGPU) connection application has been registered. Estimated sanction cost: ₹13,800.',
+        time: '07:13 PM',
+        createdAt: '2026-11-06T13:43:00.000Z',
+        formattedTimestamp: '06/11/2026, 07:13 PM',
+        targetRole: 'consumer',
+        type: 'info',
+        category: 'Approval',
+        eventType: 'APPLICATION_SUBMITTED',
+        statusBadge: 'New Submission',
+        applicationId: 'APP-2026-0847',
+        subdivision: 'Mehsana Industrial GIDC',
+        targetConsumerAccountId: 'demo_consumer',
+        relatedEntityType: 'application',
+        relatedEntityId: 'APP-2026-0847',
+        read: false,
+      },
+      {
+        id: 'NOTIF-BILL-DUE-01',
+        title: 'Gentle Overdue Notice — Bill BILL-UG-2026-10-8821',
+        message: 'Bill BILL-UG-2026-10-8821 (₹2,185) for connection 04281-99231 passed its due date (30-Oct-2026). Please complete payment at your convenience.',
+        time: '12:00 AM',
+        createdAt: '2026-11-06T00:00:00.000Z',
+        formattedTimestamp: '06/11/2026, 12:00 AM',
+        targetRole: 'consumer',
+        type: 'warning',
+        category: 'Billing',
+        statusBadge: 'Billing',
+        subdivision: 'Mehsana City North',
+        targetConsumerNo: '04281-99231',
+        targetConsumerAccountId: 'demo_consumer',
+        relatedEntityType: 'bill',
+        relatedEntityId: 'BILL-UG-2026-10-8821',
+        read: false,
+      },
+      {
+        id: 'NOTIF-FORMAL-01',
+        title: 'Formal Notice Deadline Approaching (3 Days Left): NTC-UG-2026-10-8821',
+        message: 'Notice NTC-UG-2026-10-8821 for Bill BILL-UG-2026-10-8821 (Connection 04281-99231) has 3 clear days remaining before the 08-Nov-2026 deadline. Current Outstanding: ₹2197.57 (DPS: ₹12.57).',
+        time: '12:00 AM',
+        createdAt: '2026-11-05T00:00:00.000Z',
+        formattedTimestamp: '05/11/2026, 12:00 AM',
+        targetRole: 'consumer',
+        type: 'alert',
+        category: 'Billing',
+        statusBadge: 'Notice',
+        subdivision: 'Mehsana City North',
+        targetConsumerNo: '04281-99231',
+        targetConsumerAccountId: 'demo_consumer',
+        relatedEntityType: 'notice',
+        relatedEntityId: 'NTC-UG-2026-10-8821',
+        read: false,
+      },
+      {
+        id: 'NOTIF-SR-48291',
+        title: 'Service Request #SR-48291 Updated',
+        message: 'Your service request status has been updated. Inspection team assigned.',
+        time: 'Yesterday',
+        createdAt: '2026-11-05T11:00:00.000Z',
+        formattedTimestamp: '05/11/2026, 04:30 PM',
+        targetRole: 'consumer',
+        type: 'info',
+        category: 'Inspection',
+        statusBadge: 'Update',
+        subdivision: 'Mehsana City North',
+        targetConsumerNo: '04281-99231',
+        targetConsumerAccountId: 'demo_consumer',
+        relatedEntityType: 'complaint',
+        relatedEntityId: 'SR-48291',
+        read: false,
+      },
+      {
+        id: 'NOTIF-PAY-1500',
+        title: 'Payment of ₹1,500.00 Successful',
+        message: 'Your payment has been processed successfully. Transaction reference: TXN-UPI-9921448102.',
+        time: 'Yesterday',
+        createdAt: '2026-11-05T05:45:00.000Z',
+        formattedTimestamp: '05/11/2026, 11:15 AM',
+        targetRole: 'consumer',
+        type: 'success',
+        category: 'Billing',
+        statusBadge: 'Payment',
+        subdivision: 'Mehsana City North',
+        targetConsumerNo: '04281-99231',
+        targetConsumerAccountId: 'demo_consumer',
+        relatedEntityType: 'payment',
+        relatedEntityId: 'TXN-UPI-9921448102',
+        read: false,
+      },
+      {
+        id: 'NOTIF-OUTAGE-01',
+        title: 'Power Outage in Your Area',
+        message: 'Scheduled maintenance from 10 AM to 2 PM on 11kV Visnagar Road Feeder.',
+        time: '05/11/2026',
+        createdAt: '2026-11-05T03:30:00.000Z',
+        formattedTimestamp: '05/11/2026, 09:00 AM',
+        targetRole: 'consumer',
+        type: 'alert',
+        category: 'Outage',
+        statusBadge: 'Alert',
+        subdivision: 'Mehsana City North',
+        targetConsumerNo: '04281-99231',
+        targetConsumerAccountId: 'demo_consumer',
+        relatedEntityType: 'outage',
+        read: false,
+      }
+    ];
+
+    const candidateList = isDemoConsumerUser
+      ? [
+          ...CANONICAL_CONSUMER_DEMO_NOTIFICATIONS,
+          ...filtered.filter(
+            n =>
+              !CANONICAL_CONSUMER_DEMO_NOTIFICATIONS.some(
+                c => c.id === n.id || c.title === n.title || (c.relatedEntityId && c.relatedEntityId === n.relatedEntityId)
+              ) &&
+              n.id !== 'NOTIF-02'
+          )
+        ]
+      : filtered;
+
+    const finalFiltered = candidateList
+      .filter(n => !dismissedSet.has(n.id))
+      .map(n => (readSet.has(n.id) ? { ...n, read: true } : n));
+
+    return sortNotificationsNewestFirst(finalFiltered);
   }, [demoSession, notifications, userConnections, userApplications, userComplaints, userBills, currentInboxScopeState]);
 
   const employeeNotifications = useMemo(() => {

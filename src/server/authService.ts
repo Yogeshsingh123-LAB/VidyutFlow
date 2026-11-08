@@ -361,6 +361,8 @@ export class ServerAuthService {
       rawIdent = 'field@vidyutflow.demo';
     } else if (rawIdent === 'admin-01' || rawIdent === 'adm-ugvcl-01' || rawIdent === 'superadmin') {
       rawIdent = 'admin@vidyutflow.demo';
+    } else if (rawIdent === 'ugvcl-mgt-01' || rawIdent === 'mgt-01' || rawIdent === 'management-01' || rawIdent === 'demo_management') {
+      rawIdent = 'management@vidyutflow.demo';
     }
     const cleanEmail = rawIdent;
     const password = params.password || '';
@@ -441,6 +443,8 @@ export class ServerAuthService {
       rawIdent = 'field@vidyutflow.demo';
     } else if (rawIdent === 'admin-01' || rawIdent === 'adm-ugvcl-01' || rawIdent === 'superadmin') {
       rawIdent = 'admin@vidyutflow.demo';
+    } else if (rawIdent === 'ugvcl-mgt-01' || rawIdent === 'mgt-01' || rawIdent === 'management-01' || rawIdent === 'demo_management') {
+      rawIdent = 'management@vidyutflow.demo';
     }
     const cleanEmail = rawIdent;
     const password = params.password || '';
@@ -515,6 +519,8 @@ export class ServerAuthService {
       rawIdent = 'field@vidyutflow.demo';
     } else if (rawIdent === 'admin-01' || rawIdent === 'adm-ugvcl-01' || rawIdent === 'superadmin') {
       rawIdent = 'admin@vidyutflow.demo';
+    } else if (rawIdent === 'ugvcl-mgt-01' || rawIdent === 'mgt-01' || rawIdent === 'management-01' || rawIdent === 'demo_management') {
+      rawIdent = 'management@vidyutflow.demo';
     }
     const cleanEmail = rawIdent;
     const userRecord = this.usersByEmail.get(cleanEmail);

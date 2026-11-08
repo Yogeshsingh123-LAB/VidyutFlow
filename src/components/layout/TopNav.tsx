@@ -12,7 +12,32 @@ import {
   Info,
   HelpCircle,
   ChevronDown,
-  AlertTriangle
+  AlertTriangle,
+  Zap,
+  Phone,
+  PlusCircle,
+  Receipt,
+  FileText,
+  User,
+  Inbox,
+  MessageSquareWarning,
+  CheckSquare,
+  MapPin,
+  Cpu,
+  Database,
+  BarChart3,
+  Users,
+  KeyRound,
+  FileSearch,
+  ShieldCheck,
+  Settings,
+  Server,
+  Network,
+  Wrench,
+  ClipboardCheck,
+  HardHat,
+  WifiOff,
+  History
 } from 'lucide-react';
 import { PresentationAboutModal } from '../common/PresentationAboutModal';
 import { LanguageSelector } from '../common/LanguageSelector';
@@ -26,6 +51,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
   const {
     currentRole,
     activeTab,
+    setActiveTab,
     scopedNotifications,
     setIsNotificationDrawerOpen,
     setIsCommandPaletteOpen,
@@ -44,8 +70,16 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
   const [isConfirmingHelpReset, setIsConfirmingHelpReset] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
 
+  // Dedicated Consumer Dropdowns
+  const [isServicesMenuOpen, setIsServicesMenuOpen] = useState(false);
+  const [isSupportMenuOpen, setIsSupportMenuOpen] = useState(false);
+  const [isConsumerUserMenuOpen, setIsConsumerUserMenuOpen] = useState(false);
+
   const helpMenuRef = useRef<HTMLDivElement>(null);
   const helpButtonRef = useRef<HTMLButtonElement>(null);
+  const servicesMenuRef = useRef<HTMLDivElement>(null);
+  const supportMenuRef = useRef<HTMLDivElement>(null);
+  const consumerUserMenuRef = useRef<HTMLDivElement>(null);
 
   const profile = ROLE_PROFILES[currentRole];
   const unreadNotifications = scopedNotifications.filter(n => !n.read).length;
@@ -111,20 +145,26 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
   };
 
   useEffect(() => {
-    if (!isHelpMenuOpen) {
-      setIsConfirmingHelpReset(false);
-      return;
-    }
     const handleClickOutside = (e: MouseEvent) => {
       if (helpMenuRef.current && !helpMenuRef.current.contains(e.target as Node)) {
         setIsHelpMenuOpen(false);
       }
+      if (servicesMenuRef.current && !servicesMenuRef.current.contains(e.target as Node)) {
+        setIsServicesMenuOpen(false);
+      }
+      if (supportMenuRef.current && !supportMenuRef.current.contains(e.target as Node)) {
+        setIsSupportMenuOpen(false);
+      }
+      if (consumerUserMenuRef.current && !consumerUserMenuRef.current.contains(e.target as Node)) {
+        setIsConsumerUserMenuOpen(false);
+      }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        e.preventDefault();
         setIsHelpMenuOpen(false);
-        helpButtonRef.current?.focus();
+        setIsServicesMenuOpen(false);
+        setIsSupportMenuOpen(false);
+        setIsConsumerUserMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -133,7 +173,588 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isHelpMenuOpen]);
+  }, []);
+
+  // =========================================================================
+  // CONSUMER, EMPLOYEE, ADMIN & FIELD DEDICATED HEADER (1:1 with reference design)
+  // =========================================================================
+  if (currentRole === 'consumer' || currentRole === 'employee' || currentRole === 'admin' || currentRole === 'field') {
+    return (
+      <header className="h-16 bg-white border-b border-slate-200/90 px-4 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-30 select-none">
+        <PresentationAboutModal
+          isOpen={isAboutModalOpen}
+          onClose={() => setIsAboutModalOpen(false)}
+        />
+
+        {/* Mobile Hamburger (< md) */}
+        <button
+          type="button"
+          onClick={onToggleMobileNav}
+          className="md:hidden p-2 text-slate-700 hover:text-blue-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+          aria-label="Open navigation menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Left: UGVCL | VidyutFlow Brand + Home / Services / Support Tabs */}
+        <div className="flex items-center gap-3 sm:gap-5 min-w-0">
+          <div
+            onClick={exitToWelcomeScreen}
+            className="flex items-center gap-2.5 cursor-pointer group shrink-0"
+            title="Return to VidyutFlow Homepage"
+          >
+            {/* Orange Lightning Bolt */}
+            <Zap className="w-5 h-5 text-[#FF6B00] fill-[#FF6B00] shrink-0" />
+            <span className="text-lg sm:text-xl font-black text-[#0A2540] tracking-tight leading-none">
+              UGVCL
+            </span>
+            <div className="h-5 w-px bg-slate-300 mx-1 hidden sm:block" />
+            <div className="hidden sm:block leading-tight">
+              <div className="text-[17px] font-black tracking-tight leading-none text-[#0A2540]">
+                Vidyut<span className="text-[#FF6B00]">Flow</span>
+              </div>
+              <div className="text-[9.5px] text-slate-500 font-semibold tracking-wider uppercase mt-0.5">
+                {currentRole === 'admin'
+                  ? 'Admin Portal'
+                  : currentRole === 'employee'
+                  ? 'Employee Portal'
+                  : currentRole === 'field'
+                  ? 'Field Engineer Portal'
+                  : 'Consumer Portal'}
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop Navigation Links (Home, Services/System/Field Ops, Support/Operations/Grid Assets) */}
+          <div className="hidden lg:flex items-center gap-2 ml-2">
+            {/* Home / Overview / Console Pill */}
+            <button
+              type="button"
+              onClick={() => setActiveTab(currentRole === 'admin' ? 'overview' : 'dashboard')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'dashboard' || (currentRole === 'admin' && activeTab === 'overview')
+                  ? 'bg-[#EBF3FF] text-[#1E40AF]'
+                  : 'text-slate-700 hover:text-blue-700 hover:bg-slate-100'
+              }`}
+            >
+              {currentRole === 'field' ? 'Console' : currentRole === 'admin' ? 'Overview' : 'Home'}
+            </button>
+
+            {/* Dropdown 1: System (Admin) / Field Ops (Field) / Services (Consumer & Employee) */}
+            <div className="relative" ref={servicesMenuRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsServicesMenuOpen(!isServicesMenuOpen);
+                  setIsSupportMenuOpen(false);
+                  setIsConsumerUserMenuOpen(false);
+                }}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-slate-100 flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <span>{currentRole === 'admin' ? 'System' : currentRole === 'field' ? 'Field Ops' : 'Services'}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              {isServicesMenuOpen && (
+                <div className="absolute left-0 mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in">
+                  {currentRole === 'admin' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('users');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Users className="w-4 h-4 text-blue-600" />
+                        <span>User Management & Roles</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('access');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <KeyRound className="w-4 h-4 text-amber-600" />
+                        <span>Access Matrix</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('audit');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <FileSearch className="w-4 h-4 text-purple-600" />
+                        <span>Audit Trail & Forensic Logs</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('integrations');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Server className="w-4 h-4 text-emerald-600" />
+                        <span>API Integrations & Keys</span>
+                      </button>
+                    </>
+                  ) : currentRole === 'field' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('workorders');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Wrench className="w-4 h-4 text-blue-600" />
+                        <span>Work Orders Queue</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('inspections');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <ClipboardCheck className="w-4 h-4 text-emerald-600" />
+                        <span>Site Feasibility & Meter</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('maintenance');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <HardHat className="w-4 h-4 text-amber-600" />
+                        <span>Feeder Patrol & Maintenance</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('offline');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <WifiOff className="w-4 h-4 text-purple-600" />
+                        <span>Offline Field Sync Queue</span>
+                      </button>
+                    </>
+                  ) : currentRole === 'employee' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('applications');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Inbox className="w-4 h-4 text-blue-600" />
+                        <span>Application Queue</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('complaints');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <MessageSquareWarning className="w-4 h-4 text-amber-600" />
+                        <span>Complaint Queue</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('approvals');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <CheckSquare className="w-4 h-4 text-emerald-600" />
+                        <span>Approval Center</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('outage-map');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <MapPin className="w-4 h-4 text-purple-600" />
+                        <span>Live Outage Map</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('new-connection');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <PlusCircle className="w-4 h-4 text-blue-600" />
+                        <span>Apply New Connection</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('bills');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Receipt className="w-4 h-4 text-emerald-600" />
+                        <span>Electricity Bills & Payment</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('requests');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <FileText className="w-4 h-4 text-purple-600" />
+                        <span>Solar Net-Metering & Requests</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('outage-map');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <AlertTriangle className="w-4 h-4 text-amber-600" />
+                        <span>Live Outage Map</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Dropdown 2: Operations (Admin) / Grid Assets (Field) / Support (Consumer & Employee) */}
+            <div className="relative" ref={supportMenuRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSupportMenuOpen(!isSupportMenuOpen);
+                  setIsServicesMenuOpen(false);
+                  setIsConsumerUserMenuOpen(false);
+                }}
+                className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-slate-100 flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <span>{currentRole === 'admin' ? 'Operations' : currentRole === 'field' ? 'Grid Assets' : 'Support'}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+
+              {isSupportMenuOpen && (
+                <div className="absolute left-0 mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in">
+                  {currentRole === 'admin' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('transformers');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Cpu className="w-4 h-4 text-blue-600" />
+                        <span>Distribution Transformers</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('directory');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Network className="w-4 h-4 text-indigo-600" />
+                        <span>UGVCL Directory</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('outage-map');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <MapPin className="w-4 h-4 text-rose-600" />
+                        <span>Outage Map & Timeline</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('infra');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <ShieldCheck className="w-4 h-4 text-teal-600" />
+                        <span>Infrastructure & Database</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('settings');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Settings className="w-4 h-4 text-slate-600" />
+                        <span>System Settings</span>
+                      </button>
+                    </>
+                  ) : currentRole === 'field' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('transformers');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Cpu className="w-4 h-4 text-blue-600" />
+                        <span>Distribution Transformers</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('outage-map');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <MapPin className="w-4 h-4 text-rose-600" />
+                        <span>Outage Map & Timeline</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('history');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <History className="w-4 h-4 text-emerald-600" />
+                        <span>Completed Jobs History</span>
+                      </button>
+                    </>
+                  ) : currentRole === 'employee' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('incidents');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <AlertTriangle className="w-4 h-4 text-rose-600" />
+                        <span>Incident Control Desk</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('transformers');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Cpu className="w-4 h-4 text-blue-600" />
+                        <span>Distribution Transformers</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('consumers');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Database className="w-4 h-4 text-emerald-600" />
+                        <span>Consumer Ledger</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('reports');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <BarChart3 className="w-4 h-4 text-amber-600" />
+                        <span>Revenue Reports</span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <a
+                        href="tel:19124"
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2"
+                      >
+                        <Phone className="w-4 h-4 text-blue-600" />
+                        <span>24x7 Helpline: 19124</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('complaints');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <AlertTriangle className="w-4 h-4 text-amber-600" />
+                        <span>Report Complaint / Outage</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAboutModalOpen(true);
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Info className="w-4 h-4 text-cyan-600" />
+                        <span>About UGVCL Platform</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Center: Search input */}
+        <div className="relative flex-1 max-w-xs md:max-w-md mx-2 sm:mx-4 hidden sm:block">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            readOnly
+            onClick={() => setIsCommandPaletteOpen(true)}
+            placeholder={
+              currentRole === 'admin'
+                ? 'Search users, logs, or system records...'
+                : currentRole === 'field'
+                ? 'Search work orders, poles, or feeders...'
+                : currentRole === 'employee'
+                ? 'Search records...'
+                : 'Search services, bills, or complaints...'
+            }
+            className="w-full h-9 pl-9 pr-4 rounded-full bg-slate-50 hover:bg-slate-100/90 border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer shadow-2xs"
+          />
+        </div>
+
+        {/* Right Actions: LanguageSelector + Bell + User Profile */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Shared Language Selector */}
+          <LanguageSelector variant="erp" />
+
+          {/* Notification Bell */}
+          <button
+            type="button"
+            onClick={() => setIsNotificationDrawerOpen(true)}
+            className="relative p-2 rounded-full hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+            title="Notifications"
+            aria-label="View notifications"
+          >
+            <Bell className="w-5 h-5" />
+            {currentRole === 'employee' ? (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-600 text-white text-[9px] font-black flex items-center justify-center ring-2 ring-white">
+                {unreadNotifications > 0 ? unreadNotifications : 1}
+              </span>
+            ) : currentRole === 'admin' ? (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-blue-600 text-white text-[9px] font-black flex items-center justify-center ring-2 ring-white">
+                {unreadNotifications > 0 ? unreadNotifications : 2}
+              </span>
+            ) : (
+              unreadNotifications > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#FF6B00] ring-2 ring-white" />
+              )
+            )}
+          </button>
+
+          {/* User Profile Capsule Menu */}
+          <div className="relative" ref={consumerUserMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsConsumerUserMenuOpen(!isConsumerUserMenuOpen);
+                setIsServicesMenuOpen(false);
+                setIsSupportMenuOpen(false);
+              }}
+              className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <div className="w-8 h-8 rounded-full bg-[#0A2540] text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                {activeUser.initials || (currentRole === 'field' ? 'VS' : currentRole === 'admin' ? 'AP' : currentRole === 'employee' ? 'PR' : 'MP')}
+              </div>
+              <span className="text-xs font-bold text-slate-800 hidden sm:inline max-w-[150px] truncate">
+                {activeUser.name || (currentRole === 'field' ? 'Vikramaditya Solanki' : currentRole === 'admin' ? 'Anand Patel' : currentRole === 'employee' ? 'Priya Rathod' : 'Smt. Meenaben Patel')}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+
+            {isConsumerUserMenuOpen && (
+              <div className="absolute right-0 mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in">
+                <div className="px-3.5 py-2 border-b border-slate-100">
+                  <div className="font-bold text-xs text-slate-900 truncate">
+                    {activeUser.name || (currentRole === 'field' ? 'Vikramaditya Solanki' : currentRole === 'admin' ? 'Anand Patel' : currentRole === 'employee' ? 'Priya Rathod' : 'Smt. Meenaben Patel')}
+                  </div>
+                  <div className="text-[11px] text-slate-500 font-mono">
+                    {activeUser.id}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(currentRole === 'admin' ? 'settings' : currentRole === 'field' ? 'dashboard' : 'profile');
+                    setIsConsumerUserMenuOpen(false);
+                  }}
+                  className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                >
+                  <User className="w-4 h-4 text-slate-500" />
+                  <span>{currentRole === 'admin' ? 'System Settings' : currentRole === 'field' ? 'Field Console' : 'Account Profile'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    exitToWelcomeScreen();
+                    setIsConsumerUserMenuOpen(false);
+                  }}
+                  className="w-full px-3.5 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer border-t border-slate-100"
+                >
+                  <Home className="w-4 h-4 text-rose-500" />
+                  <span>Return to Homepage</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="h-12 sm:h-16 bg-white border-b border-slate-200 px-3 min-[375px]:px-4 md:px-6 flex items-center justify-between gap-2 sticky top-0 z-30 select-none">

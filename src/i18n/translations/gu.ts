@@ -537,7 +537,7 @@ export const gu: TranslationDictionary = {
     navServiceRequests: 'સેવા વિનંતીઓ',
     navNotifications: 'સૂચનાઓ',
     navAccountProfile: 'ખાતાની પ્રોફાઇલ',
-    navErpOverview: 'ERP ઝાંખી',
+    navErpOverview: 'ઓફિસર ડેશબોર્ડ',
     navIncidentControlDesk: 'ઘટના નિયંત્રણ કક્ષ',
     navApplicationQueue: 'અરજી કતાર',
     navConsumerLedger: 'ગ્રાહક ખાતાવહી',

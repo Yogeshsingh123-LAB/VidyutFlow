@@ -537,7 +537,7 @@ export const en: TranslationDictionary = {
     navServiceRequests: 'Service Requests',
     navNotifications: 'Notifications',
     navAccountProfile: 'Account Profile',
-    navErpOverview: 'ERP Overview',
+    navErpOverview: 'Officer Dashboard',
     navIncidentControlDesk: 'Incident Control Desk',
     navApplicationQueue: 'Application Queue',
     navConsumerLedger: 'Consumer Ledger',
