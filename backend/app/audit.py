@@ -118,7 +118,9 @@ def audit(
 ):
     """Append one chained audit row. Serialized across concurrent writers until `db.commit()`."""
     if not db.info.get(_LOCK_KEY):
-        _AUDIT_TX_LOCK.acquire(timeout=10.0)
+        acquired = _AUDIT_TX_LOCK.acquire(timeout=10.0)
+        if not acquired:
+            raise RuntimeError("Audit log lock acquisition timed out")
         db.info[_LOCK_KEY] = True
 
     try:
