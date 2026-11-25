@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { EventEmitter } from 'node:events';
 import { createProductionRequestHandler } from '../src/server/prodServer';
+import { resetAuthRateLimitForTests } from '../src/server/authRoutes';
 import { resolveRouteAccess, UNAUTHORIZED_NAVIGATION_MESSAGE } from '../src/context/AppContext';
 
 async function runUnifiedLoginSecurityTestSuite() {
@@ -120,12 +121,18 @@ async function runUnifiedLoginSecurityTestSuite() {
   assert.equal(resUnregisteredMobile.status, 400, 'Unregistered mobile number must be rejected');
   console.log('   [PASS] Unregistered mobile number rejected with 400 (Ownership check enforced)');
 
-  // 1d. Valid Mobile-Only OTP Request (no consumer number required)
+  // 1d. Valid Mobile-Only OTP Request (no consumer number required, with valid CAPTCHA)
+  const extractCaptchaAnswer = (svg: string) =>
+    [...svg.matchAll(/<text[^>]*>([A-Z0-9])<\/text>/g)].map(m => m[1]).join('');
+  const c1Res = await inMemoryFetch(`${baseUrl}/api/auth/captcha`, { method: 'GET' });
+  const c1Data = await c1Res.json();
   const resValidOtp = await inMemoryFetch(`${baseUrl}/api/auth/consumer/otp/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      mobile_number: '9825014820'
+      mobile_number: '9825014820',
+      captcha_token: c1Data.captcha_token,
+      captcha_answer: extractCaptchaAnswer(c1Data.captcha_svg)
     })
   });
   assert.equal(resValidOtp.status, 200, 'Valid registered mobile must succeed without consumer number');
@@ -136,10 +143,16 @@ async function runUnifiedLoginSecurityTestSuite() {
   console.log(`   [PASS] OTP dispatched to ${otpSendData.masked_mobile} using registered mobile ONLY`);
 
   // 1e. Resend Cooldown Enforcement (Immediate retry within 45s must return 429)
+  const c2Res = await inMemoryFetch(`${baseUrl}/api/auth/captcha`, { method: 'GET' });
+  const c2Data = await c2Res.json();
   const resCooldown = await inMemoryFetch(`${baseUrl}/api/auth/consumer/otp/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mobile_number: '9825014820' })
+    body: JSON.stringify({
+      mobile_number: '9825014820',
+      captcha_token: c2Data.captcha_token,
+      captcha_answer: extractCaptchaAnswer(c2Data.captcha_svg)
+    })
   });
   assert.equal(resCooldown.status, 429, 'Immediate OTP resend must be rate-limited by cooldown');
   console.log('   [PASS] Resend cooldown (45s) enforced with 429');
@@ -179,6 +192,7 @@ async function runUnifiedLoginSecurityTestSuite() {
   // 2. STAFF AUTHENTICATION (FIELD ENGINEER, OFFICER, ADMIN)
   // =========================================================================
   console.log('\n-> Step 2: Staff & Admin Authentication with Credential & Role Verification');
+  resetAuthRateLimitForTests();
 
   // 2a. Field Engineer Login with Employee ID alias
   const resEngineer = await inMemoryFetch(`${baseUrl}/api/auth/login`, {
@@ -355,10 +369,10 @@ async function runUnifiedLoginSecurityTestSuite() {
   }
   console.log('   [PASS] Verified 0 development authentication controls in user-facing login modal');
 
-  // Verify Consumer Number & Registered Mobile Number are present in login UI and CAPTCHA is present
+  // Verify Registered Mobile Number is present (without Electricity Consumer Number) and CAPTCHA is present
   assert.ok(
-    authModalSource.includes('Electricity Consumer Number'),
-    'Consumer login UI must have Electricity Consumer Number input'
+    !authModalSource.includes('Electricity Consumer Number'),
+    'Consumer login UI must not include Electricity Consumer Number input'
   );
   assert.ok(
     authModalSource.includes('Registered Mobile Number'),
@@ -372,7 +386,7 @@ async function runUnifiedLoginSecurityTestSuite() {
     authModalSource.includes('Management Cockpit') && authModalSource.includes('Executive / HOD'),
     'Login modal must include Management Cockpit account type for executive leadership'
   );
-  console.log('   [PASS] Verified Electricity Consumer Number & Registered Mobile Number pair, Anti-bot CAPTCHA present, and Management Cockpit account type present');
+  console.log('   [PASS] Verified Registered Mobile Number (no Consumer Number), Anti-bot CAPTCHA present, and Management Cockpit account type present');
 
   // Check built HTML/assets if dist exists
   if (fs.existsSync('dist')) {

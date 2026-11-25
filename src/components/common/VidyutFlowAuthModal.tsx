@@ -119,16 +119,15 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
   });
 
   const [consumerAuthMode, setConsumerAuthMode] = useState<'password' | 'otp'>('password');
-  const [consumerUsername, setConsumerUsername] = useState<string>('04281-99231');
-  const [consumerPassword, setConsumerPassword] = useState<string>('Ugvcl@2025');
+  const [consumerUsername, setConsumerUsername] = useState<string>('');
+  const [consumerPassword, setConsumerPassword] = useState<string>('');
   const [showConsumerPassword, setShowConsumerPassword] = useState<boolean>(false);
-  const [rememberMe, setRememberMe] = useState<boolean>(true);
+  const [rememberMe, setRememberMe] = useState<boolean>(false);
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Consumer OTP & Security CAPTCHA State
-  const [consumerNo, setConsumerNo] = useState<string>('04281-99231');
-  const [consumerMobile, setConsumerMobile] = useState<string>('9825014820');
+  const [consumerMobile, setConsumerMobile] = useState<string>('');
   const [consumerOtp, setConsumerOtp] = useState<string>('');
   const [isOtpSent, setIsOtpSent] = useState<boolean>(false);
   const [maskedMobile, setMaskedMobile] = useState<string>('');
@@ -254,7 +253,7 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
 
     const cleanUser = consumerUsername.trim();
     if (!cleanUser) {
-      setErrorMessage('Please enter your Username, Registered Mobile Number, or Electricity Consumer Number.');
+      setErrorMessage('Please enter your Username, Registered Mobile Number, or Email.');
       return;
     }
     if (!consumerPassword) {
@@ -279,12 +278,6 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    const cleanCNo = (consumerNo || consumerUsername).trim();
-    if (!cleanCNo) {
-      setErrorMessage('Please enter your Electricity Consumer Number.');
-      return;
-    }
-
     const cleanMobile = consumerMobile.replace(/\D/g, '');
 
     if (cleanMobile.length < 10) {
@@ -299,7 +292,6 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
     setIsSendingOtp(true);
     try {
       const res = await sendConsumerLoginOtp({
-        consumerNo: cleanCNo,
         mobileNumber: cleanMobile,
         captchaToken,
         captchaAnswer: captchaAnswer.trim(),
@@ -334,12 +326,6 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
 
     setIsVerifyingOtp(true);
     try {
-      const cleanCNo = (consumerNo || consumerUsername).trim();
-      if (!cleanCNo) {
-        setErrorMessage('Please enter your Electricity Consumer Number.');
-        return;
-      }
-
       const cleanMobile = consumerMobile.replace(/\D/g, '');
       const result = await loginConsumerOtp(cleanMobile, cleanOtp);
       if (!result.success && result.error) {
@@ -807,17 +793,15 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
                               id={consumerNoId}
                               type="text"
                               required
+                              autoComplete="off"
                               value={consumerUsername}
-                              onChange={(e) => {
-                                setConsumerUsername(e.target.value);
-                                setConsumerNo(e.target.value);
-                              }}
+                              onChange={(e) => setConsumerUsername(e.target.value)}
                               placeholder="Username / Registered Mobile / Email"
                               className="w-full h-11 pl-10 pr-3.5 text-[13.5px] rounded-xl bg-slate-50/60 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF7A00]/30 focus:border-[#FF7A00] transition-all shadow-2xs"
                             />
                           </div>
                           <span className="text-[10.5px] text-slate-500 block px-1">
-                            Electricity Consumer Number, username or registered mobile.
+                            Enter your username, email, or registered mobile number.
                           </span>
                         </div>
 
@@ -904,24 +888,6 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
                       /* Mode B: OTP Verification with Security CAPTCHA */
                       !isOtpSent ? (
                         <form onSubmit={handleSendConsumerOtp} className="space-y-3">
-                          {/* Electricity Consumer Number */}
-                          <div className="space-y-1">
-                            <label htmlFor={consumerNoId} className="text-[11.5px] font-bold text-slate-700 block">
-                              Electricity Consumer Number
-                            </label>
-                            <div className="relative">
-                              <input
-                                id={consumerNoId}
-                                type="text"
-                                required
-                                value={consumerNo}
-                                onChange={(e) => setConsumerNo(e.target.value)}
-                                placeholder="e.g. 04281-99231"
-                                className="w-full h-10 px-3.5 text-[13px] font-mono rounded-xl bg-slate-50/60 border border-slate-200 text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF7A00]/30 focus:border-[#FF7A00] transition-all shadow-2xs"
-                              />
-                            </div>
-                          </div>
-
                           {/* Registered Mobile Number */}
                           <div className="space-y-1">
                             <label htmlFor={consumerMobileId} className="text-[11.5px] font-bold text-slate-700 block">

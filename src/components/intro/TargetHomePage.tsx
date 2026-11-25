@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { LanguageCode } from '../../i18n/types';
+import { HOME_PAGE_COPY } from './homePageTranslations';
 import {
   Phone,
   Mail,
@@ -49,6 +50,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
     demoSession
   } = useApp();
   const { language, setLanguage } = useLanguage();
+  const copy = HOME_PAGE_COPY[language] || HOME_PAGE_COPY.en;
 
   // Accessibility Font Scaling: 'sm' | 'normal' | 'lg'
   const [fontSizeScale, setFontSizeScale] = useState<'sm' | 'normal' | 'lg'>('normal');
@@ -112,7 +114,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
     { code: 'mr', name: 'Marathi', native: 'मराठी' }
   ];
 
-  const currentLangLabel = languages.find(l => l.code === language)?.name || 'English';
+  const currentLangLabel = languages.find(l => l.code === language)?.native || 'English';
 
   return (
     <div
@@ -129,7 +131,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
           <div className="flex items-center gap-3 text-[11px] sm:text-xs">
             <span className="flex items-center gap-1.5 font-medium text-slate-200">
               <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0 fill-cyan-400" />
-              <span>UGVCL – Uttar Gujarat Vij Company Limited</span>
+              <span>{copy.topUtilityOrg}</span>
             </span>
             <span className="text-slate-600 hidden sm:inline">|</span>
             <a
@@ -137,7 +139,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
               className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors"
             >
               <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-              <span>24x7 Helpline: 19124 (Toll Free)</span>
+              <span>{copy.helplineTop}</span>
             </a>
             <span className="text-slate-600 hidden md:inline">|</span>
             <a
@@ -228,7 +230,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   <span>UGVCL</span>
                 </div>
                 <div className="text-[10px] text-slate-500 font-medium tracking-wide">
-                  Powering a Smarter Gujarat
+                  {copy.brandTagline}
                 </div>
               </div>
             </div>
@@ -243,7 +245,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#0A1C3E] text-white shadow-xs font-semibold hover:bg-[#07162C] transition-colors cursor-pointer"
             >
               <Home className="w-4 h-4" />
-              <span>Home</span>
+              <span>{copy.navHome}</span>
             </button>
 
             {/* Services Dropdown */}
@@ -257,7 +259,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 }}
                 className="flex items-center gap-1 px-3.5 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
               >
-                <span>Services</span>
+                <span>{copy.navServices}</span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
               {isServicesMenuOpen && (
@@ -268,7 +270,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 text-slate-700 hover:text-[#FF6B00] flex items-center gap-2"
                   >
                     <FileText className="w-4 h-4 text-orange-500" />
-                    <span>New Connection (Apply Online)</span>
+                    <span>{copy.navNewConnection}</span>
                   </button>
                   <button
                     type="button"
@@ -276,7 +278,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 text-slate-700 hover:text-blue-600 flex items-center gap-2"
                   >
                     <CreditCard className="w-4 h-4 text-blue-500" />
-                    <span>Pay Electricity Bill Online</span>
+                    <span>{copy.navPayBill}</span>
                   </button>
                   <button
                     type="button"
@@ -284,7 +286,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 text-slate-700 hover:text-blue-600 flex items-center gap-2"
                   >
                     <MessageSquare className="w-4 h-4 text-blue-500" />
-                    <span>Register Complaint</span>
+                    <span>{copy.navRegisterComplaint}</span>
                   </button>
                   <button
                     type="button"
@@ -292,7 +294,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 text-slate-700 hover:text-blue-600 flex items-center gap-2"
                   >
                     <MapPin className="w-4 h-4 text-blue-500" />
-                    <span>Track Application Status</span>
+                    <span>{copy.navTrackApplication}</span>
                   </button>
                 </div>
               )}
@@ -309,7 +311,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 }}
                 className="flex items-center gap-1 px-3.5 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
               >
-                <span>About UGVCL</span>
+                <span>{copy.navAboutUgvcl}</span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
               {isAboutMenuOpen && (
@@ -320,7 +322,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 text-slate-700 hover:text-[#0A2540] flex items-center gap-2 cursor-pointer"
                   >
                     <Building className="w-4 h-4 text-cyan-600" />
-                    <span>Corporate Overview & Vision</span>
+                    <span>{copy.navCorporateOverview}</span>
                   </button>
                   <button
                     type="button"
@@ -328,7 +330,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 text-slate-700 hover:text-[#0A2540] flex items-center gap-2 cursor-pointer"
                   >
                     <MapPin className="w-4 h-4 text-blue-600" />
-                    <span>Distribution Network & Circles</span>
+                    <span>{copy.navDistributionNetwork}</span>
                   </button>
                 </div>
               )}
@@ -345,7 +347,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 }}
                 className="flex items-center gap-1 px-3.5 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
               >
-                <span>Help & Support</span>
+                <span>{copy.navHelpSupport}</span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
               {isHelpMenuOpen && (
@@ -355,14 +357,14 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 text-slate-700 hover:text-blue-600 flex items-center gap-2 block"
                   >
                     <Phone className="w-4 h-4 text-emerald-600" />
-                    <span>24x7 Helpline (19124)</span>
+                    <span>{copy.navHelpline24x7}</span>
                   </a>
                   <a
                     href="mailto:support@ugvcl.com"
                     className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 text-slate-700 hover:text-blue-600 flex items-center gap-2 block"
                   >
                     <Mail className="w-4 h-4 text-blue-600" />
-                    <span>Email Support</span>
+                    <span>{copy.navEmailSupport}</span>
                   </a>
                   <button
                     type="button"
@@ -370,7 +372,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 text-slate-700 hover:text-[#FF6B00] flex items-center gap-2 cursor-pointer"
                   >
                     <HelpCircle className="w-4 h-4 text-[#FF6B00]" />
-                    <span>Q&amp;A / Frequently Asked Questions</span>
+                    <span>{copy.navQaFull}</span>
                   </button>
                 </div>
               )}
@@ -382,7 +384,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
               onClick={() => setIsQaModalOpen(true)}
               className="px-3.5 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
             >
-              Q&amp;A
+              {copy.navQaShort}
             </button>
 
             {/* Contact Us */}
@@ -390,7 +392,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
               href="#contact"
               className="px-3.5 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors"
             >
-              Contact Us
+              {copy.navContactUs}
             </a>
           </nav>
 
@@ -440,7 +442,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
               className="px-5 py-2 rounded-full bg-gradient-to-r from-[#FF7A00] via-[#FF6B00] to-[#EA580C] hover:from-[#FF6B00] hover:to-[#D94F04] text-white text-xs sm:text-sm font-bold shadow-md shadow-orange-500/25 flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             >
               <User className="w-4 h-4 fill-white" />
-              <span>Sign In</span>
+              <span>{copy.signIn}</span>
             </button>
           </div>
         </div>
@@ -453,7 +455,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
         {/* Banner container with aspect ratio preserving the full panoramic building & curve */}
         <div className="relative w-full min-h-[250px] sm:min-h-[290px] md:min-h-[330px] lg:min-h-[380px] xl:min-h-[400px] flex items-start">
           <img
-            src="/assets/ugvcl/home_hero_bg.jpg?v=5"
+            src="/assets/ugvcl/home_hero_bg.png?v=6"
             alt="UGVCL Headquarters - Smart Electricity Services"
             className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none select-none"
           />
@@ -463,15 +465,15 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
             <div className="max-w-md sm:max-w-lg lg:max-w-xl">
               {/* Main Headline */}
               <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-[38px] font-black tracking-tight text-[#0A2540] leading-tight">
-                Smart Electricity Services <br />
-                <span className="text-[#0A2540]">for a </span>
-                <span className="text-[#FF6B00]">Better Tomorrow</span>
+                {copy.heroTitleLine1} <br />
+                <span className="text-[#0A2540]">{copy.heroTitlePrefix}</span>
+                <span className="text-[#FF6B00]">{copy.heroTitleHighlight}</span>
               </h1>
 
               {/* Subtitle Description */}
               <p className="mt-2.5 sm:mt-3 text-xs sm:text-sm lg:text-[14px] font-bold text-[#0C2B4E] leading-relaxed">
-                Transparent • Reliable • Digital Services <br />
-                for Every Consumer of UGVCL
+                {copy.heroSubtitleLine1} <br />
+                {copy.heroSubtitleLine2}
               </p>
 
               {/* Short Orange Accent Underline */}
@@ -485,8 +487,8 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     <Zap className="w-5 h-5 text-[#FF6B00] fill-[#FF6B00]" />
                   </div>
                   <div className="text-[11px] sm:text-xs font-bold text-[#0A2540] leading-tight">
-                    <div>Reliable</div>
-                    <div>Power</div>
+                    <div>{copy.indReliable1}</div>
+                    <div>{copy.indReliable2}</div>
                   </div>
                 </div>
 
@@ -501,8 +503,8 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     </svg>
                   </div>
                   <div className="text-[11px] sm:text-xs font-bold text-[#0A2540] leading-tight">
-                    <div>Secure</div>
-                    <div>Services</div>
+                    <div>{copy.indSecure1}</div>
+                    <div>{copy.indSecure2}</div>
                   </div>
                 </div>
 
@@ -515,8 +517,8 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     <Clock className="w-5 h-5 text-[#0B3A75]" />
                   </div>
                   <div className="text-[11px] sm:text-xs font-bold text-[#0A2540] leading-tight">
-                    <div>24x7</div>
-                    <div>Support</div>
+                    <div>{copy.indSupport1}</div>
+                    <div>{copy.indSupport2}</div>
                   </div>
                 </div>
               </div>
@@ -534,10 +536,10 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
             {/* Quick Services Title Column */}
             <div className="px-3 sm:px-4 text-center lg:text-left shrink-0">
               <h2 className="text-base sm:text-lg font-black text-[#0A2540] tracking-tight">
-                Quick Services
+                {copy.quickServicesTitle}
               </h2>
               <p className="text-[11px] text-slate-500 font-medium">
-                Get things done faster
+                {copy.quickServicesSubtitle}
               </p>
             </div>
 
@@ -555,10 +557,10 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   <FileText className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-xs font-bold text-[#0A2540] mt-1.5 leading-tight">
-                  New Connection
+                  {copy.qaNewConn1}
                 </span>
                 <span className="text-[11px] font-semibold text-[#FF6B00]">
-                  Apply Online
+                  {copy.qaNewConn2}
                 </span>
               </button>
 
@@ -572,10 +574,10 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   <CreditCard className="w-5 h-5 text-[#0284C7]" />
                 </div>
                 <span className="text-xs font-bold text-[#0A2540] mt-1.5 leading-tight">
-                  Pay Bill
+                  {copy.qaPayBill1}
                 </span>
                 <span className="text-[11px] font-semibold text-[#0284C7]">
-                  Online
+                  {copy.qaPayBill2}
                 </span>
               </button>
 
@@ -589,10 +591,10 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   <Gauge className="w-5 h-5 text-[#0B2545]" />
                 </div>
                 <span className="text-xs font-bold text-[#0A2540] mt-1.5 leading-tight">
-                  Submit
+                  {copy.qaMeter1}
                 </span>
                 <span className="text-[11px] font-semibold text-slate-600">
-                  Meter Reading
+                  {copy.qaMeter2}
                 </span>
               </button>
 
@@ -606,10 +608,10 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   <MessageSquare className="w-5 h-5 text-[#0B2545]" />
                 </div>
                 <span className="text-xs font-bold text-[#0A2540] mt-1.5 leading-tight">
-                  Register
+                  {copy.qaComplaint1}
                 </span>
                 <span className="text-[11px] font-semibold text-slate-600">
-                  Complaint
+                  {copy.qaComplaint2}
                 </span>
               </button>
 
@@ -623,10 +625,10 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   <MapPin className="w-5 h-5 text-[#0B2545]" />
                 </div>
                 <span className="text-xs font-bold text-[#0A2540] mt-1.5 leading-tight">
-                  Track
+                  {copy.qaTrack1}
                 </span>
                 <span className="text-[11px] font-semibold text-slate-600">
-                  Application
+                  {copy.qaTrack2}
                 </span>
               </button>
 
@@ -644,10 +646,10 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   <Headphones className="w-5 h-5 text-[#0B2545]" />
                 </div>
                 <span className="text-xs font-bold text-[#0A2540] mt-1.5 leading-tight">
-                  Need Help?
+                  {copy.qaHelp1}
                 </span>
                 <span className="text-[11px] font-semibold text-slate-600">
-                  Contact Us
+                  {copy.qaHelp2}
                 </span>
               </button>
             </div>
@@ -668,7 +670,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     19124
                   </div>
                   <div className="text-[11px] text-slate-300 font-medium">
-                    (Toll Free)
+                    {copy.tollFree}
                   </div>
                 </div>
               </div>
@@ -693,7 +695,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 <div className="flex items-center gap-2">
                   <Megaphone className="w-4 h-4 text-[#0A2540]" />
                   <h3 className="text-sm font-bold text-[#0A2540] tracking-tight">
-                    Latest Updates
+                    {copy.latestUpdatesTitle}
                   </h3>
                 </div>
                 <button
@@ -701,7 +703,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   onClick={() => setIsUpdatesModalOpen(true)}
                   className="text-xs font-bold text-[#0A2540] hover:text-[#FF6B00] flex items-center gap-1 transition-colors cursor-pointer"
                 >
-                  <span>View All</span>
+                  <span>{copy.viewAll}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -711,7 +713,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   <div className="flex items-start gap-2 min-w-0">
                     <span className="w-2 h-2 rounded-full bg-[#FF6B00] mt-1.5 shrink-0" />
                     <span className="text-slate-700 leading-snug">
-                      Online payment facility is now available for all UGVCL consumers.
+                      {copy.update1}
                     </span>
                   </div>
                   <span className="text-[11px] font-medium text-slate-400 shrink-0 tabular-nums">
@@ -723,7 +725,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   <div className="flex items-start gap-2 min-w-0">
                     <span className="w-2 h-2 rounded-full bg-[#FF6B00] mt-1.5 shrink-0" />
                     <span className="text-slate-700 leading-snug">
-                      Submit meter reading through VidyutFlow mobile app.
+                      {copy.update2}
                     </span>
                   </div>
                   <span className="text-[11px] font-medium text-slate-400 shrink-0 tabular-nums">
@@ -735,7 +737,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   <div className="flex items-start gap-2 min-w-0">
                     <span className="w-2 h-2 rounded-full bg-[#FF6B00] mt-1.5 shrink-0" />
                     <span className="text-slate-700 leading-snug">
-                      Digital India Initiative – Go Paperless.
+                      {copy.update3}
                     </span>
                   </div>
                   <span className="text-[11px] font-medium text-slate-400 shrink-0 tabular-nums">
@@ -754,13 +756,13 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 <div className="flex items-center gap-2">
                   <Handshake className="w-5 h-5 text-[#0A2540]" />
                   <h3 className="text-base sm:text-[17px] font-black text-[#0A2540] tracking-tight">
-                    Our Commitment
+                    {copy.commitmentTitle}
                   </h3>
                 </div>
 
                 <p className="text-xs text-[#0A2540]/85 font-medium leading-relaxed pt-2">
-                  Reliable, customer-centric and <br />
-                  technology-driven services.
+                  {copy.commitmentDesc1} <br />
+                  {copy.commitmentDesc2}
                 </p>
               </div>
 
@@ -770,7 +772,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   onClick={() => setIsCommitmentModalOpen(true)}
                   className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-[#042147] hover:bg-[#0A2E58] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
                 >
-                  <span>Know More</span>
+                  <span>{copy.knowMore}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -794,10 +796,10 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 <MapPin className="w-4 h-4 text-[#0A2540]" />
                 <div>
                   <h3 className="text-sm font-bold text-[#0A2540] tracking-tight leading-tight">
-                    UGVCL Coverage
+                    {copy.coverageTitle}
                   </h3>
                   <p className="text-[11px] text-slate-500 font-medium">
-                    Serving Gujarat with commitment
+                    {copy.coverageSubtitle}
                   </p>
                 </div>
               </div>
@@ -809,7 +811,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     <Home className="w-4 h-4 text-[#0A2540] shrink-0" />
                     <div className="leading-tight">
                       <div className="font-extrabold text-[#0A2540] text-sm">4</div>
-                      <div className="text-slate-500 text-[10px] font-medium">DISCOMs</div>
+                      <div className="text-slate-500 text-[10px] font-medium">{copy.discomsLabel}</div>
                     </div>
                   </div>
 
@@ -817,7 +819,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     <Users className="w-4 h-4 text-[#0A2540] shrink-0" />
                     <div className="leading-tight">
                       <div className="font-extrabold text-[#0A2540] text-sm">89L+</div>
-                      <div className="text-slate-500 text-[10px] font-medium">Consumers</div>
+                      <div className="text-slate-500 text-[10px] font-medium">{copy.consumersLabel}</div>
                     </div>
                   </div>
 
@@ -825,7 +827,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     <Zap className="w-4 h-4 text-[#0A2540] shrink-0" />
                     <div className="leading-tight">
                       <div className="font-extrabold text-[#0A2540] text-sm">24x7</div>
-                      <div className="text-slate-500 text-[10px] font-medium">Service</div>
+                      <div className="text-slate-500 text-[10px] font-medium">{copy.serviceLabel}</div>
                     </div>
                   </div>
                 </div>
@@ -904,7 +906,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
               onClick={() => onOpenAboutModal('overview')}
               className="hover:text-white transition-colors cursor-pointer"
             >
-              Privacy Policy
+              {copy.privacyPolicy}
             </button>
             <span className="text-slate-600">|</span>
             <button
@@ -912,7 +914,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
               onClick={() => onOpenAboutModal('overview')}
               className="hover:text-white transition-colors cursor-pointer"
             >
-              Terms & Conditions
+              {copy.termsConditions}
             </button>
             <span className="text-slate-600">|</span>
             <button
@@ -920,7 +922,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
               onClick={() => onOpenAboutModal('overview')}
               className="hover:text-white transition-colors cursor-pointer"
             >
-              Sitemap
+              {copy.sitemap}
             </button>
             <span className="text-slate-600">|</span>
             <button
@@ -928,13 +930,13 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
               onClick={() => onOpenAboutModal('overview')}
               className="hover:text-white transition-colors cursor-pointer"
             >
-              Accessibility
+              {copy.accessibility}
             </button>
           </div>
 
           {/* Right Social Media & Copyright */}
           <div className="flex items-center gap-4 text-[11px]">
-            <span className="text-slate-400 font-medium">Follow Us :</span>
+            <span className="text-slate-400 font-medium">{copy.followUs}</span>
             <div className="flex items-center gap-2 text-white">
               <a
                 href="https://youtube.com"
@@ -978,7 +980,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
             </div>
 
             <span className="text-slate-400 ml-2">
-              © 2025 UGVCL. All Rights Reserved.
+              {copy.copyright}
             </span>
           </div>
         </div>
