@@ -36,6 +36,8 @@ const consumerLoginOtpMap = new Map<string, { otp: string; expiresAt: number; at
 
 const CAPTCHA_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const consumedCaptchaTokens = new Set<string>();
+const CAPTCHA_HMAC_SECRET =
+  process.env.CAPTCHA_SECRET || process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 
 interface CaptchaRecord {
   code: string;
@@ -48,14 +50,17 @@ export function generateServerCaptcha(nowMs?: number): { token: string; svg: str
   for (const [t, rec] of activeCaptchas.entries()) {
     if (now - rec.createdAt > 180000) activeCaptchas.delete(t);
   }
+  if (consumedCaptchaTokens.size > 2000) {
+    consumedCaptchaTokens.clear();
+  }
 
   let code = '';
   for (let i = 0; i < 5; i++) {
-    code += CAPTCHA_CHARS.charAt(Math.floor(Math.random() * CAPTCHA_CHARS.length));
+    code += CAPTCHA_CHARS.charAt(crypto.randomInt(CAPTCHA_CHARS.length));
   }
 
   const salt = crypto.randomBytes(4).toString('hex');
-  const token = `${now}.${salt}.${crypto.createHmac('sha256', 'vidyutflow-secret').update(`${code}:${now}:${salt}`).digest('hex')}`;
+  const token = `${now}.${salt}.${crypto.createHmac('sha256', CAPTCHA_HMAC_SECRET).update(`${code}:${now}:${salt}`).digest('hex')}`;
 
   activeCaptchas.set(token, { code, createdAt: now });
 
@@ -173,10 +178,9 @@ function verifyCsrfProtection(req: IncomingMessage): { valid: boolean; code?: st
   if (typeof originHeader === 'string' && originHeader.trim()) {
     try {
       const originUrl = new URL(originHeader);
-      const allowedHostRaw =
-        (req.headers['x-forwarded-host'] as string) ||
-        req.headers.host ||
-        '';
+      const forwardedHost =
+        process.env.TRUSTED_PROXY === 'true' ? (req.headers['x-forwarded-host'] as string | undefined) : undefined;
+      const allowedHostRaw = forwardedHost || req.headers.host || '';
       const allowedHostname = allowedHostRaw.split(',')[0].trim().split(':')[0].toLowerCase();
       const originHostname = originUrl.hostname.toLowerCase();
 
@@ -389,6 +393,20 @@ export function createAuthApiHandler(options: AuthApiHandlerOptions = {}) {
         sendJson(res, 405, { error: 'Method not allowed. Use POST.', code: 'METHOD_NOT_ALLOWED' });
         return;
       }
+      const csrfCheck = verifyCsrfProtection(req);
+      if (!csrfCheck.valid) {
+        sendJson(res, 403, { authenticated: false, error: csrfCheck.message, code: csrfCheck.code });
+        return;
+      }
+      const clientIp = getClientIp(req);
+      if (!checkAndRecordAuthRateLimit(clientIp, getNowMs())) {
+        sendJson(res, 429, {
+          authenticated: false,
+          error: 'Too many authentication attempts. Please wait 60 seconds and try again.',
+          code: 'RATE_LIMITED'
+        });
+        return;
+      }
       try {
         const body = await readJsonBody(req);
         const rawMobile = String(body.mobile_number || body.mobileNumber || '').trim();
@@ -400,19 +418,17 @@ export function createAuthApiHandler(options: AuthApiHandlerOptions = {}) {
         }
         const norm10 = digitsOnly.slice(-10);
 
-        // Security CAPTCHA verification
+        // Security CAPTCHA verification (mandatory)
         const captchaToken = body.captcha_token || body.captchaToken;
         const captchaAnswer = body.captcha_answer || body.captchaAnswer;
-        if (captchaToken) {
-          const now = (nowMs ?? Date.now());
-          if (!captchaAnswer || !verifyServerCaptcha(String(captchaToken), String(captchaAnswer), now)) {
-            sendJson(res, 400, {
-              authenticated: false,
-              error: 'Invalid or expired security CAPTCHA. Please refresh and try again.',
-              code: 'INVALID_CAPTCHA'
-            });
-            return;
-          }
+        const nowCheck = nowMs ?? Date.now();
+        if (!captchaToken || !captchaAnswer || !verifyServerCaptcha(String(captchaToken), String(captchaAnswer), nowCheck)) {
+          sendJson(res, 400, {
+            authenticated: false,
+            error: 'Invalid or expired security CAPTCHA. Please refresh and try again.',
+            code: 'INVALID_CAPTCHA'
+          });
+          return;
         }
 
         const consumerNo = String(body.consumer_no || body.consumerNo || '').trim();
@@ -465,7 +481,7 @@ export function createAuthApiHandler(options: AuthApiHandlerOptions = {}) {
           return;
         }
 
-        const otp = '482019';
+        const otp = String(crypto.randomInt(100000, 999999));
         const entry = {
           otp,
           expiresAt: now + 5 * 60 * 1000,
@@ -477,16 +493,19 @@ export function createAuthApiHandler(options: AuthApiHandlerOptions = {}) {
         consumerLoginOtpMap.set(key, entry);
         consumerLoginOtpMap.set(resolvedCNo, entry);
 
-        sendJson(res, 200, {
+        const otpResponse: Record<string, unknown> = {
           success: true,
           status: 'OTP_SENT',
           consumer_no: resolvedCNo,
           masked_mobile: '+91 XXXXX XX20',
           expires_in_seconds: 300,
           cooldown_seconds: 45,
-          dev_simulation_otp: otp,
           message: 'Verification OTP sent to registered mobile number +91 XXXXX XX20.'
-        });
+        };
+        if (process.env.NODE_ENV !== 'production') {
+          otpResponse.dev_simulation_otp = otp;
+        }
+        sendJson(res, 200, otpResponse);
       } catch (err: any) {
         sendJson(res, 400, { authenticated: false, error: err.message || 'Failed to send OTP.' });
       }
@@ -501,6 +520,20 @@ export function createAuthApiHandler(options: AuthApiHandlerOptions = {}) {
         sendJson(res, 405, { error: 'Method not allowed. Use POST.', code: 'METHOD_NOT_ALLOWED' });
         return;
       }
+      const csrfCheck = verifyCsrfProtection(req);
+      if (!csrfCheck.valid) {
+        sendJson(res, 403, { authenticated: false, error: csrfCheck.message, code: csrfCheck.code });
+        return;
+      }
+      const clientIp = getClientIp(req);
+      if (!checkAndRecordAuthRateLimit(clientIp, getNowMs())) {
+        sendJson(res, 429, {
+          authenticated: false,
+          error: 'Too many authentication attempts. Please wait 60 seconds and try again.',
+          code: 'RATE_LIMITED'
+        });
+        return;
+      }
       try {
         const body = await readJsonBody(req);
         const consumerNo = String(body.consumer_no || body.consumerNo || '').trim();
@@ -510,9 +543,7 @@ export function createAuthApiHandler(options: AuthApiHandlerOptions = {}) {
         const otp = String(body.otp || '').trim();
 
         const rec = (norm10 && consumerLoginOtpMap.get(norm10)) ||
-                    (consumerNo && consumerLoginOtpMap.get(consumerNo)) ||
-                    consumerLoginOtpMap.get('9825014820') ||
-                    consumerLoginOtpMap.get('04281-99231');
+                    (consumerNo && consumerLoginOtpMap.get(consumerNo));
 
         if (!rec) {
           sendJson(res, 400, { authenticated: false, error: 'Verification code not found or expired. Please request a new OTP.', code: 'OTP_EXPIRED' });

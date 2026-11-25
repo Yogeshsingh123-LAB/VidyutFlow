@@ -911,7 +911,11 @@ export const AdminPortal: React.FC = () => {
                 filteredRecords={users}
               />
               <button
-                onClick={() => showToast('New enterprise user onboarding dialog (Demo)', 'info')}
+                onClick={() => {
+                  const el = document.getElementById('staff-onboard-name');
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  el?.focus();
+                }}
                 className="w-full sm:w-auto min-h-11 sm:min-h-9 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shrink-0 whitespace-nowrap cursor-pointer"
               >
                 {ad.addStaffUserBtn}
@@ -921,6 +925,20 @@ export const AdminPortal: React.FC = () => {
 
           <LiveStaffAssignmentPanel
             onToast={(msg, kind) => showToast(msg, kind || 'info')}
+            onStaffCreated={staff => {
+              setUsers(prev => [
+                {
+                  id: `USR-${100 + prev.length + 1}`,
+                  name: staff.name,
+                  email: staff.email,
+                  role: staff.roleLabel,
+                  subdivision: staff.subdivision,
+                  status: 'Active',
+                  lastLogin: 'Just now',
+                },
+                ...prev.filter(u => u.email.toLowerCase() !== staff.email.toLowerCase()),
+              ]);
+            }}
           />
 
           <div className="bg-white dark:bg-[#101C35] rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-2xs min-w-0">

@@ -15,7 +15,16 @@ import {
   RefreshCw,
   Loader2,
   FlaskConical,
+  QrCode,
+  Copy,
+  Check,
+  ExternalLink,
 } from 'lucide-react';
+import {
+  generateQrCodeSvg,
+  generateUpiBillQrPayload,
+  UGVCL_MERCHANT_UPI_ID,
+} from '../../utils/qrCodeEngine';
 import {
   ElectricityConnection,
   PaymentTransaction,
@@ -436,6 +445,7 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
     useState<ApplyPaymentToBillResult | null>(null);
   const [snapshotBillBeforePay, setSnapshotBillBeforePay] =
     useState<ReconciledElectricityBill | null>(null);
+  const [upiCopied, setUpiCopied] = useState(false);
 
   const pm =
     PAYMENT_MODAL_TRANSLATIONS[language] || PAYMENT_MODAL_TRANSLATIONS.en;
@@ -501,6 +511,26 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
       includeLateCharges: true,
     });
   }, [activeBill, existingPayments, paymentMode, customAmountStr, referenceDate]);
+
+  const upiQrPayload = useMemo(() => {
+    if (!activeBill) return null;
+    const isAlreadyPaid =
+      amountValidation.currentOutstandingAmount <= 0 ||
+      activeBill.effectiveStatus === 'Paid';
+    return generateUpiBillQrPayload({
+      billNo: activeBill.billNo,
+      consumerNo: activeBill.consumerNo || connection?.consumerNo || '',
+      amount: amountValidation.selectedPaymentAmount,
+      dueDate: activeBill.dueDate,
+      isPaid: isAlreadyPaid,
+      referenceDate,
+    });
+  }, [activeBill, amountValidation, connection?.consumerNo, referenceDate]);
+
+  const upiQrSvg = useMemo(() => {
+    if (!upiQrPayload?.isActive || !upiQrPayload.uri) return '';
+    return generateQrCodeSvg(upiQrPayload.uri, { sizePx: 148, margin: 2 });
+  }, [upiQrPayload]);
 
   if (!isOpen || !activeBill) return null;
 
@@ -969,6 +999,111 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
                 </div>
               </div>
 
+              {/* Dynamic UPI QR Code Payment Panel (kushwsand@naviaxis, expires on dueDate, single-use) */}
+              {selectedGateway === 'UPI / BHIM' && upiQrPayload && (
+                <div
+                  className="rounded-xl border border-blue-200 dark:border-blue-800/80 bg-blue-50/50 dark:bg-blue-950/30 p-4 flex flex-col sm:flex-row items-center gap-4"
+                  data-testid="upi-qr-payment-panel"
+                >
+                  {upiQrPayload.isActive ? (
+                    <div
+                      className={`w-36 h-36 shrink-0 bg-white border-2 rounded-xl p-1.5 shadow-sm flex items-center justify-center ${
+                        upiQrPayload.status === 'ACTIVE_OVERDUE_UPDATED'
+                          ? 'border-amber-600'
+                          : 'border-slate-900'
+                      }`}
+                      dangerouslySetInnerHTML={{ __html: upiQrSvg }}
+                      data-testid="upi-gateway-qr-svg"
+                    />
+                  ) : (
+                    <div
+                      className="w-36 h-36 shrink-0 rounded-xl border-2 p-3 flex flex-col items-center justify-center text-center bg-emerald-50 border-emerald-500 text-emerald-800"
+                      data-testid="upi-gateway-qr-disabled"
+                    >
+                      <QrCode className="w-7 h-7 mb-1.5 opacity-60" />
+                      <span className="text-xs font-extrabold uppercase">
+                        QR Deactivated
+                      </span>
+                      <span className="text-[10px] mt-1 leading-tight">
+                        Paid &amp; Receipt Generated
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex-1 min-w-0 space-y-2 text-xs">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                        <QrCode className="w-4 h-4 text-blue-600" />
+                        {upiQrPayload.status === 'ACTIVE_OVERDUE_UPDATED'
+                          ? 'Updated Overdue UPI QR'
+                          : 'Scan & Pay via Any UPI App'}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300">
+                        GPay · PhonePe · Paytm · BHIM
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                      {upiQrPayload.status === 'ACTIVE_OVERDUE_UPDATED'
+                        ? `Due date (${activeBill.dueDate}) passed — old QR expired. This updated QR locks the recalculated payable amount (₹${amountValidation.selectedPaymentAmount.toLocaleString('en-IN')}) and stays active until paid.`
+                        : upiQrPayload.isActive
+                        ? `Scanning locks the exact bill amount (₹${amountValidation.selectedPaymentAmount.toLocaleString('en-IN')}) to UGVCL UPI ID below and stays active until paid. After payment, this QR automatically deactivates and generates your receipt.`
+                        : upiQrPayload.reason}
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                      <div className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="text-[10px] text-slate-400 block">Payee UPI ID</span>
+                          <span className="font-mono font-bold text-slate-900 dark:text-white truncate block">
+                            {UGVCL_MERCHANT_UPI_ID}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(UGVCL_MERCHANT_UPI_ID);
+                            setUpiCopied(true);
+                            setTimeout(() => setUpiCopied(false), 1800);
+                          }}
+                          className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 cursor-pointer shrink-0"
+                          title="Copy UPI ID"
+                        >
+                          {upiCopied ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                      <div className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                        <span className="text-[10px] text-slate-400 block">
+                          QR Validity
+                        </span>
+                        <span className="font-mono font-bold text-amber-700 dark:text-amber-400">
+                          {upiQrPayload.status === 'PAID_CONSUMED'
+                            ? 'Deactivated (Paid)'
+                            : upiQrPayload.status === 'ACTIVE_OVERDUE_UPDATED'
+                            ? 'Updated · Active Until Paid'
+                            : `Due ${activeBill.dueDate} · Active Until Paid`}
+                        </span>
+                      </div>
+                    </div>
+                    {upiQrPayload.isActive && upiQrPayload.uri && (
+                      <div className="pt-1">
+                        <a
+                          href={upiQrPayload.uri}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-100/60 text-[11px] font-bold transition-colors"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>
+                            Open UPI App (₹{amountValidation.selectedPaymentAmount.toLocaleString('en-IN')})
+                          </span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Controlled DEMO Outcome Verification Selector (Clearly Separated for QA/Testing) */}
               <div
                 className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
@@ -1157,13 +1292,13 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
                 </div>
                 <div>
                   <span className="text-[11px] text-slate-400 block">
-                    {pm.bankRefLabel}
+                    {pm.bankRefLabel} · Payee UPI ID
                   </span>
                   <span
                     className="font-mono font-semibold text-slate-700 dark:text-slate-300"
                     data-testid="payment-success-bank-ref"
                   >
-                    {lastPaymentResult.paymentTransaction.bankReference}
+                    {lastPaymentResult.paymentTransaction.bankReference} · {UGVCL_MERCHANT_UPI_ID}
                   </span>
                 </div>
                 <div>

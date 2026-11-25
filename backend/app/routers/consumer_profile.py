@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import re
+import secrets
 import uuid
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
@@ -16,6 +17,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..audit import audit
+from ..config import settings
 from ..db import get_db
 from ..deps import current_user
 from ..login_limit import enforce_login_limit
@@ -43,6 +45,25 @@ class ProfileUpdate(BaseModel):
     full_name: Optional[str] = Field(None, min_length=2, max_length=120)
     date_of_birth: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     profile_photo_url: Optional[str] = None
+
+    @field_validator("profile_photo_url")
+    @classmethod
+    def validate_profile_photo_url(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        cleaned = v.strip()
+        if not cleaned:
+            return ""
+        lower = cleaned.lower()
+        if lower.startswith(("javascript:", "vbscript:", "data:text/html", "data:image/svg+xml")):
+            raise ValueError("Unsupported or unsafe profile photo URL scheme")
+        if re.match(r"^data:image/(png|jpeg|jpg|webp);base64,[A-Za-z0-9+/=]+$", cleaned, re.IGNORECASE):
+            if len(cleaned) > 524_288:
+                raise ValueError("Profile photo data URL exceeds maximum allowed size")
+            return cleaned
+        if (cleaned.startswith("https://") or cleaned.startswith("/assets/")) and len(cleaned) <= 2048:
+            return cleaned
+        raise ValueError("Profile photo URL must be an https:// URL, /assets/ path, or PNG/JPEG/WebP data URL")
 
 
 class AddressCreate(BaseModel):
@@ -477,7 +498,7 @@ def list_connections(
     }
 
 
-@router.post("/connections/link/initiate")
+@router.post("/connections/link/initiate", dependencies=[Depends(enforce_login_limit)])
 def initiate_connection_link(
     body: LinkInitiateRequest,
     db: Session = Depends(get_db),
@@ -486,7 +507,7 @@ def initiate_connection_link(
     """Initiate connection linking by issuing an OTP to the connection's official mobile number."""
     consumer_clean = body.consumer_no.strip()
 
-    # Check if already linked to this user
+    # Check if already linked to this user or claimed by another user
     already = db.query(ConsumerConnectionLink).filter(
         ConsumerConnectionLink.user_id == user.id,
         ConsumerConnectionLink.consumer_no == consumer_clean,
@@ -494,14 +515,24 @@ def initiate_connection_link(
     if already:
         raise HTTPException(status_code=400, detail="This connection is already linked to your account.")
 
+    claimed_by_other = db.query(ConsumerConnectionLink).filter(
+        ConsumerConnectionLink.consumer_no == consumer_clean,
+        ConsumerConnectionLink.user_id != user.id,
+    ).first()
+    if claimed_by_other:
+        raise HTTPException(
+            status_code=409,
+            detail="This consumer connection is already linked to another registered account.",
+        )
+
     # Masked official phone (mock / demonstration derivation)
     seed_num = sum(ord(c) for c in consumer_clean)
     last_two = str(seed_num % 90 + 10)
     masked = f"+91 XXXXX XX9{last_two[1]}"
 
-    # Deterministic or cryptographic OTP
-    demo_otp = "482019"
-    otp_hash = hashlib.sha256(demo_otp.encode("utf-8")).hexdigest()
+    # Cryptographically random 6-digit OTP (never expose in production responses)
+    otp_code = f"{secrets.randbelow(900000) + 100000}"
+    otp_hash = hashlib.sha256(otp_code.encode("utf-8")).hexdigest()
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
 
     # Invalidate previous unverified OTPs
@@ -522,14 +553,16 @@ def initiate_connection_link(
     db.add(otp_record)
     db.commit()
 
-    return {
+    resp: dict[str, Any] = {
         "status": "OTP_SENT",
         "consumer_no": consumer_clean,
         "masked_mobile": masked,
         "expires_in_seconds": 600,
-        "demo_verification_code": demo_otp,
         "message": f"Verification code sent to registered mobile {masked}. Enter code to verify ownership.",
     }
+    if settings.app_env != "production":
+        resp["demo_verification_code"] = otp_code
+    return resp
 
 
 @router.post("/connections/link/verify")
@@ -541,6 +574,15 @@ def verify_connection_link(
 ):
     """Verify OTP and link the electricity connection."""
     consumer_clean = body.consumer_no.strip()
+    claimed_by_other = db.query(ConsumerConnectionLink).filter(
+        ConsumerConnectionLink.consumer_no == consumer_clean,
+        ConsumerConnectionLink.user_id != user.id,
+    ).first()
+    if claimed_by_other:
+        raise HTTPException(
+            status_code=409,
+            detail="This consumer connection is already linked to another registered account.",
+        )
     otp_record = db.query(ConsumerConnectionOtp).filter(
         ConsumerConnectionOtp.user_id == user.id,
         ConsumerConnectionOtp.consumer_no == consumer_clean,

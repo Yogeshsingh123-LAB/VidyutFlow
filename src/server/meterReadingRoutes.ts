@@ -31,7 +31,9 @@ function validCsrf(req: IncomingMessage): boolean {
   const origin = req.headers.origin;
   if (!origin) return true;
   try {
-    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim().split(':')[0].toLowerCase();
+    const forwardedHost =
+      process.env.TRUSTED_PROXY === 'true' ? (req.headers['x-forwarded-host'] as string | undefined) : undefined;
+    const host = String(forwardedHost || req.headers.host || '').split(',')[0].trim().split(':')[0].toLowerCase();
     const originHost = new URL(origin).hostname.toLowerCase();
     const local = ['localhost', '127.0.0.1'].includes(originHost) && ['localhost', '127.0.0.1'].includes(host);
     return local || !host || originHost === host;

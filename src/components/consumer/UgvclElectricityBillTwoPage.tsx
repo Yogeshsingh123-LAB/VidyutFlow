@@ -1049,21 +1049,58 @@ export const UgvclElectricityBillTwoPage: React.FC<UgvclElectricityBillTwoPagePr
                 </div>
               </div>
 
-              {/* Unique Scannable QR Code Box */}
+              {/* Unique Scannable UPI Payment QR Code Box */}
               <div className="flex items-center gap-3 pt-1">
-                <div
-                  className="w-24 h-24 shrink-0 bg-white border-2 border-slate-900 p-1 rounded flex items-center justify-center shadow-xs"
-                  dangerouslySetInnerHTML={{ __html: p.qrSvg }}
-                  data-testid="ugvcl-bill-qr-code"
-                />
+                {p.upiQrStatus === 'PAID_CONSUMED' ? (
+                  <div
+                    className="w-24 h-24 shrink-0 bg-emerald-50 border-2 border-emerald-600 p-1.5 rounded flex flex-col items-center justify-center text-center shadow-xs"
+                    data-testid="ugvcl-bill-qr-code"
+                  >
+                    <span className="text-[10px] font-black text-emerald-800 uppercase leading-tight">
+                      PAID
+                    </span>
+                    <span className="text-[8px] font-bold text-emerald-700 leading-tight mt-0.5">
+                      QR Deactivated
+                    </span>
+                    <span className="text-[7px] text-emerald-600 mt-0.5">
+                      Receipt Generated
+                    </span>
+                  </div>
+                ) : (
+                  <div
+                    className={`w-24 h-24 shrink-0 bg-white border-2 p-1 rounded flex items-center justify-center shadow-xs ${
+                      p.upiQrStatus === 'ACTIVE_OVERDUE_UPDATED'
+                        ? 'border-amber-600'
+                        : 'border-slate-900'
+                    }`}
+                    dangerouslySetInnerHTML={{ __html: p.qrSvg }}
+                    data-testid="ugvcl-bill-qr-code"
+                  />
+                )}
                 <div className="text-[10px] text-slate-700 space-y-1 min-w-0">
                   <div className="flex items-center gap-1 font-bold text-slate-900">
                     <QrIcon className="w-3.5 h-3.5 text-blue-800 shrink-0" />
                     <span>{l.scanQrTitle}</span>
                   </div>
                   <p className="leading-tight text-slate-600">
-                    {l.scanQrSubtitle}
+                    {p.upiQrStatus === 'PAID_CONSUMED'
+                      ? 'Payment received & official receipt generated. This QR code is permanently deactivated.'
+                      : p.upiQrStatus === 'ACTIVE_OVERDUE_UPDATED'
+                      ? `Due date (${p.upiQrExpiryDate || p.dueDate}) missed — old QR expired. Updated QR active for ₹${(p.remainingPrincipal ?? Math.max(0, p.totalBillAmount - p.paidAmount)).toLocaleString('en-IN')} (incl. late charges) until paid.`
+                      : `Scan with any UPI app to pay exact ₹${(p.remainingPrincipal ?? Math.max(0, p.totalBillAmount - p.paidAmount)).toLocaleString('en-IN')} to ${p.upiId || 'kushwsand@naviaxis'}.`}
                   </p>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-0.5">
+                    <span className="font-mono text-[9px] text-slate-600 truncate">
+                      UPI: {p.upiId || 'kushwsand@naviaxis'}
+                    </span>
+                    <span className="font-mono text-[9px] text-amber-700 font-semibold">
+                      {p.upiQrStatus === 'PAID_CONSUMED'
+                        ? 'QR Status: Deactivated'
+                        : p.upiQrStatus === 'ACTIVE_OVERDUE_UPDATED'
+                        ? `Updated QR · Active Until Paid`
+                        : `Due: ${p.upiQrExpiryDate || p.dueDate} · Active Until Paid`}
+                    </span>
+                  </div>
                   <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                     <span className="font-mono text-[9px] text-slate-500 truncate">
                       Ref: {p.billNo}

@@ -144,22 +144,17 @@ def create_token(
 
 
 def decode_token(token: str, expected_type: str = "access") -> dict | None:
-    """Validate signature, expiry, algorithm, and standard claims with backward tolerance."""
+    """Validate signature, expiry, algorithm, issuer, audience, and token_type."""
     try:
         payload = jwt.decode(
             token,
             settings.secret_key,
             algorithms=[settings.algorithm],
-            options={"verify_exp": True, "verify_aud": False, "verify_iss": False},
+            audience=settings.jwt_audience,
+            issuer=settings.jwt_issuer,
+            options={"verify_exp": True, "verify_aud": True, "verify_iss": True},
         )
-        # Check issuer if present
-        if "iss" in payload and payload["iss"] != settings.jwt_issuer:
-            return None
-        # Check audience if present
-        if "aud" in payload and payload["aud"] != settings.jwt_audience:
-            return None
-        # Check token_type if present
-        if expected_type and payload.get("token_type") and payload.get("token_type") != expected_type:
+        if expected_type and payload.get("token_type") != expected_type:
             return None
         return payload
     except JWTError:

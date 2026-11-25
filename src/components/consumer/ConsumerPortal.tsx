@@ -995,8 +995,81 @@ export const ConsumerPortal: React.FC = () => {
     markFieldEdited('phase');
   };
 
+  const validateNewConnectionStep = (step: 1 | 2 | 3 | 4): string | null => {
+    if (step === 1) {
+      if (applicantName.trim().length < 2) {
+        return 'Step 1 (Applicant Details): Please enter the full name of the applicant.';
+      }
+      if (fatherOrHusbandName.trim().length < 2) {
+        return 'Step 1 (Applicant Details): Please enter Father / Husband Name.';
+      }
+      const digits = applicantPhone.replace(/\D/g, '');
+      if (digits.length < 10) {
+        return 'Step 1 (Applicant Details): Please enter a valid 10-digit mobile number.';
+      }
+      if (!identityProofType.trim() || identityNumber.trim().length < 4) {
+        return 'Step 1 (Applicant Details): Please select an identity document and enter its document number.';
+      }
+    }
+    if (step === 2) {
+      if (!subdivision.trim()) {
+        return 'Step 2 (Premises & Grid): Please select an operational sub-division.';
+      }
+      if (!premisesType.trim()) {
+        return 'Step 2 (Premises & Grid): Please select premises ownership type.';
+      }
+      if (address.trim().length < 5) {
+        return 'Step 2 (Premises & Grid): Please enter the complete street address.';
+      }
+      if (!/^\d{6}$/.test(pincode.trim())) {
+        return 'Step 2 (Premises & Grid): Please enter a valid 6-digit PIN code.';
+      }
+    }
+    if (step === 3) {
+      if (!category.trim()) {
+        return 'Step 3 (Load & Tariff): Please select a tariff category.';
+      }
+      if (!Number.isFinite(Number(loadKw)) || Number(loadKw) <= 0) {
+        return 'Step 3 (Load & Tariff): Please specify a valid sanctioned load (kW).';
+      }
+      if (!phase.trim()) {
+        return 'Step 3 (Load & Tariff): Please select a supply phase.';
+      }
+    }
+    if (step === 4) {
+      if (uploadedDocs.length === 0) {
+        return 'Step 4 (Documents & Sanction): Please attach the required verification documents.';
+      }
+    }
+    return null;
+  };
+
+  const handleAdvanceToStep = (targetStep: 1 | 2 | 3 | 4) => {
+    if (targetStep <= formStep) {
+      setFormStep(targetStep);
+      return;
+    }
+    for (let s = 1; s < targetStep; s++) {
+      const err = validateNewConnectionStep(s as 1 | 2 | 3 | 4);
+      if (err) {
+        setFormStep(s as 1 | 2 | 3 | 4);
+        showToast(err, 'error');
+        return;
+      }
+    }
+    setFormStep(targetStep);
+  };
+
   const handleNewConnectionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    for (const s of [1, 2, 3, 4] as const) {
+      const stepErr = validateNewConnectionStep(s);
+      if (stepErr) {
+        setFormStep(s);
+        showToast(stepErr, 'error');
+        return;
+      }
+    }
     const snapshot = getCurrentWizardPrefillSnapshot();
     const validation = validateServiceRequestSubmission(snapshot, language);
     if (!validation.valid) {
@@ -2560,7 +2633,7 @@ export const ConsumerPortal: React.FC = () => {
                   <button
                     key={s.step}
                     type="button"
-                    onClick={() => setFormStep(s.step as any)}
+                    onClick={() => handleAdvanceToStep(s.step as 1 | 2 | 3 | 4)}
                     className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       isActive
                         ? 'bg-[#2563EB] text-white shadow-xs'
@@ -2808,7 +2881,7 @@ export const ConsumerPortal: React.FC = () => {
                     <div className="flex justify-end pt-3">
                       <button
                         type="button"
-                        onClick={() => setFormStep(2)}
+                        onClick={() => handleAdvanceToStep(2)}
                         className="px-6 py-2.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 transition-all cursor-pointer"
                       >
                         <span>Proceed to Premises</span>
@@ -2955,7 +3028,7 @@ export const ConsumerPortal: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setFormStep(3)}
+                        onClick={() => handleAdvanceToStep(3)}
                         className="px-6 py-2.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
                       >
                         <span>{tc.proceedToTechSpecsBtn}</span>
@@ -3214,14 +3287,14 @@ export const ConsumerPortal: React.FC = () => {
                     <div className="flex justify-between pt-3">
                       <button
                         type="button"
-                        onClick={() => setFormStep(2)}
+                        onClick={() => handleAdvanceToStep(2)}
                         className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer transition-colors"
                       >
                         {tc.backBtn}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setFormStep(4)}
+                        onClick={() => handleAdvanceToStep(4)}
                         className="px-6 py-2.5 rounded-xl bg-[#2563EB] hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
                       >
                         <span>{tc.reviewCostEstimateBtn}</span>

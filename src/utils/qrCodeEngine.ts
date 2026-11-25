@@ -29,6 +29,136 @@ export interface ParsedBillVerificationParams {
   rawPayload: string;
 }
 
+export const UGVCL_MERCHANT_UPI_ID = 'kushwsand@naviaxis';
+export const UGVCL_MERCHANT_NAME = 'UGVCL VidyutFlow';
+
+export type UpiQrStatus = 'ACTIVE' | 'ACTIVE_OVERDUE_UPDATED' | 'PAID_CONSUMED';
+
+export interface UpiBillQrPayload {
+  status: UpiQrStatus;
+  isActive: boolean;
+  isOverdueUpdated?: boolean;
+  upiId: string;
+  merchantName: string;
+  billNo: string;
+  qrTransactionRef: string;
+  consumerNo: string;
+  amount: number;
+  expiryDate: string;
+  uri: string;
+  reason?: string;
+}
+
+const MONTH_INDEX_MAP: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
+function parseDateEndOfDayMs(dateStr?: string): number | null {
+  if (!dateStr) return null;
+  const trimmed = dateStr.trim();
+  // Match DD-MMM-YYYY (e.g. 30-Oct-2026)
+  const dmy = trimmed.match(/^(\d{1,2})[-/\s]([A-Za-z]{3,})[-/\s](\d{4})$/);
+  if (dmy) {
+    const day = Number(dmy[1]);
+    const mon = MONTH_INDEX_MAP[dmy[2].slice(0, 3).toLowerCase()];
+    const year = Number(dmy[3]);
+    if (mon !== undefined && !Number.isNaN(day) && !Number.isNaN(year)) {
+      return new Date(year, mon, day, 23, 59, 59, 999).getTime();
+    }
+  }
+  // Match YYYY-MM-DD
+  const ymd = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (ymd) {
+    return new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 23, 59, 59, 999).getTime();
+  }
+  const parsed = Date.parse(trimmed);
+  if (!Number.isNaN(parsed)) {
+    const d = new Date(parsed);
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
+  }
+  return null;
+}
+
+/**
+ * Generates an NPCI-compliant UPI payment URI (`upi://pay?...`) for any UPI app
+ * (GPay, PhonePe, Paytm, BHIM, Navi, etc.).
+ * - Remains active until payment is completed.
+ * - If the due date is missed, marks the old pre-due QR as superseded/expired and
+ *   issues an updated QR with the recalculated bill amount (including late charges).
+ * - Permanently deactivates once the bill is paid.
+ */
+export function generateUpiBillQrPayload(params: {
+  billNo: string;
+  consumerNo: string;
+  amount: number;
+  dueDate: string;
+  isPaid?: boolean;
+  referenceDate?: string;
+  upiId?: string;
+}): UpiBillQrPayload {
+  const upiId = params.upiId || UGVCL_MERCHANT_UPI_ID;
+  const cleanBillNo = String(params.billNo || 'BILL-UG-UNKNOWN').trim();
+  const cleanConsumer = String(params.consumerNo || '').trim();
+  const amount = Math.max(0, Number(params.amount) || 0);
+  const expiryDate = String(params.dueDate || '').trim();
+
+  if (params.isPaid || amount <= 0) {
+    return {
+      status: 'PAID_CONSUMED',
+      isActive: false,
+      isOverdueUpdated: false,
+      upiId,
+      merchantName: UGVCL_MERCHANT_NAME,
+      billNo: cleanBillNo,
+      qrTransactionRef: cleanBillNo,
+      consumerNo: cleanConsumer,
+      amount: 0,
+      expiryDate,
+      uri: '',
+      reason: 'Payment already received & receipt generated — QR code deactivated.',
+    };
+  }
+
+  const expiryMs = parseDateEndOfDayMs(expiryDate);
+  const refMs = params.referenceDate
+    ? parseDateEndOfDayMs(params.referenceDate) ?? Date.now()
+    : Date.now();
+  const isOverdue = expiryMs !== null && refMs > expiryMs;
+  const refTag = (params.referenceDate || new Date(refMs).toISOString().slice(0, 10)).replace(/[^A-Za-z0-9]/g, '');
+  const qrTransactionRef = isOverdue ? `${cleanBillNo}-OD-${refTag}` : cleanBillNo;
+
+  const formattedAmt = amount.toFixed(2);
+  const note = isOverdue
+    ? `UGVCL Updated Overdue Bill ${cleanBillNo} | Consumer ${cleanConsumer}`
+    : `UGVCL Bill ${cleanBillNo} | Consumer ${cleanConsumer} | Due ${expiryDate}`;
+  const uri =
+    `upi://pay?pa=${encodeURIComponent(upiId)}` +
+    `&pn=${encodeURIComponent(UGVCL_MERCHANT_NAME)}` +
+    `&tr=${encodeURIComponent(qrTransactionRef)}` +
+    `&tn=${encodeURIComponent(note)}` +
+    `&am=${encodeURIComponent(formattedAmt)}` +
+    `&cu=INR`;
+
+  return {
+    status: isOverdue ? 'ACTIVE_OVERDUE_UPDATED' : 'ACTIVE',
+    isActive: true,
+    isOverdueUpdated: isOverdue,
+    upiId,
+    merchantName: UGVCL_MERCHANT_NAME,
+    billNo: cleanBillNo,
+    qrTransactionRef,
+    consumerNo: cleanConsumer,
+    amount,
+    expiryDate,
+    uri,
+    reason: isOverdue
+      ? `Due date (${expiryDate}) missed — old QR expired; updated QR active for ₹${formattedAmt} until paid.`
+      : undefined,
+  };
+}
+
 /**
  * Derives the safe, canonical URL encoded inside the QR code for a given electricity bill.
  */

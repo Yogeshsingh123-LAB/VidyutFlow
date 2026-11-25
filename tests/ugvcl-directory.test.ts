@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import http from 'node:http';
 import { createProductionRequestHandler } from '../src/server/prodServer';
 import { directoryStore } from '../src/server/directoryRoutes';
+import { defaultServerAuthService } from '../src/server/authRoutes';
 
 async function runDirectoryTestSuite() {
   console.log('\n================================================================');
@@ -16,13 +17,21 @@ async function runDirectoryTestSuite() {
 
   const handler = createProductionRequestHandler();
   const baseUrl = 'http://127.0.0.1:3000';
+  const { session: adminSession } = defaultServerAuthService.login({
+    email: 'admin@vidyutflow.demo',
+    password: 'Demo@12345',
+    targetRole: 'admin'
+  });
 
   const inMemoryFetch = async (urlStr: string, init?: RequestInit): Promise<Response> => {
     const urlObj = new URL(urlStr);
     const req = new EventEmitter() as any;
     req.method = (init?.method || 'GET').toUpperCase();
     req.url = urlObj.pathname + urlObj.search;
-    req.headers = {};
+    req.headers = {
+      cookie: `vidyutflow_sid=${adminSession.signedToken}`,
+      'x-vidyutflow-csrf': '1'
+    };
     if (init?.headers) {
       if (init.headers instanceof Headers) {
         init.headers.forEach((v, k) => { req.headers[k.toLowerCase()] = v; });

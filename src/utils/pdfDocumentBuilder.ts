@@ -714,73 +714,92 @@ function renderTwoPageUgvclBillVectorStream(
 
   let cursorY = dt.topY;
 
-  // Shared Corporate Masthead (identical geometry, fonts & brand colors across Page 1 and Page 2)
-  const mastheadH = 62;
+  // Shared Corporate Masthead (matches UgvclElectricityBillTwoPage.tsx 1:1)
+  const mastheadH = 66;
   const mastheadBottomY = cursorY - mastheadH;
+  const headerTopH = 48;
+  const headerSplitX = dt.marginX + contentWidth - 152;
   ops.push('q');
-  ops.push(`${dt.mastheadBgRgb} rg`);
-  ops.push(`${dt.marginX} ${mastheadBottomY} ${contentWidth} ${mastheadH} re f`);
-  ops.push(`${dt.mastheadAccentRgb} rg`);
-  ops.push(`${dt.marginX} ${mastheadBottomY} ${contentWidth} 3 re f`);
+  // Top light slate-50 header box with dark outer border
+  ops.push('0.97 0.98 0.99 rg');
+  ops.push(`${dt.marginX} ${mastheadBottomY + 18} ${contentWidth} ${headerTopH} re f`);
+  ops.push(`${dt.borderPrimaryRgb} RG ${dt.borderWidthOuterPt} w`);
+  ops.push(`${dt.marginX} ${mastheadBottomY} ${contentWidth} ${mastheadH} re S`);
+  ops.push('0.78 0.82 0.88 RG 0.8 w');
+  ops.push(`${headerSplitX} ${mastheadBottomY + 21} m ${headerSplitX} ${cursorY - 3} l S`);
 
   // Official UGVCL Crest Box
   ops.push('1 1 1 rg');
-  ops.push(`${dt.marginX + 8} ${cursorY - 42} 36 34 re f`);
-  ops.push('0.08 0.28 0.58 rg');
-  ops.push(`BT ${dt.fontFamilyBold} 9 Tf ${dt.marginX + 10} ${cursorY - 23} Td (UGVCL) Tj ET`);
-  ops.push('0.85 0.52 0.06 rg');
-  ops.push(`BT ${dt.fontFamilyRegular} 5.5 Tf ${dt.marginX + 10} ${cursorY - 34} Td (OFFICIAL) Tj ET`);
+  ops.push(`${dt.marginX + 8} ${cursorY - 41} 36 34 re f`);
+  ops.push('0.75 0.80 0.87 RG 0.6 w');
+  ops.push(`${dt.marginX + 8} ${cursorY - 41} 36 34 re S`);
+  ops.push('0.08 0.22 0.48 rg');
+  ops.push(`BT ${dt.fontFamilyBold} 8.5 Tf ${dt.marginX + 10} ${cursorY - 22} Td (UGVCL) Tj ET`);
+  ops.push('0.85 0.45 0.05 rg');
+  ops.push(`BT ${dt.fontFamilyRegular} 5.2 Tf ${dt.marginX + 10} ${cursorY - 33} Td (OFFICIAL) Tj ET`);
 
-  // Company Title, Gujarati Name & Tagline
-  ops.push('1 1 1 rg');
+  // Company Title, Tagline & Regd. Office
+  ops.push('0.09 0.15 0.35 rg');
   ops.push(
-    `BT ${dt.fontFamilyBold} ${dt.fontSizeTitle} Tf ${dt.marginX + 52} ${cursorY - 17} Td (${pdfEscapeAscii(
+    `BT ${dt.fontFamilyBold} ${dt.fontSizeTitle} Tf ${dt.marginX + 52} ${cursorY - 16} Td (${pdfEscapeAscii(
       UGVCL_COMPANY_NAME_EN
     )}) Tj ET`
   );
-  ops.push('0.95 0.78 0.32 rg');
+  ops.push('0.22 0.28 0.36 rg');
   ops.push(
-    `BT ${dt.fontFamilyRegular} 7.5 Tf ${dt.marginX + 52} ${cursorY - 28} Td (${pdfEscapeAscii(
+    `BT ${dt.fontFamilyRegular} 7.2 Tf ${dt.marginX + 52} ${cursorY - 27} Td (${pdfEscapeAscii(
       UGVCL_TAGLINE_EN
     )}) Tj ET`
   );
-  ops.push('0.80 0.86 0.95 rg');
+  ops.push('0.35 0.41 0.49 rg');
   ops.push(
-    `BT ${dt.fontFamilyRegular} 6.5 Tf ${dt.marginX + 52} ${cursorY - 38} Td (${pdfEscapeAscii(
-      `CIN: ${UGVCL_CORPORATE_IDENTITY.cin} | Regd. Office: ${UGVCL_CORPORATE_IDENTITY.registeredOffice}`
+    `BT ${dt.fontFamilyRegular} 6.2 Tf ${dt.marginX + 52} ${cursorY - 38} Td (${pdfEscapeAscii(
+      `Regd. Office: ${p?.registeredOffice || UGVCL_CORPORATE_IDENTITY.registeredOffice}`
     )}) Tj ET`
   );
 
-  // Right Masthead Info
-  ops.push('1 1 1 rg');
+  // Right Masthead Info (CIN, GSTIN, Web, Helpline)
+  ops.push('0.12 0.18 0.26 rg');
   ops.push(
-    `BT ${dt.fontFamilyBold} 8.5 Tf ${dt.marginX + contentWidth - 175} ${cursorY - 17} Td (${pdfEscapeAscii(
-      page.isFirstPage ? 'E-ELECTRICITY BILL (FRONT)' : 'E-ELECTRICITY BILL (REVERSE)'
+    `BT ${dt.fontFamilyRegular} 6.2 Tf ${headerSplitX + 7} ${cursorY - 13} Td (${pdfEscapeAscii(
+      `CIN: ${p?.cin || UGVCL_CORPORATE_IDENTITY.cin}`
     )}) Tj ET`
   );
-  ops.push('0.95 0.78 0.32 rg');
   ops.push(
-    `BT ${dt.fontFamilyBold} 7.5 Tf ${dt.marginX + contentWidth - 175} ${cursorY - 28} Td (${pdfEscapeAscii(
-      `Ref: ${doc.referenceId} | ${doc.statusLabel}`
+    `BT ${dt.fontFamilyRegular} 6.2 Tf ${headerSplitX + 7} ${cursorY - 22} Td (${pdfEscapeAscii(
+      `GSTIN: ${p?.gstin || '24AABCU4494L1ZV'}`
     )}) Tj ET`
   );
-  ops.push('0.82 0.88 0.96 rg');
   ops.push(
-    `BT ${dt.fontFamilyRegular} 6.5 Tf ${dt.marginX + contentWidth - 175} ${cursorY - 38} Td (${pdfEscapeAscii(
-      `Helpline: 1912 / 1800 233 155335 | DEMO`
+    `BT ${dt.fontFamilyRegular} 6.2 Tf ${headerSplitX + 7} ${cursorY - 31} Td (${pdfEscapeAscii(
+      `Web: ${p?.website || 'www.ugvcl.com'}`
+    )}) Tj ET`
+  );
+  ops.push(
+    `BT ${dt.fontFamilyRegular} 6.2 Tf ${headerSplitX + 7} ${cursorY - 40} Td (${pdfEscapeAscii(
+      `Helpline: ${p?.helpline || '1912 / 1800 233 155335'}`
     )}) Tj ET`
   );
 
-  // Sub-ribbon inside Masthead
-  ops.push('0.11 0.22 0.40 rg');
-  ops.push(`${dt.marginX} ${mastheadBottomY + 3} ${contentWidth} 14 re f`);
+  // Dark Slate-900 Subheader Ribbon + Amber Status Pill
+  ops.push('0.06 0.09 0.16 rg');
+  ops.push(`${dt.marginX} ${mastheadBottomY} ${contentWidth} 18 re f`);
   ops.push('1 1 1 rg');
   const ribbonText = page.isFirstPage
-    ? `SDO: ${p?.subdivision || 'Mehsana City North'} | Cycle: ${p?.billMonth || ''} (${p?.billingCycleType || 'BI_MONTHLY'}) | Period: ${p?.periodStartDate || ''} to ${p?.periodEndDate || ''} | Consumer No: ${p?.consumerNo || doc.referenceId}`
+    ? `E-ELECTRICITY BILL : ${p?.billMonth || ''} (${p?.billingCycleType || 'BI_MONTHLY'})  |  SDO: ${(p?.subdivision || 'Mehsana City North').toUpperCase()}`
     : `STATUTORY TARIFF SCHEDULES, CALCULATION PRINCIPLES, GRIEVANCE REDRESSAL & SAFETY DIRECTIVES`;
   ops.push(
-    `BT ${dt.fontFamilyBold} 6.6 Tf ${dt.marginX + 8} ${mastheadBottomY + 7} Td (${pdfEscapeAscii(
+    `BT ${dt.fontFamilyBold} 6.5 Tf ${dt.marginX + 8} ${mastheadBottomY + 6} Td (${pdfEscapeAscii(
       ribbonText
+    )}) Tj ET`
+  );
+  // Amber status badge on right of ribbon
+  ops.push('0.98 0.75 0.14 rg');
+  ops.push(`${dt.marginX + contentWidth - 94} ${mastheadBottomY + 3} 88 12 re f`);
+  ops.push('0.06 0.09 0.16 rg');
+  ops.push(
+    `BT ${dt.fontFamilyBold} 6 Tf ${dt.marginX + contentWidth - 90} ${mastheadBottomY + 6.5} Td (${pdfEscapeAscii(
+      (doc.statusLabel || 'DEMO BILL').slice(0, 18)
     )}) Tj ET`
   );
   ops.push('Q');
@@ -885,29 +904,52 @@ function renderTwoPageUgvclBillVectorStream(
         `Payable: INR ${p.outstandingBalance.toFixed(2)}`
       )}) Tj ET`
     );
+    const upiStatus = p.upiQrStatus || (p.outstandingBalance <= 0 ? 'PAID_CONSUMED' : 'ACTIVE');
+    const upiIdText = p.upiId || 'kushwsand@naviaxis';
+    const upiExpText = p.upiQrExpiryDate || p.dueDate;
     ops.push(
-      `BT ${dt.fontFamilyRegular} 6.3 Tf ${rightColX + 8} ${cursorY - 80} Td (${pdfEscapeAscii(
-        `Scan QR for Bill Verification`
+      `BT ${dt.fontFamilyRegular} 6.2 Tf ${rightColX + 8} ${cursorY - 80} Td (${pdfEscapeAscii(
+        upiStatus === 'PAID_CONSUMED'
+          ? 'PAID - QR Deactivated'
+          : upiStatus === 'ACTIVE_OVERDUE_UPDATED'
+          ? `Updated QR (Old Expired)`
+          : `UPI: ${upiIdText}`
       )}) Tj ET`
     );
     ops.push(
-      `BT ${dt.fontFamilyRegular} 6 Tf ${rightColX + 8} ${cursorY - 89} Td (${pdfEscapeAscii(
-        `& Authorized Portal Access`
+      `BT ${dt.fontFamilyRegular} 5.9 Tf ${rightColX + 8} ${cursorY - 89} Td (${pdfEscapeAscii(
+        upiStatus === 'PAID_CONSUMED'
+          ? 'Receipt Generated'
+          : upiStatus === 'ACTIVE_OVERDUE_UPDATED'
+          ? `UPI: ${upiIdText}`
+          : `Active Until Paid (${upiExpText})`
       )}) Tj ET`
     );
 
-    // Render Scannable Vector QR Code in top-right box
+    // Render Scannable Vector UPI QR Code (or Deactivated Box once Paid) in top-right
     const qrBoxSize = 72;
     const qrX = dt.marginX + contentWidth - qrBoxSize - 8;
     const qrY = splitBottomY + 12;
-    ops.push('1 1 1 rg');
-    ops.push(`${qrX - 2} ${qrY - 2} ${qrBoxSize + 4} ${qrBoxSize + 4} re f`);
-    ops.push('0.06 0.09 0.16 RG 0.6 w');
-    ops.push(`${qrX - 2} ${qrY - 2} ${qrBoxSize + 4} ${qrBoxSize + 4} re S`);
-    ops.push('0.06 0.09 0.16 rg');
-    const qrRects = calculateQrCodePdfRects(p.qrUrl, qrX, qrY, qrBoxSize, 2);
-    for (const r of qrRects) {
-      ops.push(`${r.x.toFixed(2)} ${r.y.toFixed(2)} ${r.width.toFixed(2)} ${r.height.toFixed(2)} re f`);
+    if (upiStatus === 'PAID_CONSUMED') {
+      ops.push('0.93 0.99 0.96 rg');
+      ops.push(`${qrX - 2} ${qrY - 2} ${qrBoxSize + 4} ${qrBoxSize + 4} re f`);
+      ops.push('0.05 0.55 0.35 RG 0.9 w');
+      ops.push(`${qrX - 2} ${qrY - 2} ${qrBoxSize + 4} ${qrBoxSize + 4} re S`);
+      ops.push('0.05 0.45 0.28 rg');
+      ops.push(`BT ${dt.fontFamilyBold} 8.5 Tf ${qrX + 24} ${qrY + 42} Td (PAID) Tj ET`);
+      ops.push(`BT ${dt.fontFamilyBold} 6.2 Tf ${qrX + 10} ${qrY + 30} Td (QR DEACTIVATED) Tj ET`);
+      ops.push(`BT ${dt.fontFamilyRegular} 5.5 Tf ${qrX + 11} ${qrY + 19} Td (Receipt Generated) Tj ET`);
+    } else {
+      ops.push('1 1 1 rg');
+      ops.push(`${qrX - 2} ${qrY - 2} ${qrBoxSize + 4} ${qrBoxSize + 4} re f`);
+      ops.push(upiStatus === 'ACTIVE_OVERDUE_UPDATED' ? '0.82 0.45 0.05 RG 0.9 w' : '0.06 0.09 0.16 RG 0.6 w');
+      ops.push(`${qrX - 2} ${qrY - 2} ${qrBoxSize + 4} ${qrBoxSize + 4} re S`);
+      ops.push('0.06 0.09 0.16 rg');
+      const qrPayload = p.upiPayUri || p.qrUrl;
+      const qrRects = calculateQrCodePdfRects(qrPayload, qrX, qrY, qrBoxSize, 2);
+      for (const r of qrRects) {
+        ops.push(`${r.x.toFixed(2)} ${r.y.toFixed(2)} ${r.width.toFixed(2)} ${r.height.toFixed(2)} re f`);
+      }
     }
     ops.push('Q');
 

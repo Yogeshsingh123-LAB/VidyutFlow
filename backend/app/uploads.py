@@ -252,6 +252,14 @@ class BaseStorageProvider(abc.ABC):
         """Delete document from storage."""
         pass
 
+    def read(self, filename: str, prefix: str | None = None) -> bytes:
+        """Alias for load() used by photo vault readers."""
+        return self.load(filename, prefix)
+
+    def get_bytes(self, filename: str, prefix: str | None = None) -> bytes:
+        """Alias for load() used by persistence tests and callers."""
+        return self.load(filename, prefix)
+
 
 class LocalStorageProvider(BaseStorageProvider):
     """Local filesystem storage provider for single-instance or development environments."""
@@ -261,9 +269,19 @@ class LocalStorageProvider(BaseStorageProvider):
         self.vault_dir = vault_dir
         os.makedirs(self.vault_dir, exist_ok=True)
 
+    @staticmethod
+    def _validate_relative_path(filename: str) -> PurePosixPath:
+        norm = filename.replace("\\", "/").lstrip("/")
+        p = PurePosixPath(norm)
+        if not norm or ".." in p.parts or p.is_absolute():
+            raise ValueError("Invalid document name path structure")
+        return p
+
     def save(self, filename: str, encrypted_bytes: bytes) -> str:
         import os
-        vault_path = os.path.join(self.vault_dir, filename)
+        rel = self._validate_relative_path(filename)
+        vault_path = os.path.join(self.vault_dir, *rel.parts)
+        os.makedirs(os.path.dirname(vault_path), exist_ok=True)
         with open(vault_path, "wb") as fh:
             fh.write(encrypted_bytes)
         return vault_path
@@ -271,20 +289,20 @@ class LocalStorageProvider(BaseStorageProvider):
     def _find_matches(self, filename: str, prefix: str | None = None) -> list[str]:
         import glob
         import os
-        sanitized = PurePosixPath(filename.replace("\\", "/")).name
-        if not sanitized or sanitized != filename:
-            raise ValueError("Invalid document name path structure")
+        rel = self._validate_relative_path(filename)
         if not os.path.isdir(self.vault_dir):
             raise FileNotFoundError(f"Storage vault directory does not exist: {self.vault_dir}")
+        exact = os.path.join(self.vault_dir, *rel.parts)
+        if os.path.isfile(exact):
+            return [exact]
+        leaf = rel.name
         matches: list[str] = []
-        if prefix:
-            matches = glob.glob(os.path.join(self.vault_dir, f"{prefix}*_{filename}.enc"))
+        if prefix is not None and prefix != "":
+            if not re.fullmatch(r"[A-Za-z0-9_-]+", prefix):
+                raise ValueError("Invalid storage prefix")
+            matches = glob.glob(os.path.join(self.vault_dir, f"{prefix}*_{leaf}.enc"))
         if not matches:
-            matches = glob.glob(os.path.join(self.vault_dir, f"*_{filename}.enc"))
-        if not matches:
-            exact = os.path.join(self.vault_dir, filename)
-            if os.path.isfile(exact):
-                matches = [exact]
+            matches = glob.glob(os.path.join(self.vault_dir, f"*_{leaf}.enc"))
         matches.sort(key=lambda p: os.path.getmtime(p), reverse=True)
         return matches
 
@@ -441,8 +459,7 @@ async def validate_and_encrypt_upload(
             raise HTTPException(400, "Uploaded document must not be empty")
         raw_bytes = bytes(buf)
         validate_magic_bytes(clean_name, raw_bytes)
-        key_material = master_secret if len(master_secret) >= 16 else (master_secret * 4)[:32]
-        encrypted_blob = encrypt_upload_at_rest(raw_bytes, key_material, aad=clean_name.encode("utf-8"))
+        encrypted_blob = encrypt_upload_at_rest(raw_bytes, master_secret, aad=clean_name.encode("utf-8"))
         cipher_sha256 = hashlib.sha256(encrypted_blob).hexdigest()
 
         provider = get_storage_provider(vault_dir=vault_dir)
@@ -468,5 +485,4 @@ def retrieve_decrypted_document(
     provider = get_storage_provider(vault_dir=vault_dir)
     encrypted_blob = provider.load(clean_name, prefix=prefix)
 
-    key_material = master_secret if len(master_secret) >= 16 else (master_secret * 4)[:32]
-    return decrypt_upload_at_rest(encrypted_blob, key_material, aad=clean_name.encode("utf-8"))
+    return decrypt_upload_at_rest(encrypted_blob, master_secret, aad=clean_name.encode("utf-8"))

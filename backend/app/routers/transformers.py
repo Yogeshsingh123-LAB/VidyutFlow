@@ -1061,10 +1061,15 @@ def create_field_inspection(
                 detail=f"Access denied: cannot submit inspection for '{tr.zone}' transformer outside your assigned '{u.zone}' zone",
             )
 
-    # Idempotency check on client_uuid
+    # Idempotency check on client_uuid scoped to target transformer
     if body.client_uuid:
         existing = db.query(InspectionRecord).filter(InspectionRecord.id == body.client_uuid).first()
         if existing:
+            if existing.transformer_id != tr.id:
+                raise HTTPException(
+                    status_code=http_status.HTTP_409_CONFLICT,
+                    detail="client_uuid already belongs to a different transformer asset",
+                )
             return _inspection_out(existing)
 
     rec_id = body.client_uuid if body.client_uuid else str(uuid.uuid4())

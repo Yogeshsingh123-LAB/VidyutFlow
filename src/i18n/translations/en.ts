@@ -559,7 +559,7 @@ export const en: TranslationDictionary = {
     navExecutiveExport: 'Executive Export',
     navSystemOverview: 'System Overview',
     navUgvclDirectory: 'UGVCL Directory',
-    navUsersRoles: 'Users & Roles',
+    navUsersRoles: 'User Management',
     navAccessMatrix: 'Access Matrix',
     navAuditTrail: 'Audit Trail',
     navApiIntegrations: 'API Integrations',

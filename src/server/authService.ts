@@ -623,6 +623,25 @@ export class ServerAuthService {
   }
 
   /**
+   * Verifies current password and updates stored scrypt hash for an authenticated user.
+   */
+  public changePassword(userId: string, currentPassword: string, newPassword: string): void {
+    const rec = this.usersById.get(userId);
+    if (!rec) {
+      throw new AuthSecurityError(401, 'SESSION_INVALID', 'Authenticated user record not found.');
+    }
+    if (!currentPassword || !verifyPasswordScrypt(currentPassword, rec.passwordSalt, rec.passwordHash)) {
+      throw new AuthSecurityError(400, 'INVALID_PASSWORD', 'Current password is incorrect.');
+    }
+    if (!newPassword || newPassword.length < 8) {
+      throw new AuthSecurityError(400, 'WEAK_PASSWORD', 'New password must be at least 8 characters long.');
+    }
+    const { salt, hash } = hashPasswordScrypt(newPassword);
+    rec.passwordSalt = salt;
+    rec.passwordHash = hash;
+  }
+
+  /**
    * Inspects internal stored hash metadata for security auditing in tests without exposing it via public APIs.
    */
   public getStoredHashMetadataForAudit(email: string): {

@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'http';
-import { parseSessionCookieHeader } from './authService';
+import { parseSessionCookieHeader, requireServerRole, AuthSecurityError } from './authService';
+import { defaultServerAuthService } from './authRoutes';
 
 interface CircleRecord {
   id: string;
@@ -312,16 +313,28 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-function readJson(req: IncomingMessage): Promise<Record<string, any>> {
+function readJson(req: IncomingMessage, maxBytes = 1_048_576): Promise<Record<string, any>> {
   if ((req as any).body && typeof (req as any).body === 'object') {
     return Promise.resolve((req as any).body);
   }
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
+    let byteCount = 0;
+    let rejected = false;
     req.on('data', chunk => {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      if (rejected) return;
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      byteCount += buf.length;
+      if (byteCount > maxBytes) {
+        rejected = true;
+        req.destroy?.();
+        reject(new Error('Payload too large'));
+        return;
+      }
+      chunks.push(buf);
     });
     req.on('end', () => {
+      if (rejected) return;
       try {
         const text = Buffer.concat(chunks).toString('utf8') || '{}';
         resolve(JSON.parse(text));
@@ -331,6 +344,27 @@ function readJson(req: IncomingMessage): Promise<Record<string, any>> {
     });
     req.on('error', reject);
   });
+}
+
+function requireAdminDirectoryMutation(req: IncomingMessage, res: ServerResponse): boolean {
+  const csrf = req.headers['x-vidyutflow-csrf'];
+  const requestedWith = req.headers['x-requested-with'];
+  if (!(csrf === '1' || csrf === 'true' || requestedWith === 'VidyutFlow-ERP' || requestedWith === 'XMLHttpRequest')) {
+    json(res, 403, { detail: 'CSRF validation failed: Missing required X-VidyutFlow-CSRF header.' });
+    return false;
+  }
+  const token = parseSessionCookieHeader(req.headers.cookie);
+  try {
+    requireServerRole(defaultServerAuthService, token, ['admin']);
+    return true;
+  } catch (err) {
+    if (err instanceof AuthSecurityError) {
+      json(res, err.statusCode, { detail: err.message, code: err.code });
+    } else {
+      json(res, 401, { detail: 'Authentication required.' });
+    }
+    return false;
+  }
 }
 
 export async function handleDirectoryRoute(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
@@ -518,6 +552,7 @@ export async function handleDirectoryRoute(req: IncomingMessage, res: ServerResp
 
   // 5. POST /api/directory/offices
   if (pathname === '/api/directory/offices' && req.method === 'POST') {
+    if (!requireAdminDirectoryMutation(req, res)) return true;
     try {
       const body = await readJson(req);
       const t = String(body.office_type || '').toLowerCase();
@@ -594,6 +629,7 @@ export async function handleDirectoryRoute(req: IncomingMessage, res: ServerResp
 
   // 6. POST /api/directory/import-csv
   if (pathname === '/api/directory/import-csv' && req.method === 'POST') {
+    if (!requireAdminDirectoryMutation(req, res)) return true;
     try {
       const body = await readJson(req);
       const rows = Array.isArray(body.rows) ? body.rows : [];

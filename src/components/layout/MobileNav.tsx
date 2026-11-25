@@ -210,7 +210,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
           { id: 'transformers', label: t.erp.navTransformerAssetRegistry, icon: <Cpu className="w-4 h-4" /> }, // Transformer Asset Registry
           { id: 'directory', label: t.erp.navUgvclDirectory, icon: <Network className="w-4 h-4" /> },
           { id: 'outage-map', label: t.erp.navOutageMap, icon: <MapPin className="w-4 h-4" /> },
-          { id: 'users', label: t.erp.navUsersRoles, icon: <UsersIcon className="w-4 h-4" />, badge: 12 },
+          { id: 'users', label: t.erp.navUsersRoles, icon: <UsersIcon className="w-4 h-4" /> },
           { id: 'access', label: t.erp.navAccessMatrix, icon: <KeyRound className="w-4 h-4" /> },
           { id: 'audit', label: t.erp.navAuditTrail, icon: <FileSearch className="w-4 h-4" /> },
           { id: 'integrations', label: t.erp.navApiIntegrations, icon: <Server className="w-4 h-4" /> },

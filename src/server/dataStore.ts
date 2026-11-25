@@ -1041,8 +1041,20 @@ export class ServerDataStore {
     return { ...this.meterThresholds, history: deepClone(this.thresholdHistory) };
   }
 
+  private ephemeralUploadKey: string | null = null;
+
   private derivePhotoKey(photoId: string): Buffer {
-    const masterSecret = process.env.VIDYUTFLOW_UPLOAD_KEY || 'vidyutflow-phase11a-encrypted-photo-vault-key-v1';
+    let masterSecret = process.env.VIDYUTFLOW_UPLOAD_KEY || '';
+    if (process.env.NODE_ENV === 'production') {
+      if (masterSecret.length < 32) {
+        throw new Error('SECURITY ERROR: VIDYUTFLOW_UPLOAD_KEY (>= 32 chars) must be set in production.');
+      }
+    } else if (!masterSecret) {
+      if (!this.ephemeralUploadKey) {
+        this.ephemeralUploadKey = crypto.randomBytes(32).toString('hex');
+      }
+      masterSecret = this.ephemeralUploadKey;
+    }
     return Buffer.from(
       crypto.hkdfSync(
         'sha256',

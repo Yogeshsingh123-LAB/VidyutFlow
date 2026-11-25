@@ -225,8 +225,8 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
   const handleSavePersonal = async (e: React.FormEvent) => {
     e.preventDefault();
     setPersonalSaveStatus(null);
-    if (!fullName.trim()) {
-      showToast('Please enter your full name.', 'error');
+    if (!fullName.trim() || !dateOfBirth.trim()) {
+      showToast('All personal profile fields (Full Name and Date of Birth) are required.', 'error');
       return;
     }
 
@@ -266,8 +266,15 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
     e.preventDefault();
     setAddressError(null);
 
-    if (!addressFormData.houseFlatNo.trim() || !addressFormData.street.trim()) {
-      setAddressError('House/Flat number and Street are mandatory.');
+    if (
+      !addressFormData.houseFlatNo.trim() ||
+      !addressFormData.street.trim() ||
+      !addressFormData.area.trim() ||
+      !addressFormData.cityVillage.trim() ||
+      !addressFormData.taluka.trim() ||
+      !addressFormData.district.trim()
+    ) {
+      setAddressError('All address fields (House/Flat No., Street, Area/Landmark, City/Village, Taluka, District, and PIN Code) are required.');
       return;
     }
     if (!/^[1-9][0-9]{5}$/.test(addressFormData.pinCode.trim())) {
@@ -626,12 +633,13 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                    Date of Birth (Optional)
+                    Date of Birth *
                   </label>
                   <input
                     type="date"
                     value={dateOfBirth}
                     onChange={e => setDateOfBirth(e.target.value)}
+                    required
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-medium focus:ring-2 focus:ring-blue-600 outline-none"
                   />
                 </div>
@@ -783,10 +791,11 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
               <form onSubmit={handleAddAddressSubmit} className="space-y-4 text-xs">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <label className="font-semibold text-slate-700 dark:text-slate-300">Address Type</label>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300">Address Type *</label>
                     <select
                       value={addressFormData.addressType}
                       onChange={e => setAddressFormData({ ...addressFormData, addressType: e.target.value as any })}
+                      required
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
                     >
                       <option value="RESIDENTIAL">Residential Premises</option>
@@ -821,12 +830,13 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <label className="font-semibold text-slate-700 dark:text-slate-300">Area / Landmark</label>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300">Area / Landmark *</label>
                     <input
                       type="text"
                       placeholder="e.g. Visnagar Road"
                       value={addressFormData.area}
                       onChange={e => setAddressFormData({ ...addressFormData, area: e.target.value })}
+                      required
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
                     />
                   </div>

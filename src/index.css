@@ -227,3 +227,45 @@
     transition: none !important;
   }
 }
+
+/* Print ONLY the viewed official document / UGVCL bill (no sidebar, topnav, or modal chrome) */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  [data-testid="official-document-printable-sheet"],
+  [data-testid="official-document-printable-sheet"] * {
+    visibility: visible !important;
+  }
+
+  [data-testid="official-document-printable-sheet"] {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #020617 !important;
+    box-shadow: none !important;
+  }
+
+  [data-testid="official-document-printable-sheet"] .print\:hidden {
+    display: none !important;
+  }
+}

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { UserPlus, MapPin, RefreshCw, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { UserPlus, MapPin, RefreshCw, CheckCircle2, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { hasBackendSession, subscribeBackendSession } from '../../utils/backendSession';
 import {
@@ -103,8 +103,97 @@ const TEXT = {
   },
 } as const;
 
-export const LiveStaffAssignmentPanel: React.FC<{ onToast?: (msg: string, kind?: 'success' | 'error' | 'info') => void }> = ({
+export interface OfficerPostOption {
+  post: string;
+  role: 'officer' | 'engineer';
+  roleLabel: string;
+  subdivisions: { name: string; zone: string }[];
+}
+
+export const OFFICER_POST_OPTIONS: OfficerPostOption[] = [
+  {
+    post: 'Sub-Divisional Officer (SDO)',
+    role: 'officer',
+    roleLabel: 'Office Employee ERP',
+    subdivisions: [
+      { name: 'Mehsana City North', zone: 'North' },
+      { name: 'Mehsana Industrial GIDC', zone: 'North' },
+      { name: 'Gandhinagar Sub-Div 2', zone: 'Central' },
+      { name: 'Kadi Rural (Ag)', zone: 'West' },
+      { name: 'Visnagar Sub-Division', zone: 'East' },
+      { name: 'Kalol Industrial Sub-Division', zone: 'South' },
+    ],
+  },
+  {
+    post: 'Deputy Executive Engineer (DEE)',
+    role: 'officer',
+    roleLabel: 'Office Employee ERP',
+    subdivisions: [
+      { name: 'Mehsana City North', zone: 'North' },
+      { name: 'Mehsana Industrial GIDC', zone: 'North' },
+      { name: 'Gandhinagar Sub-Div 2', zone: 'Central' },
+      { name: 'Patan City Sub-Division', zone: 'West' },
+    ],
+  },
+  {
+    post: 'Assistant Engineer (Commercial & Billing)',
+    role: 'officer',
+    roleLabel: 'Office Employee ERP',
+    subdivisions: [
+      { name: 'Mehsana City North', zone: 'North' },
+      { name: 'Gandhinagar Sub-Div 2', zone: 'Central' },
+      { name: 'Visnagar Sub-Division', zone: 'East' },
+      { name: 'Kalol Industrial Sub-Division', zone: 'South' },
+    ],
+  },
+  {
+    post: 'Executive Engineer (Circle Office)',
+    role: 'officer',
+    roleLabel: 'Office Employee ERP',
+    subdivisions: [
+      { name: 'Mehsana Circle Division', zone: 'North' },
+      { name: 'Gandhinagar Circle Division', zone: 'Central' },
+      { name: 'Patan Circle Division', zone: 'West' },
+      { name: 'Sabarkantha Circle Division', zone: 'East' },
+    ],
+  },
+  {
+    post: 'Junior Engineer (Field Operations)',
+    role: 'engineer',
+    roleLabel: 'Field Engineer',
+    subdivisions: [
+      { name: 'Mehsana Rural Feeder Wing', zone: 'North' },
+      { name: 'Mehsana Industrial GIDC', zone: 'North' },
+      { name: 'Gandhinagar Sub-Div 2', zone: 'Central' },
+      { name: 'Kadi Rural Feeder Wing', zone: 'West' },
+      { name: 'Visnagar Feeder Wing', zone: 'East' },
+    ],
+  },
+  {
+    post: 'Field Maintenance Engineer',
+    role: 'engineer',
+    roleLabel: 'Field Engineer',
+    subdivisions: [
+      { name: 'Mehsana Rural Feeder Wing', zone: 'North' },
+      { name: 'Kalol Industrial Sub-Division', zone: 'South' },
+      { name: 'Patan Rural Feeder Wing', zone: 'West' },
+    ],
+  },
+];
+
+export const LiveStaffAssignmentPanel: React.FC<{
+  onToast?: (msg: string, kind?: 'success' | 'error' | 'info') => void;
+  onStaffCreated?: (staff: {
+    name: string;
+    email: string;
+    post: string;
+    roleLabel: string;
+    subdivision: string;
+    zone: string;
+  }) => void;
+}> = ({
   onToast,
+  onStaffCreated,
 }) => {
   const { language } = useLanguage();
   const lang = (language in TEXT ? language : 'en') as keyof typeof TEXT;
@@ -116,9 +205,32 @@ export const LiveStaffAssignmentPanel: React.FC<{ onToast?: (msg: string, kind?:
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('Staff@1234');
-  const [role, setRole] = useState<'officer' | 'engineer'>('engineer');
-  const [zone, setZone] = useState('East');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(OFFICER_POST_OPTIONS[0].post);
+  const [subdivision, setSubdivision] = useState(OFFICER_POST_OPTIONS[0].subdivisions[0].name);
+  const [zone, setZone] = useState(OFFICER_POST_OPTIONS[0].subdivisions[0].zone);
+
+  const activePostConfig =
+    OFFICER_POST_OPTIONS.find(p => p.post === selectedPost) || OFFICER_POST_OPTIONS[0];
+  const role = activePostConfig.role;
+
+  const handlePostChange = (nextPost: string) => {
+    setSelectedPost(nextPost);
+    const cfg = OFFICER_POST_OPTIONS.find(p => p.post === nextPost) || OFFICER_POST_OPTIONS[0];
+    if (cfg.subdivisions.length > 0) {
+      setSubdivision(cfg.subdivisions[0].name);
+      setZone(cfg.subdivisions[0].zone);
+    }
+  };
+
+  const handleSubdivisionChange = (nextSub: string) => {
+    setSubdivision(nextSub);
+    const matched = activePostConfig.subdivisions.find(s => s.name === nextSub);
+    if (matched) {
+      setZone(matched.zone);
+    }
+  };
 
   const [newZoneCode, setNewZoneCode] = useState('');
   const [newZoneDisplay, setNewZoneDisplay] = useState('');
@@ -148,21 +260,39 @@ export const LiveStaffAssignmentPanel: React.FC<{ onToast?: (msg: string, kind?:
 
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || password.length < 8) return;
+    if (!name.trim() || !email.trim() || password.length < 8) {
+      onToast?.('Please enter full name, official email, and a password of at least 8 characters.', 'error');
+      return;
+    }
     setBusy(true);
     try {
-      const created = await createStaffMember({
+      let claimedCount = 0;
+      if (liveConnected) {
+        const created = await createStaffMember({
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          password,
+          role,
+          zone,
+        });
+        claimedCount = created.claimed_unassigned_requests;
+        await loadDirectory();
+      }
+      onStaffCreated?.({
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        password,
-        role,
+        post: selectedPost,
+        roleLabel: `${activePostConfig.roleLabel} — ${selectedPost}`,
+        subdivision,
         zone,
       });
       setName('');
       setEmail('');
-      await loadDirectory();
+      setPassword('');
       onToast?.(
-        `Created ${created.role} ${created.name} in ${created.zone} zone (claimed ${created.claimed_unassigned_requests} unassigned requests).`,
+        liveConnected
+          ? `Created ${selectedPost} (${name.trim()}) for ${subdivision} [${zone} zone] — claimed ${claimedCount} unassigned requests.`
+          : `Created ${selectedPost} credential for ${name.trim()} (${subdivision}).`,
         'success'
       );
     } catch (err: any) {
@@ -257,6 +387,7 @@ export const LiveStaffAssignmentPanel: React.FC<{ onToast?: (msg: string, kind?:
           <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{t.onboardTitle}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
             <input
+              id="staff-onboard-name"
               type="text"
               required
               value={name}
@@ -274,43 +405,54 @@ export const LiveStaffAssignmentPanel: React.FC<{ onToast?: (msg: string, kind?:
               aria-label={t.emailLabel}
               className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
             />
-            <input
-              type="password"
-              required
-              minLength={8}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder={t.passwordLabel}
-              aria-label={t.passwordLabel}
-              className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <select
-                value={role}
-                onChange={e => setRole(e.target.value as 'officer' | 'engineer')}
-                aria-label={t.roleLabel}
-                className="px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                minLength={8}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder={t.passwordLabel}
+                aria-label={t.passwordLabel}
+                className="w-full px-3 py-2 pr-9 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(prev => !prev)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                <option value="engineer">Field Engineer</option>
-                <option value="officer">Subdivision Officer</option>
-              </select>
-              <select
-                value={zone}
-                onChange={e => setZone(e.target.value)}
-                aria-label={t.zoneLabel}
-                className="px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-              >
-                {zoneOptions.map(z => (
-                  <option key={z} value={z}>
-                    {z}
-                  </option>
-                ))}
-              </select>
+                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
             </div>
+            <select
+              value={selectedPost}
+              onChange={e => handlePostChange(e.target.value)}
+              aria-label="Officer Post"
+              className="px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+            >
+              {OFFICER_POST_OPTIONS.map(opt => (
+                <option key={opt.post} value={opt.post}>
+                  {opt.post}
+                </option>
+              ))}
+            </select>
+            <select
+              value={subdivision}
+              onChange={e => handleSubdivisionChange(e.target.value)}
+              aria-label="Assigned Sub-Division"
+              className="sm:col-span-2 px-2.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+            >
+              {activePostConfig.subdivisions.map(sub => (
+                <option key={sub.name} value={sub.name}>
+                  {sub.name} ({sub.zone} Zone)
+                </option>
+              ))}
+            </select>
           </div>
           <button
             type="submit"
-            disabled={busy || !liveConnected}
+            disabled={busy}
             className="min-h-9 px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
           >
             {t.createStaffBtn}

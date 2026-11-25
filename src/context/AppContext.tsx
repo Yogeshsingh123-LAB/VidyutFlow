@@ -906,6 +906,8 @@ interface AppContextType {
   setIsAIAssistantOpen: (v: boolean) => void;
   isWorkflowVisualizerOpen: boolean;
   setIsWorkflowVisualizerOpen: (v: boolean) => void;
+  isSidebarCollapsed: boolean;
+  setIsSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
   activeCaseDrawer: { type: 'application' | 'complaint' | 'workorder'; id: string } | null;
   openCaseDrawer: (type: 'application' | 'complaint' | 'workorder', id: string) => void;
   closeCaseDrawer: () => void;
@@ -1382,16 +1384,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const initialRuntime = getStoredActivePortalRuntime();
 
   // Only read localStorage session when in development client 'demo' mode; in 'server' mode
-  // (and unconditionally in production), localStorage sessions are ignored (never trusted, and never overwritten/deleted).
+  // (and unconditionally in production), Web Storage sessions are never trusted before /api/auth/me verification.
   const initialStoredSession = authMode === 'demo' ? getStoredDemoSession() : null;
   const validInitialSession =
     authMode === 'demo' && isValidDemoSession(initialStoredSession)
       ? initialStoredSession
-      : authMode === 'server' &&
-        initialRuntime &&
-        initialRuntime.session.sessionToken === SERVER_SESSION_MARKER &&
-        isValidDemoSession(initialRuntime.session)
-      ? initialRuntime.session
       : null;
 
   if (authMode === 'demo' && initialStoredSession && !isValidDemoSession(initialStoredSession)) {
@@ -1789,6 +1786,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
   const [isWorkflowVisualizerOpen, setIsWorkflowVisualizerOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeCaseDrawer, setActiveCaseDrawer] = useState<{ type: 'application' | 'complaint' | 'workorder'; id: string } | null>(null);
 
   // Toast feedback
@@ -4784,22 +4782,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActiveTabState(targetTab);
         setHasEnteredPlatformState(preserveEntered);
       } else {
-        // If an in-memory session is already active (e.g., cross-origin preview iframe blocked SameSite=Lax cookie)
-        // and the server did not explicitly report SESSION_EXPIRED, preserve the active session and portal state.
-        const existingSession = demoSessionRef.current;
-        if (existingSession && isValidDemoSession(existingSession) && result.code !== 'SESSION_EXPIRED') {
-          if (currentRoute.isExplicitPortalRequest && currentRoute.role && currentRoute.role !== existingSession.role) {
-            if (typeof window !== 'undefined') {
-              window.history.replaceState(null, '', '/');
-            }
-            setHasEnteredPlatformState(false);
-            showToast(UNAUTHORIZED_NAVIGATION_MESSAGE, 'warning');
-          }
-          return;
-        }
-
         setDemoSession(null);
         setHasEnteredPlatformState(false);
+        setStoredActivePortalRuntime(null);
         if (currentRoute.isExplicitPortalRequest) {
           if (typeof window !== 'undefined') {
             window.history.replaceState(null, '', '/');
@@ -4865,18 +4850,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
               return;
             }
-            // If cookie was blocked by cross-origin preview iframe, preserve valid in-memory session matching route.role
-            const activeInMem = demoSessionRef.current;
-            if (
-              activeInMem &&
-              isValidDemoSession(activeInMem) &&
-              res.code !== 'SESSION_EXPIRED' &&
-              (!route.role || activeInMem.role === route.role)
-            ) {
-              return;
-            }
             window.history.replaceState(null, '', '/');
             setHasEnteredPlatformState(false);
+            setStoredActivePortalRuntime(null);
             if (!res.authenticated) {
               setDemoSession(null);
             }
@@ -8779,6 +8755,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsAIAssistantOpen,
         isWorkflowVisualizerOpen,
         setIsWorkflowVisualizerOpen,
+        isSidebarCollapsed,
+        setIsSidebarCollapsed,
         activeCaseDrawer,
         openCaseDrawer,
         closeCaseDrawer,

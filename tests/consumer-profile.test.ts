@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { createProductionRequestHandler } from '../src/server/prodServer';
+import { defaultServerAuthService } from '../src/server/authRoutes';
 
 async function runConsumerProfileTestSuite() {
   console.log('\n================================================================');
@@ -10,13 +11,22 @@ async function runConsumerProfileTestSuite() {
 
   const handler = createProductionRequestHandler();
   const baseUrl = 'http://127.0.0.1:3000';
+  const { session } = defaultServerAuthService.login({
+    email: 'consumer@vidyutflow.demo',
+    password: 'Demo@12345',
+    targetRole: 'consumer'
+  });
 
-  const inMemoryFetch = async (urlStr: string, init?: RequestInit): Promise<Response> => {
+  const inMemoryFetch = async (urlStr: string, init?: RequestInit & { skipAuth?: boolean }): Promise<Response> => {
     const urlObj = new URL(urlStr);
     const req = new EventEmitter() as any;
     req.method = (init?.method || 'GET').toUpperCase();
     req.url = urlObj.pathname + urlObj.search;
     req.headers = {};
+    if (!init?.skipAuth) {
+      req.headers['cookie'] = `vidyutflow_sid=${session.signedToken}`;
+      req.headers['x-vidyutflow-csrf'] = '1';
+    }
     if (init?.headers) {
       if (init.headers instanceof Headers) {
         init.headers.forEach((v, k) => { req.headers[k.toLowerCase()] = v; });
@@ -76,6 +86,10 @@ async function runConsumerProfileTestSuite() {
 
     return responsePromise;
   };
+
+  // --- STEP 0: Verify unauthenticated requests are rejected with 401 ---
+  const resUnauth = await inMemoryFetch(`${baseUrl}/api/v1/consumer/profile`, { skipAuth: true });
+  assert.equal(resUnauth.status, 401, 'Unauthenticated profile request must be rejected with 401');
 
   // --- STEP 1: Fetch Demo Consumer Profile & Summary ---
   console.log('-> Step 1: GET /api/v1/consumer/profile (Profile Retrieval & Completion Rate)');

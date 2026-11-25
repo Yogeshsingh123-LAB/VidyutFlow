@@ -960,8 +960,9 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
                                 onCopy={(e) => e.preventDefault()}
                               >
                                 {captchaSvg ? (
-                                  <div
-                                    dangerouslySetInnerHTML={{ __html: captchaSvg }}
+                                  <img
+                                    src={`data:image/svg+xml;utf8,${encodeURIComponent(captchaSvg)}`}
+                                    alt="Security CAPTCHA"
                                     className="pointer-events-none select-none scale-90 origin-center"
                                   />
                                 ) : (

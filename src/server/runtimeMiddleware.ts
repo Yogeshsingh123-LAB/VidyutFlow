@@ -173,7 +173,9 @@ export function createAiChatHandler() {
     if (typeof originHeader === 'string' && originHeader.trim()) {
       try {
         const originHostname = new URL(originHeader).hostname.toLowerCase();
-        const allowedHostRaw = String(req.headers['x-forwarded-host'] || req.headers.host || '');
+        const forwardedHost =
+          process.env.TRUSTED_PROXY === 'true' ? (req.headers['x-forwarded-host'] as string | undefined) : undefined;
+        const allowedHostRaw = String(forwardedHost || req.headers.host || '');
         const allowedHostname = allowedHostRaw.split(',')[0].trim().split(':')[0].toLowerCase();
         const isLocal =
           (originHostname === 'localhost' || originHostname === '127.0.0.1') &&

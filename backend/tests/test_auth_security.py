@@ -97,7 +97,10 @@ def test_production_requires_non_placeholder_secret_and_skips_demo_seeding(monke
     with pytest.raises(ValueError, match='Production requires a SECRET_KEY'):
         Settings(app_env='production', secret_key='replace-with-a-random-secret-at-least-32-characters')
 
-    secure_settings = Settings(app_env='production', secret_key='x' * 48)
+    with pytest.raises(ValueError, match='Production requires TELEMETRY_INGEST_SECRET'):
+        Settings(app_env='production', secret_key='x' * 48)
+
+    secure_settings = Settings(app_env='production', secret_key='x' * 48, telemetry_ingest_secret='t' * 48)
     assert secure_settings.app_env == 'production'
 
     from app import main

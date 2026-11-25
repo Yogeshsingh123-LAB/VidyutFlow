@@ -91,9 +91,9 @@ export default defineConfig(() => {
       }
     },
     server: {
-      host: '0.0.0.0',
+      host: process.env.VITE_HOST || '127.0.0.1',
       port: Number(process.env.PORT) || 3000,
-      allowedHosts: true,
+      allowedHosts: ['localhost', '127.0.0.1'],
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
@@ -190,9 +190,9 @@ export default defineConfig(() => {
       }
     },
     preview: {
-      host: '0.0.0.0',
+      host: process.env.VITE_HOST || '127.0.0.1',
       port: Number(process.env.PORT) || 3000,
-      allowedHosts: true
+      allowedHosts: ['localhost', '127.0.0.1']
     },
     build: {
       emptyOutDir: true,

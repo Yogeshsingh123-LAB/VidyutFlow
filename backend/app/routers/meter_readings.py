@@ -16,14 +16,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..audit import log_event
-from ..billing_engine import calculate_configurable_cycle_tariff_breakdown
+from ..billing_engine import (
+    calculate_configurable_cycle_tariff_breakdown as _engine_tariff_breakdown,
+)
 from ..config import settings
 from ..db import get_db
 from ..models import (
     ActorIdempotencyRecord,
+    ConnectionRequest,
     ConsumerBillingReviewHistoryRecord,
     ConsumerBillingReviewRecord,
     ConsumerConnectionLink as ConsumerConnection,
+    ElectricityBill,
     FinancialAdjustmentHistoryRecord,
     FinancialAdjustmentProposalRecord,
     MeterAmbiguousDigitRecord,
@@ -41,10 +45,8 @@ from ..models import (
     Notification,
     Role as RoleEnum,
     User,
-    UtilityBill,
-    WorkOrder,
 )
-from ..security import decode_access_token
+from ..security import decode_token as decode_access_token
 from ..uploads import (
     decrypt_upload_at_rest,
     encrypt_upload_at_rest,
@@ -53,6 +55,36 @@ from ..uploads import (
 
 router = APIRouter(prefix="/meter-readings", tags=["meter-readings"])
 optional_bearer = HTTPBearer(auto_error=False)
+
+_TARIFF_CATEGORY_MAP = {
+    "RGP": "Residential (RGPU)",
+    "RGPU": "Residential (RGPU)",
+    "NRGP": "Commercial (NRGP)",
+    "LTMD": "Industrial (LTMD)",
+    "AG": "Agricultural (AG)",
+}
+
+
+def calculate_configurable_cycle_tariff_breakdown(
+    category_code: str,
+    units_consumed: float,
+    sanctioned_load_kw: float,
+    cycle_days: int = 30,
+    arrears: float = 0.0,
+    delayed_payment_surcharge: float = 0.0,
+) -> dict[str, Any]:
+    """Adapt Phase 11 meter_readings call signature to billing_engine's tariff calculator."""
+    tariff_category = _TARIFF_CATEGORY_MAP.get((category_code or "").strip().upper(), category_code or "Residential (RGPU)")
+    cycle_type = "BI_MONTHLY" if int(cycle_days or 30) >= 45 else "MONTHLY"
+    res = _engine_tariff_breakdown(
+        tariff_category=tariff_category,
+        sanctioned_load_kw=float(sanctioned_load_kw or 2.0),
+        units_consumed=float(units_consumed or 0.0),
+        billing_cycle_type=cycle_type,
+        other_adjustments=float(arrears or 0.0) + float(delayed_payment_surcharge or 0.0),
+    )
+    res["totalBillAmount"] = res["total_amount"]
+    return res
 
 # ==============================================================================
 # CANONICAL DEMO CONNECTION & BILL REFERENCE BASELINES (READ-ONLY)
@@ -392,22 +424,35 @@ def get_phase11_actor(
     creds: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
     db: Session = Depends(get_db),
 ) -> Phase11Actor:
-    # 1. Check signed Node compatibility proxy headers
+    # 1. Check signed Node compatibility proxy headers (with mandatory timestamp & active-user check)
     proxy_user_id = request.headers.get("x-vidyutflow-proxy-user-id")
     proxy_email = request.headers.get("x-vidyutflow-proxy-user-email")
     proxy_name = request.headers.get("x-vidyutflow-proxy-user-name")
     proxy_role = request.headers.get("x-vidyutflow-proxy-user-role")
+    proxy_ts = request.headers.get("x-vidyutflow-proxy-ts")
     proxy_sig = request.headers.get("x-vidyutflow-proxy-signature")
 
-    if proxy_user_id and proxy_email and proxy_role and proxy_sig:
+    if proxy_user_id and proxy_email and proxy_role and proxy_ts and proxy_sig:
+        try:
+            ts_int = int(proxy_ts)
+        except ValueError:
+            raise HTTPException(status_code=401, detail="Invalid proxy signature timestamp.")
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        if abs(now_ts - ts_int) > 60:
+            raise HTTPException(status_code=401, detail="Expired proxy signature.")
         proxy_secret = settings.secret_key
-        signing_input = f"{proxy_user_id}:{proxy_email}:{proxy_name or ''}:{proxy_role}"
+        signing_input = f"{proxy_user_id}:{proxy_email}:{proxy_name or ''}:{proxy_role}:{proxy_ts}"
         expected_sig = hmac.new(
             proxy_secret.encode("utf-8"),
             signing_input.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
         if hmac.compare_digest(expected_sig, proxy_sig):
+            db_user = db.get(User, proxy_user_id)
+            if db_user is not None and not db_user.is_active:
+                raise HTTPException(status_code=401, detail="User not found or inactive.")
+            if settings.app_env == "production" and db_user is None:
+                raise HTTPException(status_code=401, detail="User not found or inactive.")
             return Phase11Actor(
                 id=proxy_user_id,
                 email=proxy_email.lower(),
@@ -708,12 +753,12 @@ def _field_engineer_assigned_to_connection(
             ] or actor.name in wo_meta["assignedNames"]:
                 return True, wo_id
 
-    stmt = select(WorkOrder).where(WorkOrder.assigned_to_user_id == actor.id)
-    for wo in db.scalars(stmt).all():
-        if work_order_id and wo.id != work_order_id:
+    stmt = select(ConnectionRequest).where(ConnectionRequest.assigned_engineer_id == actor.id)
+    for req in db.scalars(stmt).all():
+        if work_order_id and req.id != work_order_id:
             continue
-        if conn_key in (wo.title or "") or conn_key in (wo.description or ""):
-            return True, wo.id
+        if conn_key in (req.description or "") or conn_key in (req.address or ""):
+            return True, req.id
 
     return False, None
 
@@ -1335,34 +1380,52 @@ def _serialize_financial_adjustment(
     }
 
 
+def _resolve_bill_meta(db: Session, bill_no: str) -> dict[str, Any]:
+    clean_no = bill_no.strip()
+    bill_meta = CANONICAL_BILLS.get(clean_no)
+    if bill_meta:
+        return bill_meta
+
+    db_bill = db.scalar(select(ElectricityBill).where(ElectricityBill.bill_no == clean_no))
+    if not db_bill:
+        raise HTTPException(status_code=404, detail=f"Bill {bill_no} not found.")
+
+    try:
+        conn_meta = _resolve_connection_meta(db, db_bill.consumer_no)
+    except HTTPException:
+        conn_meta = {}
+
+    cycle_days = (
+        61
+        if (db_bill.billing_cycle_type or "").upper() in ("BI_MONTHLY", "BIMONTHLY")
+        else 30
+    )
+    return {
+        "billNo": db_bill.bill_no,
+        "connectionNo": db_bill.consumer_no,
+        "consumerNo": db_bill.consumer_no,
+        "consumerName": conn_meta.get("consumerName", "UGVCL Consumer"),
+        "tariffCategory": conn_meta.get("tariffCategory", "RGP"),
+        "sanctionedLoadKw": float(conn_meta.get("sanctionedLoadKw", 4.0)),
+        "billingPeriod": db_bill.bill_month,
+        "previousReading": float(db_bill.previous_reading_kwh),
+        "previousReadingDate": db_bill.previous_reading_date,
+        "currentReading": float(db_bill.current_reading_kwh),
+        "currentReadingDate": db_bill.current_reading_date,
+        "cycleDays": cycle_days,
+        "unitsBilled": float(db_bill.units_consumed),
+        "energyCharges": float(db_bill.energy_charges),
+        "fixedCharges": float(db_bill.fixed_charges),
+        "fpppaCharges": float(db_bill.fuel_price_adjustment),
+        "electricityDuty": float(db_bill.electricity_duty),
+        "arrears": 0.0,
+        "delayedPaymentSurcharge": 0.0,
+        "totalAmount": float(db_bill.total_amount),
+    }
+
+
 def _validate_bill_canonical(db: Session, bill_no: str) -> dict[str, Any]:
-    bill_meta = CANONICAL_BILLS.get(bill_no)
-    if not bill_meta:
-        db_bill = db.scalar(select(UtilityBill).where(UtilityBill.bill_no == bill_no))
-        if not db_bill:
-            raise HTTPException(status_code=404, detail=f"Bill {bill_no} not found.")
-        bill_meta = {
-            "billNo": db_bill.bill_no,
-            "connectionNo": db_bill.consumer_no,
-            "consumerNo": db_bill.consumer_no,
-            "consumerName": db_bill.consumer_name,
-            "tariffCategory": db_bill.tariff_category,
-            "sanctionedLoadKw": float(db_bill.sanctioned_load_kw),
-            "billingPeriod": db_bill.billing_period,
-            "previousReading": float(db_bill.previous_reading),
-            "previousReadingDate": db_bill.previous_reading_date,
-            "currentReading": float(db_bill.current_reading),
-            "currentReadingDate": db_bill.current_reading_date,
-            "cycleDays": int(db_bill.cycle_days or 61),
-            "unitsBilled": float(db_bill.units_billed),
-            "energyCharges": float(db_bill.energy_charges),
-            "fixedCharges": float(db_bill.fixed_charges),
-            "fpppaCharges": float(db_bill.fpppa_charges),
-            "electricityDuty": float(db_bill.electricity_duty),
-            "arrears": float(db_bill.arrears),
-            "delayedPaymentSurcharge": float(db_bill.delayed_payment_surcharge),
-            "totalAmount": float(db_bill.total_amount),
-        }
+    bill_meta = _resolve_bill_meta(db, bill_no)
 
     breakdown = calculate_configurable_cycle_tariff_breakdown(
         category_code=bill_meta["tariffCategory"],
@@ -2167,13 +2230,8 @@ def validate_bill_endpoint(
 ):
     _ensure_not_management(actor, "individual bill validation")
     seed_phase11_demo_records(db)
-    bill_meta = CANONICAL_BILLS.get(bill_no)
-    conn_no = bill_meta["connectionNo"] if bill_meta else None
-    if not conn_no:
-        db_bill = db.scalar(select(UtilityBill).where(UtilityBill.bill_no == bill_no))
-        if not db_bill:
-            raise HTTPException(status_code=404, detail=f"Bill {bill_no} not found.")
-        conn_no = db_bill.consumer_no
+    bill_meta = _resolve_bill_meta(db, bill_no)
+    conn_no = bill_meta["connectionNo"]
 
     if actor.role == "CONSUMER" and not _consumer_owns_connection(db, actor, conn_no):
         raise HTTPException(
@@ -3049,20 +3107,9 @@ def create_billing_review_endpoint(
             )
         return {"review": _serialize_billing_review(db, existing_by_uuid)}
 
-    bill_meta = CANONICAL_BILLS.get(payload.billNo.strip())
-    if not bill_meta:
-        db_bill = db.scalar(
-            select(UtilityBill).where(UtilityBill.bill_no == payload.billNo.strip())
-        )
-        if not db_bill:
-            raise HTTPException(
-                status_code=404, detail=f"Bill {payload.billNo} not found."
-            )
-        conn_no = db_bill.consumer_no
-        consumer_name = db_bill.consumer_name
-    else:
-        conn_no = bill_meta["connectionNo"]
-        consumer_name = bill_meta["consumerName"]
+    bill_meta = _resolve_bill_meta(db, payload.billNo)
+    conn_no = bill_meta["connectionNo"]
+    consumer_name = bill_meta["consumerName"]
 
     if actor.role == "CONSUMER" and not _consumer_owns_connection(db, actor, conn_no):
         raise HTTPException(
@@ -3229,28 +3276,7 @@ def propose_financial_adjustment_endpoint(
     if replay is not None:
         return replay
 
-    bill_meta = CANONICAL_BILLS.get(payload.billNo.strip())
-    if not bill_meta:
-        db_bill = db.scalar(
-            select(UtilityBill).where(UtilityBill.bill_no == payload.billNo.strip())
-        )
-        if not db_bill:
-            raise HTTPException(
-                status_code=404, detail=f"Bill {payload.billNo} not found."
-            )
-        bill_meta = {
-            "billNo": db_bill.bill_no,
-            "connectionNo": db_bill.consumer_no,
-            "consumerNo": db_bill.consumer_no,
-            "consumerName": db_bill.consumer_name,
-            "tariffCategory": db_bill.tariff_category,
-            "sanctionedLoadKw": float(db_bill.sanctioned_load_kw),
-            "cycleDays": int(db_bill.cycle_days or 61),
-            "unitsBilled": float(db_bill.units_billed),
-            "arrears": float(db_bill.arrears),
-            "delayedPaymentSurcharge": float(db_bill.delayed_payment_surcharge),
-            "totalAmount": float(db_bill.total_amount),
-        }
+    bill_meta = _resolve_bill_meta(db, payload.billNo)
 
     revised_breakdown = calculate_configurable_cycle_tariff_breakdown(
         category_code=bill_meta["tariffCategory"],

@@ -1,6 +1,8 @@
 import { IncomingMessage, ServerResponse } from 'http';
+import crypto from 'crypto';
 import { defaultServerDataStore } from './dataStore';
 import { defaultServerAuthService } from './authRoutes';
+import { parseSessionCookieHeader, AuthSecurityError } from './authService';
 
 export interface ConsumerAddressDto {
   id: string;
@@ -42,32 +44,57 @@ const inMemoryPreferences: Map<string, any> = new Map();
 const inMemoryActivities: Map<string, any[]> = new Map();
 const inMemoryConnectionOtps: Map<string, { otp: string; expiresAt: number; attempts: number }> = new Map();
 
-function getUserIdFromReq(req: IncomingMessage): string {
+function getUserIdFromReq(req: IncomingMessage): string | null {
+  const cookieToken = parseSessionCookieHeader(req.headers.cookie);
   const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.slice(7);
-    try {
-      const session = defaultServerAuthService.validateSession(token);
-      if (session) return session.userId;
-    } catch {
-      // invalid or expired token
-    }
+  const bearerToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+  const token = cookieToken || bearerToken;
+  if (!token) return null;
+  try {
+    const session = defaultServerAuthService.validateSession(token);
+    return session ? session.userId : null;
+  } catch {
+    return null;
   }
-  // Fallback to active demo consumer
-  return 'demo-consumer-meenaben-patel';
 }
 
-function parseJsonBody(req: IncomingMessage): Promise<any> {
-  return new Promise((resolve) => {
+function hasValidCsrf(req: IncomingMessage): boolean {
+  const csrf = req.headers['x-vidyutflow-csrf'];
+  const requestedWith = req.headers['x-requested-with'];
+  return (
+    csrf === '1' ||
+    csrf === 'true' ||
+    requestedWith === 'VidyutFlow-ERP' ||
+    requestedWith === 'XMLHttpRequest'
+  );
+}
+
+function parseJsonBody(req: IncomingMessage, maxBytes = 65536): Promise<any> {
+  return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', chunk => { body += chunk; });
+    let byteCount = 0;
+    let rejected = false;
+    req.on('data', chunk => {
+      if (rejected) return;
+      const str = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk);
+      byteCount += Buffer.byteLength(str, 'utf8');
+      if (byteCount > maxBytes) {
+        rejected = true;
+        req.destroy?.();
+        reject(new Error('Payload too large'));
+        return;
+      }
+      body += str;
+    });
     req.on('end', () => {
+      if (rejected) return;
       try {
         resolve(body ? JSON.parse(body) : {});
       } catch {
         resolve({});
       }
     });
+    req.on('error', reject);
   });
 }
 
@@ -97,6 +124,14 @@ export async function handleConsumerProfileRoute(req: IncomingMessage, res: Serv
   const cleanPath = url.split('?')[0].replace(/^\/api\/v1\/consumer/, '').replace(/^\/api\/consumer/, '');
   const method = req.method || 'GET';
   const userId = getUserIdFromReq(req);
+  if (!userId) {
+    sendJson(res, 401, { detail: 'Authentication required.' });
+    return true;
+  }
+  if ((method === 'POST' || method === 'PATCH' || method === 'DELETE') && !hasValidCsrf(req)) {
+    sendJson(res, 403, { detail: 'CSRF validation failed: Missing required X-VidyutFlow-CSRF header.' });
+    return true;
+  }
 
   // Initialize demo addresses if empty
   if (!inMemoryAddresses.has(userId)) {
@@ -283,19 +318,23 @@ export async function handleConsumerProfileRoute(req: IncomingMessage, res: Serv
   if (cleanPath === '/connections/link/initiate' && method === 'POST') {
     const body = await parseJsonBody(req);
     const consumerNo = body.consumer_no || '04281-99231';
+    const otp = String(crypto.randomInt(100000, 999999));
     inMemoryConnectionOtps.set(`${userId}:${consumerNo}`, {
-      otp: '482019',
+      otp,
       expiresAt: Date.now() + 600000,
       attempts: 0
     });
-    sendJson(res, 200, {
+    const respPayload: Record<string, unknown> = {
       status: 'OTP_SENT',
       consumer_no: consumerNo,
       masked_mobile: '+91 XXXXX XX92',
       expires_in_seconds: 600,
-      demo_verification_code: '482019',
       message: 'Verification code sent to registered mobile +91 XXXXX XX92.'
-    });
+    };
+    if (process.env.NODE_ENV !== 'production') {
+      respPayload.demo_verification_code = otp;
+    }
+    sendJson(res, 200, respPayload);
     return true;
   }
 
@@ -303,11 +342,28 @@ export async function handleConsumerProfileRoute(req: IncomingMessage, res: Serv
   if (cleanPath === '/connections/link/verify' && method === 'POST') {
     const body = await parseJsonBody(req);
     const consumerNo = body.consumer_no;
-    const rec = inMemoryConnectionOtps.get(`${userId}:${consumerNo}`);
-    if (!rec || rec.otp !== body.otp) {
+    const otpKey = `${userId}:${consumerNo}`;
+    const rec = inMemoryConnectionOtps.get(otpKey);
+    if (!rec) {
+      sendJson(res, 400, { detail: 'Verification code not found or expired. Please request a new OTP.' });
+      return true;
+    }
+    if (Date.now() > rec.expiresAt) {
+      inMemoryConnectionOtps.delete(otpKey);
+      sendJson(res, 400, { detail: 'Verification code has expired. Please request a new OTP.' });
+      return true;
+    }
+    if (rec.attempts >= 5) {
+      inMemoryConnectionOtps.delete(otpKey);
+      sendJson(res, 429, { detail: 'Maximum verification attempts exceeded. Please request a new OTP.' });
+      return true;
+    }
+    if (rec.otp !== body.otp) {
+      rec.attempts += 1;
       sendJson(res, 400, { detail: 'Incorrect verification code. Please try again.' });
       return true;
     }
+    inMemoryConnectionOtps.delete(otpKey);
     // Link connection to user in datastore
     defaultServerDataStore.linkConsumerConnection(userId, consumerNo);
 
@@ -345,7 +401,19 @@ export async function handleConsumerProfileRoute(req: IncomingMessage, res: Serv
   if (cleanPath === '/preferences' && method === 'PATCH') {
     const body = await parseJsonBody(req);
     const pref = inMemoryPreferences.get(userId) || {};
-    Object.assign(pref, body);
+    const allowedKeys = [
+      'preferred_language',
+      'sms_notifications',
+      'email_notifications',
+      'bill_reminders',
+      'outage_alerts',
+      'application_status_alerts'
+    ];
+    for (const key of allowedKeys) {
+      if (Object.prototype.hasOwnProperty.call(body, key)) {
+        pref[key] = body[key];
+      }
+    }
     inMemoryPreferences.set(userId, pref);
     sendJson(res, 200, { message: 'Preferences updated successfully' });
     return true;
@@ -369,8 +437,18 @@ export async function handleConsumerProfileRoute(req: IncomingMessage, res: Serv
   // 12. POST /security/change-password
   if (cleanPath === '/security/change-password' && method === 'POST') {
     const body = await parseJsonBody(req);
-    if (!body.current_password) {
-      sendJson(res, 400, { detail: 'Current password required' });
+    try {
+      defaultServerAuthService.changePassword(
+        userId,
+        String(body.current_password || ''),
+        String(body.new_password || '')
+      );
+    } catch (err) {
+      if (err instanceof AuthSecurityError) {
+        sendJson(res, err.statusCode, { detail: err.message, code: err.code });
+      } else {
+        sendJson(res, 400, { detail: 'Failed to change password.' });
+      }
       return true;
     }
     const activities = inMemoryActivities.get(userId) || [];

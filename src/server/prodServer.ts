@@ -51,6 +51,9 @@ const FASTAPI_PREFIXES = [
 ];
 
 function applySecurityHeaders(res: ServerResponse) {
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -165,7 +168,14 @@ export function createProductionRequestHandler(options?: {
 
     // Serve built SPA static files from dist/ with strict path-separator traversal protection
     const normalizedDist = path.resolve(distDir);
-    const decodedPath = decodeURIComponent(pathname === '/' ? '/index.html' : pathname);
+    let decodedPath: string;
+    try {
+      decodedPath = decodeURIComponent(pathname === '/' ? '/index.html' : pathname);
+    } catch {
+      res.statusCode = 400;
+      res.end('Bad Request');
+      return;
+    }
     const resolvedFile = path.resolve(normalizedDist, '.' + decodedPath);
     if (resolvedFile !== normalizedDist && !resolvedFile.startsWith(normalizedDist + path.sep)) {
       res.statusCode = 403;

@@ -60,7 +60,9 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
     resetDemoData,
     activeUser,
     unreadIncidentsCount,
-    criticalIncidentsCount
+    criticalIncidentsCount,
+    isSidebarCollapsed,
+    setIsSidebarCollapsed
   } = useApp();
   const { t, language } = useLanguage();
   const accountLabels = getAccountMenuLabels(language);
@@ -196,6 +198,17 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
           <Menu className="w-5 h-5" />
         </button>
 
+        {/* Desktop Three-Line Sliding Sidebar Toggle (md+) */}
+        <button
+          type="button"
+          onClick={() => setIsSidebarCollapsed(prev => !prev)}
+          className="hidden md:inline-flex p-2 text-slate-700 hover:text-[#0A2540] hover:bg-slate-100 rounded-lg transition-colors cursor-pointer shrink-0"
+          aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={isSidebarCollapsed ? 'Slide sidebar open' : 'Slide sidebar closed'}
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
         {/* Left: UGVCL | VidyutFlow Brand + Home / Services / Support Tabs */}
         <div className="flex items-center gap-3 sm:gap-5 min-w-0">
           <div
@@ -268,7 +281,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
                         className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
                       >
                         <Users className="w-4 h-4 text-blue-600" />
-                        <span>User Management & Roles</span>
+                        <span>User Management</span>
                       </button>
                       <button
                         type="button"

@@ -73,6 +73,8 @@ import {
 import {
   deriveCanonicalQrVerificationUrl,
   generateQrCodeSvg,
+  generateUpiBillQrPayload,
+  UpiQrStatus,
 } from './qrCodeEngine';
 import {
   deriveCanonical9FieldBillStatement,
@@ -302,6 +304,10 @@ export interface UgvclBillParticulars {
   barcodeSvg: string;
   qrUrl: string;
   qrSvg: string;
+  upiQrStatus?: UpiQrStatus;
+  upiQrExpiryDate?: string;
+  upiId?: string;
+  upiPayUri?: string;
 }
 
 export interface GeneratedOfficialDocument {
@@ -3250,15 +3256,25 @@ export function generateElectricityBillDocument(
     showHumanReadable: true,
   });
 
-  // 2. Scannable QR Code calculation
+  // 2. Scannable UPI Payment QR Code calculation (expires on dueDate; deactivated once Paid)
   const qrData = deriveCanonicalQrVerificationUrl(
     rawBill.billNo,
     consumerNo
   );
-  const qrSvg = generateQrCodeSvg(qrData.url, {
-    sizePx: 110,
-    margin: 2,
+  const upiQr = generateUpiBillQrPayload({
+    billNo: rawBill.billNo,
+    consumerNo,
+    amount: currentTotalOutstandingInr,
+    dueDate: rawBill.dueDate,
+    isPaid: reconciled.effectiveStatus === 'Paid',
+    referenceDate: effectiveRefDate,
   });
+  const qrSvg = upiQr.isActive
+    ? generateQrCodeSvg(upiQr.uri, {
+        sizePx: 110,
+        margin: 2,
+      })
+    : '';
 
   // 3. Meter Readings & Classification
   const prevReading =
@@ -3481,6 +3497,10 @@ export function generateElectricityBillDocument(
     barcodeSvg: barcodeObj.svg,
     qrUrl: qrData.url,
     qrSvg,
+    upiQrStatus: upiQr.status,
+    upiQrExpiryDate: upiQr.expiryDate,
+    upiId: upiQr.upiId,
+    upiPayUri: upiQr.uri,
   };
 
   return {

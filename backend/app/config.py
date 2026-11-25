@@ -71,6 +71,16 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "Production CORS origins must not contain wildcard '*' when allow_credentials=True"
                 )
+            telem_secret = self.telemetry_ingest_secret.casefold()
+            if (
+                len(self.telemetry_ingest_secret) < 32
+                or telem_secret == "vidyutflow-dev-telemetry-ingest-secret-2026"
+                or telem_secret.startswith(("dev-", "vidyutflow-dev-", "change-me", "replace-with"))
+            ):
+                raise ValueError(
+                    "Production requires TELEMETRY_INGEST_SECRET of at least 32 characters "
+                    "that is not a development placeholder"
+                )
         return self
 
 settings = Settings()

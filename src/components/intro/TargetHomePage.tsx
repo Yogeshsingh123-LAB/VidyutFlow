@@ -27,11 +27,16 @@ import {
   Linkedin,
   Youtube,
   Globe,
-  Check
+  Check,
+  X,
+  CheckCircle2,
+  Calendar,
+  HelpCircle,
+  Search
 } from 'lucide-react';
 
 interface TargetHomePageProps {
-  onOpenAboutModal: () => void;
+  onOpenAboutModal: (section?: 'overview' | 'network') => void;
 }
 
 export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal }) => {
@@ -51,6 +56,12 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
   const [isServicesMenuOpen, setIsServicesMenuOpen] = useState(false);
   const [isAboutMenuOpen, setIsAboutMenuOpen] = useState(false);
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
+  const [isUpdatesModalOpen, setIsUpdatesModalOpen] = useState(false);
+  const [isCommitmentModalOpen, setIsCommitmentModalOpen] = useState(false);
+  const [isQaModalOpen, setIsQaModalOpen] = useState(false);
+  const [qaSearch, setQaSearch] = useState('');
+  const [qaCategory, setQaCategory] = useState<'All' | 'New Connection' | 'Billing & UPI' | 'Meter Reading' | 'Outages & Support'>('All');
+  const [openQaIndex, setOpenQaIndex] = useState<number | null>(0);
 
   // Live dynamic clock state
   const [timeString, setTimeString] = useState('Monday, 27 Oct 2025 | 08:15 AM');
@@ -305,20 +316,20 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-xl shadow-xl border border-slate-100 p-2 z-50 animate-in fade-in slide-in-from-top-1">
                   <button
                     type="button"
-                    onClick={() => { onOpenAboutModal(); setIsAboutMenuOpen(false); }}
-                    className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 text-slate-700 hover:text-[#0A2540] flex items-center gap-2"
+                    onClick={() => { onOpenAboutModal('overview'); setIsAboutMenuOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 text-slate-700 hover:text-[#0A2540] flex items-center gap-2 cursor-pointer"
                   >
                     <Building className="w-4 h-4 text-cyan-600" />
                     <span>Corporate Overview & Vision</span>
                   </button>
-                  <a
-                    href="#coverage"
-                    onClick={() => setIsAboutMenuOpen(false)}
-                    className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 text-slate-700 hover:text-[#0A2540] flex items-center gap-2 block"
+                  <button
+                    type="button"
+                    onClick={() => { onOpenAboutModal('network'); setIsAboutMenuOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 text-slate-700 hover:text-[#0A2540] flex items-center gap-2 cursor-pointer"
                   >
                     <MapPin className="w-4 h-4 text-blue-600" />
                     <span>Distribution Network & Circles</span>
-                  </a>
+                  </button>
                 </div>
               )}
             </div>
@@ -353,9 +364,26 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     <Mail className="w-4 h-4 text-blue-600" />
                     <span>Email Support</span>
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => { setIsQaModalOpen(true); setIsHelpMenuOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 text-slate-700 hover:text-[#FF6B00] flex items-center gap-2 cursor-pointer"
+                  >
+                    <HelpCircle className="w-4 h-4 text-[#FF6B00]" />
+                    <span>Q&amp;A / Frequently Asked Questions</span>
+                  </button>
                 </div>
               )}
             </div>
+
+            {/* Q&A Page Button */}
+            <button
+              type="button"
+              onClick={() => setIsQaModalOpen(true)}
+              className="px-3.5 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+            >
+              Q&amp;A
+            </button>
 
             {/* Contact Us */}
             <a
@@ -425,7 +453,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
         {/* Banner container with aspect ratio preserving the full panoramic building & curve */}
         <div className="relative w-full min-h-[250px] sm:min-h-[290px] md:min-h-[330px] lg:min-h-[380px] xl:min-h-[400px] flex items-start">
           <img
-            src="/assets/ugvcl/home_hero_bg.jpg"
+            src="/assets/ugvcl/home_hero_bg.jpg?v=5"
             alt="UGVCL Headquarters - Smart Electricity Services"
             className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none select-none"
           />
@@ -670,7 +698,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 </div>
                 <button
                   type="button"
-                  onClick={onOpenAboutModal}
+                  onClick={() => setIsUpdatesModalOpen(true)}
                   className="text-xs font-bold text-[#0A2540] hover:text-[#FF6B00] flex items-center gap-1 transition-colors cursor-pointer"
                 >
                   <span>View All</span>
@@ -719,18 +747,18 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
           </div>
 
           {/* CARD 2: OUR COMMITMENT (With glowing bulb & plant visual) */}
-          <div className="relative rounded-2xl border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.03)] overflow-hidden bg-gradient-to-r from-white via-[#F8FAFC] to-[#EEF3F8] p-5 flex flex-col justify-between min-h-[165px]">
+          <div className="relative rounded-2xl border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.03)] overflow-hidden bg-gradient-to-r from-[#F4F7FB] via-[#EFF4FA] to-[#E6EEF6] p-5 flex flex-col justify-between min-h-[168px]">
             {/* Left Content */}
-            <div className="relative z-10 max-w-[56%] flex flex-col justify-between h-full space-y-3">
+            <div className="relative z-20 max-w-[58%] flex flex-col justify-between h-full space-y-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <Handshake className="w-5 h-5 text-[#0052CC]" />
-                  <h3 className="text-sm sm:text-base font-bold text-[#0A2540] tracking-tight">
+                  <Handshake className="w-5 h-5 text-[#0A2540]" />
+                  <h3 className="text-base sm:text-[17px] font-black text-[#0A2540] tracking-tight">
                     Our Commitment
                   </h3>
                 </div>
 
-                <p className="text-xs text-slate-700 font-medium leading-relaxed pt-2">
+                <p className="text-xs text-[#0A2540]/85 font-medium leading-relaxed pt-2">
                   Reliable, customer-centric and <br />
                   technology-driven services.
                 </p>
@@ -739,8 +767,8 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
               <div>
                 <button
                   type="button"
-                  onClick={onOpenAboutModal}
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#061C38] hover:bg-[#0A2E58] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  onClick={() => setIsCommitmentModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-[#042147] hover:bg-[#0A2E58] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
                 >
                   <span>Know More</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -748,18 +776,19 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
               </div>
             </div>
 
-            {/* Glowing Lightbulb & Sprout Visual */}
-            <div className="absolute right-0 top-0 bottom-0 w-[50%] pointer-events-none select-none">
+            {/* Glowing Lightbulb & Sprout Visual with seamless left fade */}
+            <div className="absolute right-0 top-0 bottom-0 w-[56%] pointer-events-none select-none">
               <img
-                src="/assets/ugvcl/bulb_card_bg.png"
+                src="/assets/ugvcl/bulb_card_bg.png?v=2"
                 alt="Our Commitment to Green Energy"
-                className="w-full h-full object-cover object-left rounded-r-2xl"
+                className="w-full h-full object-cover object-center rounded-r-2xl"
               />
+              <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-[#EFF4FA] via-[#EFF4FA]/75 to-transparent" />
             </div>
           </div>
 
           {/* CARD 3: UGVCL COVERAGE (With Gujarat Map) */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.03)] p-5 flex flex-col justify-between">
+          <div id="coverage" className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.03)] p-5 flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2 mb-3">
                 <MapPin className="w-4 h-4 text-[#0A2540]" />
@@ -872,7 +901,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
           <div className="flex items-center flex-wrap justify-center gap-2 text-[11px] text-slate-300">
             <button
               type="button"
-              onClick={onOpenAboutModal}
+              onClick={() => onOpenAboutModal('overview')}
               className="hover:text-white transition-colors cursor-pointer"
             >
               Privacy Policy
@@ -880,7 +909,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
             <span className="text-slate-600">|</span>
             <button
               type="button"
-              onClick={onOpenAboutModal}
+              onClick={() => onOpenAboutModal('overview')}
               className="hover:text-white transition-colors cursor-pointer"
             >
               Terms & Conditions
@@ -888,7 +917,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
             <span className="text-slate-600">|</span>
             <button
               type="button"
-              onClick={onOpenAboutModal}
+              onClick={() => onOpenAboutModal('overview')}
               className="hover:text-white transition-colors cursor-pointer"
             >
               Sitemap
@@ -896,7 +925,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
             <span className="text-slate-600">|</span>
             <button
               type="button"
-              onClick={onOpenAboutModal}
+              onClick={() => onOpenAboutModal('overview')}
               className="hover:text-white transition-colors cursor-pointer"
             >
               Accessibility
@@ -954,6 +983,363 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
           </div>
         </div>
       </footer>
+
+      {/* =========================================================================
+          LATEST UPDATES & PUBLIC NOTICES MODAL
+         ========================================================================= */}
+      {isUpdatesModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ugvcl-latest-updates-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/65 backdrop-blur-xs animate-in fade-in"
+        >
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="bg-[#0A2540] text-white px-6 py-4 flex items-center justify-between border-b-4 border-[#FF6B00]">
+              <div className="flex items-center gap-2.5">
+                <Megaphone className="w-5 h-5 text-[#FF6B00]" />
+                <div>
+                  <h3 id="ugvcl-latest-updates-title" className="text-base font-extrabold tracking-tight">
+                    UGVCL Latest Updates &amp; Public Notices
+                  </h3>
+                  <p className="text-[11px] text-slate-300">
+                    Uttar Gujarat Vij Company Limited · Official Consumer Announcements
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsUpdatesModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer"
+                aria-label="Close Latest Updates"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-3">
+              {[
+                {
+                  date: '27 Oct 2025',
+                  tag: 'Digital Billing',
+                  title: 'Online UPI & BBPS Payment Facility Active Across All Circles',
+                  desc: 'All UGVCL LT & HT consumers can now pay bills instantly via UPI QR codes on e-bills with automatic receipt generation.',
+                },
+                {
+                  date: '25 Oct 2025',
+                  tag: 'Smart Metering',
+                  title: 'Self-Service Meter Reading Submission via VidyutFlow',
+                  desc: 'Submit your meter photograph directly through the Consumer Portal for automated OCR verification and transparent billing.',
+                },
+                {
+                  date: '20 Oct 2025',
+                  tag: 'Green Initiative',
+                  title: 'Digital India Initiative – Go Paperless e-Bill Rebate',
+                  desc: 'Opt for paperless digital electricity bills and instant SMS/email alerts for due-date reminders and outage schedules.',
+                },
+                {
+                  date: '14 Oct 2025',
+                  tag: 'Solar Net-Metering',
+                  title: 'Fast-Track PM Surya Ghar Rooftop Solar Sanctions',
+                  desc: 'Online 4-step sanction workflow for residential and commercial rooftop solar net-metering connections across Mehsana, Gandhinagar & Patan.',
+                },
+                {
+                  date: '08 Oct 2025',
+                  tag: 'Grid Reliability',
+                  title: '24×7 Preventive Transformer Health Telemetry Active',
+                  desc: 'Real-time feeder load balancing and predictive maintenance alerts deployed across 11 kV & 33 kV distribution substations.',
+                },
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white transition-colors space-y-1.5"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="px-2 py-0.5 rounded-md bg-orange-100 text-[#FF6B00] text-[10px] font-bold uppercase tracking-wider">
+                      {item.tag}
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1 tabular-nums">
+                      <Calendar className="w-3 h-3" />
+                      {item.date}
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-bold text-[#0A2540]">{item.title}</h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsUpdatesModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-[#0A2540] hover:bg-[#07162C] text-white text-xs font-bold cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          OUR COMMITMENT & VISION MODAL
+         ========================================================================= */}
+      {isCommitmentModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ugvcl-commitment-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/65 backdrop-blur-xs animate-in fade-in"
+        >
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="bg-[#0A2540] text-white px-6 py-4 flex items-center justify-between border-b-4 border-[#FF6B00]">
+              <div className="flex items-center gap-2.5">
+                <Handshake className="w-5 h-5 text-[#FF6B00]" />
+                <div>
+                  <h3 id="ugvcl-commitment-title" className="text-base font-extrabold tracking-tight">
+                    Our Commitment to Gujarat
+                  </h3>
+                  <p className="text-[11px] text-slate-300">
+                    Reliable, Customer-Centric &amp; Technology-Driven Power Distribution
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCommitmentModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer"
+                aria-label="Close Our Commitment"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-6 overflow-y-auto space-y-4">
+              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                Uttar Gujarat Vij Company Limited (UGVCL) serves over <strong>89 Lakh+ consumers</strong> across
+                North Gujarat with a commitment to uninterrupted power supply, transparent digital billing,
+                and clean renewable energy integration.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  {
+                    title: '24×7 Uninterrupted Supply',
+                    desc: 'Automated feeder monitoring, proactive transformer health tracking, and rapid field fault restoration.',
+                  },
+                  {
+                    title: 'Transparent Digital Billing',
+                    desc: 'Progressive slab tariffs, verified meter reading proofs, and instant UPI QR settlement with official receipts.',
+                  },
+                  {
+                    title: 'Clean & Green Energy',
+                    desc: 'Streamlined solar net-metering approvals and paperless e-billing supporting Gujarat’s renewable transition.',
+                  },
+                  {
+                    title: 'Time-Bound Consumer SLA',
+                    desc: '24-hour grievance resolution tracking and real-time status updates across every sub-division.',
+                  },
+                ].map((pillar, idx) => (
+                  <div key={idx} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#0A2540]">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{pillar.title}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">{pillar.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCommitmentModalOpen(false);
+                  onOpenAboutModal();
+                }}
+                className="text-xs font-bold text-blue-700 hover:underline cursor-pointer"
+              >
+                View Full Institutional Profile →
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsCommitmentModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-[#0A2540] hover:bg-[#07162C] text-white text-xs font-bold cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          Q&A (FREQUENTLY ASKED QUESTIONS) PAGE MODAL
+         ========================================================================= */}
+      {isQaModalOpen && (() => {
+        const qaItems: Array<{
+          category: 'New Connection' | 'Billing & UPI' | 'Meter Reading' | 'Outages & Support';
+          q: string;
+          a: string;
+        }> = [
+          {
+            category: 'New Connection',
+            q: 'How do I apply for a new UGVCL electricity connection online?',
+            a: 'Sign in to the Consumer Portal and open "New Connection". Complete all 4 mandatory steps: (1) Applicant Details, (2) Premises & Grid Details, (3) Load & Tariff Specifications, and (4) Documents & Sanction Review. Once submitted, you can track progress in My Connections.',
+          },
+          {
+            category: 'New Connection',
+            q: 'Which documents are required for a new LT or HT connection?',
+            a: 'Keep your Aadhaar / PAN Card, property ownership or rent/lease proof, and passport-size photo / site test report ready. All required details in each step must be completed before submission.',
+          },
+          {
+            category: 'Billing & UPI',
+            q: 'How do I pay my electricity bill using the UPI QR code?',
+            a: 'Open your bill or click "Pay Bill" and select UPI / BHIM. Scan the QR code with any UPI app (GPay, PhonePe, Paytm, BHIM) — it automatically fills the exact payable amount to UGVCL UPI ID kushwsand@naviaxis. Once paid, the QR code deactivates and your receipt is generated.',
+          },
+          {
+            category: 'Billing & UPI',
+            q: 'What happens to the QR code if I miss the due date?',
+            a: 'Unpaid bills never leave you stuck: if the due date passes, the old pre-due QR expires and a fresh updated QR is automatically generated with the recalculated payable amount (including late charges) until payment is completed.',
+          },
+          {
+            category: 'Meter Reading',
+            q: 'How can I submit my meter reading from home?',
+            a: 'Go to Usage Analytics / Meter Reading in the Consumer Portal, upload a clear photograph of your digital meter display, verify the OCR-detected kWh reading, and submit. An officer reviews any flagged anomalies before billing.',
+          },
+          {
+            category: 'Outages & Support',
+            q: 'How do I report a power outage or voltage fluctuation?',
+            a: 'Use "Register Complaint" under Services or "Outage & Alerts" in the Consumer Portal to log a feeder or transformer complaint, or call the 24×7 UGVCL Helpline at 1912 / 1800 233 155335.',
+          },
+        ];
+        const filteredQa = qaItems.filter(item => {
+          const catOk = qaCategory === 'All' || item.category === qaCategory;
+          const qLower = qaSearch.trim().toLowerCase();
+          const textOk = !qLower || item.q.toLowerCase().includes(qLower) || item.a.toLowerCase().includes(qLower);
+          return catOk && textOk;
+        });
+
+        return (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ugvcl-qa-modal-title"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/65 backdrop-blur-xs animate-in fade-in"
+            onClick={() => setIsQaModalOpen(false)}
+          >
+            <div
+              className="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[88vh]"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="bg-[#0A2540] text-white px-6 py-4 flex items-center justify-between border-b-4 border-[#FF6B00]">
+                <div className="flex items-center gap-2.5">
+                  <HelpCircle className="w-5 h-5 text-[#FF6B00]" />
+                  <div>
+                    <h3 id="ugvcl-qa-modal-title" className="text-base font-extrabold tracking-tight">
+                      UGVCL Consumer Q&amp;A Center
+                    </h3>
+                    <p className="text-[11px] text-slate-300">
+                      Frequently Asked Questions on Connections, UPI QR Billing, Metering &amp; Support
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsQaModalOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer"
+                  aria-label="Close Q&A"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 sm:p-6 overflow-y-auto space-y-4 bg-slate-50/40">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={qaSearch}
+                      onChange={e => setQaSearch(e.target.value)}
+                      placeholder="Search questions (e.g. QR, UPI, new connection, meter reading)..."
+                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {(['All', 'New Connection', 'Billing & UPI', 'Meter Reading', 'Outages & Support'] as const).map(cat => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => {
+                        setQaCategory(cat);
+                        setOpenQaIndex(0);
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${
+                        qaCategory === cat
+                          ? 'bg-[#0A2540] text-white'
+                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-2.5">
+                  {filteredQa.map((item, idx) => {
+                    const isOpen = openQaIndex === idx;
+                    return (
+                      <div key={idx} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setOpenQaIndex(isOpen ? null : idx)}
+                          className="w-full px-4 py-3 text-left flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors cursor-pointer"
+                        >
+                          <div className="min-w-0">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#FF6B00] block">
+                              {item.category}
+                            </span>
+                            <span className="text-xs font-bold text-[#0A2540]">{item.q}</span>
+                          </div>
+                          <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        {isOpen && (
+                          <div className="px-4 pb-3.5 pt-1 text-xs text-slate-600 leading-relaxed border-t border-slate-100 bg-slate-50/40">
+                            {item.a}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {filteredQa.length === 0 && (
+                    <div className="p-6 text-center text-xs text-slate-500 bg-white rounded-xl border border-slate-200">
+                      No matching questions found. Try a different keyword or call 19124.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="px-6 py-3.5 bg-white border-t border-slate-200 flex items-center justify-between">
+                <span className="text-[11px] text-slate-500">
+                  24×7 Toll-Free Helpline: <strong>1912 / 1800 233 155335</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsQaModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-[#0A2540] hover:bg-[#07162C] text-white text-xs font-bold cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
