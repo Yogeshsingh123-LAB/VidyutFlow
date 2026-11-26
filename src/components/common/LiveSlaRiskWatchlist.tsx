@@ -90,6 +90,8 @@ export const LIVE_WATCHLIST_TRANSLATIONS: Record<
 };
 
 export const LiveSlaRiskWatchlist: React.FC = () => {
+  const showServerPanel = false as boolean;
+  if (!showServerPanel) return null;
   const { language } = useLanguage();
   const t = LIVE_WATCHLIST_TRANSLATIONS[language] || LIVE_WATCHLIST_TRANSLATIONS.en;
   const { data, error, lastUpdated, refresh, loading } = useLivePoll<LiveRequestRow[]>(fetchLiveRequests);

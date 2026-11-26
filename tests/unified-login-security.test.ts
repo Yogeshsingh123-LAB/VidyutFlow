@@ -260,6 +260,41 @@ async function runUnifiedLoginSecurityTestSuite() {
   assert.ok(managementData.user.designation.includes('Chief Engineer'));
   console.log(`   [PASS] Management Cockpit authenticated: ${managementData.user.name} (${managementData.user.designation})`);
 
+  // 2e. Consumer login using 10-digit mobile number + password (demo & newly registered)
+  resetAuthRateLimitForTests();
+  const resMobileDemo = await inMemoryFetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: '9825044112', password: 'Demo@12345', targetRole: 'consumer' })
+  });
+  assert.equal(resMobileDemo.status, 200, 'Demo consumer login via mobile + password must succeed');
+  const mobileDemoData = await resMobileDemo.json();
+  assert.equal(mobileDemoData.role, 'consumer');
+
+  const regEmail = `mobile.login.${Date.now()}@example.com`;
+  const resSignupMobile = await inMemoryFetch(`${baseUrl}/api/auth/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Kiran Desai',
+      email: regEmail,
+      password: 'Password@123',
+      mobileNumber: '9876501234'
+    })
+  });
+  assert.equal(resSignupMobile.status, 200, 'Signup with mobile number must succeed');
+
+  const resMobileNew = await inMemoryFetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: '+91 98765 01234', password: 'Password@123', targetRole: 'consumer' })
+  });
+  assert.equal(resMobileNew.status, 200, 'Newly registered consumer login via mobile + password must succeed');
+  const mobileNewData = await resMobileNew.json();
+  assert.equal(mobileNewData.user.email, regEmail);
+  assert.equal(mobileNewData.user.mobileNumber, '9876501234');
+  console.log('   [PASS] Consumer mobile number + password login verified for demo and newly registered accounts');
+
   // =========================================================================
   // 3. ZERO-TRUST AUTHORIZATION & ROLE SPOOFING REJECTION
   // =========================================================================

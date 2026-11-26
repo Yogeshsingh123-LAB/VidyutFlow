@@ -851,11 +851,16 @@ export const UgvclElectricityBillTwoPage: React.FC<UgvclElectricityBillTwoPagePr
   const l = TWO_PAGE_BILL_LABELS[language] || TWO_PAGE_BILL_LABELS.en;
   const extra = BILL_AND_RECEIPT_EXTRA_LABELS[language] || BILL_AND_RECEIPT_EXTRA_LABELS.en;
   const chart = p.sixPeriodComparisonChart;
+  const isIndic = language === 'gu' || language === 'hi' || language === 'mr';
+  const labelCaseClass = isIndic ? '' : 'uppercase tracking-wide';
 
   return (
     <div
-      className="w-full max-w-[850px] mx-auto space-y-8 text-slate-900 dark:text-slate-100 print:text-black print:max-w-none print:w-full"
-      style={{ fontFamily: document.fontFamilyCss }}
+      className="w-full max-w-[850px] mx-auto space-y-8 text-slate-900 dark:text-slate-100 print:text-black print:max-w-none print:w-full antialiased"
+      style={{
+        fontFamily: document.fontFamilyCss,
+        lineHeight: isIndic ? 1.6 : 1.45,
+      }}
     >
       {/* =========================================================================
           PAGE 1 — UGVCL ELECTRICITY BILL FRONT
@@ -895,31 +900,31 @@ export const UgvclElectricityBillTwoPage: React.FC<UgvclElectricityBillTwoPagePr
                 >
                   {UGVCL_COMPANY_NAME_EN}
                 </h1>
-                <p className="text-xs font-bold text-slate-700 leading-tight">
-                  {UGVCL_COMPANY_NAME_GU} — <span className="italic font-normal">{UGVCL_TAGLINE_EN}</span>
+                <p className="text-xs font-bold text-slate-700 leading-snug mt-0.5">
+                  {UGVCL_COMPANY_NAME_GU} — <span className="font-medium text-slate-600">{UGVCL_TAGLINE_EN}</span>
                 </p>
-                <p className="text-[10px] text-slate-600 leading-tight mt-0.5">
+                <p className="text-[11px] text-slate-600 leading-snug mt-0.5">
                   Regd. Office: {p.registeredOffice || UGVCL_CORPORATE_IDENTITY.registeredOffice}
                 </p>
               </div>
             </div>
 
-            <div className="text-right text-[10px] font-mono shrink-0 space-y-0.5 sm:border-l-2 sm:border-slate-300 sm:pl-3">
-              <div><span className="font-bold">CIN:</span> {p.cin || UGVCL_CORPORATE_IDENTITY.cin}</div>
-              <div><span className="font-bold">GSTIN:</span> {p.gstin || '24AABCU4494L1ZV'}</div>
+            <div className="text-right text-[11px] tabular-nums shrink-0 space-y-0.5 sm:border-l-2 sm:border-slate-300 sm:pl-3">
+              <div><span className="font-bold">CIN:</span> <span className="font-mono">{p.cin || UGVCL_CORPORATE_IDENTITY.cin}</span></div>
+              <div><span className="font-bold">GSTIN:</span> <span className="font-mono">{p.gstin || '24AABCU4494L1ZV'}</span></div>
               <div><span className="font-bold">Web:</span> {p.website || 'www.ugvcl.com'}</div>
               <div><span className="font-bold">Helpline:</span> {p.helpline || '1912 / 1800 233 155335'}</div>
             </div>
           </div>
 
           {/* Subheader Ribbon */}
-          <div className="bg-slate-900 text-white px-3 py-1 text-[11px] font-mono flex flex-wrap items-center justify-between font-bold gap-2">
+          <div className="bg-slate-900 text-white px-3 py-1.5 text-[11.5px] tabular-nums flex flex-wrap items-center justify-between font-bold gap-2">
             <span>
               {l.eBillBannerPrefix} : {p.billMonth} ({p.billingCycleShortBadge})
             </span>
             <span>SDO: {p.subdivision.toUpperCase()}</span>
             <span
-              className="bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded font-sans text-[10px]"
+              className="bg-amber-400 text-slate-950 px-2 py-0.5 rounded text-[10.5px] font-bold"
               data-testid="official-document-status-badge"
             >
               {document.statusLabel || l.demoUtilityBadge}
@@ -932,113 +937,113 @@ export const UgvclElectricityBillTwoPage: React.FC<UgvclElectricityBillTwoPagePr
             data-testid="document-section-consumer-connection"
           >
             {/* Left: Consumer Particulars */}
-            <div className="p-3 space-y-1.5">
-              <div className="border-b border-slate-200 pb-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block">{l.consumerName}</span>
-                <span className="font-black text-sm text-slate-950" data-testid="document-field-consumerName">
+            <div className="p-3.5 space-y-2">
+              <div className="border-b border-slate-200 pb-1.5">
+                <span className={`text-[10px] font-bold text-slate-500 ${labelCaseClass} block`}>{l.consumerName}</span>
+                <span className="font-extrabold text-[15px] text-slate-950 leading-snug" data-testid="document-field-consumerName">
                   {p.consumerName}
                 </span>
               </div>
-              <div className="border-b border-slate-200 pb-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block">{l.servicePremisesAddress}</span>
+              <div className="border-b border-slate-200 pb-1.5">
+                <span className={`text-[10px] font-bold text-slate-500 ${labelCaseClass} block`}>{l.servicePremisesAddress}</span>
                 <span className="font-medium text-slate-800 leading-snug" data-testid="document-field-address">
                   {p.premisesAddress}
                 </span>
-                <span className="text-[10px] text-slate-600 block mt-0.5">{p.villageTalukaDistrict}</span>
+                <span className="text-[11px] text-slate-600 block mt-0.5">{p.villageTalukaDistrict}</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 pt-0.5 font-mono text-[11px]">
+              <div className="grid grid-cols-2 gap-2.5 pt-0.5 text-xs tabular-nums">
                 <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block font-sans">{l.consumerNo}</span>
-                  <span className="font-black text-blue-900 text-xs" data-testid="document-field-consumerNo">
+                  <span className={`text-[10px] font-bold text-slate-500 ${labelCaseClass} block`}>{l.consumerNo}</span>
+                  <span className="font-extrabold font-mono text-blue-900 text-[13px]" data-testid="document-field-consumerNo">
                     {p.consumerNo}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block font-sans">{l.connectionId}</span>
-                  <span className="font-bold text-slate-900" data-testid="document-field-connectionId">
+                  <span className={`text-[10px] font-bold text-slate-500 ${labelCaseClass} block`}>{l.connectionId}</span>
+                  <span className="font-bold font-mono text-slate-900" data-testid="document-field-connectionId">
                     {p.connectionId}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block font-sans">{l.meterNo}</span>
-                  <span className="font-bold text-slate-900" data-testid="document-field-meterNo">
+                  <span className={`text-[10px] font-bold text-slate-500 ${labelCaseClass} block`}>{l.meterNo}</span>
+                  <span className="font-bold font-mono text-slate-900" data-testid="document-field-meterNo">
                     {p.meterNo}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block font-sans">{l.tariffCategory}</span>
+                  <span className={`text-[10px] font-bold text-slate-500 ${labelCaseClass} block`}>{l.tariffCategory}</span>
                   <span className="font-bold text-slate-900" data-testid="document-field-tariffCategory">
                     {p.tariffCategory}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block font-sans">{l.sanctionedLoad}</span>
+                  <span className={`text-[10px] font-bold text-slate-500 ${labelCaseClass} block`}>{l.sanctionedLoad}</span>
                   <span className="font-bold text-slate-900" data-testid="document-field-sanctionedLoad">
                     {p.sanctionedLoadKw} kW ({p.phase})
                   </span>
                 </div>
                 <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block font-sans">{l.securityDeposit}</span>
+                  <span className={`text-[10px] font-bold text-slate-500 ${labelCaseClass} block`}>{l.securityDeposit}</span>
                   <span className="font-bold text-slate-900">₹{p.securityDeposit.toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </div>
 
             {/* Right: Technical Routing, Bi-Monthly Period, Due Dates & Scannable QR Code */}
-            <div className="p-3 flex flex-col justify-between space-y-2" data-testid="document-section-bill-metadata">
-              <div className="grid grid-cols-2 gap-2 text-[11px] font-mono border-b border-slate-200 pb-2">
+            <div className="p-3.5 flex flex-col justify-between space-y-2.5" data-testid="document-section-bill-metadata">
+              <div className="grid grid-cols-2 gap-2.5 text-xs tabular-nums border-b border-slate-200 pb-2.5">
                 <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block font-sans">{l.feederCode}</span>
+                  <span className={`text-[10px] font-bold text-slate-500 ${labelCaseClass} block`}>{l.feederCode}</span>
                   <span className="font-semibold text-slate-800">{p.feederCode}</span>
                 </div>
                 <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block font-sans">{l.poleNo}</span>
+                  <span className={`text-[10px] font-bold text-slate-500 ${labelCaseClass} block`}>{l.poleNo}</span>
                   <span className="font-semibold text-slate-800">{p.poleNo}</span>
                 </div>
                 <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block font-sans">{l.billNumber}</span>
-                  <span className="font-black text-slate-950" data-testid="document-field-billNo">
+                  <span className={`text-[10px] font-bold text-slate-500 ${labelCaseClass} block`}>{l.billNumber}</span>
+                  <span className="font-extrabold font-mono text-slate-950" data-testid="document-field-billNo">
                     {p.billNo}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block font-sans">{l.billDate}</span>
+                  <span className={`text-[10px] font-bold text-slate-500 ${labelCaseClass} block`}>{l.billDate}</span>
                   <span className="font-bold text-slate-800" data-testid="document-field-billDate">
                     {p.billDate}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block font-sans">
+                  <span className={`text-[10px] font-bold text-slate-500 ${labelCaseClass} block`}>
                     {l.billingCycleTypeLabel}
                   </span>
                   <span
-                    className="font-bold text-blue-900 font-sans text-[11px]"
+                    className="font-bold text-blue-900 text-xs"
                     data-testid="document-field-billingCycleType"
                   >
                     {p.billingCycleLabel}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[9px] font-bold text-slate-500 uppercase block font-sans">
+                  <span className={`text-[10px] font-bold text-slate-500 ${labelCaseClass} block`}>
                     {l.billingPeriodDatesLabel}
                   </span>
                   <span
-                    className="font-bold text-slate-900 text-[10px]"
+                    className="font-bold text-slate-900 text-[11px]"
                     data-testid="document-field-billingPeriodDates"
                   >
                     {p.periodStartDate} – {p.periodEndDate}
                   </span>
                 </div>
-                <div className="col-span-2 bg-amber-50 border border-amber-300 p-1.5 rounded flex items-center justify-between">
+                <div className="col-span-2 bg-amber-50 border border-amber-300 p-2 rounded flex items-center justify-between">
                   <div>
-                    <span className="text-[9px] font-black text-amber-900 uppercase block font-sans">{l.paymentDueDate}</span>
-                    <span className="font-black text-xs text-rose-700" data-testid="document-field-dueDate">
+                    <span className={`text-[10px] font-bold text-amber-900 ${labelCaseClass} block`}>{l.paymentDueDate}</span>
+                    <span className="font-extrabold text-[13px] text-rose-700" data-testid="document-field-dueDate">
                       {p.dueDate}
                     </span>
                   </div>
                   <span
                     data-testid="document-field-paymentStatusBadge"
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold font-sans uppercase border ${
+                    className={`px-2 py-0.5 rounded text-[10.5px] font-bold ${labelCaseClass} border ${
                       isPaid
                         ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                         : 'bg-rose-100 text-rose-800 border-rose-300'
@@ -1125,49 +1130,49 @@ export const UgvclElectricityBillTwoPage: React.FC<UgvclElectricityBillTwoPagePr
 
         {/* 3. Meter Readings & Cumulative Consumption Table (Reference A & B) */}
         <div className="border-2 border-slate-900 mb-3" data-testid="document-section-consumption-summary">
-          <div className="bg-slate-100 border-b border-slate-900 px-3 py-1 font-bold text-xs flex flex-wrap justify-between items-center gap-2">
+          <div className="bg-slate-100 border-b border-slate-900 px-3 py-1.5 font-bold text-xs flex flex-wrap justify-between items-center gap-2">
             <span>{l.meterReadingRegister}</span>
-            <span className="font-mono text-[10px] font-normal text-slate-600">
+            <span className="text-[11px] font-medium text-slate-600 tabular-nums">
               {l.cycleDatesPrefix} {p.readingDates} | {l.classificationPrefix} {p.readingProvenanceLabel || p.readingClassification}
             </span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-center border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-300 text-[10px] font-bold text-slate-700 uppercase">
-                  <th className="p-1.5 border-r border-slate-300">{l.colMeterSerial}</th>
-                  <th className="p-1.5 border-r border-slate-300">{l.colPrevReading}</th>
-                  <th className="p-1.5 border-r border-slate-300">{l.colCurrReading}</th>
-                  <th className="p-1.5 border-r border-slate-300">{l.colDifference}</th>
-                  <th className="p-1.5 border-r border-slate-300">{l.colMultiplier}</th>
-                  <th className="p-1.5 border-r border-slate-300">{l.colBilledConsumption}</th>
-                  <th className="p-1.5">{l.colReadingStatus}</th>
+                <tr className={`bg-slate-50 border-b border-slate-300 text-[10.5px] font-bold text-slate-700 ${labelCaseClass}`}>
+                  <th className="p-2 border-r border-slate-300">{l.colMeterSerial}</th>
+                  <th className="p-2 border-r border-slate-300">{l.colPrevReading}</th>
+                  <th className="p-2 border-r border-slate-300">{l.colCurrReading}</th>
+                  <th className="p-2 border-r border-slate-300">{l.colDifference}</th>
+                  <th className="p-2 border-r border-slate-300">{l.colMultiplier}</th>
+                  <th className="p-2 border-r border-slate-300">{l.colBilledConsumption}</th>
+                  <th className="p-2">{l.colReadingStatus}</th>
                 </tr>
               </thead>
-              <tbody className="font-mono text-xs">
+              <tbody className="text-xs tabular-nums">
                 <tr>
-                  <td className="p-1.5 border-r border-slate-300 font-bold">{p.meterNo}</td>
-                  <td className="p-1.5 border-r border-slate-300" data-testid="document-field-previousReading">
-                    <div>{p.previousReadingKwh.toLocaleString('en-IN')}</div>
-                    <div className="text-[9px] text-slate-500" data-testid="document-field-previousReadingDate">
+                  <td className="p-2 border-r border-slate-300 font-bold font-mono">{p.meterNo}</td>
+                  <td className="p-2 border-r border-slate-300" data-testid="document-field-previousReading">
+                    <div className="font-semibold">{p.previousReadingKwh.toLocaleString('en-IN')}</div>
+                    <div className="text-[10px] text-slate-500" data-testid="document-field-previousReadingDate">
                       ({p.previousReadingDate})
                     </div>
                   </td>
-                  <td className="p-1.5 border-r border-slate-300" data-testid="document-field-currentReading">
-                    <div>{p.currentReadingKwh.toLocaleString('en-IN')}</div>
-                    <div className="text-[9px] text-slate-500" data-testid="document-field-currentReadingDate">
+                  <td className="p-2 border-r border-slate-300" data-testid="document-field-currentReading">
+                    <div className="font-semibold">{p.currentReadingKwh.toLocaleString('en-IN')}</div>
+                    <div className="text-[10px] text-slate-500" data-testid="document-field-currentReadingDate">
                       ({p.currentReadingDate})
                     </div>
                   </td>
-                  <td className="p-1.5 border-r border-slate-300 font-semibold">{p.readingDifference}</td>
-                  <td className="p-1.5 border-r border-slate-300">{p.meterMultiplier.toFixed(2)}</td>
+                  <td className="p-2 border-r border-slate-300 font-semibold">{p.readingDifference}</td>
+                  <td className="p-2 border-r border-slate-300">{p.meterMultiplier.toFixed(2)}</td>
                   <td
-                    className="p-1.5 border-r border-slate-300 font-black text-blue-950 text-sm"
+                    className="p-2 border-r border-slate-300 font-extrabold text-blue-950 text-sm"
                     data-testid="document-field-unitsConsumed"
                   >
                     {p.billedUnits} kWh
                   </td>
-                  <td className="p-1.5 font-sans font-semibold text-[11px] text-emerald-800">
+                  <td className="p-2 font-semibold text-[11px] text-emerald-800">
                     {p.readingProvenanceLabel || p.readingClassification}
                   </td>
                 </tr>
@@ -1193,30 +1198,30 @@ export const UgvclElectricityBillTwoPage: React.FC<UgvclElectricityBillTwoPagePr
             data-testid="document-table-slab-breakdown-table"
           >
             <div>
-              <div className="bg-slate-100 border-b border-slate-900 px-3 py-1 font-bold text-xs flex justify-between items-center">
+              <div className="bg-slate-100 border-b border-slate-900 px-3 py-1.5 font-bold text-xs flex justify-between items-center">
                 <span>
                   {l.gercSlabBreakdown} ({p.tariffCategory})
                 </span>
-                <span className="font-mono text-[10px] text-slate-600">
+                <span className="text-[10.5px] font-semibold text-slate-600 tabular-nums">
                   {p.billingCycleShortBadge}
                 </span>
               </div>
               <table className="w-full text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-300 text-[10px] font-bold text-slate-700 uppercase">
-                    <th className="p-1.5 text-left border-r border-slate-300">{l.colSlab}</th>
-                    <th className="p-1.5 text-right border-r border-slate-300">{l.colUnits}</th>
-                    <th className="p-1.5 text-right border-r border-slate-300">{l.colRate}</th>
-                    <th className="p-1.5 text-right">{l.colAmount}</th>
+                  <tr className={`bg-slate-50 border-b border-slate-300 text-[10.5px] font-bold text-slate-700 ${labelCaseClass}`}>
+                    <th className="p-2 text-left border-r border-slate-300">{l.colSlab}</th>
+                    <th className="p-2 text-right border-r border-slate-300">{l.colUnits}</th>
+                    <th className="p-2 text-right border-r border-slate-300">{l.colRate}</th>
+                    <th className="p-2 text-right">{l.colAmount}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 font-mono text-[11px]">
+                <tbody className="divide-y divide-slate-200 text-xs tabular-nums">
                   {p.slabBreakdown.map((s, idx) => (
                     <tr key={idx} className="hover:bg-slate-50">
-                      <td className="p-1.5 border-r border-slate-300 font-sans">{s.slab}</td>
-                      <td className="p-1.5 text-right border-r border-slate-300">{s.units}</td>
-                      <td className="p-1.5 text-right border-r border-slate-300">₹{s.rate.toFixed(2)}</td>
-                      <td className="p-1.5 text-right font-semibold">₹{s.amount.toFixed(2)}</td>
+                      <td className="p-2 border-r border-slate-300">{s.slab}</td>
+                      <td className="p-2 text-right border-r border-slate-300">{s.units}</td>
+                      <td className="p-2 text-right border-r border-slate-300">₹{s.rate.toFixed(2)}</td>
+                      <td className="p-2 text-right font-semibold">₹{s.amount.toFixed(2)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -188,6 +188,8 @@ const FALLBACK_AI_GOVERNANCE: AiGovernanceResponse = {
 };
 
 export const LiveAiGovernancePanel: React.FC = () => {
+  const showServerPanel = false as boolean;
+  if (!showServerPanel) return null;
   const { language } = useLanguage();
   const t = AI_GOVERNANCE_TRANSLATIONS[language] || AI_GOVERNANCE_TRANSLATIONS.en;
 

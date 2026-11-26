@@ -102,6 +102,8 @@ export const PERFORMANCE_TELEMETRY_TRANSLATIONS: Record<
 };
 
 export const LivePerformanceTelemetryPanel: React.FC = () => {
+  const showServerPanel = false as boolean;
+  if (!showServerPanel) return null;
   const { language } = useLanguage();
   const t =
     PERFORMANCE_TELEMETRY_TRANSLATIONS[language] || PERFORMANCE_TELEMETRY_TRANSLATIONS.en;

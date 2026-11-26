@@ -230,8 +230,8 @@ export const ManagementMeterIntegritySection: React.FC = () => {
             <span className="text-[11px] text-slate-400">{mp.mgtTotalReadings}: {metrics?.totalReadings ?? 0}</span>
           </div>
 
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
               <BarChart data={readingStatusChartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
                 <XAxis dataKey="status" tick={{ fontSize: 11 }} />
@@ -254,9 +254,9 @@ export const ManagementMeterIntegritySection: React.FC = () => {
             <span className="text-[11px] text-slate-400">{metrics?.cases?.total ?? 0}</span>
           </div>
 
-          <div className="h-64 w-full">
+          <div className="h-64 w-full min-w-0">
             {anomalyCategoryChartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
                 <BarChart data={anomalyCategoryChartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
                   <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-15} textAnchor="end" height={50} />

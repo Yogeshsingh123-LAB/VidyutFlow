@@ -428,9 +428,9 @@ export const FieldTransformerInspectionsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-4 w-full">
       {/* Header Banner */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
             <ClipboardCheck className="w-6 h-6" />
@@ -498,7 +498,7 @@ export const FieldTransformerInspectionsView: React.FC = () => {
       </div>
 
       {/* SECTION 1: FIELD ENGINEER MAINTENANCE ASSIGNMENT INBOX */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
+      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
             <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
@@ -756,7 +756,7 @@ export const FieldTransformerInspectionsView: React.FC = () => {
       </div>
 
       {/* Target Asset Selector */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
+      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
         <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
           Select Target Transformer in {userZone} Zone for Inspection
         </label>
@@ -805,9 +805,11 @@ export const FieldTransformerInspectionsView: React.FC = () => {
         </div>
       </div>
 
+      {/* Checklist & Observation Notes Side-by-Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
       {/* Structured Field Checklist */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
-        <div className="flex items-center justify-between">
+      <div className="lg:col-span-7 bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
             Standard DTR Verification Checklist ({activeTransformer?.utility_asset_code})
           </h2>
@@ -819,7 +821,7 @@ export const FieldTransformerInspectionsView: React.FC = () => {
         </div>
         <div className="divide-y divide-slate-100">
           {checklist.map((item) => (
-            <div key={item.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div key={item.id} className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <span className="text-xs font-medium text-slate-800">{item.label}</span>
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
@@ -862,7 +864,7 @@ export const FieldTransformerInspectionsView: React.FC = () => {
       </div>
 
       {/* Observation Notes & Photo Capture */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
+      <div className="lg:col-span-5 bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
         <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
           Field Evidence & Observations
         </h2>
@@ -915,14 +917,11 @@ export const FieldTransformerInspectionsView: React.FC = () => {
           </div>
           <span className="font-semibold text-emerald-700">Accuracy: ±{gpsAccuracy}m</span>
         </div>
-      </div>
 
-      {/* Submission Footer */}
-      <div className="flex items-center justify-end gap-3 pt-2">
         <button
           onClick={handleSubmitInspection}
           disabled={isSubmitting}
-          className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all shadow-sm hover:shadow-md disabled:opacity-50"
         >
           <FileCheck className="w-4 h-4" />
           {isSubmitting
@@ -931,6 +930,7 @@ export const FieldTransformerInspectionsView: React.FC = () => {
               ? tr.btnSubmitForReview || 'Submit Inspection for Review'
               : 'Save Offline to IndexedDB'}
         </button>
+      </div>
       </div>
     </div>
   );

@@ -61,6 +61,8 @@ const SANDBOX_FALLBACK_LOGS: ErpSyncLogItem[] = [
 ];
 
 export const LiveErpAdapterPanel: React.FC = () => {
+  const showServerPanel = false as boolean;
+  if (!showServerPanel) return null;
   const { showToast } = useApp();
   const { language } = useLanguage();
   const ad = getAdminUiDictionary(language);

@@ -4998,7 +4998,7 @@ export function ensureConsumerBiMonthlyBillingSchedule(params: {
  * - On 06-Nov-2026: 7 days overdue (₹42.73 late charges on ₹14,854 -> ₹14,896.73; ₹6.29 on ₹2,185 -> ₹2,191.29)
  * - On 10-Nov-2026: 11 days overdue
  */
-export const CANONICAL_OVERDUE_BILL_DUE_DATE = '30-Oct-2026' as const;
+export const CANONICAL_OVERDUE_BILL_DUE_DATE = '15-Dec-2026' as const;
 
 /**
  * Canonical UNPAID (not yet overdue) DEMO bill on the consumer's second linked meter
@@ -5088,6 +5088,7 @@ export function reconcileRuntimeDemoBillsSeed(
         OVERDUE_TARGET_BILL_NOS.has(merged.billNo) &&
         (merged.dueDate === '22-Oct-2026' ||
           merged.dueDate === '20-Oct-2026' ||
+          merged.dueDate === '30-Oct-2026' ||
           !merged.dueDate)
       ) {
         merged.dueDate = CANONICAL_OVERDUE_BILL_DUE_DATE;

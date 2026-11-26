@@ -286,11 +286,38 @@ export const AIAssistantDrawer: React.FC = () => {
     return currentPersona.suggestedPrompts;
   }, [currentRole, currentPersona, userConnections, userBills]);
 
-  if (!isAIAssistantOpen) return null;
+  if (!isAIAssistantOpen || currentRole !== 'consumer') return null;
+
+  const isSensitiveOrRestrictedQuery = (query: string): boolean => {
+    const q = query.toLowerCase();
+    return /\b(password|passcode|pin|otp|credential|credentials|login\s*id|employee\s*id|admin\s*id|secret|token|api\s*key|aadhaar|aadhar|pan\s*card|bank\s*account|cvv|card\s*number|other\s*user|other\s*consumer|someone\s*else|all\s*consumers|customer\s*list|phone\s*numbers|email\s*list|private\s*data|personal\s*info)\b/i.test(
+      q
+    );
+  };
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend || inputVal).trim();
     if (!text || isLoading || isSubmittingRef.current) return;
+
+    if (isSensitiveOrRestrictedQuery(text)) {
+      const userMsg: ChatMessage = {
+        id: `msg-user-${Date.now()}`,
+        sender: 'user',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        text,
+      };
+      const guardMsg: ChatMessage = {
+        id: `msg-guard-${Date.now() + 1}`,
+        sender: 'assistant',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        text: 'For your security and privacy, **Vidyut Mitra** cannot share passwords, login credentials, OTPs, tokens, Aadhaar/PAN or bank details, or any other person\'s account or personal information.\n\nI am here to help you with normal consumer queries such as your electricity bills, tariff slabs, new connection steps, solar net-metering, power outage complaints, or UGVCL helpline support (**19124 / 19121**).',
+        personaName: currentPersona.name,
+        contextTag: 'system',
+      };
+      setMessages(prev => [...prev, userMsg, guardMsg]);
+      if (!textToSend) setInputVal('');
+      return;
+    }
 
     isSubmittingRef.current = true;
     shouldAutoScrollRef.current = true;
@@ -651,7 +678,7 @@ export const AIAssistantDrawer: React.FC = () => {
         </div>
 
         {/* Human-in-the-Loop Action Recommendations Banner */}
-        {recommendations.filter(r => r.status === 'PENDING_APPROVAL' && (r.requiredApprovingRole === currentRole || currentRole === 'management' || currentRole === 'admin')).length > 0 && (
+        {recommendations.filter(r => r.status === 'PENDING_APPROVAL' && r.requiredApprovingRole === currentRole).length > 0 && (
           <div className="px-4 py-2.5 bg-indigo-50/70 border-t border-indigo-100 shrink-0 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-950">
@@ -659,13 +686,13 @@ export const AIAssistantDrawer: React.FC = () => {
                 <span>AI Action Recommendations (Human Concurrence Required)</span>
               </div>
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
-                {recommendations.filter(r => r.status === 'PENDING_APPROVAL' && (r.requiredApprovingRole === currentRole || currentRole === 'management' || currentRole === 'admin')).length} Pending
+                {recommendations.filter(r => r.status === 'PENDING_APPROVAL' && r.requiredApprovingRole === currentRole).length} Pending
               </span>
             </div>
 
             <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
               {recommendations
-                .filter(r => r.status === 'PENDING_APPROVAL' && (r.requiredApprovingRole === currentRole || currentRole === 'management' || currentRole === 'admin'))
+                .filter(r => r.status === 'PENDING_APPROVAL' && r.requiredApprovingRole === currentRole)
                 .slice(0, 3)
                 .map(rec => (
                   <div

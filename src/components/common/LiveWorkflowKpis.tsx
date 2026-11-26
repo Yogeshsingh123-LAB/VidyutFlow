@@ -163,6 +163,8 @@ const Tile: React.FC<{ label: string; value: string; tone?: string; sub?: string
 );
 
 export const LiveWorkflowKpis: React.FC = () => {
+  const showServerPanel = false as boolean;
+  if (!showServerPanel) return null;
   const { language } = useLanguage();
   const t = LIVE_KPIS_TRANSLATIONS[language] || LIVE_KPIS_TRANSLATIONS.en;
   const { data, error, lastUpdated, refresh, loading } = useLivePoll<LiveKpiSummary>(fetchLiveKpis);

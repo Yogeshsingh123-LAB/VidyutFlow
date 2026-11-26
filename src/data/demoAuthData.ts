@@ -566,3 +566,33 @@ export function setStoredDemoSession(session: DemoSession | null): void {
   }
 }
 
+/** Verifies the active staff/employee password before executing sensitive queue actions. */
+export function verifyStaffActionPassword(
+  plainPassword: string,
+  actor?: { id?: string; email?: string; role?: UserRole }
+): boolean {
+  const trimmed = (plainPassword || '').trim();
+  if (!trimmed) return false;
+
+  const canonical = resolveCanonicalDemoIdentity({
+    id: actor?.id,
+    email: actor?.email,
+    role: actor?.role,
+  });
+  if (canonical && canonical.password === trimmed) {
+    return true;
+  }
+
+  const customUsers = getCustomDemoUsers();
+  const matchedCustom = customUsers.find(
+    (u) =>
+      (actor?.id && u.id === actor.id) ||
+      (actor?.email && u.email.toLowerCase() === actor.email.toLowerCase())
+  );
+  if (matchedCustom && verifyDemoPassword(trimmed, matchedCustom.passwordHash)) {
+    return true;
+  }
+
+  return false;
+}
+

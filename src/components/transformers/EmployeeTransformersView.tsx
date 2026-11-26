@@ -1452,8 +1452,8 @@ export const EmployeeTransformersView: React.FC = () => {
 
                   {!showChartDataTable ? (
                     <div className="border border-slate-200 rounded-2xl p-4 bg-white">
-                      <div className="h-72 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
+                      <div className="h-64 w-full min-w-0">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
                           <LineChart data={activeTelemetrySeries}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                             <XAxis dataKey="timeLabel" stroke="#94a3b8" fontSize={11} />
@@ -2145,9 +2145,9 @@ export const EmployeeTransformersView: React.FC = () => {
               </div>
 
               <div className="p-3 bg-blue-50/70 rounded-xl border border-blue-200/80 text-blue-900 text-xs leading-relaxed">
-                <strong>Deterministic Data Policy:</strong> When the FastAPI gateway (:8008) is standby, VidyutFlow
+                <strong>Deterministic Data Policy:</strong> VidyutFlow
                 uses calibrated mathematical models reflecting real utility engineering standards (IEC 60076, CEA Grid Code).
-                Zero fake LIVE data is presented; all scenarios reflect audited baseline fixtures.
+                All scenarios reflect audited baseline fixtures.
               </div>
             </div>
 

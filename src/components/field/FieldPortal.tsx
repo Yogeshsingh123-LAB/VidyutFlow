@@ -3,6 +3,20 @@ import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 const FieldTransformerInspectionsView = React.lazy(() =>
   import('../transformers/FieldTransformerInspectionsView').then(m => ({ default: m.FieldTransformerInspectionsView }))
 );
+
+const workOrderNeedsMeterReading = (wo: WorkOrder): boolean => {
+  if (wo.type === 'Meter Replacement' || wo.type === 'Disconnection Order') {
+    return true;
+  }
+  const text = `${wo.title} ${wo.scopeDescription || ''} ${wo.recommendedAction || ''}`.toLowerCase();
+  return (
+    text.includes('meter reading') ||
+    text.includes('reread') ||
+    text.includes('re-read') ||
+    text.includes('meter verification') ||
+    text.includes('meter check')
+  );
+};
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { UGVCL_LOGO_PATH, FEEDER_METRICS } from '../../data/mockData';
@@ -18,6 +32,7 @@ import {
   getDocumentUiTranslations,
   generateInspectionSummaryDocument,
 } from '../../utils/documentEngine';
+import { isWorkOrderAssignedToFieldEngineer } from '../../utils/exportEngine';
 import {
   FIELD_UI_TRANSLATIONS,
   localizeFeederName,
@@ -124,7 +139,7 @@ export const FieldPortal: React.FC = () => {
   const [fieldOfficialDoc, setFieldOfficialDoc] = useState<GeneratedOfficialDocument | null>(null);
 
   const fieldDocumentActor = {
-    id: activeUser.name || 'FLD-UG-201',
+    id: activeUser.id || activeUser.name || 'FLD-UG-201',
     name: activeUser.name,
     role: 'field' as const,
     email: activeUser.email,
@@ -518,7 +533,7 @@ export const FieldPortal: React.FC = () => {
           {/* Manual Sync Button (Accessible Fallback) */}
           <button
             type="button"
-            disabled={isFieldSyncing || isBrowserOffline || isOfflineSimulated || (pendingOfflineCount === 0 && failedOfflineCount === 0)}
+            disabled={isFieldSyncing || isBrowserOffline || (pendingOfflineCount === 0 && failedOfflineCount === 0)}
             onClick={() => handleSimulateSyncNow()}
             className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold cursor-pointer shadow-xs transition-all"
           >
@@ -1042,6 +1057,7 @@ export const FieldPortal: React.FC = () => {
                     )}
                     {wo.status !== 'Completed' && (
                       <>
+                      {workOrderNeedsMeterReading(wo) && (
                       <button
                         type="button"
                         onClick={() => setMeterReadingWorkOrder(wo)}
@@ -1051,6 +1067,7 @@ export const FieldPortal: React.FC = () => {
                         <Camera className="w-3.5 h-3.5" />
                         <span>Meter Reading</span>
                       </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setEvidenceModalWO(wo)}
@@ -1225,10 +1242,10 @@ export const FieldPortal: React.FC = () => {
 
       {/* TAB 3: SITE INSPECTION FORM */}
       {activeTab === 'inspections' && (
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+        <div className="w-full">
+          <div className="bg-white dark:bg-[#111827] rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs">
+            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
                 <FileCheck className="w-5 h-5" />
               </div>
               <div>
@@ -1244,7 +1261,7 @@ export const FieldPortal: React.FC = () => {
               </div>
             </div>
 
-            <form onSubmit={handleInspectionSubmit} className="space-y-4">
+            <form onSubmit={handleInspectionSubmit} className="space-y-3.5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -1419,7 +1436,7 @@ export const FieldPortal: React.FC = () => {
             <button
               type="button"
               data-testid="offline-queue-manual-sync-btn"
-              disabled={isFieldSyncing || isBrowserOffline || isOfflineSimulated || (pendingOfflineCount === 0 && failedOfflineCount === 0)}
+              disabled={isFieldSyncing || isBrowserOffline || (pendingOfflineCount === 0 && failedOfflineCount === 0)}
               onClick={() => handleSimulateSyncNow()}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold cursor-pointer shrink-0 transition-colors shadow-xs"
             >
@@ -2065,7 +2082,11 @@ export const FieldPortal: React.FC = () => {
                       className="flex items-center gap-2 self-start sm:self-center flex-wrap"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {wo.inspectionReport && (
+                      {wo.inspectionReport &&
+                        isWorkOrderAssignedToFieldEngineer(
+                          wo as unknown as Record<string, unknown>,
+                          fieldDocumentActor
+                        ) && (
                         <button
                           type="button"
                           onClick={() =>

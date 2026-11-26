@@ -138,6 +138,27 @@ export const SmartOutageMapPanel: React.FC<SmartOutageMapPanelProps> = ({
 
       mapInstanceRef.current = map;
       overlayLayerRef.current = layerGroup;
+
+      const rafId = window.requestAnimationFrame(() => {
+        map.invalidateSize({ animate: false });
+      });
+      const resizeObserver =
+        typeof ResizeObserver !== 'undefined'
+          ? new ResizeObserver(() => {
+              map.invalidateSize({ animate: false });
+            })
+          : null;
+      resizeObserver?.observe(el);
+
+      return () => {
+        window.cancelAnimationFrame(rafId);
+        resizeObserver?.disconnect();
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.remove();
+          mapInstanceRef.current = null;
+          overlayLayerRef.current = null;
+        }
+      };
     } catch {
       setTileErrorDetected(true);
     }

@@ -172,6 +172,8 @@ const SANDBOX_ALERT_FALLBACK: AlertDispatchItem[] = [
 ];
 
 export const LiveAlertEnginePanel: React.FC = () => {
+  const showServerPanel = false as boolean;
+  if (!showServerPanel) return null;
   const { showToast } = useApp();
   const { language } = useLanguage();
   const ui = ALERT_ENGINE_TRANSLATIONS[language] || ALERT_ENGINE_TRANSLATIONS.en;

@@ -19,7 +19,12 @@ import {
   Info,
   Layers,
   Sparkles,
+  Lock,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
+import { verifyStaffActionPassword } from '../../data/demoAuthData';
 import { NewConnectionApplication } from '../../types';
 import { Language } from '../../i18n/types';
 import {
@@ -726,66 +731,14 @@ export const ApplicationInspectFileWorkspace: React.FC<ApplicationInspectFileWor
         </div>
       )}
 
-      {/* 4. AUTHORIZED STAFF LIFECYCLE CONTROLS (ONLY FOR AUTHORIZED UTILITY ROLES) */}
+      {/* 4. AUTHORIZED STAFF LIFECYCLE CONTROLS (Password-Protected Action Desk) */}
       {canMutateLifecycle && onUpdateStatus && (
-        <div className="p-4 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-950 dark:text-amber-200 flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-amber-700" />
-              <span>Utility Officer Control Bar (Staff Only)</span>
-            </span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-200 text-amber-900">
-              Restricted Access
-            </span>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => onUpdateStatus('Document Verification', 'Scrutiny passed by subdivision.')}
-              className="px-2.5 py-1.5 rounded text-xs font-semibold bg-white dark:bg-slate-800 hover:bg-slate-100 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 cursor-pointer"
-            >
-              Approve Docs (Step 2)
-            </button>
-            <button
-              type="button"
-              onClick={() => onUpdateStatus('Site Inspection', 'Assigned site visit to JE field.')}
-              className="px-2.5 py-1.5 rounded text-xs font-semibold bg-white dark:bg-slate-800 hover:bg-slate-100 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 cursor-pointer"
-            >
-              Dispatch Site Visit (Step 3)
-            </button>
-            <button
-              type="button"
-              onClick={() => onUpdateStatus('Sanction Approval', 'Technical feasibility cleared. Ready for payment.')}
-              className="px-2.5 py-1.5 rounded text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
-            >
-              Sanction File (Step 4)
-            </button>
-            <button
-              type="button"
-              onClick={() => onUpdateStatus('Meter Installed', 'Smart meter energized.')}
-              className="px-2.5 py-1.5 rounded text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
-            >
-              Energize Meter (Step 5)
-            </button>
-            {onRequestClarification && (
-              <button
-                type="button"
-                onClick={() => onRequestClarification(newStaffNote || 'Please upload updated property deed copy.')}
-                className="px-2.5 py-1.5 rounded text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white cursor-pointer"
-              >
-                Request Clarification
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => onUpdateStatus('Rejected', 'Site feasibility rejected by subdivision.')}
-              className="px-2.5 py-1.5 rounded text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white cursor-pointer"
-            >
-              Reject File
-            </button>
-          </div>
-        </div>
+        <StaffApplicationActionDesk
+          applicationStatus={application.status}
+          hasClarificationHandler={Boolean(onRequestClarification)}
+          onExecuteStatus={(status, note) => onUpdateStatus(status, note)}
+          onExecuteClarification={(note) => onRequestClarification?.(note)}
+        />
       )}
 
       {/* READ-ONLY CONSUMER FOOTER DISCLAIMER */}
@@ -808,6 +761,235 @@ export const ApplicationInspectFileWorkspace: React.FC<ApplicationInspectFileWor
           </span>
         </div>
       )}
+    </div>
+  );
+};
+
+
+interface PendingStaffAction {
+  kind: 'status' | 'clarification';
+  status?: string;
+  label: string;
+  defaultNote: string;
+}
+
+const StaffApplicationActionDesk: React.FC<{
+  applicationStatus: string;
+  hasClarificationHandler: boolean;
+  onExecuteStatus: (status: string, note: string) => void;
+  onExecuteClarification: (note: string) => void;
+}> = ({ applicationStatus, hasClarificationHandler, onExecuteStatus, onExecuteClarification }) => {
+  const { currentRole, activeUser } = useApp();
+  const [remarksInput, setRemarksInput] = useState('');
+  const [pendingAction, setPendingAction] = useState<PendingStaffAction | null>(null);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
+  const startAction = (action: PendingStaffAction) => {
+    setPendingAction(action);
+    setPasswordInput('');
+    setPasswordError(null);
+  };
+
+  const handleConfirmWithPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingAction) return;
+
+    const ok = verifyStaffActionPassword(passwordInput, {
+      id: activeUser?.id,
+      email: activeUser?.email,
+      role: currentRole,
+    });
+
+    if (!ok) {
+      setPasswordError('Incorrect employee password. Action authorization denied.');
+      return;
+    }
+
+    const finalNote = remarksInput.trim() || pendingAction.defaultNote;
+    if (pendingAction.kind === 'status' && pendingAction.status) {
+      onExecuteStatus(pendingAction.status, finalNote);
+    } else if (pendingAction.kind === 'clarification') {
+      onExecuteClarification(finalNote);
+    }
+
+    setPendingAction(null);
+    setPasswordInput('');
+    setPasswordError(null);
+    setRemarksInput('');
+  };
+
+  const actionButtons: Array<PendingStaffAction & { styleClass: string }> = [
+    {
+      kind: 'status',
+      status: 'Document Verification',
+      label: 'Approve Docs (Step 2)',
+      defaultNote: 'Scrutiny passed by subdivision.',
+      styleClass:
+        'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100',
+    },
+    {
+      kind: 'status',
+      status: 'Site Inspection',
+      label: 'Dispatch Site Visit (Step 3)',
+      defaultNote: 'Assigned site visit to JE field.',
+      styleClass:
+        'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100',
+    },
+    {
+      kind: 'status',
+      status: 'Sanction Approval',
+      label: 'Sanction File (Step 4)',
+      defaultNote: 'Technical feasibility cleared. Ready for payment.',
+      styleClass: 'bg-blue-600 hover:bg-blue-700 border-blue-600 text-white',
+    },
+    {
+      kind: 'status',
+      status: 'Meter Installed',
+      label: 'Energize Meter (Step 5)',
+      defaultNote: 'Smart meter energized.',
+      styleClass: 'bg-emerald-600 hover:bg-emerald-700 border-emerald-600 text-white',
+    },
+    ...(hasClarificationHandler
+      ? [
+          {
+            kind: 'clarification' as const,
+            label: 'Request Clarification',
+            defaultNote: 'Please upload updated property deed copy.',
+            styleClass: 'bg-amber-600 hover:bg-amber-700 border-amber-600 text-white',
+          },
+        ]
+      : []),
+    {
+      kind: 'status',
+      status: 'Rejected',
+      label: 'Reject File',
+      defaultNote: 'Site feasibility rejected by subdivision.',
+      styleClass: 'bg-rose-600 hover:bg-rose-700 border-rose-600 text-white',
+    },
+  ];
+
+  return (
+    <div
+      data-testid="employee-action-desk"
+      className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#101C35] shadow-sm overflow-hidden"
+    >
+      {/* Header Strip */}
+      <div className="px-4 py-3 bg-[#0A2540] text-white flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-[#FF6B00] shrink-0" />
+          <span className="text-xs font-bold tracking-wide">
+            Employee Action &amp; Authorization Desk
+          </span>
+        </div>
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-white/10 text-amber-200 border border-white/15">
+          <Lock className="w-3 h-3" />
+          <span>Password Required · {applicationStatus}</span>
+        </span>
+      </div>
+
+      <div className="p-4 space-y-3.5">
+        {/* Official Remarks Input */}
+        <div className="space-y-1">
+          <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block">
+            Official Remarks / Inspection Note (Optional)
+          </label>
+          <input
+            type="text"
+            value={remarksInput}
+            onChange={(e) => setRemarksInput(e.target.value)}
+            placeholder="Enter scrutiny remarks, site note, or clarification reason..."
+            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0A2540]/20"
+          />
+        </div>
+
+        {/* Action Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {actionButtons.map((btn) => {
+            const isSelected = pendingAction?.label === btn.label;
+            return (
+              <button
+                key={btn.label}
+                type="button"
+                onClick={() => startAction(btn)}
+                className={`min-h-[40px] px-3 py-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  btn.styleClass
+                } ${isSelected ? 'ring-2 ring-[#FF6B00] ring-offset-1' : ''}`}
+              >
+                <Lock className="w-3 h-3 opacity-80 shrink-0" />
+                <span>{btn.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Inline Password Confirmation Panel */}
+        {pendingAction && (
+          <form
+            onSubmit={handleConfirmWithPassword}
+            className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700 space-y-2.5 animate-in fade-in"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-bold text-[#0A2540] dark:text-white flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-[#FF6B00]" />
+                <span>Authorize Action: {pendingAction.label}</span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-500">
+                {activeUser?.email || 'Employee Session'}
+              </span>
+            </div>
+
+            {passwordError && (
+              <div className="p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-semibold">
+                {passwordError}
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  autoFocus
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    if (passwordError) setPasswordError(null);
+                  }}
+                  placeholder="Enter your employee password to confirm"
+                  className="w-full h-10 pl-3 pr-9 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/40"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <button
+                type="submit"
+                className="h-10 px-4 rounded-xl bg-[#0A2540] hover:bg-[#12365c] text-white text-xs font-bold cursor-pointer shrink-0"
+              >
+                Confirm &amp; Execute
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingAction(null);
+                  setPasswordInput('');
+                  setPasswordError(null);
+                }}
+                className="h-10 px-3.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-xs font-semibold cursor-pointer shrink-0"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 };

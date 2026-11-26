@@ -60,6 +60,7 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
 }) => {
   const {
     activeUser,
+    demoSession,
     userConnections: consumerConnections,
     selectedConsumerConnectionNo,
     setSelectedConsumerConnectionNo,
@@ -75,6 +76,10 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
   };
 
 
+  const isDemoConsumerAccount =
+    activeUser?.id === 'demo_consumer' ||
+    activeUser?.email?.toLowerCase() === 'consumer@vidyutflow.demo';
+
   // Active sub-tab
   const [activeSubTab, setActiveSubTab] = useState<
     'personal' | 'addresses' | 'connections' | 'preferences' | 'security' | 'activity'
@@ -82,27 +87,33 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
 
   // Personal Info Form State
   const [isEditingPersonal, setIsEditingPersonal] = useState(false);
-  const [fullName, setFullName] = useState(activeUser?.name || 'Smt. Meenaben Patel');
-  const [dateOfBirth, setDateOfBirth] = useState('1979-08-14');
+  const [fullName, setFullName] = useState(activeUser?.name || '');
+  const [dateOfBirth, setDateOfBirth] = useState(isDemoConsumerAccount ? '1979-08-14' : '');
+  const [profileMobile, setProfileMobile] = useState(demoSession?.user?.mobileNumber || '');
+  const [profileEmail, setProfileEmail] = useState(activeUser?.email || '');
   const [personalSaveStatus, setPersonalSaveStatus] = useState<string | null>(null);
 
-  // Address State
-  const [addresses, setAddresses] = useState<AddressItem[]>([
-    {
-      id: 'addr-01',
-      addressType: 'RESIDENTIAL',
-      isPrimary: true,
-      houseFlatNo: '14',
-      street: 'Anand Nagar Society',
-      area: 'Visnagar Road',
-      cityVillage: 'Mehsana',
-      taluka: 'Mehsana',
-      district: 'Mehsana',
-      state: 'Gujarat',
-      pinCode: '384002',
-      formatted: '14, Anand Nagar Society, Visnagar Road, Mehsana, Mehsana - 384002'
-    }
-  ]);
+  // Address State (newly registered consumers start with zero addresses)
+  const [addresses, setAddresses] = useState<AddressItem[]>(
+    isDemoConsumerAccount
+      ? [
+          {
+            id: 'addr-01',
+            addressType: 'RESIDENTIAL',
+            isPrimary: true,
+            houseFlatNo: '14',
+            street: 'Anand Nagar Society',
+            area: 'Visnagar Road',
+            cityVillage: 'Mehsana',
+            taluka: 'Mehsana',
+            district: 'Mehsana',
+            state: 'Gujarat',
+            pinCode: '384002',
+            formatted: '14, Anand Nagar Society, Visnagar Road, Mehsana, Mehsana - 384002'
+          }
+        ]
+      : []
+  );
   const [isAddAddressOpen, setIsAddAddressOpen] = useState(false);
   const [addressFormData, setAddressFormData] = useState({
     addressType: 'RESIDENTIAL' as 'RESIDENTIAL' | 'COMMERCIAL' | 'CORRESPONDENCE' | 'BILLING',
@@ -145,24 +156,37 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
   // Sessions State
-  const [sessions, setSessions] = useState([
-    {
-      id: 'sess-01',
-      device: 'Chrome on Windows 11',
-      ip: '127.0.0.1 (Localhost / Sandbox)',
-      location: 'Gandhinagar, Gujarat',
-      lastActive: 'Active now',
-      isCurrent: true
-    },
-    {
-      id: 'sess-02',
-      device: 'Mobile Safari on iPhone 15',
-      ip: '49.36.128.45',
-      location: 'Mehsana, Gujarat',
-      lastActive: 'Yesterday at 18:42',
-      isCurrent: false
-    }
-  ]);
+  const [sessions, setSessions] = useState(
+    isDemoConsumerAccount
+      ? [
+          {
+            id: 'sess-01',
+            device: 'Chrome on Windows 11',
+            ip: '127.0.0.1 (Localhost / Sandbox)',
+            location: 'Gandhinagar, Gujarat',
+            lastActive: 'Active now',
+            isCurrent: true
+          },
+          {
+            id: 'sess-02',
+            device: 'Mobile Safari on iPhone 15',
+            ip: '49.36.128.45',
+            location: 'Mehsana, Gujarat',
+            lastActive: 'Yesterday at 18:42',
+            isCurrent: false
+          }
+        ]
+      : [
+          {
+            id: 'sess-01',
+            device: 'Current Browser Session',
+            ip: 'Active Session',
+            location: 'Gujarat, India',
+            lastActive: 'Active now',
+            isCurrent: true
+          }
+        ]
+  );
 
   // Activity Audit Log
   const [activities, setActivities] = useState<ActivityItem[]>([
@@ -171,41 +195,49 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
       event_type: 'PROFILE_UPDATED',
       description: 'Citizen account profile accessed and verified',
       created_at: new Date().toISOString()
-    },
-    {
-      id: 'act-02',
-      event_type: 'SECURITY_LOGIN',
-      description: 'Successful authenticated login from Chrome / Windows',
-      created_at: new Date(Date.now() - 3600000).toISOString()
     }
   ]);
 
+  // Keep local state aligned with authenticated user session
+  useEffect(() => {
+    if (activeUser?.name) setFullName(activeUser.name);
+    if (activeUser?.email) setProfileEmail(activeUser.email);
+    if (demoSession?.user?.mobileNumber) setProfileMobile(demoSession.user.mobileNumber);
+  }, [activeUser?.id, activeUser?.name, activeUser?.email, demoSession?.user?.mobileNumber]);
+
   // Sync with API on load
   useEffect(() => {
-    // Attempt fetching live profile data
     fetch('/api/v1/consumer/profile', {
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' }
     })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (data && data.full_name) {
-          setFullName(data.full_name);
-          if (data.date_of_birth) setDateOfBirth(data.date_of_birth);
+        if (data) {
+          if (data.full_name) setFullName(data.full_name);
+          if (typeof data.date_of_birth === 'string') setDateOfBirth(data.date_of_birth);
+          if (data.contacts?.mobile_number && !demoSession?.user?.mobileNumber) {
+            setProfileMobile(data.contacts.mobile_number);
+          }
+          if (data.contacts?.email && !activeUser?.email) {
+            setProfileEmail(data.contacts.email);
+          }
         }
       })
       .catch(() => undefined);
 
     fetch('/api/v1/consumer/addresses', {
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' }
     })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
           setAddresses(data);
         }
       })
       .catch(() => undefined);
-  }, []);
+  }, [activeUser?.id]);
 
   const isNewApplicant = consumerConnections.length === 0;
 
@@ -233,7 +265,8 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
     try {
       await fetch('/api/v1/consumer/profile', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-VidyutFlow-CSRF': '1' },
         body: JSON.stringify({ full_name: fullName.trim(), date_of_birth: dateOfBirth })
       });
     } catch {
@@ -300,7 +333,8 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
     try {
       await fetch('/api/v1/consumer/addresses', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-VidyutFlow-CSRF': '1' },
         body: JSON.stringify({
           address_type: newAddressItem.addressType,
           is_primary: newAddressItem.isPrimary,
@@ -372,7 +406,8 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
     try {
       const res = await fetch('/api/v1/consumer/connections/link/initiate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-VidyutFlow-CSRF': '1' },
         body: JSON.stringify({ consumer_no: cleaned })
       });
       const data = await res.json();
@@ -406,7 +441,8 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
     try {
       const res = await fetch('/api/v1/consumer/connections/link/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-VidyutFlow-CSRF': '1' },
         body: JSON.stringify({ consumer_no: linkConsumerNo.trim(), otp: linkOtp.trim() })
       });
       const data = await res.json();
@@ -459,7 +495,8 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
     try {
       const res = await fetch('/api/v1/consumer/security/change-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-VidyutFlow-CSRF': '1' },
         body: JSON.stringify({
           current_password: currentPassword,
           new_password: newPassword,
@@ -508,23 +545,23 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12">
-      {/* Profile Overview Card */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-6">
+    <div className="space-y-6 pb-12">
+      {/* Profile Overview Card (Matches Consumer Dashboard Header & Palette) */}
+      <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#101C35] border border-slate-200/80 dark:border-slate-800 shadow-2xs space-y-5">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-extrabold text-2xl flex items-center justify-center shadow-md shrink-0">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#0A2540] text-white font-black text-xl sm:text-2xl flex items-center justify-center shadow-sm border-2 border-[#FF6B00]/80 shrink-0">
               {fullName.slice(0, 2).toUpperCase()}
             </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-bold text-slate-900 dark:text-white">
+                <h1 className="text-lg sm:text-xl font-black text-[#0A2540] dark:text-white tracking-tight">
                   {fullName}
                 </h1>
                 <span
-                  className={`text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 ${
+                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 ${
                     isNewApplicant
-                      ? 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                      ? 'bg-amber-50 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                       : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                   }`}
                 >
@@ -532,26 +569,26 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
                   {isNewApplicant ? t.applicantBadge : t.consumerBadge}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-mono">
-                Citizen Account ID: <span className="text-slate-700 dark:text-slate-300 font-semibold">{activeUser?.id || 'CITIZEN-001'}</span>
-                {' • '}DISCOM: <span className="font-semibold text-blue-600 dark:text-blue-400">UGVCL</span>
+              <p className="text-xs text-slate-600 dark:text-slate-400 font-mono">
+                Citizen Account ID: <span className="text-[#0A2540] dark:text-slate-200 font-bold">{activeUser?.id || 'CITIZEN-001'}</span>
+                {' • '}DISCOM: <span className="font-bold text-[#FF6B00]">UGVCL</span>
               </p>
             </div>
           </div>
 
           {/* Profile Completion Indicator */}
-          <div className="w-full sm:w-auto bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 min-w-[220px]">
+          <div className="w-full sm:w-auto bg-[#F4F7FB] dark:bg-slate-900/60 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 min-w-[235px]">
             <div className="flex items-center justify-between text-xs mb-1.5">
-              <span className="font-semibold text-slate-700 dark:text-slate-300">Profile Completion</span>
-              <span className="font-bold text-blue-600 dark:text-blue-400">{completionPercentage}%</span>
+              <span className="font-bold text-[#0A2540] dark:text-slate-300">Profile Completion</span>
+              <span className="font-black font-mono tabular-nums text-[#0A2540] dark:text-blue-400">{completionPercentage}%</span>
             </div>
             <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500"
+                className="h-full bg-gradient-to-r from-[#0A2540] to-[#FF6B00] rounded-full transition-all duration-500"
                 style={{ width: `${completionPercentage}%` }}
               />
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1.5 font-medium">
               {completionPercentage === 100
                 ? 'All citizen profile requirements completed'
                 : isNewApplicant
@@ -561,8 +598,66 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
           </div>
         </div>
 
-        {/* Sub-tab Pill Navigation */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-slate-100 dark:border-slate-800 text-sm">
+        {/* 4 Dashboard-Matched Pastel KPI Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <div className="bg-[#F0F7FF] border border-[#D5E6FA] rounded-2xl p-3.5 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+              <User className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Identity</div>
+              <div className="text-lg font-black text-[#0A2540] tabular-nums">{completionPercentage}%</div>
+              <div className="text-[11px] font-semibold text-blue-700 truncate">Citizen KYC</div>
+            </div>
+          </div>
+
+          <div
+            onClick={() => setActiveSubTab('connections')}
+            className="bg-[#F0FDF4] border border-[#DCFCE7] rounded-2xl p-3.5 flex items-center gap-3 cursor-pointer hover:shadow-xs transition-shadow"
+          >
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Connections</div>
+              <div className="text-lg font-black text-[#0A2540] tabular-nums">{(consumerConnections || []).length}</div>
+              <div className="text-[11px] font-semibold text-emerald-700 truncate">
+                {(consumerConnections || []).length > 0 ? 'Active Utility Links' : 'No Active Connection'}
+              </div>
+            </div>
+          </div>
+
+          <div
+            onClick={() => setActiveSubTab('addresses')}
+            className="bg-[#FAF5FF] border border-[#F3E8FF] rounded-2xl p-3.5 flex items-center gap-3 cursor-pointer hover:shadow-xs transition-shadow"
+          >
+            <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+              <MapPin className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Addresses</div>
+              <div className="text-lg font-black text-[#0A2540] tabular-nums">{addresses.length}</div>
+              <div className="text-[11px] font-semibold text-purple-700 truncate">Permitted Premises</div>
+            </div>
+          </div>
+
+          <div
+            onClick={() => setActiveSubTab('security')}
+            className="bg-[#FFFBEB] border border-[#FEF3C7] rounded-2xl p-3.5 flex items-center gap-3 cursor-pointer hover:shadow-xs transition-shadow"
+          >
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Security</div>
+              <div className="text-lg font-black text-[#0A2540] tabular-nums">{sessions.length}</div>
+              <div className="text-[11px] font-semibold text-amber-800 truncate">Active Session(s)</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sub-tab Pill Navigation (Matches Homepage/Dashboard Navy Active Pill) */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pt-1 border-t border-slate-100 dark:border-slate-800 text-sm">
           {[
             { id: 'personal', label: t.tabPersonal, icon: User },
             { id: 'addresses', label: t.tabAddresses, icon: MapPin },
@@ -576,14 +671,15 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
             return (
               <button
                 key={tab.id}
+                type="button"
                 onClick={() => setActiveSubTab(tab.id as any)}
-                className={`flex items-center gap-2 px-3.5 py-2 font-medium rounded-xl transition-all whitespace-nowrap cursor-pointer text-xs sm:text-sm ${
+                className={`flex items-center gap-2 px-4 py-2.5 min-h-[40px] font-semibold rounded-xl transition-all whitespace-nowrap cursor-pointer text-xs sm:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A2540] ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                    ? 'bg-[#0A1C3E] text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-[#0A2540] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className={`w-4 h-4 ${isActive ? 'text-[#FF6B00]' : ''}`} />
                 <span>{tab.label}</span>
               </button>
             );
@@ -646,7 +742,7 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
                 <div className="flex items-center gap-2 pt-2">
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs cursor-pointer"
+                    className="px-4 py-2.5 bg-[#0A2540] hover:bg-[#12365c] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
                   >
                     Save Changes
                   </button>
@@ -712,10 +808,10 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
                     Verified
                   </span>
                 </div>
-                <p className="font-mono font-bold text-slate-900 dark:text-white text-base">
-                  +91 98250 14820
+                <p className="font-mono font-bold text-[#0A2540] dark:text-white text-base">
+                  {profileMobile || demoSession?.user?.mobileNumber || 'Not provided'}
                 </p>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-600 dark:text-slate-400">
                   Used for instant bill reminders, outage alerts and official OTP confirmations.
                 </p>
               </div>
@@ -728,10 +824,10 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
                     Verified
                   </span>
                 </div>
-                <p className="font-medium text-slate-900 dark:text-white text-sm">
-                  {activeUser?.email || 'meenaben.patel@example.com'}
+                <p className="font-medium text-[#0A2540] dark:text-white text-sm">
+                  {profileEmail || activeUser?.email || 'Not provided'}
                 </p>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-600 dark:text-slate-400">
                   Electronic bills, payment receipts and formal statutory notices delivered here.
                 </p>
               </div>
@@ -757,7 +853,7 @@ export const ConsumerProfileWorkspace: React.FC<ConsumerProfileWorkspaceProps> =
             <button
               type="button"
               onClick={() => setIsAddAddressOpen(true)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0"
+              className="px-4 py-2.5 bg-[#0A2540] hover:bg-[#12365c] text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0"
             >
               <Plus className="w-4 h-4" />
               Add New Address

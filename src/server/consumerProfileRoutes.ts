@@ -39,20 +39,20 @@ export interface ConsumerConnectionDto {
 }
 
 // In-memory store for demo/standalone node parity
+const inMemoryProfiles: Map<string, { full_name?: string; date_of_birth?: string }> = new Map();
 const inMemoryAddresses: Map<string, ConsumerAddressDto[]> = new Map();
 const inMemoryPreferences: Map<string, any> = new Map();
 const inMemoryActivities: Map<string, any[]> = new Map();
 const inMemoryConnectionOtps: Map<string, { otp: string; expiresAt: number; attempts: number }> = new Map();
 
-function getUserIdFromReq(req: IncomingMessage): string | null {
+function getSessionFromReq(req: IncomingMessage) {
   const cookieToken = parseSessionCookieHeader(req.headers.cookie);
   const authHeader = req.headers.authorization;
   const bearerToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
   const token = cookieToken || bearerToken;
   if (!token) return null;
   try {
-    const session = defaultServerAuthService.validateSession(token);
-    return session ? session.userId : null;
+    return defaultServerAuthService.validateSession(token) || null;
   } catch {
     return null;
   }
@@ -123,36 +123,47 @@ export async function handleConsumerProfileRoute(req: IncomingMessage, res: Serv
 
   const cleanPath = url.split('?')[0].replace(/^\/api\/v1\/consumer/, '').replace(/^\/api\/consumer/, '');
   const method = req.method || 'GET';
-  const userId = getUserIdFromReq(req);
-  if (!userId) {
+  const session = getSessionFromReq(req);
+  if (!session) {
     sendJson(res, 401, { detail: 'Authentication required.' });
     return true;
   }
+  const userId = session.userId;
+  const isDemoConsumer =
+    Boolean(session.user?.isDemoAccount) ||
+    userId === 'demo_consumer' ||
+    userId === 'demo-consumer-meenaben-patel' ||
+    session.user?.email?.toLowerCase() === 'consumer@vidyutflow.demo';
   if ((method === 'POST' || method === 'PATCH' || method === 'DELETE') && !hasValidCsrf(req)) {
     sendJson(res, 403, { detail: 'CSRF validation failed: Missing required X-VidyutFlow-CSRF header.' });
     return true;
   }
 
-  // Initialize demo addresses if empty
+  // Only seed default address for the built-in demo consumer; newly registered consumers start with []
   if (!inMemoryAddresses.has(userId)) {
-    inMemoryAddresses.set(userId, [
-      {
-        id: 'addr-demo-01',
-        userId,
-        addressType: 'RESIDENTIAL',
-        isPrimary: true,
-        houseFlatNo: '14',
-        street: 'Anand Nagar Society',
-        area: 'Visnagar Road',
-        cityVillage: 'Mehsana',
-        taluka: 'Mehsana',
-        district: 'Mehsana',
-        state: 'Gujarat',
-        pinCode: '384002',
-        formatted: '14, Anand Nagar Society, Visnagar Road, Mehsana, Mehsana - 384002',
-        createdAt: new Date().toISOString()
-      }
-    ]);
+    inMemoryAddresses.set(
+      userId,
+      isDemoConsumer
+        ? [
+            {
+              id: 'addr-demo-01',
+              userId,
+              addressType: 'RESIDENTIAL',
+              isPrimary: true,
+              houseFlatNo: '14',
+              street: 'Anand Nagar Society',
+              area: 'Visnagar Road',
+              cityVillage: 'Mehsana',
+              taluka: 'Mehsana',
+              district: 'Mehsana',
+              state: 'Gujarat',
+              pinCode: '384002',
+              formatted: '14, Anand Nagar Society, Visnagar Road, Mehsana, Mehsana - 384002',
+              createdAt: new Date().toISOString()
+            }
+          ]
+        : []
+    );
   }
 
   // Initialize preferences if empty
@@ -181,24 +192,35 @@ export async function handleConsumerProfileRoute(req: IncomingMessage, res: Serv
 
   // 1. GET /profile
   if ((cleanPath === '/profile' || cleanPath === '') && method === 'GET') {
+    const savedProfile = inMemoryProfiles.get(userId);
     const addresses = inMemoryAddresses.get(userId) || [];
     const pref = inMemoryPreferences.get(userId);
     const ownedConns = defaultServerDataStore.getConsumerConnectionsForUser(userId);
     const isNewApplicant = ownedConns.length === 0;
+    const resolvedName =
+      savedProfile?.full_name ||
+      session.user?.name ||
+      (isDemoConsumer ? 'Smt. Meenaben Patel' : 'Citizen Consumer');
+    const resolvedDob =
+      savedProfile?.date_of_birth ?? (isDemoConsumer ? '1979-08-14' : '');
+    const resolvedEmail =
+      session.user?.email || (isDemoConsumer ? 'meenaben.patel@example.com' : '');
+    const resolvedMobile =
+      session.user?.mobileNumber || (isDemoConsumer ? '+91 98250 14820' : '');
 
     sendJson(res, 200, {
       user_id: userId,
-      full_name: userId === 'demo-consumer-meenaben-patel' ? 'Smt. Meenaben Patel' : 'Citizen Consumer',
-      date_of_birth: '1979-08-14',
+      full_name: resolvedName,
+      date_of_birth: resolvedDob,
       profile_photo_url: null,
       profile_completion_percentage: isNewApplicant ? 60 : 90,
       role: 'consumer',
       is_new_applicant: isNewApplicant,
       contacts: {
-        email: userId === 'demo-consumer-meenaben-patel' ? 'meenaben.patel@example.com' : 'citizen@example.com',
-        email_verified: true,
-        mobile_number: '+91 98250 14820',
-        mobile_verified: true
+        email: resolvedEmail,
+        email_verified: Boolean(resolvedEmail),
+        mobile_number: resolvedMobile,
+        mobile_verified: Boolean(resolvedMobile)
       },
       addresses_count: addresses.length,
       connections_count: ownedConns.length,
@@ -212,6 +234,11 @@ export async function handleConsumerProfileRoute(req: IncomingMessage, res: Serv
   // 2. PATCH /profile
   if (cleanPath === '/profile' && method === 'PATCH') {
     const body = await parseJsonBody(req);
+    const prevProfile = inMemoryProfiles.get(userId) || {};
+    inMemoryProfiles.set(userId, {
+      full_name: typeof body.full_name === 'string' && body.full_name.trim() ? body.full_name.trim() : prevProfile.full_name,
+      date_of_birth: typeof body.date_of_birth === 'string' ? body.date_of_birth : prevProfile.date_of_birth
+    });
     const activities = inMemoryActivities.get(userId) || [];
     activities.unshift({
       id: `act-${Date.now()}`,

@@ -645,11 +645,13 @@ export function createAuthApiHandler(options: AuthApiHandlerOptions = {}) {
         const password = typeof body.password === 'string' ? body.password : '';
         const targetRole =
           typeof body.targetRole === 'string' ? (body.targetRole as UserRole) : undefined;
+        const rememberMe = Boolean(body.rememberMe ?? body.remember_me);
 
         const { user, session } = authService.login({
           email,
           password,
           targetRole,
+          ttlMs: rememberMe ? 30 * 24 * 60 * 60 * 1000 : undefined,
           nowMs
         });
 

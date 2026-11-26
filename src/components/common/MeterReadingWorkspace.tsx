@@ -12,9 +12,13 @@ import {
   RotateCw,
   Sliders,
   Upload,
-  X
+  X,
+  Lock,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { verifyStaffActionPassword } from '../../data/demoAuthData';
 import { useLanguage } from '../../i18n/LanguageContext';
 import {
   localizeMeterNotification,
@@ -222,8 +226,25 @@ export const MeterReadingWorkspace: React.FC<MeterReadingWorkspaceProps> = ({
   const [reviewPhotos, setReviewPhotos] = useState<Record<string, string>>({});
   const [thresholds, setThresholds] = useState<{ version: number; minimumHistory: number; highDailyRatio: number; lowDailyRatio: number; highDailyUnits: number } | null>(null);
   const [meterConfiguration, setMeterConfiguration] = useState<MeterConfiguration | null>(null);
+  const [fieldSubmitPassword, setFieldSubmitPassword] = useState('');
+  const [showSubmitPassword, setShowSubmitPassword] = useState(false);
+  const [photoMeterStatus, setPhotoMeterStatus] = useState<'idle' | 'checking' | 'verified' | 'no_meter'>('idle');
   const isStaffReview = currentRole === 'employee' || currentRole === 'admin';
-  const candidates = useMemo(() => currentRole === 'consumer' ? userConnections : currentRole === 'field' ? connections.filter(conn => workOrders.some(wo => wo.consumerNo === conn.consumerNo && wo.assignedTo.toLowerCase().includes(activeUser.name.toLowerCase()))) : connections, [activeUser.name, connections, currentRole, userConnections, workOrders]);
+  const candidates = useMemo(() => {
+    if (currentRole === 'consumer') return userConnections;
+    if (currentRole === 'field') {
+      const assigned = connections.filter(conn =>
+        (initialConnectionNo && conn.consumerNo === initialConnectionNo) ||
+        workOrders.some(
+          wo =>
+            wo.consumerNo === conn.consumerNo &&
+            wo.assignedTo.toLowerCase().includes((activeUser.name || '').toLowerCase())
+        )
+      );
+      return assigned.length > 0 ? assigned : connections;
+    }
+    return connections;
+  }, [activeUser.name, connections, currentRole, initialConnectionNo, userConnections, workOrders]);
   const selectedConnection = candidates.find(conn => conn.consumerNo === connectionNo) || candidates[0];
   const visibleBills = currentRole === 'consumer' ? userBills : bills;
   const visiblePayments = currentRole === 'consumer' ? userPayments : payments;
@@ -270,6 +291,7 @@ export const MeterReadingWorkspace: React.FC<MeterReadingWorkspaceProps> = ({
     setIsCropApplied(false);
     setActivePreviewTab('full');
     setCropBox({ x: 0.1, y: 0.25, width: 0.8, height: 0.4 });
+    setPhotoMeterStatus('idle');
     setError('');
   };
 
@@ -368,8 +390,22 @@ export const MeterReadingWorkspace: React.FC<MeterReadingWorkspaceProps> = ({
   useEffect(() => { if (open && demoSession) void refresh(); }, [open, demoSession, currentRole]);
   useEffect(() => {
     if (!open || !selectedConnection || currentRole === 'management') return;
-    void request<{ configuration: MeterConfiguration }>(`/api/meter-readings/config?consumerNo=${encodeURIComponent(selectedConnection.consumerNo)}`).then(result => setMeterConfiguration(result.configuration)).catch(err => setError(err instanceof Error ? err.message : text.error));
-  }, [open, selectedConnection?.consumerNo, currentRole]);
+    const fallbackConfig: MeterConfiguration = {
+      connectionId: selectedConnection.connectionId || selectedConnection.consumerNo,
+      meterNo: selectedConnection.meterNo,
+      multiplier: 1,
+      decimalPlaces: 1,
+      version: 1,
+      source: 'DEMO_DEFAULT',
+    };
+    setMeterConfiguration(prev => (prev && prev.meterNo === selectedConnection.meterNo ? prev : fallbackConfig));
+    if (isFieldEffectivelyOffline(isOfflineSimulated)) return;
+    void request<{ configuration: MeterConfiguration }>(`/api/meter-readings/config?consumerNo=${encodeURIComponent(selectedConnection.consumerNo)}`)
+      .then(result => setMeterConfiguration(result.configuration))
+      .catch(() => {
+        setMeterConfiguration(fallbackConfig);
+      });
+  }, [open, selectedConnection?.consumerNo, currentRole, isOfflineSimulated]);
   useEffect(() => {
     if (!open || !isStaffReview) return;
     for (const record of records) {
@@ -380,24 +416,13 @@ export const MeterReadingWorkspace: React.FC<MeterReadingWorkspaceProps> = ({
   }, [open, isStaffReview, records]);
   useEffect(() => { if (!candidates.some(c => c.consumerNo === connectionNo)) setConnectionNo(candidates[0]?.consumerNo || ''); }, [candidates, connectionNo]);
 
-  const chooseFile = (next: File | null) => {
-    if (!next) return;
-    const issue = validateMeterPhoto(next);
-    if (issue) { setError(issue); return; }
-    closeCamera();
-    resetImageState();
-    setFile(next);
-    setPreview(URL.createObjectURL(next));
-  };
-
-  const runOcr = async () => {
-    if (!file) return;
-    setBusy(true); setError('');
+  const runOcrOnFile = async (targetFile: File, preserveManualReading = false) => {
+    setBusy(true); setError(''); setPhotoMeterStatus('checking');
     try {
       // 1. Prepare cropped display if crop was applied; otherwise use rotated full photo
-      const preparedForOcr = await prepareMeterPhoto(file, rotation, isCropApplied ? cropBox : undefined);
+      const preparedForOcr = await prepareMeterPhoto(targetFile, rotation, isCropApplied ? cropBox : undefined);
       // 2. Prepare full rotated photo for server preservation & authorized staff audit
-      const fullPrepared = await prepareMeterPhoto(file, rotation);
+      const fullPrepared = await prepareMeterPhoto(targetFile, rotation);
       const preparedDataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result));
@@ -406,27 +431,81 @@ export const MeterReadingWorkspace: React.FC<MeterReadingWorkspaceProps> = ({
       });
       setPhotoPayload(preparedDataUrl);
 
-      // 3. Run local Tesseract Web Worker OCR
+      // 3. Run local Tesseract Web Worker OCR with meter format rules
       const result = await extractMeterReading(
         preparedForOcr.blob,
         (value) => setProgress(Math.round(value * 100)),
-        isCropApplied
+        isCropApplied,
+        meterConfiguration
+          ? {
+              decimalPlaces: meterConfiguration.decimalPlaces,
+              expectedMultiplier: meterConfiguration.multiplier,
+            }
+          : undefined
       );
       setOcr(result);
-      if (result.normalizedReading !== undefined) {
-        setReading(result.candidateReading.replace(',', '.'));
+      if (result.normalizedReading !== undefined && result.candidateReading) {
+        setPhotoMeterStatus('verified');
+        if (!preserveManualReading || !reading.trim()) {
+          setReading(result.candidateReading.replace(',', '.'));
+        }
+        if (result.requiresReview) {
+          showToast(text.readingCheck, 'warning');
+        }
+      } else {
+        setPhotoMeterStatus('no_meter');
+        if (!preserveManualReading) {
+          setReading('');
+        }
+        setError('Warning: No electricity meter display detected in this photo. Please point the camera at the meter and capture a clear photo.');
       }
-      if (result.requiresReview) {
-        showToast(text.readingCheck, 'warning');
-      }
-    } catch (err) { setError(err instanceof Error ? err.message : text.error); }
-    finally { setBusy(false); }
+    } catch (err) {
+      setPhotoMeterStatus('no_meter');
+      setError(err instanceof Error ? err.message : text.error);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const chooseFile = (next: File | null) => {
+    if (!next) return;
+    const issue = validateMeterPhoto(next);
+    if (issue) { setError(issue); return; }
+    closeCamera();
+    resetImageState();
+    setFile(next);
+    setPreview(URL.createObjectURL(next));
+    void runOcrOnFile(next, Boolean(reading.trim()));
+  };
+
+  const runOcr = async () => {
+    if (!file) return;
+    await runOcrOnFile(file, false);
   };
 
   const submit = async () => {
     if (!selectedConnection) return;
     setBusy(true); setError('');
     try {
+      if (currentRole === 'field') {
+        if (!file) {
+          throw new Error('Please capture or upload a meter photo and verify the meter reading before submitting.');
+        }
+        if (photoMeterStatus === 'checking') {
+          throw new Error('Verifying meter in photo. Please wait a moment.');
+        }
+        if (photoMeterStatus === 'no_meter' || (ocr && !ocr.candidateReading && ocr.normalizedReading === undefined)) {
+          throw new Error('Warning: No electricity meter was detected in the uploaded photo. Please capture a clear photo of the meter display.');
+        }
+        const isPasswordValid = verifyStaffActionPassword(fieldSubmitPassword, {
+          id: demoSession?.user?.id || activeUser.id,
+          email: demoSession?.user?.email || activeUser.email,
+          role: currentRole,
+        });
+        if (!isPasswordValid) {
+          throw new Error('Incorrect field engineer password. Enter your password to authorize meter reading submission.');
+        }
+      }
       if (!meterConfiguration) throw new Error('The administrator-configured meter format is not available.');
       if (!/^\d{4}-\d{2}-\d{2}$/.test(readingAt) || Number.isNaN(Date.parse(`${readingAt}T12:00:00Z`))) {
         throw new Error('Choose a valid reading date.');
@@ -446,7 +525,7 @@ export const MeterReadingWorkspace: React.FC<MeterReadingWorkspaceProps> = ({
           meterReading: { consumerNo: selectedConnection.consumerNo, meterNo: meterConfiguration.meterNo, displayedReading: reading.trim(), readingKwh: normalized, multiplier: meterConfiguration.multiplier, readingAt: readingIso, decimalPlaces: meterConfiguration.decimalPlaces, meterEvent, ...(ocr ? { ocr } : {}) },
           ...(offlinePhoto ? { photo: offlinePhoto } : {})
         });
-        setReading(''); resetImageState();
+        setReading(''); setFieldSubmitPassword(''); resetImageState();
         showToast(text.queuedOffline, 'success');
         return;
       }
@@ -462,7 +541,7 @@ export const MeterReadingWorkspace: React.FC<MeterReadingWorkspaceProps> = ({
         multiplier: meterConfiguration.multiplier, readingAt: readingIso, decimalPlaces: meterConfiguration.decimalPlaces, meterEvent,
         ...(ocr ? { ocr } : {}), ...(submittedPhotoPayload ? { photoDataUrl: submittedPhotoPayload } : {})
       });
-      setReading(''); resetImageState();
+      setReading(''); setFieldSubmitPassword(''); resetImageState();
       showToast(text.pending, 'success');
       await refresh();
     } catch (err) { setError(err instanceof Error ? err.message : text.error); }
@@ -518,13 +597,67 @@ export const MeterReadingWorkspace: React.FC<MeterReadingWorkspaceProps> = ({
         {(currentRole === 'consumer' || currentRole === 'field') && <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,.85fr)]">
           <div className="space-y-3">
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">{text.connection}<select value={selectedConnection?.consumerNo || ''} onChange={event => setConnectionNo(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-950">{candidates.map(conn => <option key={conn.consumerNo} value={conn.consumerNo}>{conn.consumerNo} · {conn.consumerName}</option>)}</select></label>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">{text.meter}<input readOnly value={selectedConnection?.meterNo || ''} className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm dark:border-slate-700 dark:bg-slate-800" /></label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">Connection Number<input readOnly value={selectedConnection?.consumerNo || initialConnectionNo || ''} className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm font-mono dark:border-slate-700 dark:bg-slate-800" /></label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">{text.meter}<input readOnly value={selectedConnection?.meterNo || ''} className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm font-mono dark:border-slate-700 dark:bg-slate-800" /></label>
+            </div>
+            {file && photoMeterStatus !== 'idle' && (
+              <div className={`rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-2 border ${
+                photoMeterStatus === 'verified'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800'
+                  : photoMeterStatus === 'checking'
+                  ? 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950/40 dark:text-blue-200 dark:border-blue-800'
+                  : 'bg-amber-50 text-amber-900 border-amber-300 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-800'
+              }`}>
+                {photoMeterStatus === 'verified' ? (
+                  <>
+                    <Check size={14} className="shrink-0" />
+                    <span>Meter verified in photo{ocr?.candidateReading ? ` · Detected: ${ocr.candidateReading} kWh` : ''}</span>
+                  </>
+                ) : photoMeterStatus === 'checking' ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin shrink-0" />
+                    <span>Scanning photo to verify electricity meter...</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle size={14} className="shrink-0 text-amber-600" />
+                    <span>Warning: No meter detected in image. Capture a clear meter display photo.</span>
+                  </>
+                )}
+              </div>
+            )}
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">{text.reading}<input value={reading} onChange={event => setReading(event.target.value)} inputMode="decimal" maxLength={24} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-lg font-mono dark:border-slate-700 dark:bg-slate-950" placeholder="e.g. 015180" /></label>
             <div className="grid grid-cols-3 gap-3"><label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">{text.date}<input type="date" value={readingAt} onChange={event => setReadingAt(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-950" /></label><label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">{text.multiplier}<input readOnly value={meterConfiguration?.multiplier ?? '…'} className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm dark:border-slate-700 dark:bg-slate-800" /></label><label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">{text.precision}<input readOnly value={meterConfiguration?.decimalPlaces ?? '…'} className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm dark:border-slate-700 dark:bg-slate-800" /></label></div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">{eventText.label}<select value={meterEvent} onChange={event => setMeterEvent(event.target.value as typeof meterEvent)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-950"><option value="ordinary">{eventText.ordinary}</option><option value="replacement">{eventText.replacement}</option><option value="rollover">{eventText.rollover}</option></select></label>
             {meterEvent === 'rollover' && <p className="text-xs text-amber-700">{eventText.limit}: {meterConfiguration?.rolloverAt ?? 'not configured; ask an administrator to verify the meter specification'}</p>}
             <p className="text-xs text-slate-500">{text.identityCheck}</p>
-            <button type="button" disabled={busy || !reading} onClick={() => void submit()} className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? text.loading : text.submit}</button>
+            {currentRole === 'field' && (
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-cyan-700" />
+                  <span>Field Engineer Password *</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showSubmitPassword ? 'text' : 'password'}
+                    value={fieldSubmitPassword}
+                    onChange={event => setFieldSubmitPassword(event.target.value)}
+                    placeholder="Enter field engineer password to submit"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 pr-9 text-sm dark:border-slate-700 dark:bg-slate-950"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSubmitPassword(prev => !prev)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    aria-label={showSubmitPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showSubmitPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
+            <button type="button" disabled={busy || !reading || (currentRole === 'field' && (!file || !fieldSubmitPassword.trim()))} onClick={() => void submit()} className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 cursor-pointer">{busy ? text.loading : text.submit}</button>
           </div>
           <div className="space-y-3 rounded-xl border border-dashed border-slate-300 p-3 dark:border-slate-700">
             <p className="text-xs text-slate-600 dark:text-slate-300">{text.photoHelp}</p>

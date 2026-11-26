@@ -295,8 +295,13 @@ export class ServerAuthService {
         this.usersById.set(canonicalRecord.id, canonicalRecord);
       } else {
         const existing = this.usersByEmail.get(normalizedEmail);
-        if (existing && !this.usersById.has(identity.id)) {
-          this.usersById.set(identity.id, existing);
+        if (existing) {
+          if (!existing.mobileNumber && identity.phone) {
+            existing.mobileNumber = identity.phone;
+          }
+          if (!this.usersById.has(identity.id)) {
+            this.usersById.set(identity.id, existing);
+          }
         }
       }
     }
@@ -450,12 +455,26 @@ export class ServerAuthService {
     const password = params.password || '';
 
     if (!cleanEmail || !password) {
-      throw new AuthSecurityError(400, 'MISSING_CREDENTIALS', 'Email and password are required.');
+      throw new AuthSecurityError(400, 'MISSING_CREDENTIALS', 'Email, mobile number, and password are required.');
     }
 
-    const userRecord = this.usersByEmail.get(cleanEmail);
+    let userRecord = this.usersByEmail.get(cleanEmail);
+    if (!userRecord && !cleanEmail.includes('@')) {
+      const digits = cleanEmail.replace(/\D/g, '');
+      if (digits.length >= 10) {
+        const norm10 = digits.slice(-10);
+        const allUsers = Array.from(this.usersById.values());
+        userRecord =
+          allUsers.find(
+            u =>
+              (!params.targetRole || u.role === params.targetRole) &&
+              (u.mobileNumber || '').replace(/\D/g, '').slice(-10) === norm10
+          ) ||
+          allUsers.find(u => (u.mobileNumber || '').replace(/\D/g, '').slice(-10) === norm10);
+      }
+    }
     if (!userRecord) {
-      throw new AuthSecurityError(401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
+      throw new AuthSecurityError(401, 'INVALID_CREDENTIALS', 'Invalid email/mobile number or password.');
     }
 
     const passwordValid = verifyPasswordScrypt(

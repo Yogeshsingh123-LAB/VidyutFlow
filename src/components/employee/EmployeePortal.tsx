@@ -7,6 +7,7 @@ const EmployeeTransformersView = React.lazy(() =>
   import('../transformers/EmployeeTransformersView').then(m => ({ default: m.EmployeeTransformersView }))
 );
 import { useApp } from '../../context/AppContext';
+import { verifyStaffActionPassword } from '../../data/demoAuthData';
 import { useLanguage } from '../../i18n/LanguageContext';
 import {
   localizeIncident,
@@ -125,7 +126,6 @@ import {
   selectEmployeeWorkloadAndSlaMetrics,
   getCanonicalAnalyticsTranslations
 } from '../../utils/canonicalAnalytics';
-import { LiveRequestQueue } from '../common/LiveRequestQueue';
 
 export const EmployeePortal: React.FC = () => {
   const { t, language } = useLanguage();
@@ -197,6 +197,9 @@ export const EmployeePortal: React.FC = () => {
   const [reviewingWorkOrder, setReviewingWorkOrder] = useState<WorkOrder | null>(null);
   const [confirmArchiveAppId, setConfirmArchiveAppId] = useState<string | null>(null);
   const [archiveReasonInput, setArchiveReasonInput] = useState<string>('');
+  const [archivePasswordInput, setArchivePasswordInput] = useState<string>('');
+  const [confirmRestoreAppId, setConfirmRestoreAppId] = useState<string | null>(null);
+  const [restorePasswordInput, setRestorePasswordInput] = useState<string>('');
 
   // Incident Control Desk State
   const [incidentStatusFilter, setIncidentStatusFilter] = useState<string>('All');
@@ -260,11 +263,36 @@ export const EmployeePortal: React.FC = () => {
   const actionRequiredCount = activeApplications.filter(a => getApplicationStatusDisplayMeta(a).requiresEmployeeAction).length;
 
   const handleConfirmArchive = (id: string) => {
+    const validPassword = verifyStaffActionPassword(archivePasswordInput, {
+      id: activeUser?.id,
+      email: activeUser?.email,
+      role: 'employee',
+    });
+    if (!validPassword) {
+      showToast('Incorrect employee password. Archive action denied.', 'error');
+      return;
+    }
     const ok = archiveApplication(id, archiveReasonInput.trim() || undefined);
     if (ok) {
       setConfirmArchiveAppId(null);
       setArchiveReasonInput('');
+      setArchivePasswordInput('');
     }
+  };
+
+  const handleConfirmRestore = (id: string) => {
+    const validPassword = verifyStaffActionPassword(restorePasswordInput, {
+      id: activeUser?.id,
+      email: activeUser?.email,
+      role: 'employee',
+    });
+    if (!validPassword) {
+      showToast('Incorrect employee password. Restore action denied.', 'error');
+      return;
+    }
+    restoreApplication(id);
+    setConfirmRestoreAppId(null);
+    setRestorePasswordInput('');
   };
 
   // Incident Control Desk Filtering
@@ -378,7 +406,8 @@ export const EmployeePortal: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6 min-w-0">
-      {/* Officer Dashboard Top Bar (1:1 with reference screenshot) */}
+      {/* Officer Dashboard Top Bar (Shown only on Dashboard view) */}
+      {activeTab === 'dashboard' && (
       <div className="relative overflow-hidden p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         {/* Left: UGVCL Icon Box, Title, Badge & Subtitle */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3.5 min-w-0 z-10">
@@ -454,6 +483,7 @@ export const EmployeePortal: React.FC = () => {
           </button>
         </div>
       </div>
+      )}
 
       {/* VIEW 1: ERP DASHBOARD OVERVIEW */}
       {activeTab === 'dashboard' && (
@@ -614,8 +644,8 @@ export const EmployeePortal: React.FC = () => {
               {/* Donut Chart and Legend */}
               <div className="grid grid-cols-1 sm:grid-cols-2 items-center gap-4 my-2">
                 {/* Donut Chart with Center Total */}
-                <div className="relative h-56 w-full flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="relative h-56 w-full min-w-0 flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={210}>
                     <PieChart>
                       <Pie
                         data={[
@@ -762,7 +792,6 @@ export const EmployeePortal: React.FC = () => {
       {/* VIEW 2: APPLICATION QUEUE */}
       {(activeTab === 'applications' || activeTab === 'approvals') && (
         <div className="space-y-4 min-w-0">
-          <LiveRequestQueue />
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -858,13 +887,22 @@ export const EmployeePortal: React.FC = () => {
                 <p className="text-[11px] text-amber-900 leading-relaxed">
                   {te.archiveConfirmBody}
                 </p>
-                <input
-                  type="text"
-                  value={archiveReasonInput}
-                  onChange={e => setArchiveReasonInput(e.target.value)}
-                  placeholder={te.archiveRemarkPlaceholder}
-                  className="w-full sm:w-96 mt-1 px-2.5 py-1.5 text-xs rounded border border-amber-300 bg-white text-slate-800"
-                />
+                <div className="flex flex-col sm:flex-row gap-2 mt-1">
+                  <input
+                    type="text"
+                    value={archiveReasonInput}
+                    onChange={e => setArchiveReasonInput(e.target.value)}
+                    placeholder={te.archiveRemarkPlaceholder}
+                    className="w-full sm:w-64 px-2.5 py-1.5 text-xs rounded border border-amber-300 bg-white text-slate-800"
+                  />
+                  <input
+                    type="password"
+                    value={archivePasswordInput}
+                    onChange={e => setArchivePasswordInput(e.target.value)}
+                    placeholder="Employee password *"
+                    className="w-full sm:w-48 px-2.5 py-1.5 text-xs rounded border border-amber-300 bg-white text-slate-800"
+                  />
+                </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button
@@ -872,6 +910,7 @@ export const EmployeePortal: React.FC = () => {
                   onClick={() => {
                     setConfirmArchiveAppId(null);
                     setArchiveReasonInput('');
+                    setArchivePasswordInput('');
                   }}
                   className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
@@ -883,6 +922,44 @@ export const EmployeePortal: React.FC = () => {
                   className="px-3 py-1.5 text-xs font-bold rounded-lg bg-amber-600 hover:bg-amber-700 text-white cursor-pointer"
                 >
                   {te.archiveConfirmBtn}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Inline Password Confirmation Banner for Restoring Archived Application */}
+          {confirmRestoreAppId && (
+            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
+              <div className="space-y-1">
+                <div className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                  <RotateCcw className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Authorize Restore: {confirmRestoreAppId}</span>
+                </div>
+                <input
+                  type="password"
+                  value={restorePasswordInput}
+                  onChange={e => setRestorePasswordInput(e.target.value)}
+                  placeholder="Enter employee password to restore *"
+                  className="w-full sm:w-64 mt-1 px-2.5 py-1.5 text-xs rounded border border-emerald-300 bg-white text-slate-800"
+                />
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmRestoreAppId(null);
+                    setRestorePasswordInput('');
+                  }}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  {t.common.cancel}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleConfirmRestore(confirmRestoreAppId)}
+                  className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
+                >
+                  Confirm Restore
                 </button>
               </div>
             </div>
@@ -1058,7 +1135,10 @@ export const EmployeePortal: React.FC = () => {
                             {app.isArchived && (
                               <button
                                 type="button"
-                                onClick={() => restoreApplication(app.id)}
+                                onClick={() => {
+                                  setConfirmRestoreAppId(app.id);
+                                  setRestorePasswordInput('');
+                                }}
                                 className="px-2.5 py-1 text-xs font-semibold rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors inline-flex items-center gap-1 whitespace-nowrap cursor-pointer"
                                 title={te.restoreBtnTitle}
                               >
@@ -1757,78 +1837,126 @@ export const EmployeePortal: React.FC = () => {
       )}
 
       {/* VIEW 6: REVENUE REPORTS */}
-      {activeTab === 'reports' && (
-        <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white leading-snug">
-                {te.revenueReportTitle}
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {te.revenueReportSubtitle}
-              </p>
-            </div>
-            <ExportMenu
-              datasetKey="revenue_report"
-              filteredRecords={EXECUTIVE_MONTHLY_METRICS}
-              labelOverride={te.exportCsvBtn}
-            />
-          </div>
+      {activeTab === 'reports' && (() => {
+        const latestMonthly = EXECUTIVE_MONTHLY_METRICS[EXECUTIVE_MONTHLY_METRICS.length - 1];
+        const ledger = employeeCanonicalMetrics.liveBillingLedger;
+        const paidLabel = language === 'gu' ? 'ચૂકવેલ' : language === 'hi' ? 'भुगतान' : language === 'mr' ? 'भरलेले' : 'Paid';
+        const dueLabel = language === 'gu' ? 'બાકી' : language === 'hi' ? 'बकाया' : language === 'mr' ? 'थकीत' : 'Due';
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-              <span className="text-slate-400 block mb-0.5">{te.revTotalEnergyBilled}</span>
-              <span className="text-xl font-bold font-mono text-slate-900 dark:text-white">161.9 MU</span>
+        return (
+          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white leading-snug">
+                  {te.revenueReportTitle}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {te.revenueReportSubtitle}
+                </p>
+              </div>
+              <ExportMenu
+                datasetKey="revenue_report"
+                filteredRecords={EXECUTIVE_MONTHLY_METRICS}
+                labelOverride={te.exportCsvBtn}
+              />
             </div>
-            <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-              <span className="text-slate-400 block mb-0.5">{te.revCollectedTitle}</span>
-              <span className="text-xl font-bold font-mono text-emerald-600">{te.revCollectedValue}</span>
-            </div>
-            <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-              <span className="text-slate-400 block mb-0.5">{te.revEfficiencyTitle}</span>
-              <span className="text-xl font-bold font-mono text-blue-600">98.4%</span>
-            </div>
-          </div>
 
-          {/* Canonical Live ERP Billing & Collection Ledger Strip */}
-          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                {caTranslations.liveErpCollectionLedgerTitle}
-              </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                {employeeCanonicalMetrics.liveBillingLedger.paidBillsCount}/{employeeCanonicalMetrics.liveBillingLedger.totalBillsCount} Paid · {employeeCanonicalMetrics.liveBillingLedger.unpaidBillsCount} Due
-              </span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-500 block mb-0.5">{te.revTotalEnergyBilled}</span>
+                <span className="text-xl font-bold tabular-nums text-slate-900 dark:text-white">
+                  {latestMonthly ? `${latestMonthly.billedMUs.toFixed(1)} MU` : '161.9 MU'}
+                </span>
+              </div>
+              <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-500 block mb-0.5">{te.revCollectedTitle}</span>
+                <span className="text-xl font-bold tabular-nums text-emerald-600">
+                  {latestMonthly ? `₹${latestMonthly.collectedCr.toFixed(1)} Cr` : te.revCollectedValue}
+                </span>
+              </div>
+              <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
+                <span className="text-slate-500 block mb-0.5">{te.revEfficiencyTitle}</span>
+                <span className="text-xl font-bold tabular-nums text-blue-600">
+                  {ledger.totalBillsCount > 0 ? `${ledger.liveCollectionEfficiencyPct}%` : '98.4%'}
+                </span>
+              </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
-                <span className="text-slate-400 block text-[10px] mb-0.5">{caTranslations.liveErpBilledLabel}</span>
-                <span data-testid="employee-live-billed-inr" className="text-sm font-bold font-mono text-slate-900 dark:text-white">
-                  ₹{employeeCanonicalMetrics.liveBillingLedger.totalBilledAmountInr.toLocaleString('en-IN')}
+
+            {/* Canonical Live ERP Billing & Collection Ledger Strip */}
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {caTranslations.liveErpCollectionLedgerTitle}
+                </span>
+                <span className="text-[10.5px] font-semibold tabular-nums px-2.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                  {ledger.paidBillsCount}/{ledger.totalBillsCount} {paidLabel} · {ledger.unpaidBillsCount} {dueLabel}
                 </span>
               </div>
-              <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
-                <span className="text-slate-400 block text-[10px] mb-0.5">{caTranslations.liveErpCollectedLabel}</span>
-                <span data-testid="employee-live-collected-inr" className="text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400">
-                  ₹{employeeCanonicalMetrics.liveBillingLedger.totalCollectedAmountInr.toLocaleString('en-IN')}
-                </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
+                  <span className="text-slate-500 block text-[10.5px] mb-0.5">{caTranslations.liveErpBilledLabel}</span>
+                  <span data-testid="employee-live-billed-inr" className="text-sm font-bold tabular-nums text-slate-900 dark:text-white">
+                    ₹{ledger.totalBilledAmountInr.toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
+                  <span className="text-slate-500 block text-[10.5px] mb-0.5">{caTranslations.liveErpCollectedLabel}</span>
+                  <span data-testid="employee-live-collected-inr" className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+                    ₹{ledger.totalCollectedAmountInr.toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
+                  <span className="text-slate-500 block text-[10.5px] mb-0.5">{caTranslations.liveErpOutstandingLabel}</span>
+                  <span data-testid="employee-live-outstanding-inr" className="text-sm font-bold tabular-nums text-amber-600 dark:text-amber-400">
+                    ₹{ledger.totalOutstandingAmountInr.toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
+                  <span className="text-slate-500 block text-[10.5px] mb-0.5">{caTranslations.liveErpCollectionEfficiencyLabel}</span>
+                  <span data-testid="employee-live-collection-rate" className="text-sm font-bold tabular-nums text-blue-600 dark:text-blue-400">
+                    {ledger.liveCollectionEfficiencyPct}%
+                  </span>
+                </div>
               </div>
-              <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
-                <span className="text-slate-400 block text-[10px] mb-0.5">{caTranslations.liveErpOutstandingLabel}</span>
-                <span data-testid="employee-live-outstanding-inr" className="text-sm font-bold font-mono text-amber-600 dark:text-amber-400">
-                  ₹{employeeCanonicalMetrics.liveBillingLedger.totalOutstandingAmountInr.toLocaleString('en-IN')}
-                </span>
+            </div>
+
+            {/* Monthly Energy & Revenue Breakdown Table */}
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                {language === 'gu'
+                  ? 'માસિક ઊર્જા અને મહેસૂલ પત્રક'
+                  : language === 'hi'
+                  ? 'मासिक ऊर्जा और राजस्व विवरण'
+                  : language === 'mr'
+                  ? 'मासिक ऊर्जा आणि महसूल तक्ता'
+                  : 'Monthly Energy & Revenue Ledger'}
               </div>
-              <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
-                <span className="text-slate-400 block text-[10px] mb-0.5">{caTranslations.liveErpCollectionEfficiencyLabel}</span>
-                <span data-testid="employee-live-collection-rate" className="text-sm font-bold font-mono text-blue-600 dark:text-blue-400">
-                  {employeeCanonicalMetrics.liveBillingLedger.liveCollectionEfficiencyPct}%
-                </span>
+              <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-600 dark:text-slate-300 text-[11px] font-bold border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="px-3.5 py-2.5">Month</th>
+                      <th className="px-3.5 py-2.5 text-right">Energy Billed (MU)</th>
+                      <th className="px-3.5 py-2.5 text-right">Collected (₹ Cr)</th>
+                      <th className="px-3.5 py-2.5 text-right">AT&amp;C Loss (%)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 tabular-nums">
+                    {EXECUTIVE_MONTHLY_METRICS.map((row) => (
+                      <tr key={row.month} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                        <td className="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">{row.month}</td>
+                        <td className="px-3.5 py-2.5 text-right font-bold text-slate-900 dark:text-white">{row.billedMUs.toFixed(1)} MU</td>
+                        <td className="px-3.5 py-2.5 text-right font-semibold text-emerald-700 dark:text-emerald-400">₹{row.collectedCr.toFixed(1)} Cr</td>
+                        <td className="px-3.5 py-2.5 text-right font-semibold text-amber-700 dark:text-amber-300">{row.atcLossPct.toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* VIEW: INCIDENT CONTROL DESK */}
       {activeTab === 'incidents' && (

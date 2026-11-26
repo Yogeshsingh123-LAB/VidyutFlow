@@ -1036,7 +1036,7 @@ interface AppContextType {
   employeeNotifications: AppNotification[];
   scopedNotifications: AppNotification[];
   linkConnectionDemo: (consumerNo: string) => { success: boolean; error?: string; connection?: ElectricityConnection };
-  loginDemoUser: (email: string, password: string, targetRole: UserRole, mfaCode?: string, selectedUserId?: string) => Promise<{ success: boolean; error?: string }>;
+  loginDemoUser: (email: string, password: string, targetRole: UserRole, mfaCode?: string, selectedUserId?: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>;
   loginConsumerOtp: (consumerNo: string, otp: string) => Promise<{ success: boolean; error?: string }>;
   loginAsCanonicalDemoAccount: (accountId: string, targetRole?: UserRole) => Promise<{ success: boolean; error?: string }>;
   switchDemoUserAccount: (accountId: string) => { success: boolean; error?: string };
@@ -2219,7 +2219,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       {
         id: 'NOTIF-BILL-DUE-01',
         title: 'Gentle Overdue Notice — Bill BILL-UG-2026-10-8821',
-        message: 'Bill BILL-UG-2026-10-8821 (₹2,185) for connection 04281-99231 passed its due date (30-Oct-2026). Please complete payment at your convenience.',
+        message: 'Bill BILL-UG-2026-10-8821 (₹2,185) for connection 04281-99231 has due date 15-Dec-2026. Please complete payment before the due date to avoid late-payment charges.',
         time: '12:00 AM',
         createdAt: '2026-11-06T00:00:00.000Z',
         formattedTimestamp: '06/11/2026, 12:00 AM',
@@ -5229,14 +5229,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     password: string,
     targetRole: UserRole,
     mfaCode?: string,
-    selectedUserId?: string
+    selectedUserId?: string,
+    rememberMe: boolean = false
   ): Promise<{ success: boolean; error?: string }> => {
     // -------------------------------------------------------------------------
     // SERVER AUTHENTICATION MODE (POST /api/auth/login + GET /api/auth/me)
     // Never falls back to client-side authentication if server login fails.
     // -------------------------------------------------------------------------
     if (authMode === 'server') {
-      const serverResult = await loginWithServerApi(email, password, targetRole, mfaCode);
+      const serverResult = await loginWithServerApi(email, password, targetRole, mfaCode, fetch, rememberMe);
       if (!serverResult.success || !serverResult.session) {
         return {
           success: false,
@@ -5298,11 +5299,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // CLIENT DEMO AUTHENTICATION MODE (Original localStorage sandbox)
     // -------------------------------------------------------------------------
     const trimmedEmail = email.trim().toLowerCase();
+    const identDigits = trimmedEmail.replace(/\D/g, '');
+    const identNorm10 = !trimmedEmail.includes('@') && identDigits.length >= 10 ? identDigits.slice(-10) : '';
 
-    // 1. Check canonical demo identities first (by explicit selectedUserId or email)
+    // 1. Check canonical demo identities first (by explicit selectedUserId, email, or 10-digit mobile)
     const canonicalBySelected = selectedUserId ? getCanonicalIdentityById(selectedUserId) : undefined;
     const canonicalByEmail = CANONICAL_DEMO_IDENTITIES.find(
-      item => item.email.toLowerCase() === trimmedEmail
+      item =>
+        item.email.toLowerCase() === trimmedEmail ||
+        (Boolean(identNorm10) && (item.phone || '').replace(/\D/g, '').slice(-10) === identNorm10)
     );
     const matchedCanonical =
       canonicalBySelected && (!trimmedEmail || canonicalBySelected.email.toLowerCase() === trimmedEmail)
@@ -5364,9 +5369,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: true };
     }
 
-    // 2. Check custom registered demo consumers
+    // 2. Check custom registered demo consumers (by email or 10-digit mobile)
     const customUsers = getCustomDemoUsers();
-    const customUser = customUsers.find(u => u.email.toLowerCase() === trimmedEmail);
+    const customUser = customUsers.find(
+      u =>
+        u.email.toLowerCase() === trimmedEmail ||
+        (Boolean(identNorm10) && (u.mobileNumber || '').replace(/\D/g, '').slice(-10) === identNorm10)
+    );
 
     if (customUser) {
       if (!verifyDemoPassword(password, customUser.passwordHash)) {

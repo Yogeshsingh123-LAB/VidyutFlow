@@ -508,30 +508,51 @@ export async function extractMeterReading(
     });
 
     const result = await worker.recognize(image);
-    const rawText = result.data.text.trim();
+    let rawText = result.data.text.trim();
 
     // Collect word boxes with bounding box coordinates
-    const wordBoxes: OcrWordBox[] = [];
-    const pageData = result.data as unknown as { words?: Array<{ text?: string; confidence?: number; bbox?: { x0: number; y0: number; x1: number; y1: number } }> };
-    if (pageData.words && Array.isArray(pageData.words)) {
-      for (const w of pageData.words) {
-        if (w.text && w.bbox) {
-          wordBoxes.push({
-            text: w.text,
-            confidence: Number.isFinite(w.confidence) ? (w.confidence as number) : 0,
-            bbox: {
-              x0: w.bbox.x0,
-              y0: w.bbox.y0,
-              x1: w.bbox.x1,
-              y1: w.bbox.y1
-            }
-          });
+    const collectWordBoxes = (data: unknown): OcrWordBox[] => {
+      const boxes: OcrWordBox[] = [];
+      const pageData = data as { words?: Array<{ text?: string; confidence?: number; bbox?: { x0: number; y0: number; x1: number; y1: number } }> };
+      if (pageData.words && Array.isArray(pageData.words)) {
+        for (const w of pageData.words) {
+          if (w.text && w.bbox) {
+            boxes.push({
+              text: w.text,
+              confidence: Number.isFinite(w.confidence) ? (w.confidence as number) : 0,
+              bbox: { x0: w.bbox.x0, y0: w.bbox.y0, x1: w.bbox.x1, y1: w.bbox.y1 }
+            });
+          }
+        }
+      }
+      return boxes;
+    };
+
+    let wordBoxes = collectWordBoxes(result.data);
+    let rankedCandidates = rankOcrCandidates(wordBoxes, formatRules);
+
+    // Pass 2: High-precision digit-whitelist pass if Pass 1 had no candidate or low confidence (< 85)
+    if (rankedCandidates.length === 0 || (rankedCandidates[0]?.confidence ?? 0) < 85) {
+      await worker.setParameters({
+        tessedit_pageseg_mode: isCropped ? PSM.SINGLE_LINE : PSM.SINGLE_BLOCK,
+        tessedit_char_whitelist: '0123456789.,kWhKWH ',
+        preserve_interword_spaces: '1'
+      });
+      const pass2 = await worker.recognize(image);
+      const pass2Boxes = collectWordBoxes(pass2.data);
+      const pass2Ranked = rankOcrCandidates(pass2Boxes, formatRules);
+      if (
+        pass2Ranked.length > 0 &&
+        (rankedCandidates.length === 0 || pass2Ranked[0].score >= rankedCandidates[0].score)
+      ) {
+        wordBoxes = pass2Boxes;
+        rankedCandidates = pass2Ranked;
+        if (pass2.data.text.trim()) {
+          rawText = `${rawText}\n${pass2.data.text.trim()}`.trim();
         }
       }
     }
 
-    // Rank candidates using domain-specific meter display format rules
-    const rankedCandidates = rankOcrCandidates(wordBoxes, formatRules);
     const topCandidate = rankedCandidates[0];
 
     // Fallback regex scan if word boxes didn't capture tokens cleanly

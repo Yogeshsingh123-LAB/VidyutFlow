@@ -21,7 +21,8 @@ import {
   Building,
   CheckCircle2,
   Clock,
-  ArrowRight
+  ArrowRight,
+  ChevronRight
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -40,7 +41,6 @@ import {
 import { SmartGridDigitalTwin } from '../intro/SmartGridDigitalTwin';
 import { AIEnergyForecasting } from '../intro/AIEnergyForecasting';
 import { ExportMenu } from '../common/ExportMenu';
-import { LiveWorkflowKpis } from '../common/LiveWorkflowKpis';
 import { LiveSlaRiskWatchlist } from '../common/LiveSlaRiskWatchlist';
 import { LiveAlertEnginePanel } from '../common/LiveAlertEnginePanel';
 import { LiveAiGovernancePanel } from '../common/LiveAiGovernancePanel';
@@ -198,34 +198,76 @@ export const ManagementPortal: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6 min-w-0">
-      {/* Executive Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3.5 min-w-0">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white p-1 border border-slate-200 dark:border-slate-700 shadow-xs flex items-center justify-center shrink-0">
+      {/* Management Cockpit Top Bar (1:1 with Admin Portal design) */}
+      <div className="relative overflow-hidden p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Left: UGVCL Icon Box, Title, Badge & Subtitle */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3.5 min-w-0 z-10">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white p-1 border border-slate-200 shadow-xs flex items-center justify-center shrink-0">
             <img src="/assets/ugvcl-logo.png" alt="UGVCL Official Logo" className="w-full h-full object-contain" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white leading-snug break-words">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-snug break-words">
                 {tm.cockpitTitle}
               </h1>
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                 {tm.corporateOfficeBadge}
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-relaxed break-words">
+            <p className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-relaxed break-words">
               <span>{tm.officerPrefix}</span>
-              <span className="font-semibold text-slate-700 dark:text-slate-300">{localizeActorName(activeUser.name, language)}</span>
+              <span className="font-semibold text-slate-700">{localizeActorName(activeUser.name, language)}</span>
               <span>({activeUser.designation})</span>
             </p>
           </div>
         </div>
 
-        <div className="flex flex-col min-[420px]:flex-row sm:flex-nowrap items-stretch min-[420px]:items-center gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800/80 shrink-0">
+        {/* Right: Transmission Pylons Artwork & Action Controls */}
+        <div className="flex items-center gap-3 shrink-0 z-10 self-end sm:self-auto flex-wrap sm:flex-nowrap">
+          {/* Catenary Transmission Pylons SVG Vector Art */}
+          <div className="relative w-56 sm:w-64 h-20 hidden md:block shrink-0 pointer-events-none select-none">
+            <svg viewBox="0 0 320 120" fill="none" className="w-full h-full">
+              <path d="M0,105 Q90,65 170,90 T320,55 L320,120 L0,120 Z" fill="#FDF4E7" opacity="0.9" />
+              <path d="M0,112 Q100,80 190,100 T320,75 L320,120 L0,120 Z" fill="#FCE8D3" opacity="0.6" />
+              <path d="M0,62 Q130,95 230,55" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+              <path d="M0,72 Q135,105 230,65" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+              <path d="M230,55 Q265,70 300,30" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+              <path d="M230,65 Q265,80 300,40" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+              <g stroke="#0F2B48" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="230" y1="35" x2="218" y2="115" />
+                <line x1="230" y1="35" x2="242" y2="115" />
+                <line x1="223" y1="55" x2="237" y2="55" />
+                <line x1="220" y1="75" x2="240" y2="75" />
+                <line x1="218" y1="95" x2="242" y2="95" />
+                <line x1="223" y1="55" x2="240" y2="75" />
+                <line x1="237" y1="55" x2="220" y2="75" />
+                <line x1="220" y1="75" x2="242" y2="95" />
+                <line x1="240" y1="75" x2="218" y2="95" />
+                <line x1="210" y1="55" x2="250" y2="55" />
+                <line x1="214" y1="65" x2="246" y2="65" />
+                <line x1="230" y1="28" x2="230" y2="35" />
+              </g>
+              <g stroke="#0F2B48" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="300" y1="12" x2="282" y2="115" />
+                <line x1="300" y1="12" x2="318" y2="115" />
+                <line x1="289" y1="40" x2="311" y2="40" />
+                <line x1="285" y1="65" x2="315" y2="65" />
+                <line x1="282" y1="90" x2="318" y2="90" />
+                <line x1="289" y1="40" x2="315" y2="65" />
+                <line x1="311" y1="40" x2="285" y2="65" />
+                <line x1="285" y1="65" x2="318" y2="90" />
+                <line x1="315" y1="65" x2="282" y2="90" />
+                <line x1="272" y1="40" x2="328" y2="40" />
+                <line x1="276" y1="52" x2="324" y2="52" />
+                <line x1="300" y1="5" x2="300" y2="12" />
+              </g>
+            </svg>
+          </div>
+
           <select
             value={timePeriod}
             onChange={e => setTimePeriod(e.target.value as any)}
-            className="flex-1 sm:flex-initial min-h-11 sm:min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 dark:bg-[#131D31] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
+            className="min-h-11 sm:min-h-9 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-200 text-slate-700 shadow-2xs"
           >
             <option value="Q2-2026">{tm.optQ2}</option>
             <option value="FY26-YTD">{tm.optYtd}</option>
@@ -240,68 +282,122 @@ export const ManagementPortal: React.FC = () => {
         </div>
       </div>
 
-      {/* Cross-Portal ERP Workflow Operations Pulse */}
-      <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white border border-slate-800 shadow-md">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3.5">
-          <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <h2 className="text-sm font-bold tracking-wide">
-                {tm.telemetryTitle}
-              </h2>
-              <span
-                data-testid="mgmt-pulse-source-badge"
-                className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border ${
-                  mgmtDataSource.isTrulyLive
-                    ? 'bg-emerald-500/20 text-emerald-200 border-emerald-400/40'
-                    : 'bg-amber-500/20 text-amber-200 border-amber-400/40'
-                }`}
-              >
-                {mgmtDataSource.badgeLabel}
-              </span>
+      {/* Bento Health & Operations KPI Strip (1:1 with Admin Portal design) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div
+          onClick={() => setActiveTab('analytics')}
+          className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition cursor-pointer flex flex-col justify-between"
+        >
+          <div className="flex items-center justify-between">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+              <CheckCircle2 className="w-5 h-5" />
             </div>
-            <p className="text-[11px] text-slate-300 mt-1">
-              {mgmtDataSource.isTrulyLive ? at.mgmtErpPulseLiveNote : at.mgmtErpPulseDemoNote}
-            </p>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono ml-2.5">
+              {tm.kpiPendingAppsTitle}
+            </span>
+            <ChevronRight className="w-4 h-4 text-slate-400 ml-auto shrink-0" />
           </div>
-          <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-white/10 text-slate-200 self-start sm:self-auto border border-white/10">
-            {tm.canonicalStateSyncActive}
-          </span>
+          <div className="text-2xl font-black text-emerald-600 mt-3 tabular-nums">
+            {pendingApplications.length}
+          </div>
+          <div className="text-xs font-medium text-emerald-600 mt-2 hover:underline">
+            {tm.kpiPendingAppsSub} →
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-            <span className="text-[10px] text-slate-300 block uppercase font-medium">{tm.kpiPendingAppsTitle}</span>
-            <div className="text-xl font-bold text-white mt-0.5 font-mono">{pendingApplications.length}</div>
-            <span className="text-[10px] text-teal-300">{tm.kpiPendingAppsSub}</span>
-          </div>
-
-          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-            <span className="text-[10px] text-slate-300 block uppercase font-medium">{tm.kpiActiveGrievancesTitle}</span>
-            <div className="text-xl font-bold text-white mt-0.5 font-mono">{openComplaints.length}</div>
-            <span className="text-[10px] text-amber-300">{tm.kpiActiveGrievancesSub}</span>
-          </div>
-
-          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-            <span className="text-[10px] text-slate-300 block uppercase font-medium">{tm.kpiDispatchedFieldOrdersTitle}</span>
-            <div className="text-xl font-bold text-white mt-0.5 font-mono">{activeWorkOrders.length}</div>
-            <span className="text-[10px] text-sky-300">{tm.kpiDispatchedFieldOrdersSub}</span>
-          </div>
-
-          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-            <span className="text-[10px] text-slate-300 block uppercase font-medium">{tm.kpiCriticalHazardsTitle}</span>
-            <div className={`text-xl font-bold mt-0.5 font-mono ${criticalIncidents.length > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-              {criticalIncidents.length}
+        <div
+          onClick={() => setActiveTab('sla')}
+          className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition cursor-pointer flex flex-col justify-between"
+        >
+          <div className="flex items-center justify-between">
+            <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+              <Clock className="w-5 h-5" />
             </div>
-            <span className="text-[10px] text-rose-300">{tm.kpiCriticalHazardsSub}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono ml-2.5">
+              {tm.kpiActiveGrievancesTitle}
+            </span>
+            <ChevronRight className="w-4 h-4 text-slate-400 ml-auto shrink-0" />
+          </div>
+          <div className="text-2xl font-black text-amber-600 mt-3 tabular-nums">
+            {openComplaints.length}
+          </div>
+          <div className="text-xs font-medium text-amber-600 mt-2 hover:underline">
+            {tm.kpiActiveGrievancesSub} →
           </div>
         </div>
+
+        <div
+          onClick={() => setActiveTab('feeders')}
+          className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition cursor-pointer flex flex-col justify-between"
+        >
+          <div className="flex items-center justify-between">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+              <Zap className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono ml-2.5">
+              {tm.kpiDispatchedFieldOrdersTitle}
+            </span>
+            <ChevronRight className="w-4 h-4 text-slate-400 ml-auto shrink-0" />
+          </div>
+          <div className="text-2xl font-black text-blue-600 mt-3 tabular-nums">
+            {activeWorkOrders.length}
+          </div>
+          <div className="text-xs font-medium text-blue-600 mt-2 hover:underline">
+            {tm.kpiDispatchedFieldOrdersSub} →
+          </div>
+        </div>
+
+        <div
+          onClick={() => setActiveTab('outage-map')}
+          className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:shadow-xs transition cursor-pointer flex flex-col justify-between"
+        >
+          <div className="flex items-center justify-between">
+            <div className="w-9 h-9 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 font-mono ml-2.5">
+              {tm.kpiCriticalHazardsTitle}
+            </span>
+            <ChevronRight className="w-4 h-4 text-slate-400 ml-auto shrink-0" />
+          </div>
+          <div className={`text-2xl font-black mt-3 tabular-nums ${criticalIncidents.length > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+            {criticalIncidents.length}
+          </div>
+          <div className="text-xs font-medium text-rose-600 mt-2 hover:underline">
+            {tm.kpiCriticalHazardsSub} →
+          </div>
+        </div>
+      </div>
+
+      {/* Compact Canonical Telemetry Strip (Matching Admin Portal Card Style) */}
+      <div className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+            <h2 className="text-sm font-bold text-slate-900">{tm.telemetryTitle}</h2>
+            <span
+              data-testid="mgmt-pulse-source-badge"
+              className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${
+                mgmtDataSource.isTrulyLive
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : 'bg-amber-50 text-amber-800 border-amber-200'
+              }`}
+            >
+              {mgmtDataSource.badgeLabel}
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {mgmtDataSource.isTrulyLive ? at.mgmtErpPulseLiveNote : at.mgmtErpPulseDemoNote}
+          </p>
+        </div>
+        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 self-start sm:self-auto shrink-0">
+          {tm.canonicalStateSyncActive}
+        </span>
       </div>
 
       {/* VIEW 1: EXECUTIVE DASHBOARD */}
       {activeTab === 'dashboard' && (
         <div className="space-y-4 sm:space-y-6">
-          <LiveWorkflowKpis />
           {/* Live Database-Backed Executive Analytics & Recharts */}
           <LiveExecutiveAnalyticsSection mode="dashboard" />
           {/* Executive Escalation Inbox (Only Escalated Incidents or Emergency Safety Overrides Appear Here) */}
@@ -566,44 +662,46 @@ export const ManagementPortal: React.FC = () => {
           {/* Step 4A: Macro Delinquent Revenue & DPS Late Charge Breakdown */}
           <div
             data-testid="mgmt-delinquent-dps-card"
-            className="p-5 rounded-xl bg-gradient-to-r from-amber-50/80 via-white to-rose-50/70 dark:from-[#132238] dark:via-[#101C35] dark:to-[#1a1c35] border border-amber-200/90 dark:border-amber-800/60 shadow-2xs space-y-3"
+            className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-3"
           >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-amber-100 dark:border-amber-900/40">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-900">
                   {language === 'gu' ? 'વિલંબિત મહેસૂલ અને લેટ ચાર્જ સરચાર્જ વિશ્લેષણ' : language === 'hi' ? 'अतिदेय राजस्व एवं विलंब अधिभार (DPS) विश्लेषण' : language === 'mr' ? 'थकीत महसूल आणि विलंब अधिभार विश्लेषण' : 'Delinquent Revenue & Late Surcharge (DPS) Macro Breakdown'}
                 </h3>
               </div>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+              <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
                 {language === 'gu' ? 'શૂન્ય બેવડી ગણતરી (માસિક + દ્વિ-માસિક એકીકૃત)' : language === 'hi' ? 'शून्य दोहराव (मासिक + द्वैमासिक एकीकृत)' : language === 'mr' ? 'शून्य दुहेरी मोजणी (मासिक + द्वैमासिक एकत्रित)' : 'Zero Double-Counting · Monthly & Bi-Monthly Unified'}
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              <div className="p-3 rounded-lg bg-white/90 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
-                <span className="text-slate-500 dark:text-slate-400 block text-[11px] mb-1">
+              <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200/80">
+                <span className="text-amber-800 block text-[11px] font-medium mb-1">
                   {language === 'gu' ? 'કુલ મુદત વીતેલ મુદ્દલ' : language === 'hi' ? 'कुल अतिदेय मूलधन' : language === 'mr' ? 'एकूण मुदतबाह्य मुद्दल' : 'Total Overdue Principal'}
                 </span>
-                <span data-testid="mgmt-overdue-principal" className="text-lg font-bold font-mono text-amber-700 dark:text-amber-300">
+                <span data-testid="mgmt-overdue-principal" className="text-lg font-extrabold font-mono text-amber-700 tabular-nums">
                   ₹{(mgmtCanonicalMetrics.executiveKpis.overduePrincipalInr || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
 
-              <div className="p-3 rounded-lg bg-rose-50/90 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/60">
-                <span className="text-rose-700 dark:text-rose-300 block text-[11px] mb-1">
+              <div className="p-3.5 rounded-xl bg-rose-50/60 border border-rose-200/80">
+                <span className="text-rose-800 block text-[11px] font-medium mb-1">
                   {language === 'gu' ? 'સંચિત વિલંબિત સરચાર્જ (૧૫% વાર્ષિક)' : language === 'hi' ? 'संचित विलंब अधिभार (१५% वार्षिक)' : language === 'mr' ? 'संचित विलंब अधिभार (१५% वार्षिक)' : 'Accrued Late Charges (DPS @ 15% p.a.)'}
                 </span>
-                <span data-testid="mgmt-accrued-late-charges" className="text-lg font-bold font-mono text-rose-700 dark:text-rose-300">
+                <span data-testid="mgmt-accrued-late-charges" className="text-lg font-extrabold font-mono text-rose-700 tabular-nums">
                   +₹{(mgmtCanonicalMetrics.executiveKpis.accruedLateChargesInr || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
 
-              <div className="p-3 rounded-lg bg-slate-900 dark:bg-slate-950 text-white border border-slate-800">
-                <span className="text-slate-300 block text-[11px] mb-1">
+              <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-200/80">
+                <span className="text-blue-800 block text-[11px] font-medium mb-1">
                   {language === 'gu' ? 'કુલ બાકી લેણી રકમ (મુદ્દલ + ચાર્જ)' : language === 'hi' ? 'कुल वसूली योग्य बकाया (मूलधन + अधिभार)' : language === 'mr' ? 'एकूण थकीत देय रक्कम (मुद्दल + आकारणी)' : 'Total Outstanding Recoverable'}
                 </span>
-                <span data-testid="mgmt-total-recoverable" className="text-lg font-extrabold font-mono text-white">
+                <span data-testid="mgmt-total-recoverable" className="text-lg font-extrabold font-mono text-blue-700 tabular-nums">
                   ₹{(mgmtCanonicalMetrics.executiveKpis.totalOutstandingWithChargesInr || mgmtCanonicalMetrics.executiveKpis.liveErpTotalOutstandingInr).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
@@ -679,8 +777,8 @@ export const ManagementPortal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-64 w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
                   <LineChart data={localizedMonthlyMetrics} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.15} />
                     <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
@@ -730,8 +828,8 @@ export const ManagementPortal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-64 w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
                   <BarChart data={localizedMonthlyMetrics} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.15} />
                     <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} />
@@ -864,25 +962,27 @@ export const ManagementPortal: React.FC = () => {
           <LiveAiGovernancePanel />
           <LivePredictiveDecisionPanel />
           <LiveSlaRiskWatchlist />
-          <div className="p-5 rounded-xl bg-gradient-to-r from-blue-900/20 to-teal-900/20 border border-teal-500/30 space-y-3">
+          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-2.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <Sparkles className="w-5 h-5 text-teal-400" />
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                <div className="w-8 h-8 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600 shrink-0">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <h2 className="text-base font-bold text-slate-900">
                   {tm.aiRadarBannerTitle}
                 </h2>
                 <span
                   data-testid="mgmt-ai-insights-source-badge"
-                  className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800"
+                  className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200"
                 >
                   {mgmtForecastSource.badgeLabel}
                 </span>
               </div>
-              <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+              <span className="text-[11px] font-mono text-slate-500">
                 {at.readOnlyAdvisoryNote}
               </span>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+            <p className="text-xs text-slate-600 leading-relaxed">
               {tm.aiRadarBannerSubtitle} ({at.mgmtAiRadarDisclosure})
             </p>
           </div>
@@ -910,13 +1010,6 @@ export const ManagementPortal: React.FC = () => {
                   <span>{at.predicted} · 14d Horizon</span>
                   <span>{forecastUncertaintyMeta.badgeText}</span>
                 </div>
-                <button
-                  onClick={() => setIsAIAssistantOpen(true)}
-                  className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span>{tm.askCopilotBtn}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
               </div>
             </div>
 

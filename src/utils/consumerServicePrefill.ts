@@ -338,13 +338,8 @@ export function buildConsumerServicePrefillState(params: {
     };
   }
 
-  // Fallback when no authorized connection is linked (or when opening standard NEW_CONNECTION)
-  const fallbackAddress =
-    requestType === 'NEW_CONNECTION' && isDefaultDemoConsumer
-      ? '14, Anand Nagar Society, Visnagar Road, Mehsana'
-      : '';
-  const fallbackPincode =
-    requestType === 'NEW_CONNECTION' && isDefaultDemoConsumer ? '384002' : '';
+  // For NEW_CONNECTION (or when no authorized connection is linked), start with clean blank applicant fields
+  const isNewConnection = requestType === 'NEW_CONNECTION';
   const defaultLoadKw = 6;
 
   return {
@@ -352,14 +347,15 @@ export function buildConsumerServicePrefillState(params: {
     linkedConsumerNo: '',
     linkedMeterNo: '',
     currentSanctionedLoadKw: null,
-    applicantName: sessionName || (isDefaultDemoConsumer ? 'Smt. Meenaben Patel' : ''),
-    applicantPhone: sessionPhone || (isDefaultDemoConsumer ? '+91 98250 14820' : ''),
-    applicantEmail: sessionEmail || (isDefaultDemoConsumer ? 'consumer@vidyutflow.demo' : ''),
-    subdivision: authorizedConnection?.subdivision
-      ? normalizeCanonicalSubdivision(authorizedConnection.subdivision)
-      : 'Mehsana City North',
-    address: fallbackAddress,
-    pincode: fallbackPincode,
+    applicantName: isNewConnection ? '' : sessionName,
+    applicantPhone: isNewConnection ? '' : sessionPhone,
+    applicantEmail: isNewConnection ? '' : sessionEmail,
+    subdivision:
+      !isNewConnection && authorizedConnection?.subdivision
+        ? normalizeCanonicalSubdivision(authorizedConnection.subdivision)
+        : 'Mehsana City North',
+    address: '',
+    pincode: '',
     premisesType: 'Owned',
     category: 'Residential (RGPU)',
     loadKw: defaultLoadKw,

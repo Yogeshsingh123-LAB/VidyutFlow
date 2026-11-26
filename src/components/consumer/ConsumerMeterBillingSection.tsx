@@ -289,26 +289,8 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
 
   return (
     <div className="space-y-6" aria-live="polite">
-      {/* SECTION HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-gradient-to-r from-cyan-50 via-white to-blue-50 dark:from-[#0f1f3d] dark:via-[#101c35] dark:to-[#0d1829] border border-cyan-200 dark:border-cyan-900/40 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-            <Gauge className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400 block">
-              {mp.cnsSectionBadge}
-            </span>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              {mp.cnsSectionTitle}
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {mp.cnsSectionSubtitle}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
+      {/* SECTION HEADER ACTIONS */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
           {onRequestSelfReading && (
             <button
               type="button"
@@ -338,7 +320,6 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
-        </div>
       </div>
 
       {error && (

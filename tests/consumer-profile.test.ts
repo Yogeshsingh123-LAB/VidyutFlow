@@ -214,8 +214,8 @@ async function runConsumerProfileTestSuite() {
   assert.ok(sessions.length >= 1, 'At least one active session must exist');
   console.log(`   [PASS] Active devices/sessions listed: ${sessions.length}`);
 
-  // Change password check
-  const res6Pw = await inMemoryFetch(`${baseUrl}/api/v1/consumer/security/change-password`, {
+  // Change password check (verifies wrong password is rejected, then valid change + restore)
+  const res6WrongPw = await inMemoryFetch(`${baseUrl}/api/v1/consumer/security/change-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -223,7 +223,27 @@ async function runConsumerProfileTestSuite() {
       new_password: 'NewSecurePassword@456'
     })
   });
+  assert.equal(res6WrongPw.status, 400);
+
+  const res6Pw = await inMemoryFetch(`${baseUrl}/api/v1/consumer/security/change-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      current_password: 'Demo@12345',
+      new_password: 'NewSecurePassword@456'
+    })
+  });
   assert.equal(res6Pw.status, 200);
+
+  const res6Restore = await inMemoryFetch(`${baseUrl}/api/v1/consumer/security/change-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      current_password: 'NewSecurePassword@456',
+      new_password: 'Demo@12345'
+    })
+  });
+  assert.equal(res6Restore.status, 200);
   console.log('   [PASS] Password change validation and audit pass');
 
   // --- STEP 7: Immutability of Official Connection Records ---
@@ -254,6 +274,35 @@ async function runConsumerProfileTestSuite() {
   assert.ok(Array.isArray(activityList), 'Activity must be an array');
   assert.ok(activityList.length >= 2, 'Audit trail must record recent account actions');
   console.log(`   [PASS] Audit activity events retrieved: ${activityList.length}`);
+
+  // --- STEP 9: Newly Registered Consumer Starts With 0 Addresses & Registered Mobile ---
+  console.log('-> Step 9: Newly Registered Consumer Profile & Empty Address Isolation');
+  const reg = defaultServerAuthService.registerConsumer({
+    name: 'Ramesh Shah',
+    email: `ramesh.new.${Date.now()}@example.com`,
+    password: 'Password@123',
+    mobileNumber: '9876543210'
+  });
+  const resNewProfile = await inMemoryFetch(`${baseUrl}/api/v1/consumer/profile`, {
+    skipAuth: true,
+    headers: { cookie: `vidyutflow_sid=${reg.session.signedToken}` }
+  });
+  assert.equal(resNewProfile.status, 200);
+  const newProfile = await resNewProfile.json();
+  assert.equal(newProfile.full_name, 'Ramesh Shah');
+  assert.equal(newProfile.contacts.mobile_number, '9876543210');
+  assert.equal(newProfile.date_of_birth, '');
+  assert.equal(newProfile.addresses_count, 0);
+  assert.equal(newProfile.connections_count, 0);
+
+  const resNewAddrs = await inMemoryFetch(`${baseUrl}/api/v1/consumer/addresses`, {
+    skipAuth: true,
+    headers: { cookie: `vidyutflow_sid=${reg.session.signedToken}` }
+  });
+  assert.equal(resNewAddrs.status, 200);
+  const newAddrs = await resNewAddrs.json();
+  assert.deepEqual(newAddrs, [], 'Newly registered consumer must start with 0 addresses');
+  console.log('   [PASS] New consumer starts with 0 addresses and exact registered mobile number');
 
   console.log('\n================================================================');
   console.log('ALL CONSUMER PROFILE TESTS PASSED WITH 100% SUCCESS');

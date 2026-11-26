@@ -157,6 +157,20 @@ export const AdminPortal: React.FC = () => {
   const [permissions, setPermissions] = useState<PermissionRow[]>(() =>
     safeLoadStorage(ADMIN_RBAC_PERMISSIONS_STORAGE_KEY, INITIAL_PERMISSIONS)
   );
+  const [isSslModalOpen, setIsSslModalOpen] = useState(false);
+  const [sslCheckedAt, setSslCheckedAt] = useState<string>(() => new Date().toLocaleTimeString());
+
+  const handleCheckSslCertificates = () => {
+    setSslCheckedAt(new Date().toLocaleTimeString());
+    setIsSslModalOpen(true);
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    showToast(
+      isHttps
+        ? 'SSL/TLS Certificate Verified (HTTPS Active)'
+        : 'Local Development Transport Inspected (HTTP localhost)',
+      isHttps ? 'success' : 'info'
+    );
+  };
 
   const overdueAuditBills = useMemo(() => {
     return bills
@@ -316,9 +330,9 @@ export const AdminPortal: React.FC = () => {
         </div>
 
         {/* Right: Transmission Pylons Artwork & Action Buttons */}
-        <div className="flex items-center gap-3 shrink-0 z-10 self-end sm:self-auto">
+        <div className="flex flex-wrap items-center justify-end gap-2.5 shrink-0 z-10 self-end sm:self-auto">
           {/* Catenary Transmission Pylons SVG Vector Art */}
-          <div className="relative w-56 sm:w-64 h-20 hidden md:block shrink-0 pointer-events-none select-none">
+          <div className="relative w-52 lg:w-64 h-20 hidden lg:block shrink-0 pointer-events-none select-none">
             <svg viewBox="0 0 320 120" fill="none" className="w-full h-full">
               <path d="M0,105 Q90,65 170,90 T320,55 L320,120 L0,120 Z" fill="#FDF4E7" opacity="0.9" />
               <path d="M0,112 Q100,80 190,100 T320,75 L320,120 L0,120 Z" fill="#FCE8D3" opacity="0.6" />
@@ -357,21 +371,26 @@ export const AdminPortal: React.FC = () => {
             </svg>
           </div>
 
-          <button
-            type="button"
-            data-testid="admin-open-backup-center-btn"
-            onClick={() => setActiveTab('infra')}
-            className="w-full sm:w-auto min-h-11 sm:min-h-9 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-          >
-            <Database className="w-3.5 h-3.5" />
-            <span>{bkpDict.demoScopeBadge}</span>
-          </button>
-          <button
-            onClick={() => showToast('Simulated zero-downtime certificate renewal', 'success')}
-            className="w-full sm:w-auto min-h-11 sm:min-h-9 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer"
-          >
-            {ad.checkSslBtn}
-          </button>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <button
+              type="button"
+              data-testid="admin-open-backup-center-btn"
+              onClick={() => setActiveTab('infra')}
+              className="w-full sm:w-auto min-h-11 sm:min-h-9 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <Database className="w-3.5 h-3.5 shrink-0" />
+              <span>{bkpDict.demoScopeBadge}</span>
+            </button>
+            <button
+              type="button"
+              data-testid="admin-check-ssl-btn"
+              onClick={handleCheckSslCertificates}
+              className="w-full sm:w-auto min-h-11 sm:min-h-9 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>{ad.checkSslBtn}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -384,7 +403,6 @@ export const AdminPortal: React.FC = () => {
               <AdminMeterOcrHealthSection />
             </>
           )}
-          <LiveWorkflowKpis />
           {/* Bento Health Strip */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div
@@ -1415,6 +1433,84 @@ export const AdminPortal: React.FC = () => {
             </button>
           </div>
         </div>
+        </div>
+      )}
+
+      {isSslModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={ad.checkSslBtn}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">{ad.checkSslBtn}</h3>
+                  <p className="text-[11px] text-slate-500">Checked at {sslCheckedAt}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSslModalOpen(false)}
+                className="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <span className="text-slate-500">Origin Host</span>
+                <span className="font-mono font-semibold text-slate-900">
+                  {typeof window !== 'undefined' ? window.location.host : 'localhost'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <span className="text-slate-500">Transport Protocol</span>
+                <span className="font-mono font-semibold text-slate-900 uppercase">
+                  {typeof window !== 'undefined' ? window.location.protocol.replace(':', '') : 'http'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <span className="text-slate-500">Secure Browser Context</span>
+                <span
+                  className={`font-semibold px-2 py-0.5 rounded-full text-[11px] ${
+                    typeof window !== 'undefined' && window.isSecureContext
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-amber-50 text-amber-800 border border-amber-200'
+                  }`}
+                >
+                  {typeof window !== 'undefined' && window.isSecureContext ? 'Verified' : 'Non-HTTPS Dev Origin'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <span className="text-slate-500">Vault / Token Cipher</span>
+                <span className="font-mono font-semibold text-slate-900">AES-256-GCM · HKDF-SHA256</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={handleCheckSslCertificates}
+                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer"
+              >
+                Re-verify
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSslModalOpen(false)}
+                className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

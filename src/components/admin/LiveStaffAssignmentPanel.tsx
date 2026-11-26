@@ -1,5 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { UserPlus, MapPin, RefreshCw, CheckCircle2, ShieldAlert, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, MapPin, RefreshCw, CheckCircle2, ShieldAlert, Eye, EyeOff, Lock } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
+import {
+  CANONICAL_DEMO_IDENTITIES,
+  getCustomDemoUsers,
+  verifyStaffActionPassword,
+} from '../../data/demoAuthData';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { hasBackendSession, subscribeBackendSession } from '../../utils/backendSession';
 import {
@@ -33,6 +39,9 @@ const TEXT = {
     roleLabel: 'Operational Role',
     zoneLabel: 'Assigned Zone',
     createStaffBtn: 'Create & Assign Staff',
+    adminPasswordLabel: 'Admin Authorization Password',
+    adminPasswordPlaceholder: 'Enter your admin password to authorize',
+    adminPasswordError: 'Incorrect admin password. Enter your password to authorize creating & assigning staff.',
     zoneCodePlaceholder: 'Zone code (e.g. MehsanaRural)',
     zoneDisplayPlaceholder: 'Subdivision display name',
     addZoneBtn: 'Add Active Zone',
@@ -53,6 +62,9 @@ const TEXT = {
     roleLabel: 'ભૂમિકા',
     zoneLabel: 'ફાળવેલ ઝોન',
     createStaffBtn: 'સ્ટાફ બનાવો અને સોંપો',
+    adminPasswordLabel: 'એડમિન અધિકૃત પાસવર્ડ',
+    adminPasswordPlaceholder: 'મંજૂરી માટે તમારો એડમિન પાસવર્ડ દાખલ કરો',
+    adminPasswordError: 'એડમિન પાસવર્ડ ખોટો છે. સ્ટાફ બનાવવા અને સોંપવા માટે તમારો પાસવર્ડ દાખલ કરો.',
     zoneCodePlaceholder: 'ઝોન કોડ (દા.ત. MehsanaRural)',
     zoneDisplayPlaceholder: 'સબ-ડિવિઝન નામ',
     addZoneBtn: 'સક્રિય ઝોન ઉમેરો',
@@ -73,6 +85,9 @@ const TEXT = {
     roleLabel: 'भूमिका',
     zoneLabel: 'आवंटित ज़ोन',
     createStaffBtn: 'स्टाफ़ बनाएं और आवंटित करें',
+    adminPasswordLabel: 'एडमिन प्राधिकरण पासवर्ड',
+    adminPasswordPlaceholder: 'अनुमति देने के लिए अपना एडमिन पासवर्ड दर्ज करें',
+    adminPasswordError: 'गलत एडमिन पासवर्ड। स्टाफ़ बनाने और आवंटित करने के लिए अपना पासवर्ड दर्ज करें।',
     zoneCodePlaceholder: 'ज़ोन कोड (जैसे MehsanaRural)',
     zoneDisplayPlaceholder: 'सब-डिवीजन नाम',
     addZoneBtn: 'सक्रिय ज़ोन जोड़ें',
@@ -93,6 +108,9 @@ const TEXT = {
     roleLabel: 'भूमिका',
     zoneLabel: 'नेमलेला झोन',
     createStaffBtn: 'स्टाफ तयार करा आणि नेमा',
+    adminPasswordLabel: 'अॅडमिन अधिकृत पासवर्ड',
+    adminPasswordPlaceholder: 'मंजुरीसाठी तुमचा अॅडमिन पासवर्ड टाका',
+    adminPasswordError: 'चुकीचा अॅडमिन पासवर्ड. स्टाफ तयार करण्यासाठी आणि नेमण्यासाठी तुमचा पासवर्ड टाका.',
     zoneCodePlaceholder: 'झोन कोड (उदा. MehsanaRural)',
     zoneDisplayPlaceholder: 'सब-डिव्हिजन नाव',
     addZoneBtn: 'सक्रिय झोन जोडा',
@@ -195,6 +213,7 @@ export const LiveStaffAssignmentPanel: React.FC<{
   onToast,
   onStaffCreated,
 }) => {
+  const { activeUser } = useApp();
   const { language } = useLanguage();
   const lang = (language in TEXT ? language : 'en') as keyof typeof TEXT;
   const t = TEXT[lang];
@@ -207,6 +226,15 @@ export const LiveStaffAssignmentPanel: React.FC<{
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [adminPasswordError, setAdminPasswordError] = useState<string | null>(null);
+  const [pendingZoneReassign, setPendingZoneReassign] = useState<{
+    member: StaffMemberItem;
+    nextZone: string;
+  } | null>(null);
+  const [reassignPassword, setReassignPassword] = useState('');
+  const [reassignPasswordError, setReassignPasswordError] = useState<string | null>(null);
   const [selectedPost, setSelectedPost] = useState(OFFICER_POST_OPTIONS[0].post);
   const [subdivision, setSubdivision] = useState(OFFICER_POST_OPTIONS[0].subdivisions[0].name);
   const [zone, setZone] = useState(OFFICER_POST_OPTIONS[0].subdivisions[0].zone);
@@ -235,21 +263,109 @@ export const LiveStaffAssignmentPanel: React.FC<{
   const [newZoneCode, setNewZoneCode] = useState('');
   const [newZoneDisplay, setNewZoneDisplay] = useState('');
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const loadDirectory = useCallback(async () => {
-    if (!hasBackendSession()) {
-      setLiveConnected(false);
-      return;
-    }
-    try {
-      const [zRes, sRes] = await Promise.all([fetchSubdivisionZones(), fetchStaffMembers()]);
-      setZones(zRes.items);
-      setStaff(sRes.items);
-      setLiveConnected(true);
-    } catch {
-      setLiveConnected(false);
-    }
+  const buildLocalDirectorySnapshot = useCallback((): {
+    zones: SubdivisionZoneItem[];
+    staff: StaffMemberItem[];
+  } => {
+    const baseZones = ['North', 'South', 'East', 'West', 'Central'];
+    const mapRole = (r: string): StaffMemberItem['role'] =>
+      r === 'field' ? 'engineer' : r === 'admin' ? 'admin' : 'officer';
+    const inferZone = (subdivision?: string): string => {
+      const s = (subdivision || '').toLowerCase();
+      if (s.includes('south')) return 'South';
+      if (s.includes('east')) return 'East';
+      if (s.includes('west')) return 'West';
+      if (s.includes('central')) return 'Central';
+      return 'North';
+    };
+
+    const canonicalStaff: StaffMemberItem[] = CANONICAL_DEMO_IDENTITIES.filter(
+      u => u.role === 'employee' || u.role === 'field' || u.role === 'admin'
+    ).map(u => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: mapRole(u.role),
+      zone: inferZone(u.subdivision),
+      is_active: true,
+      active_workload: u.role === 'field' ? 2 : u.role === 'employee' ? 3 : 0,
+      created_at: null,
+    }));
+
+    const customStaff: StaffMemberItem[] = getCustomDemoUsers()
+      .filter(u => u.role === 'employee' || u.role === 'field' || u.role === 'admin')
+      .map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: mapRole(u.role),
+        zone: inferZone((u as { subdivision?: string }).subdivision),
+        is_active: true,
+        active_workload: 0,
+        created_at: null,
+      }));
+
+    const seen = new Set<string>();
+    const mergedStaff = [...canonicalStaff, ...customStaff].filter(item => {
+      const key = item.email.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const mergedZones: SubdivisionZoneItem[] = baseZones.map(code => ({
+      code,
+      display_name: `${code} Zone`,
+      circle_name: 'UGVCL Circle',
+      pin_prefix: '38',
+      center_lat: 23.6,
+      center_lng: 72.4,
+      is_active: true,
+      officer_count: mergedStaff.filter(s => s.zone === code && s.role === 'officer').length,
+      engineer_count: mergedStaff.filter(s => s.zone === code && s.role === 'engineer').length,
+    }));
+
+    return { zones: mergedZones, staff: mergedStaff };
   }, []);
+
+  const loadDirectory = useCallback(async (manual = false) => {
+    setRefreshing(true);
+    try {
+      if (hasBackendSession()) {
+        try {
+          const [zRes, sRes] = await Promise.all([fetchSubdivisionZones(), fetchStaffMembers()]);
+          setZones(zRes.items);
+          setStaff(sRes.items);
+          setLiveConnected(true);
+          if (manual) {
+            onToast?.(`Directory refreshed (${sRes.items.length} staff · ${zRes.items.length} zones).`, 'info');
+          }
+          return;
+        } catch {
+          // Fall back to local directory snapshot
+        }
+      }
+      setLiveConnected(false);
+      const local = buildLocalDirectorySnapshot();
+      setZones(prev => {
+        const existingCodes = new Set(local.zones.map(z => z.code));
+        const customZones = prev.filter(z => !existingCodes.has(z.code));
+        return [...local.zones, ...customZones];
+      });
+      setStaff(prev => {
+        const seen = new Set(local.staff.map(s => s.email.toLowerCase()));
+        const sessionCreated = prev.filter(s => !seen.has(s.email.toLowerCase()));
+        return [...local.staff, ...sessionCreated];
+      });
+      if (manual) {
+        onToast?.(`Directory refreshed (${local.staff.length} staff · ${local.zones.length} zones).`, 'info');
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, [buildLocalDirectorySnapshot, onToast]);
 
   useEffect(() => {
     void loadDirectory();
@@ -260,8 +376,19 @@ export const LiveStaffAssignmentPanel: React.FC<{
 
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAdminPasswordError(null);
     if (!name.trim() || !email.trim() || password.length < 8) {
       onToast?.('Please enter full name, official email, and a password of at least 8 characters.', 'error');
+      return;
+    }
+    const isAdminPasswordValid = verifyStaffActionPassword(adminPassword, {
+      id: activeUser?.id,
+      email: activeUser?.email,
+      role: 'admin',
+    });
+    if (!isAdminPasswordValid) {
+      setAdminPasswordError(t.adminPasswordError);
+      onToast?.(t.adminPasswordError, 'error');
       return;
     }
     setBusy(true);
@@ -277,6 +404,20 @@ export const LiveStaffAssignmentPanel: React.FC<{
         });
         claimedCount = created.claimed_unassigned_requests;
         await loadDirectory();
+      } else {
+        setStaff(prev => [
+          ...prev,
+          {
+            id: `STF-${Date.now().toString().slice(-4)}`,
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            role,
+            zone,
+            is_active: true,
+            active_workload: 0,
+            created_at: new Date().toISOString(),
+          },
+        ]);
       }
       onStaffCreated?.({
         name: name.trim(),
@@ -289,6 +430,7 @@ export const LiveStaffAssignmentPanel: React.FC<{
       setName('');
       setEmail('');
       setPassword('');
+      setAdminPassword('');
       onToast?.(
         liveConnected
           ? `Created ${selectedPost} (${name.trim()}) for ${subdivision} [${zone} zone] — claimed ${claimedCount} unassigned requests.`
@@ -307,15 +449,39 @@ export const LiveStaffAssignmentPanel: React.FC<{
     if (!newZoneCode.trim() || !newZoneDisplay.trim()) return;
     setBusy(true);
     try {
-      const z = await upsertSubdivisionZone({
-        code: newZoneCode.trim(),
-        display_name: newZoneDisplay.trim(),
-      });
-      setZone(z.code);
+      const code = newZoneCode.trim();
+      const displayName = newZoneDisplay.trim();
+      if (liveConnected) {
+        const z = await upsertSubdivisionZone({
+          code,
+          display_name: displayName,
+        });
+        setZone(z.code);
+        await loadDirectory();
+        onToast?.(`Active subdivision zone "${z.code}" registered.`, 'success');
+      } else {
+        setZones(prev => {
+          if (prev.some(z => z.code.toLowerCase() === code.toLowerCase())) return prev;
+          return [
+            ...prev,
+            {
+              code,
+              display_name: displayName,
+              circle_name: 'UGVCL Circle',
+              pin_prefix: '38',
+              center_lat: 23.6,
+              center_lng: 72.4,
+              is_active: true,
+              officer_count: 0,
+              engineer_count: 0,
+            },
+          ];
+        });
+        setZone(code);
+        onToast?.(`Active subdivision zone "${code}" registered.`, 'success');
+      }
       setNewZoneCode('');
       setNewZoneDisplay('');
-      await loadDirectory();
-      onToast?.(`Active subdivision zone "${z.code}" registered.`, 'success');
     } catch (err: any) {
       onToast?.(err?.message || 'Failed to register zone.', 'error');
     } finally {
@@ -323,14 +489,45 @@ export const LiveStaffAssignmentPanel: React.FC<{
     }
   };
 
-  const handleReassignZone = async (member: StaffMemberItem, nextZone: string) => {
+  const handleReassignZone = (member: StaffMemberItem, nextZone: string) => {
+    if (nextZone === member.zone) return;
+    setReassignPassword('');
+    setReassignPasswordError(null);
+    setPendingZoneReassign({ member, nextZone });
+  };
+
+  const handleConfirmReassignZone = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingZoneReassign) return;
+    const ok = verifyStaffActionPassword(reassignPassword, {
+      id: activeUser?.id,
+      email: activeUser?.email,
+      role: 'admin',
+    });
+    if (!ok) {
+      setReassignPasswordError(t.adminPasswordError);
+      return;
+    }
     try {
-      const updated = await updateStaffMember(member.id, { zone: nextZone });
-      await loadDirectory();
-      onToast?.(
-        `Reassigned ${updated.name} to ${updated.zone} (claimed ${updated.claimed_unassigned_requests} open requests).`,
-        'success'
-      );
+      if (liveConnected) {
+        const updated = await updateStaffMember(pendingZoneReassign.member.id, {
+          zone: pendingZoneReassign.nextZone,
+        });
+        await loadDirectory();
+        onToast?.(
+          `Reassigned ${updated.name} to ${updated.zone} (claimed ${updated.claimed_unassigned_requests} open requests).`,
+          'success'
+        );
+      } else {
+        const target = pendingZoneReassign;
+        setStaff(prev =>
+          prev.map(m => (m.id === target.member.id ? { ...m, zone: target.nextZone } : m))
+        );
+        onToast?.(`Reassigned ${target.member.name} to ${target.nextZone}.`, 'success');
+      }
+      setPendingZoneReassign(null);
+      setReassignPassword('');
+      setReassignPasswordError(null);
     } catch (err: any) {
       onToast?.(err?.message || 'Zone reassignment failed.', 'error');
     }
@@ -338,9 +535,15 @@ export const LiveStaffAssignmentPanel: React.FC<{
 
   const handleToggleActive = async (member: StaffMemberItem) => {
     try {
-      const updated = await updateStaffMember(member.id, { is_active: !member.is_active });
-      await loadDirectory();
-      onToast?.(`${updated.name} marked ${updated.is_active ? 'On Duty' : 'Off Duty'}.`, 'info');
+      if (liveConnected) {
+        const updated = await updateStaffMember(member.id, { is_active: !member.is_active });
+        await loadDirectory();
+        onToast?.(`${updated.name} marked ${updated.is_active ? 'On Duty' : 'Off Duty'}.`, 'info');
+      } else {
+        const nextActive = !member.is_active;
+        setStaff(prev => prev.map(m => (m.id === member.id ? { ...m, is_active: nextActive } : m)));
+        onToast?.(`${member.name} marked ${nextActive ? 'On Duty' : 'Off Duty'}.`, 'info');
+      }
     } catch (err: any) {
       onToast?.(err?.message || 'Status update failed.', 'error');
     }
@@ -363,20 +566,14 @@ export const LiveStaffAssignmentPanel: React.FC<{
         </div>
         <button
           type="button"
-          onClick={() => void loadDirectory()}
-          className="self-start sm:self-auto px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer"
+          onClick={() => void loadDirectory(true)}
+          disabled={refreshing}
+          className="self-start sm:self-auto px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
         >
-          <RefreshCw className="w-3.5 h-3.5" />
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
           <span>{t.refreshBtn}</span>
         </button>
       </div>
-
-      {!liveConnected && (
-        <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
-          <ShieldAlert className="w-4 h-4 shrink-0" />
-          <span>{t.offlineNotice}</span>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Staff Onboarding Form */}
@@ -450,6 +647,42 @@ export const LiveStaffAssignmentPanel: React.FC<{
               ))}
             </select>
           </div>
+          <div className="space-y-1.5">
+            <label
+              htmlFor="staff-create-admin-password"
+              className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300"
+            >
+              {t.adminPasswordLabel} *
+            </label>
+            <div className="relative">
+              <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                id="staff-create-admin-password"
+                type={showAdminPassword ? 'text' : 'password'}
+                required
+                value={adminPassword}
+                onChange={e => {
+                  setAdminPassword(e.target.value);
+                  if (adminPasswordError) setAdminPasswordError(null);
+                }}
+                placeholder={t.adminPasswordPlaceholder}
+                className="w-full pl-8 pr-9 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-900 dark:text-white"
+              />
+              <button
+                type="button"
+                onClick={() => setShowAdminPassword(prev => !prev)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                aria-label={showAdminPassword ? 'Hide admin password' : 'Show admin password'}
+              >
+                {showAdminPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+            {adminPasswordError && (
+              <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                {adminPasswordError}
+              </p>
+            )}
+          </div>
           <button
             type="submit"
             disabled={busy}
@@ -488,7 +721,7 @@ export const LiveStaffAssignmentPanel: React.FC<{
           />
           <button
             type="submit"
-            disabled={busy || !liveConnected}
+            disabled={busy}
             className="w-full min-h-9 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
           >
             {t.addZoneBtn}
@@ -520,7 +753,7 @@ export const LiveStaffAssignmentPanel: React.FC<{
                   <td className="p-2.5">
                     <select
                       value={m.zone}
-                      onChange={e => void handleReassignZone(m, e.target.value)}
+                      onChange={e => handleReassignZone(m, e.target.value)}
                       aria-label={`Reassign zone for ${m.name}`}
                       className="px-2 py-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs"
                     >
@@ -551,6 +784,54 @@ export const LiveStaffAssignmentPanel: React.FC<{
             </tbody>
           </table>
         </div>
+      )}
+
+      {pendingZoneReassign && (
+        <form
+          onSubmit={handleConfirmReassignZone}
+          className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 space-y-2.5 text-xs"
+        >
+          <div className="font-semibold text-amber-950 dark:text-amber-200">
+            Authorize zone reassignment for <strong>{pendingZoneReassign.member.name}</strong> ({pendingZoneReassign.member.zone} → {pendingZoneReassign.nextZone})
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="password"
+              required
+              value={reassignPassword}
+              onChange={e => {
+                setReassignPassword(e.target.value);
+                if (reassignPasswordError) setReassignPasswordError(null);
+              }}
+              placeholder={t.adminPasswordPlaceholder}
+              className="flex-1 px-3 py-1.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="submit"
+                className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold cursor-pointer"
+              >
+                Confirm
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingZoneReassign(null);
+                  setReassignPassword('');
+                  setReassignPasswordError(null);
+                }}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+          {reassignPasswordError && (
+            <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+              {reassignPasswordError}
+            </p>
+          )}
+        </form>
       )}
     </div>
   );

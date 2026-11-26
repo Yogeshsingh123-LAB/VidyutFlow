@@ -160,7 +160,7 @@ export function buildEnterpriseAccountMenuViewModel(params: {
       isCustomUser: Boolean(params.activeUser.isCustomUser)
     },
     sectionB: {
-      visible: params.dataMode === 'DEMO' && accounts.length > 1,
+      visible: false,
       accounts: accounts.map((acc) => ({
         id: acc.id,
         name: acc.name,
@@ -487,18 +487,20 @@ export const EnterpriseAccountMenu: React.FC<EnterpriseAccountMenuProps> = ({
               <span>{t.erp.searchRecordsShort}</span>
             </button>
 
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onClose();
-                setIsAIAssistantOpen(true);
-              }}
-              className="sm:hidden w-full flex items-center gap-2.5 px-2.5 py-2 text-teal-700 hover:bg-teal-50 rounded-lg text-left font-medium transition-colors cursor-pointer"
-            >
-              <Sparkles className="w-4 h-4 text-teal-600 shrink-0" aria-hidden="true" />
-              <span>{t.erp.vidyutMitraAi}</span>
-            </button>
+            {currentRole === 'consumer' && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onClose();
+                  setIsAIAssistantOpen(true);
+                }}
+                className="sm:hidden w-full flex items-center gap-2.5 px-2.5 py-2 text-teal-700 hover:bg-teal-50 rounded-lg text-left font-medium transition-colors cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-teal-600 shrink-0" aria-hidden="true" />
+                <span>{t.erp.vidyutMitraAi}</span>
+              </button>
+            )}
 
             <button
               type="button"

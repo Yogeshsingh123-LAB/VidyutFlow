@@ -134,6 +134,8 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export const LiveRequestQueue: React.FC = () => {
+  const showServerPanel = false as boolean;
+  if (!showServerPanel) return null;
   const { language } = useLanguage();
   const t = LIVE_QUEUE_TRANSLATIONS[language] || LIVE_QUEUE_TRANSLATIONS.en;
   const { data, error, lastUpdated, refresh, loading } = useLivePoll<LiveRequestRow[]>(fetchLiveRequests);

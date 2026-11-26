@@ -260,14 +260,16 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
           );
         })}
 
-        <button
-          type="button"
-          onClick={() => setIsAIAssistantOpen(true)}
-          className="h-8 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap shrink-0 bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 cursor-pointer"
-        >
-          <Cpu className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-          <span>{t.erp.vidyutMitraAi}</span>
-        </button>
+        {currentRole === 'consumer' && (
+          <button
+            type="button"
+            onClick={() => setIsAIAssistantOpen(true)}
+            className="h-8 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap shrink-0 bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 cursor-pointer"
+          >
+            <Cpu className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+            <span>{t.erp.vidyutMitraAi}</span>
+          </button>
+        )}
       </nav>
 
       {/* Slide-Over Mobile Navigation Drawer */}
@@ -384,17 +386,19 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
 
             {/* Quick Tools & Session Footer */}
             <div className="pt-3 border-t border-slate-800 space-y-2">
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  setIsAIAssistantOpen(true);
-                }}
-                className="w-full min-h-[40px] px-3 py-2 rounded-lg text-xs font-semibold text-teal-200 hover:text-white bg-teal-950/50 hover:bg-teal-900/50 border border-teal-800/50 flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 cursor-pointer"
-              >
-                <Cpu className="w-4 h-4 text-teal-400 shrink-0" />
-                <span>{t.erp.vidyutMitraAiAssistant}</span>
-              </button>
+              {currentRole === 'consumer' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    setIsAIAssistantOpen(true);
+                  }}
+                  className="w-full min-h-[40px] px-3 py-2 rounded-lg text-xs font-semibold text-teal-200 hover:text-white bg-teal-950/50 hover:bg-teal-900/50 border border-teal-800/50 flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 cursor-pointer"
+                >
+                  <Cpu className="w-4 h-4 text-teal-400 shrink-0" />
+                  <span>{t.erp.vidyutMitraAiAssistant}</span>
+                </button>
+              )}
 
               <button
                 type="button"

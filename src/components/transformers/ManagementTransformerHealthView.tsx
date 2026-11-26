@@ -299,8 +299,8 @@ export const ManagementTransformerHealthView: React.FC = () => {
           </h3>
           <p className="text-xs text-slate-500 mb-4">Total Assets vs High-Risk Units per Subdivision</p>
 
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
               <BarChart data={zoneBreakdown}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="zone" stroke="#94a3b8" fontSize={11} />
@@ -322,8 +322,8 @@ export const ManagementTransformerHealthView: React.FC = () => {
           </h3>
           <p className="text-xs text-slate-500 mb-4">ML Thermal & Utilization Hazard Classification</p>
 
-          <div className="h-64 w-full flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 w-full min-w-0 flex items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
               <PieChart>
                 <Pie
                   data={riskPieData}

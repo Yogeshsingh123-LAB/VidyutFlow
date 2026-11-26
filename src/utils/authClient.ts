@@ -224,7 +224,8 @@ export async function loginWithServerApi(
   password: string,
   targetRole: UserRole,
   mfaCodeOrFetch?: string | FetchLike,
-  fetchImpl: FetchLike = fetch
+  fetchImpl: FetchLike = fetch,
+  rememberMe: boolean = false
 ): Promise<{
   success: boolean;
   session?: DemoSession;
@@ -255,6 +256,8 @@ export async function loginWithServerApi(
         employeeId: identifier.trim(),
         password,
         targetRole,
+        rememberMe,
+        remember_me: rememberMe,
         mfa_code: effectiveMfaCode?.trim() || undefined,
         mfaCode: effectiveMfaCode?.trim() || undefined
       })

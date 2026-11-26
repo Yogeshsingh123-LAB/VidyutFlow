@@ -217,6 +217,18 @@ import {
   validateServiceRequestSubmission
 } from '../../utils/consumerServicePrefill';
 
+/** Returns a localized greeting based on the user's current local hour. */
+function getTimeOfDayGreeting(lang: string, now: Date = new Date()): string {
+  const hour = now.getHours();
+  const slot = hour >= 5 && hour < 12 ? 'morning' : hour >= 12 && hour < 17 ? 'afternoon' : 'evening';
+  const labels: Record<'morning' | 'afternoon' | 'evening', Record<string, string>> = {
+    morning: { en: 'Good Morning,', gu: 'શુભ સવાર,', hi: 'सुप्रभात,', mr: 'सुप्रभात,' },
+    afternoon: { en: 'Good Afternoon,', gu: 'શુભ બપોર,', hi: 'नमस्कार,', mr: 'शुभ दुपार,' },
+    evening: { en: 'Good Evening,', gu: 'શુભ સાંજ,', hi: 'शुभ संध्या,', mr: 'शुभ संध्याकाळ,' },
+  };
+  return labels[slot][lang] || labels[slot].en;
+}
+
 export const ConsumerPortal: React.FC = () => {
   const {
     activeTab,
@@ -307,6 +319,8 @@ export const ConsumerPortal: React.FC = () => {
   const consumerNotifications = userNotifications || [];
 
   const hasConnections = consumerConnections.length > 0;
+  const [consumptionRangeMonths, setConsumptionRangeMonths] = useState<3 | 6 | 12>(6);
+  const [isConsumptionRangeOpen, setIsConsumptionRangeOpen] = useState(false);
 
   const selectedConnectionNo = selectedConsumerConnectionNo || consumerConnections[0]?.consumerNo || '';
   const setSelectedConnectionNo = setSelectedConsumerConnectionNo;
@@ -427,50 +441,24 @@ export const ConsumerPortal: React.FC = () => {
 
   // New connection form states (Multi-step interactive wizard)
   const [formStep, setFormStep] = useState<1 | 2 | 3 | 4>(1);
-  const [applicantName, setApplicantName] = useState(
-    demoSession?.user.name || (isDefaultDemoConsumer ? 'Smt. Meenaben Patel' : '')
-  );
-  const [applicantPhone, setApplicantPhone] = useState(
-    demoSession?.user.mobileNumber || (isDefaultDemoConsumer ? '+91 98250 14820' : '')
-  );
-  const [applicantEmail, setApplicantEmail] = useState(
-    demoSession?.user.email || (isDefaultDemoConsumer ? 'consumer@vidyutflow.demo' : '')
-  );
+  const [applicantName, setApplicantName] = useState('');
+  const [applicantPhone, setApplicantPhone] = useState('');
+  const [applicantEmail, setApplicantEmail] = useState('');
   const [identityProofType, setIdentityProofType] = useState('Aadhaar Card');
-  const [identityNumber, setIdentityNumber] = useState(
-    isDefaultDemoConsumer ? 'XXXX-XXXX-8421' : ''
-  );
-  const [fatherOrHusbandName, setFatherOrHusbandName] = useState(
-    isDefaultDemoConsumer ? 'Late Shri Kantilal Patel' : ''
-  );
+  const [identityNumber, setIdentityNumber] = useState('');
+  const [fatherOrHusbandName, setFatherOrHusbandName] = useState('');
 
   const [subdivision, setSubdivision] = useState('Mehsana City North');
-  const [address, setAddress] = useState(
-    isDefaultDemoConsumer ? '14, Anand Nagar Society, Visnagar Road, Mehsana' : ''
-  );
-  const [pincode, setPincode] = useState('384002');
+  const [address, setAddress] = useState('');
+  const [pincode, setPincode] = useState('');
   const [premisesType, setPremisesType] = useState<'Owned' | 'Rented' | 'Government Leased'>('Owned');
 
-  // Keep applicant form synced with logged-in user session
+  // Keep link-connection phone synced with logged-in user session; leave New Connection applicant fields blank by default
   useEffect(() => {
-    if (demoSession?.user) {
-      setApplicantName(demoSession.user.name);
-      setApplicantEmail(demoSession.user.email);
-      if (demoSession.user.mobileNumber) {
-        setApplicantPhone(demoSession.user.mobileNumber);
-        setLinkPhone(demoSession.user.mobileNumber);
-      }
-      if (isDefaultDemoConsumer) {
-        setAddress('14, Anand Nagar Society, Visnagar Road, Mehsana');
-        setFatherOrHusbandName('Late Shri Kantilal Patel');
-        setIdentityNumber('XXXX-XXXX-8421');
-      } else {
-        setAddress(selectedConnection?.address || '');
-        setFatherOrHusbandName('');
-        setIdentityNumber('');
-      }
+    if (demoSession?.user?.mobileNumber) {
+      setLinkPhone(demoSession.user.mobileNumber);
     }
-  }, [demoSession?.user.id, isDefaultDemoConsumer]);
+  }, [demoSession?.user.id]);
 
   const [category, setCategory] = useState<TariffCategory>('Residential (RGPU)');
   const [loadKw, setLoadKw] = useState<number>(6);
@@ -563,6 +551,10 @@ export const ConsumerPortal: React.FC = () => {
       sessionUser: demoSession?.user || null,
       isDefaultDemoConsumer
     });
+    if (mode === 'NEW_CONNECTION') {
+      setFatherOrHusbandName('');
+      setIdentityNumber('');
+    }
     setUserEditedFields(new Set());
     applyPrefillStateToWizard(nextPrefill);
     setFormStep(1);
@@ -1163,136 +1155,6 @@ export const ConsumerPortal: React.FC = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6 min-w-0">
-      {/* Account & Connection Summary Header (Hidden on Dashboard, New Connection and Notifications views for 1:1 clean design match) */}
-      {activeTab !== 'dashboard' && activeTab !== 'new-connection' && activeTab !== 'notifications' && (
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 min-w-0">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white p-1.5 border border-slate-200 dark:border-slate-700 shadow-2xs flex items-center justify-center shrink-0">
-              <img src="/assets/ugvcl-logo.png" alt="UGVCL Official Logo" className="w-full h-full object-contain" />
-            </div>
-            <div className="min-w-0 flex-1">
-              {hasConnections && selectedConnection ? (
-                <>
-                  <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5 flex-wrap">
-                    <span>{tc.ugvclPrefix} {localizeSubdivision(selectedConnection.subdivision, language)}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{localizeTariffCategory(selectedConnection.tariffCategory, language)}</span>
-                    <span aria-hidden="true">·</span>
-                    <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-semibold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      {localizeConnectionStatus(selectedConnection.status, language)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight leading-snug break-words">
-                      {selectedConnection.consumerName}
-                    </h1>
-                    <span className="text-xs font-mono font-semibold text-blue-700 dark:text-blue-300 bg-blue-50/80 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-md border border-blue-200/80 dark:border-blue-800/80">
-                      {tc.consumerNoLabel} {selectedConnection.consumerNo}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-start sm:items-center gap-2 flex-wrap leading-relaxed">
-                    <span className="inline-flex items-start sm:items-center gap-1 min-w-0">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5 sm:mt-0" />
-                      <span className="break-words">{localizeConsumerAddress(selectedConnection.address, language)}</span>
-                    </span>
-                    <span className="text-slate-300 dark:text-slate-700 hidden sm:inline" aria-hidden="true">|</span>
-                    <span className="font-mono text-[11px] text-slate-600 dark:text-slate-300">
-                      {tc.meterLabel} {selectedConnection.meterNo} ({selectedConnection.sanctionedLoadKw} kW · {localizePhase(selectedConnection.phase, language)})
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-0.5 flex-wrap">
-                    <span>{tc.selfServicePortal}</span>
-                    <span aria-hidden="true">·</span>
-                    <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                      {tc.noConnectionLinked}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight leading-snug break-words">
-                      {tc.consumerAccountLabel} {currentUserName}
-                    </h1>
-                    <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                      {tc.idLabel} {currentUserId}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-start sm:items-center gap-1.5 flex-wrap leading-relaxed">
-                    <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5 sm:mt-0" />
-                    <span className="break-words">{currentUserEmail || tc.registeredCitizenAccount} · {tc.independentErpDemo}</span>
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Right: Active Meter Selector or Onboarding Actions */}
-          <div className="flex items-center gap-3 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100 dark:border-slate-800/80 shrink-0 min-w-0">
-            {hasConnections ? (
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full lg:w-auto min-w-0">
-                <label
-                  htmlFor="active-meter-select"
-                  className="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 shrink-0"
-                >
-                  <Gauge className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                  <span>{tc.activeMeterLabel}</span>
-                </label>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 min-w-0">
-                  <select
-                    id="active-meter-select"
-                    value={selectedConnection?.consumerNo}
-                    onChange={e => {
-                      handleWizardConnectionSwitch(e.target.value);
-                    }}
-                    aria-label={tc.selectActiveMeterAria}
-                    className="min-h-11 sm:min-h-9 min-w-0 w-full sm:w-auto px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 dark:bg-[#131D31] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-colors cursor-pointer"
-                  >
-                    {consumerConnections.map(c => {
-                      const connDue =
-                        consumerBillingSummary.summariesByConnectionNo[c.consumerNo]?.dueBillCount || 0;
-                      return (
-                        <option key={c.consumerNo} value={c.consumerNo}>
-                          {c.consumerNo} — {localizeTariffCategory(c.tariffCategory, language)} ({c.sanctionedLoadKw} kW)
-                          {connDue > 0 ? ` · ${bUi.dueBillsCountBadge(connDue)}` : ''}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('connections')}
-                    className="min-h-11 sm:min-h-9 px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer shrink-0"
-                    title={tc.manageConnectionsTitle}
-                  >
-                    {tc.manageConnectionsBtn} ({consumerConnections.length})
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => initializeServiceRequestWizard('NEW_CONNECTION')}
-                  className="flex-1 sm:flex-initial min-h-11 sm:min-h-9 px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
-                >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  <span>{tc.applyForConnectionBtn}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsLinkModalOpen(true)}
-                  className="flex-1 sm:flex-initial min-h-11 sm:min-h-9 px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-colors flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
-                >
-                  <Link2 className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{tc.linkExistingBtn}</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* SUBVIEW 1: DASHBOARD */}
       {activeTab === 'dashboard' && (
@@ -1398,13 +1260,19 @@ export const ConsumerPortal: React.FC = () => {
             {/* Left: Greeting Text & Accent Bar */}
             <div className="z-10">
               <div className="text-slate-500 text-sm font-semibold">
-                Good Afternoon,
+                {getTimeOfDayGreeting(language)}
               </div>
               <h1 className="text-2xl sm:text-[28px] font-black text-[#0A2540] tracking-tight leading-tight mt-0.5">
                 {currentUserName || 'Smt. Meenaben Patel'}
               </h1>
               <p className="text-xs sm:text-[13px] text-slate-500 font-medium mt-1">
-                Manage your electricity services, bills and requests at one place.
+                {language === 'gu'
+                  ? 'તમારી વીજળી સેવાઓ, બિલ અને વિનંતીઓ એક જ જગ્યાએ મેનેજ કરો.'
+                  : language === 'hi'
+                  ? 'अपनी बिजली सेवाएँ, बिल और अनुरोध एक ही स्थान पर प्रबंधित करें।'
+                  : language === 'mr'
+                  ? 'तुमच्या वीज सेवा, बिले आणि विनंत्या एकाच ठिकाणी व्यवस्थापित करा.'
+                  : 'Manage your electricity services, bills and requests at one place.'}
               </p>
               <div className="w-12 h-1 bg-[#FF6B00] rounded-full mt-3" />
             </div>
@@ -1477,11 +1345,17 @@ export const ConsumerPortal: React.FC = () => {
                   <div className="text-xl sm:text-[22px] font-black text-[#0A2540] tracking-tight tabular-nums">
                     {hasConnections && currentBill
                       ? `₹${(currentBill.isPartiallyPaid ? currentBill.outstandingBalance : currentBill.totalAmount).toLocaleString('en-IN')}`
-                      : '₹2,185.00'}
+                      : '₹0'}
                   </div>
                   <span
                     data-testid="dashboard-bill-status-badge"
-                    className="text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-0.5 bg-rose-100 text-rose-700"
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-0.5 ${
+                      !hasConnections || !currentBill
+                        ? 'bg-slate-200/80 text-slate-600'
+                        : dashboardBadgeState === 'PAID'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-rose-100 text-rose-700'
+                    }`}
                   >
                     {dashboardBadgeState === 'NO_ACTIVE_CONNECTION'
                       ? tc.noActiveConnection
@@ -1514,10 +1388,22 @@ export const ConsumerPortal: React.FC = () => {
                     Total Outstanding
                   </div>
                   <div className="text-xl sm:text-[22px] font-black text-[#0A2540] tracking-tight tabular-nums">
-                    ₹2,197.57
+                    {(() => {
+                      const totalOut = consumerBillingSummary?.accountTotalOutstandingWithCharges ?? 0;
+                      return hasConnections
+                        ? `₹${totalOut.toLocaleString('en-IN', {
+                            minimumFractionDigits: totalOut % 1 !== 0 ? 2 : 0,
+                            maximumFractionDigits: 2,
+                          })}`
+                        : '₹0';
+                    })()}
                   </div>
                   <div className="text-[10px] text-slate-500 font-medium mt-0.5">
-                    (14 days chargeable)
+                    {!hasConnections
+                      ? tc.noActiveConnection
+                      : (consumerBillingSummary?.accountTotalOutstandingWithCharges ?? 0) > 0
+                      ? `${consumerBillingSummary?.accountDueBillCount ?? 0} due bill(s)`
+                      : 'All bills settled'}
                   </div>
                 </div>
               </div>
@@ -1538,10 +1424,16 @@ export const ConsumerPortal: React.FC = () => {
                     This Month Usage
                   </div>
                   <div className="text-xl sm:text-[22px] font-black text-[#0A2540] tracking-tight tabular-nums">
-                    {hasConnections && currentBill ? `${currentBill.unitsConsumed} kWh` : '360 kWh'}
+                    {hasConnections && currentBill ? `${currentBill.unitsConsumed} kWh` : '0 kWh'}
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-0.5 mt-0.5 bg-emerald-100 text-emerald-700">
-                    <span>↓ 12% vs last month</span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-0.5 mt-0.5 ${
+                      hasConnections && currentBill
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-slate-200/80 text-slate-600'
+                    }`}
+                  >
+                    <span>{hasConnections && currentBill ? 'Current cycle usage' : tc.noActiveConnection}</span>
                   </span>
                 </div>
               </div>
@@ -1559,19 +1451,30 @@ export const ConsumerPortal: React.FC = () => {
                     Due Date
                   </div>
                   <div className="text-base sm:text-lg font-black text-[#0A2540] tracking-tight tabular-nums flex items-center gap-1">
-                    <span>{hasConnections && currentBill?.dueDate ? currentBill.dueDate : '22-Oct-2026'}</span>
+                    <span>{hasConnections && currentBill?.dueDate ? currentBill.dueDate : '—'}</span>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-400 inline" />
                   </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => handlePayClick(currentBill?.billNo || 'BILL-UG-2026-10-8821')}
-                className="px-4 py-2.5 rounded-xl bg-[#0A2540] hover:bg-[#12365c] text-white font-bold text-xs shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 cursor-pointer shrink-0 ml-2"
-              >
-                <span>Pay Bill</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+              {hasConnections && currentBill && !currentBill.isPaid && currentBill.outstandingBalance > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => handlePayClick(currentBill.billNo)}
+                  className="px-4 py-2.5 rounded-xl bg-[#0A2540] hover:bg-[#12365c] text-white font-bold text-xs shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 cursor-pointer shrink-0 ml-2"
+                >
+                  <span>Pay Bill</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              ) : !hasConnections ? (
+                <button
+                  type="button"
+                  onClick={() => initializeServiceRequestWizard('NEW_CONNECTION')}
+                  className="px-3.5 py-2.5 rounded-xl bg-[#0A2540] hover:bg-[#12365c] text-white font-bold text-xs shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 cursor-pointer shrink-0 ml-2"
+                >
+                  <span>Apply</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -1584,56 +1487,135 @@ export const ConsumerPortal: React.FC = () => {
               <div className="flex items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2 font-black text-sm text-[#0A2540]">
                   <BarChart3 className="w-4 h-4 text-blue-600" />
-                  <span>Electricity Consumption</span>
+                  <span>
+                    {language === 'gu'
+                      ? 'વીજળી વપરાશ'
+                      : language === 'hi'
+                      ? 'बिजली खपत'
+                      : language === 'mr'
+                      ? 'वीज वापर'
+                      : 'Electricity Consumption'}
+                  </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('analytics')}
-                  className="text-[11px] font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <span>Last 6 Months</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsConsumptionRangeOpen(prev => !prev)}
+                    aria-expanded={isConsumptionRangeOpen}
+                    aria-haspopup="menu"
+                    className="text-[11px] font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <span>
+                      {consumptionRangeMonths === 3
+                        ? language === 'gu' ? 'છેલ્લા 3 મહિના' : language === 'hi' ? 'पिछले 3 महीने' : language === 'mr' ? 'मागील 3 महिने' : 'Last 3 Months'
+                        : consumptionRangeMonths === 12
+                        ? language === 'gu' ? 'છેલ્લા 12 મહિના' : language === 'hi' ? 'पिछले 12 महीने' : language === 'mr' ? 'मागील 12 महिने' : 'Last 12 Months'
+                        : language === 'gu' ? 'છેલ્લા 6 મહિના' : language === 'hi' ? 'पिछले 6 महीने' : language === 'mr' ? 'मागील 6 महिने' : 'Last 6 Months'}
+                    </span>
+                    <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isConsumptionRangeOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isConsumptionRangeOpen && (
+                    <div
+                      role="menu"
+                      className="absolute right-0 top-full mt-1 w-44 bg-white rounded-xl shadow-xl border border-slate-200 p-1 z-30 animate-in fade-in slide-in-from-top-1"
+                    >
+                      {([3, 6, 12] as const).map(months => (
+                        <button
+                          key={months}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setConsumptionRangeMonths(months);
+                            setIsConsumptionRangeOpen(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
+                            consumptionRangeMonths === months
+                              ? 'bg-blue-50 text-blue-700'
+                              : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span>
+                            {months === 3
+                              ? language === 'gu' ? 'છેલ્લા 3 મહિના' : language === 'hi' ? 'पिछले 3 महीने' : language === 'mr' ? 'मागील 3 महिने' : 'Last 3 Months'
+                              : months === 12
+                              ? language === 'gu' ? 'છેલ્લા 12 મહિના' : language === 'hi' ? 'पिछले 12 महीने' : language === 'mr' ? 'मागील 12 महिने' : 'Last 12 Months'
+                              : language === 'gu' ? 'છેલ્લા 6 મહિના' : language === 'hi' ? 'पिछले 6 महीने' : language === 'mr' ? 'मागील 6 महिने' : 'Last 6 Months'}
+                          </span>
+                          {consumptionRangeMonths === months && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                        </button>
+                      ))}
+                      <div className="my-1 border-t border-slate-100" />
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setIsConsumptionRangeOpen(false);
+                          setActiveTab('analytics');
+                        }}
+                        className="w-full text-left px-2.5 py-1.5 text-xs font-bold text-[#0A2540] hover:bg-orange-50 hover:text-[#FF6B00] rounded-lg flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <span>
+                          {language === 'gu'
+                            ? 'સંપૂર્ણ એનાલિટિક્સ જુઓ'
+                            : language === 'hi'
+                            ? 'पूरा विश्लेषण देखें'
+                            : language === 'mr'
+                            ? 'संपूर्ण विश्लेषण पहा'
+                            : 'Open Full Analytics'}
+                        </span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Bar Chart Matching Reference */}
+              {/* Bar Chart */}
               <div className="pt-2">
-                <div className="flex items-end gap-2.5 sm:gap-3 justify-between h-44 px-2 pt-6 pb-2 border-b border-slate-100 relative">
-                  {/* Y Axis indicator on left */}
-                  <div className="absolute top-0 left-0 text-[10px] font-bold text-slate-400">kWh</div>
-                  
-                  {/* Horizontal grid lines */}
-                  <div className="absolute left-6 right-0 top-6 border-b border-dashed border-slate-100 pointer-events-none" />
-                  <div className="absolute left-6 right-0 top-18 border-b border-dashed border-slate-100 pointer-events-none" />
-                  <div className="absolute left-6 right-0 top-30 border-b border-dashed border-slate-100 pointer-events-none" />
+                {hasConnections && localizedConsumptionHistory.length > 0 ? (
+                  <div className="flex items-end gap-2.5 sm:gap-3 justify-between h-44 px-2 pt-6 pb-2 border-b border-slate-100 relative">
+                    <div className="absolute top-0 left-0 text-[10px] font-bold text-slate-400">kWh</div>
+                    <div className="absolute left-6 right-0 top-6 border-b border-dashed border-slate-100 pointer-events-none" />
+                    <div className="absolute left-6 right-0 top-18 border-b border-dashed border-slate-100 pointer-events-none" />
+                    <div className="absolute left-6 right-0 top-30 border-b border-dashed border-slate-100 pointer-events-none" />
 
-                  {/* 6 Bars */}
-                  {[
-                    { month: 'May 2026', kwh: 420, active: false, heightPct: '70%' },
-                    { month: 'Jun 2026', kwh: 480, active: true, heightPct: '80%' },
-                    { month: 'Jul 2026', kwh: 360, active: false, heightPct: '60%' },
-                    { month: 'Aug 2026', kwh: 410, active: false, heightPct: '68%' },
-                    { month: 'Sep 2026', kwh: 370, active: false, heightPct: '62%' },
-                    { month: 'Oct 2026', kwh: 340, active: false, heightPct: '57%' },
-                  ].map((item, idx) => (
-                    <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end z-10">
-                      <span className="text-[10px] font-bold text-slate-700 leading-none">
-                        {item.kwh}
-                      </span>
-                      <div
-                        className={`w-full max-w-[38px] rounded-t-md transition-all ${
-                          item.active
-                            ? 'bg-[#2563EB] shadow-xs'
-                            : 'bg-[#93C5FD] hover:bg-blue-400'
-                        }`}
-                        style={{ height: item.heightPct }}
-                      />
-                      <span className="text-[9.5px] font-semibold text-slate-500 whitespace-nowrap mt-1">
-                        {item.month}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                    {(() => {
+                      const slice = localizedConsumptionHistory.slice(-consumptionRangeMonths);
+                      const maxUnits = Math.max(...slice.map(s => s.units || 0), 1);
+                      return slice.map((item, idx) => {
+                        const pct = Math.max(12, Math.round(((item.units || 0) / maxUnits) * 85));
+                        const isLatest = idx === slice.length - 1;
+                        return (
+                          <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end z-10">
+                            <span className="text-[10px] font-bold text-slate-700 leading-none">
+                              {item.units}
+                            </span>
+                            <div
+                              className={`w-full max-w-[38px] rounded-t-md transition-all ${
+                                isLatest
+                                  ? 'bg-[#2563EB] shadow-xs'
+                                  : 'bg-[#93C5FD] hover:bg-blue-400'
+                              }`}
+                              style={{ height: `${pct}%` }}
+                            />
+                            <span className="text-[9.5px] font-semibold text-slate-500 whitespace-nowrap mt-1">
+                              {item.displayMonth || item.month}
+                            </span>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                ) : (
+                  <div className="h-44 flex flex-col items-center justify-center text-center px-4 rounded-xl bg-slate-50/70 border border-dashed border-slate-200">
+                    <BarChart3 className="w-7 h-7 text-slate-300 mb-2" />
+                    <p className="text-xs font-bold text-slate-700">No consumption history yet</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Apply for or link an electricity connection to view monthly kWh usage.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1649,56 +1631,67 @@ export const ConsumerPortal: React.FC = () => {
                   <span className="text-slate-500 font-medium">Consumer No.</span>
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono font-bold text-slate-900">
-                      {selectedConnection?.consumerNo || '04281-99231'}
+                      {hasConnections && selectedConnection ? selectedConnection.consumerNo : '—'}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard?.writeText(selectedConnection?.consumerNo || '04281-99231');
-                        showToast('Consumer number copied to clipboard', 'info');
-                      }}
-                      className="text-slate-400 hover:text-blue-600 p-0.5 cursor-pointer"
-                      title="Copy consumer number"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
+                    {hasConnections && selectedConnection?.consumerNo && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(selectedConnection.consumerNo);
+                          showToast('Consumer number copied to clipboard', 'info');
+                        }}
+                        className="text-slate-400 hover:text-blue-600 p-0.5 cursor-pointer"
+                        title="Copy consumer number"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between py-1 border-b border-slate-100">
                   <span className="text-slate-500 font-medium">Meter No.</span>
                   <span className="font-mono font-bold text-slate-900">
-                    {selectedConnection?.meterNo || 'MTR-2024-884102'}
+                    {hasConnections && selectedConnection ? selectedConnection.meterNo : '—'}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 border-b border-slate-100">
                   <span className="text-slate-500 font-medium">Connection Type</span>
                   <span className="font-semibold text-slate-800">
-                    {selectedConnection?.tariffCategory || 'Residential (RGPU)'}
+                    {hasConnections && selectedConnection ? selectedConnection.tariffCategory : '—'}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 border-b border-slate-100">
                   <span className="text-slate-500 font-medium">Feeder</span>
-                  <span className="font-semibold text-slate-800 truncate max-w-[170px]" title={selectedConnection?.feederName || '11kV Visnagar Road Feeder'}>
-                    {selectedConnection?.feederName || '11kV Visnagar Road Feeder'}
+                  <span
+                    className="font-semibold text-slate-800 truncate max-w-[170px]"
+                    title={hasConnections && selectedConnection ? selectedConnection.feederName : undefined}
+                  >
+                    {hasConnections && selectedConnection ? selectedConnection.feederName : '—'}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 border-b border-slate-100">
                   <span className="text-slate-500 font-medium">Voltage</span>
                   <span className="font-semibold text-slate-800">
-                    232 V (Stable)
+                    {hasConnections && selectedConnection ? '232 V (Stable)' : '—'}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1">
                   <span className="text-slate-500 font-medium">Status</span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200/60">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    Normal Supply
-                  </span>
+                  {hasConnections && selectedConnection ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200/60">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      {localizeConnectionStatus(selectedConnection.status, language)}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200/80">
+                      {tc.noActiveConnection}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1765,7 +1758,7 @@ export const ConsumerPortal: React.FC = () => {
               4. BOTTOM ROW (Notices & Updates, Recent Activity)
              ========================================================================= */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
-            {/* Card 1: Notices & Updates */}
+            {/* Card 1: Notices & Updates (Real User-Scoped Notifications) */}
             <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs">
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2 font-black text-sm text-[#0A2540]">
@@ -1783,48 +1776,33 @@ export const ConsumerPortal: React.FC = () => {
               </div>
 
               <div className="space-y-3">
-                {/* Notice 1 */}
-                <div className="flex items-start justify-between gap-3 text-xs">
-                  <div className="flex items-start gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-[#FF7A00] shrink-0 mt-1.5" />
-                    <span className="font-semibold text-slate-800 hover:text-blue-700 transition-colors leading-snug cursor-pointer">
-                      Section 56 Formal Notice & Statutory Payment Deadline – 08-Nov-2026
-                    </span>
+                {consumerNotifications.length > 0 ? (
+                  consumerNotifications.slice(0, 3).map((notif) => (
+                    <div
+                      key={notif.id}
+                      onClick={() => setActiveTab('notifications')}
+                      className="flex items-start justify-between gap-3 text-xs cursor-pointer group"
+                    >
+                      <div className="flex items-start gap-2 min-w-0">
+                        <span className="w-2 h-2 rounded-full bg-[#FF7A00] shrink-0 mt-1.5" />
+                        <span className="font-semibold text-slate-800 group-hover:text-blue-700 transition-colors leading-snug line-clamp-2">
+                          {notif.title || notif.message}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 shrink-0 font-medium">
+                        {notif.time || ''}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-6 text-center text-xs text-slate-500">
+                    No active notices or alerts for your account yet.
                   </div>
-                  <span className="text-[11px] text-slate-400 shrink-0 font-medium">
-                    27 Oct 2025
-                  </span>
-                </div>
-
-                {/* Notice 2 */}
-                <div className="flex items-start justify-between gap-3 text-xs">
-                  <div className="flex items-start gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-[#FF7A00] shrink-0 mt-1.5" />
-                    <span className="font-semibold text-slate-800 hover:text-blue-700 transition-colors leading-snug cursor-pointer">
-                      Delayed Payment Surcharge (15% p.a.) – DEMO Policy v2026.1
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-slate-400 shrink-0 font-medium">
-                    25 Oct 2025
-                  </span>
-                </div>
-
-                {/* Notice 3 */}
-                <div className="flex items-start justify-between gap-3 text-xs">
-                  <div className="flex items-start gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-[#FF7A00] shrink-0 mt-1.5" />
-                    <span className="font-semibold text-slate-800 hover:text-blue-700 transition-colors leading-snug cursor-pointer">
-                      Consumer Advisory: Online Payment Facility Now Available
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-slate-400 shrink-0 font-medium">
-                    20 Oct 2025
-                  </span>
-                </div>
+                )}
               </div>
             </div>
 
-            {/* Card 2: Recent Activity */}
+            {/* Card 2: Recent Activity (Real User-Scoped Payments, Applications, Complaints & Bills) */}
             <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs">
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2 font-black text-sm text-[#0A2540]">
@@ -1833,7 +1811,7 @@ export const ConsumerPortal: React.FC = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('payments')}
+                  onClick={() => setActiveTab(consumerPayments.length > 0 ? 'payments' : 'requests')}
                   className="text-xs font-bold text-[#0A2540] hover:text-[#FF6B00] transition-colors flex items-center gap-1 cursor-pointer"
                 >
                   <span>View All</span>
@@ -1841,46 +1819,82 @@ export const ConsumerPortal: React.FC = () => {
                 </button>
               </div>
 
-              <div className="space-y-3">
-                {/* Activity 1 */}
-                <div className="flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span className="font-semibold text-slate-800 leading-snug">
-                      Payment of ₹1,500.00 – Successful
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-slate-400 shrink-0 font-medium">
-                    10 Oct 2025
-                  </span>
-                </div>
+              {(() => {
+                const activityItems: Array<{
+                  id: string;
+                  kind: 'payment' | 'request' | 'complaint' | 'bill';
+                  label: string;
+                  dateLabel: string;
+                  targetTab: 'payments' | 'requests' | 'complaints' | 'bills';
+                }> = [
+                  ...consumerPayments.slice(0, 3).map(p => ({
+                    id: `pay-${p.txId}`,
+                    kind: 'payment' as const,
+                    label: `Payment of ₹${(p.amount ?? 0).toLocaleString('en-IN')} – ${p.status || 'Successful'}`,
+                    dateLabel: p.date || '',
+                    targetTab: 'payments' as const,
+                  })),
+                  ...consumerApplications.slice(0, 3).map(a => ({
+                    id: `app-${a.id}`,
+                    kind: 'request' as const,
+                    label: `Application #${a.id} (${a.category || 'New Connection'}) – ${a.status}`,
+                    dateLabel: a.appliedDate || '',
+                    targetTab: 'requests' as const,
+                  })),
+                  ...consumerComplaints.slice(0, 3).map(c => ({
+                    id: `cmp-${c.id}`,
+                    kind: 'complaint' as const,
+                    label: `Complaint #${c.id} (${c.category}) – ${c.status}`,
+                    dateLabel: c.filedAt || '',
+                    targetTab: 'complaints' as const,
+                  })),
+                  ...(hasConnections
+                    ? consumerBills.slice(0, 2).map(b => ({
+                        id: `bill-${b.billNo}`,
+                        kind: 'bill' as const,
+                        label: `Bill ${b.billNo} Generated – ₹${(b.totalAmount ?? 0).toLocaleString('en-IN')}`,
+                        dateLabel: b.billDate || '',
+                        targetTab: 'bills' as const,
+                      }))
+                    : []),
+                ].slice(0, 4);
 
-                {/* Activity 2 */}
-                <div className="flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <FileText className="w-4 h-4 text-blue-500 shrink-0" />
-                    <span className="font-semibold text-slate-800 leading-snug">
-                      Service Request #SR-48291 – Submitted
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-slate-400 shrink-0 font-medium">
-                    08 Oct 2025
-                  </span>
-                </div>
+                if (activityItems.length === 0) {
+                  return (
+                    <div className="py-6 text-center text-xs text-slate-500">
+                      No recent activity yet. Apply for a new connection or link a consumer number to get started.
+                    </div>
+                  );
+                }
 
-                {/* Activity 3 */}
-                <div className="flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Receipt className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span className="font-semibold text-slate-800 leading-snug">
-                      Bill Generated – ₹2,185.00
-                    </span>
+                return (
+                  <div className="space-y-3">
+                    {activityItems.map(item => (
+                      <div
+                        key={item.id}
+                        onClick={() => setActiveTab(item.targetTab)}
+                        className="flex items-center justify-between gap-3 text-xs cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {item.kind === 'payment' ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                          ) : item.kind === 'request' || item.kind === 'complaint' ? (
+                            <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+                          ) : (
+                            <Receipt className="w-4 h-4 text-slate-400 shrink-0" />
+                          )}
+                          <span className="font-semibold text-slate-800 group-hover:text-blue-700 transition-colors leading-snug truncate">
+                            {item.label}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-slate-400 shrink-0 font-medium">
+                          {item.dateLabel}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                  <span className="text-[11px] text-slate-400 shrink-0 font-medium">
-                    22 Sep 2025
-                  </span>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -1989,8 +2003,8 @@ export const ConsumerPortal: React.FC = () => {
 
             {hasConnections ? (
               <div className="space-y-4">
-                <div className="h-72 w-full" data-testid="consumer-monthly-consumption-chart">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="h-64 w-full min-w-0" data-testid="consumer-monthly-consumption-chart">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
                     <AreaChart data={localizedConsumptionHistory} margin={{ top: 10, right: 16, left: 0, bottom: 4 }}>
                       <defs>
                         <linearGradient id="colorUnits" x1="0" y1="0" x2="0" y2="1">
@@ -4445,59 +4459,148 @@ export const ConsumerPortal: React.FC = () => {
 
       {/* SUBVIEW 7: SERVICE REQUESTS */}
       {activeTab === 'requests' && (
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              {tc.selfServiceRequestsTitle}
-            </h2>
-            <p className="text-xs text-slate-500">
-              {tc.selfServiceRequestsSub}
-            </p>
+        <div className="space-y-5">
+          {/* Breadcrumbs */}
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <button
+              type="button"
+              onClick={() => setActiveTab('dashboard')}
+              className="hover:text-[#0A2540] transition-colors cursor-pointer"
+            >
+              {language === 'gu' ? 'હોમ' : language === 'hi' ? 'होम' : language === 'mr' ? 'होम' : 'Home'}
+            </button>
+            <span className="text-slate-400">›</span>
+            <span className="text-slate-800 dark:text-slate-200 font-semibold">{tc.selfServiceRequestsTitle}</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-teal-50 dark:bg-teal-950/40 text-teal-600 flex items-center justify-center font-bold">
-                  <TrendingUp className="w-5 h-5" />
+          {/* Institutional Hero Banner */}
+          <div className="rounded-2xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs relative overflow-hidden p-6 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="min-w-0 space-y-2 z-10">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0A2540] dark:text-white tracking-tight">
+                  {tc.selfServiceRequestsTitle}
+                </h1>
+                {selectedConnection && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 dark:bg-orange-950/40 border border-orange-200/80 dark:border-orange-800/60 text-[11px] font-bold text-[#0A2540] dark:text-orange-200">
+                    <Zap className="w-3 h-3 text-[#FF6B00] fill-[#FF6B00]" />
+                    <span>{selectedConnection.consumerNo}</span>
+                    <span className="text-slate-400">•</span>
+                    <span>{selectedConnection.sanctionedLoadKw} kW</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 font-medium max-w-2xl">
+                {tc.selfServiceRequestsSub}
+              </p>
+              <div className="w-12 h-1 bg-[#FF6B00] rounded-full pt-0.5" />
+            </div>
+
+            {/* Right: Pylon Artwork */}
+            <div className="relative w-64 sm:w-72 h-24 hidden md:block shrink-0 pointer-events-none select-none">
+              <svg viewBox="0 0 320 120" fill="none" className="w-full h-full">
+                <path d="M0,105 Q90,65 170,90 T320,55 L320,120 L0,120 Z" fill="#FDF4E7" opacity="0.9" />
+                <path d="M0,112 Q100,80 190,100 T320,75 L320,120 L0,120 Z" fill="#FCE8D3" opacity="0.6" />
+                <path d="M0,62 Q130,95 230,55" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+                <path d="M0,72 Q135,105 230,65" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+                <path d="M230,55 Q265,70 300,30" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+                <path d="M230,65 Q265,80 300,40" stroke="#94A3B8" strokeWidth="1.2" fill="none" />
+                <g stroke="#0F2B48" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="230" y1="35" x2="218" y2="115" />
+                  <line x1="230" y1="35" x2="242" y2="115" />
+                  <line x1="223" y1="55" x2="237" y2="55" />
+                  <line x1="220" y1="75" x2="240" y2="75" />
+                  <line x1="218" y1="95" x2="242" y2="95" />
+                  <line x1="210" y1="55" x2="250" y2="55" />
+                  <line x1="214" y1="65" x2="246" y2="65" />
+                  <line x1="230" y1="28" x2="230" y2="35" />
+                </g>
+                <g stroke="#0F2B48" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="300" y1="12" x2="282" y2="115" />
+                  <line x1="300" y1="12" x2="318" y2="115" />
+                  <line x1="289" y1="40" x2="311" y2="40" />
+                  <line x1="285" y1="65" x2="315" y2="65" />
+                  <line x1="282" y1="90" x2="318" y2="90" />
+                  <line x1="272" y1="40" x2="328" y2="40" />
+                  <line x1="276" y1="52" x2="324" y2="52" />
+                  <line x1="300" y1="5" x2="300" y2="12" />
+                </g>
+              </svg>
+            </div>
+          </div>
+
+          {/* 3-Column Primary Service Request Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+            {/* Card 1: Solar Net-Metering */}
+            <div className="p-5 rounded-2xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs flex flex-col justify-between space-y-4 hover:border-teal-300 transition-colors">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-teal-50 dark:bg-teal-950/40 text-teal-600 flex items-center justify-center shrink-0 border border-teal-100 dark:border-teal-900/50">
+                      <Sun className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-[#0A2540] dark:text-white leading-snug">
+                        {tc.solarNetMeteringCardTitle}
+                      </h3>
+                      <span className="inline-block mt-0.5 text-[11px] font-semibold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/50 px-2 py-0.5 rounded">
+                        {tc.solarSubsidyBadge}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    {tc.solarNetMeteringCardTitle}
-                  </h3>
-                  <span className="text-[11px] text-slate-400">{tc.solarSubsidyBadge}</span>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  {tc.solarNetMeteringCardDesc}
+                </p>
+                <div className="flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                  <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">Bi-Directional Meter</span>
+                  <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">SLA: 15–21 Days</span>
                 </div>
               </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                {tc.solarNetMeteringCardDesc}
-              </p>
               <button
+                type="button"
                 onClick={() => {
                   initializeServiceRequestWizard('SOLAR_NET_METERING', selectedConnection?.consumerNo);
                   showToast(tc.solarFormInitToast, 'info');
                 }}
-                className="w-full py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold cursor-pointer"
+                className="w-full py-2.5 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
-                {tc.applySolarNetMeteringBtn}
+                <span>{tc.applySolarNetMeteringBtn}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center font-bold">
-                  <Layers className="w-5 h-5" />
+            {/* Card 2: Load Enhancement / Reduction */}
+            <div className="p-5 rounded-2xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs flex flex-col justify-between space-y-4 hover:border-blue-300 transition-colors">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/50">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-[#0A2540] dark:text-white leading-snug">
+                        {tc.loadChangeCardTitle}
+                      </h3>
+                      <span className="inline-block mt-0.5 text-[11px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 px-2 py-0.5 rounded">
+                        {tc.loadChangeBadge}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    {tc.loadChangeCardTitle}
-                  </h3>
-                  <span className="text-[11px] text-slate-400">{tc.loadChangeBadge}</span>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  {tc.loadChangeCardDesc}
+                </p>
+                <div className="flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                  {selectedConnection && (
+                    <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">
+                      Current: {selectedConnection.sanctionedLoadKw} kW
+                    </span>
+                  )}
+                  <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">SLA: 7–10 Days</span>
                 </div>
               </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                {tc.loadChangeCardDesc}
-              </p>
               <button
+                type="button"
                 onClick={() => {
                   initializeServiceRequestWizard('LOAD_CHANGE', selectedConnection?.consumerNo);
                   showToast(
@@ -4507,10 +4610,194 @@ export const ConsumerPortal: React.FC = () => {
                     'info'
                   );
                 }}
-                className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer"
+                className="w-full py-2.5 px-4 rounded-xl bg-[#0A2540] hover:bg-[#13385e] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
-                {tc.requestLoadChangeBtn}
+                <span>{tc.requestLoadChangeBtn}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
+            </div>
+
+            {/* Card 3: New Connection & Account Services */}
+            <div className="p-5 rounded-2xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs flex flex-col justify-between space-y-4 hover:border-orange-300 transition-colors">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-[#FF6B00] flex items-center justify-center shrink-0 border border-orange-100 dark:border-orange-900/50">
+                      <PlusCircle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-[#0A2540] dark:text-white leading-snug">
+                        {language === 'gu'
+                          ? 'નવું વીજ જોડાણ / કનેક્શન સેવાઓ'
+                          : language === 'hi'
+                          ? 'नया कनेक्शन / सेवा अनुरोध'
+                          : language === 'mr'
+                          ? 'नवीन जोडणी / सेवा विनंती'
+                          : 'New Connection & Meter Services'}
+                      </h3>
+                      <span className="inline-block mt-0.5 text-[11px] font-semibold text-[#FF6B00] bg-orange-50 dark:bg-orange-950/50 px-2 py-0.5 rounded">
+                        GERC Fast-Track
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  {language === 'gu'
+                    ? 'નવા ઘરેલુ, વાણિજ્યિક અથવા ઔદ્યોગિક વીજ જોડાણ માટે ઓનલાઇન અરજી કરો અથવા ફરિયાદ નોંધાવો.'
+                    : language === 'hi'
+                    ? 'नए घरेलू, वाणिज्यिक या औद्योगिक बिजली कनेक्शन के लिए आवेदन करें या शिकायत दर्ज करें।'
+                    : language === 'mr'
+                    ? 'नवीन घरगुती, व्यावसायिक किंवा औद्योगिक वीज जोडणीसाठी अर्ज करा किंवा तक्रार नोंदवा.'
+                    : 'Apply online for a new LT/HT electricity connection, meter shifting, or raise a supply complaint.'}
+                </p>
+                <div className="flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                  <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">Online KYC</span>
+                  <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">Real-Time Tracking</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => initializeServiceRequestWizard('NEW_CONNECTION')}
+                  className="py-2.5 px-3 rounded-xl bg-[#FF6B00] hover:bg-[#e56000] text-white text-xs font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                >
+                  <span>
+                    {language === 'gu' ? 'નવું જોડાણ' : language === 'hi' ? 'नया कनेक्शन' : language === 'mr' ? 'नवीन जोडणी' : 'New Connection'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('complaints')}
+                  className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#0A2540] dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                >
+                  <span>
+                    {language === 'gu' ? 'ફરિયાદ' : language === 'hi' ? 'शिकायत' : language === 'mr' ? 'तक्रार' : 'Complaint'}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom 2-Column Operational Workspace: Recent Requests + Checklist/Helpline */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            {/* Left 7 Cols: Recent Applications & Service Requests */}
+            <div className="lg:col-span-7 bg-white dark:bg-[#101C35] rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xs p-5 space-y-4">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <FileCheck className="w-4 h-4 text-[#FF6B00]" />
+                  <h3 className="text-sm font-bold text-[#0A2540] dark:text-white">
+                    {language === 'gu'
+                      ? 'તાજેતરની સેવા અરજીઓ અને સ્થિતિ'
+                      : language === 'hi'
+                      ? 'हाल के सेवा अनुरोध और स्थिति'
+                      : language === 'mr'
+                      ? 'अलीकडील सेवा विनंत्या आणि स्थिती'
+                      : 'Recent Applications & Service Requests'}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('applications')}
+                  className="text-xs font-bold text-[#0A2540] dark:text-orange-400 hover:text-[#FF6B00] flex items-center gap-1 cursor-pointer"
+                >
+                  <span>
+                    {language === 'gu' ? 'બધું જુઓ' : language === 'hi' ? 'सभी देखें' : language === 'mr' ? 'सर्व पहा' : 'View All'}
+                  </span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {userApplications.length === 0 ? (
+                <div className="p-6 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-200 dark:border-slate-700 text-center space-y-2">
+                  <FileText className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="text-xs text-slate-500">
+                    {language === 'gu'
+                      ? 'કોઈ તાજેતરની અરજી મળી નથી. ઉપરની સેવા પસંદ કરીને શરૂઆત કરો.'
+                      : language === 'hi'
+                      ? 'कोई हालिया आवेदन नहीं मिला। ऊपर से कोई सेवा चुनकर शुरू करें।'
+                      : language === 'mr'
+                      ? 'कोणताही अलीकडील अर्ज आढळला नाही. वरील सेवा निवडून सुरुवात करा.'
+                      : 'No service requests submitted yet. Choose any service above to get started.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {userApplications.slice(0, 4).map((app) => (
+                    <div key={app.id} className="py-3 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold font-mono text-[#0A2540] dark:text-white">{app.id}</span>
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                            {app.category} • {app.requestedLoadKw} kW
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                          {localizeSubdivision(app.subdivision, language)} • {app.appliedDate}
+                        </p>
+                      </div>
+                      <span className="self-start sm:self-auto px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200/70 dark:border-blue-800/60 shrink-0">
+                        {localizeApplicationStatus(app.status, language)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <LiveConsumerRequests />
+            </div>
+
+            {/* Right 5 Cols: Document Checklist & Helpline */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="bg-white dark:bg-[#101C35] rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-2xs p-5 space-y-3">
+                <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <h3 className="text-sm font-bold text-[#0A2540] dark:text-white">
+                    {language === 'gu'
+                      ? 'જરૂરી દસ્તાવેજો અને GERC માર્ગદર્શિકા'
+                      : language === 'hi'
+                      ? 'आवश्यक दस्तावेज़ एवं GERC दिशानिर्देश'
+                      : language === 'mr'
+                      ? 'आवश्यक कागदपत्रे आणि GERC मार्गदर्शक तत्त्वे'
+                      : 'Document Checklist & GERC Guidelines'}
+                  </h3>
+                </div>
+                <ul className="space-y-2.5 text-xs text-slate-600 dark:text-slate-300">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Identity &amp; Address Proof (Aadhaar / Voter ID / PAN)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Latest Paid Electricity Bill (zero overdue balance recommended)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Licensed Electrical Contractor Test Report (for Load Change &amp; Solar)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>Premises Ownership / Index-2 Copy or NOC from Owner</span>
+                  </li>
+                </ul>
+              </div>
+
+              <a
+                href="tel:19124"
+                className="block p-4 rounded-2xl bg-[#082444] hover:bg-[#0A2E58] text-white shadow-sm transition-colors"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                      <Phone className="w-4 h-4 text-[#FF6B00]" />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-300 font-medium">UGVCL 24×7 Service Desk</div>
+                      <div className="text-lg font-extrabold font-mono tracking-wide">19124 / 19121</div>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-300 shrink-0" />
+                </div>
+              </a>
             </div>
           </div>
         </div>
@@ -5069,6 +5356,215 @@ export const ConsumerPortal: React.FC = () => {
           handlePayClick(billNo);
         }}
       />
+
+      {activeTab === 'analytics' && (
+        <div className="space-y-5" data-testid="consumer-usage-analytics-view">
+          {/* Breadcrumbs */}
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+            <button
+              type="button"
+              onClick={() => setActiveTab('dashboard')}
+              className="hover:text-[#0A2540] transition-colors cursor-pointer"
+            >
+              {language === 'gu' ? 'હોમ' : language === 'hi' ? 'होम' : language === 'mr' ? 'होम' : 'Home'}
+            </button>
+            <span className="text-slate-400">›</span>
+            <span className="text-slate-800 dark:text-slate-200 font-semibold">
+              {language === 'gu'
+                ? 'વપરાશ એનાલિટિક્સ'
+                : language === 'hi'
+                ? 'खपत विश्लेषण'
+                : language === 'mr'
+                ? 'वापर विश्लेषण'
+                : 'Usage Analytics'}
+            </span>
+          </div>
+
+          {/* Hero Banner */}
+          <div className="rounded-2xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs p-6 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="min-w-0 space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0A2540] dark:text-white tracking-tight">
+                  {tc.consumptionTrendTitle}
+                </h1>
+                {selectedConnection && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/60 text-[11px] font-bold text-indigo-800 dark:text-indigo-200">
+                    <Gauge className="w-3 h-3" />
+                    <span>{selectedConnection.meterNo}</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-xs sm:text-[13px] text-slate-500 dark:text-slate-400 font-medium">
+                {hasConnections && selectedConnection
+                  ? `${tc.consumptionTrendSubConnected} ${selectedConnection.meterNo}`
+                  : tc.consumptionTrendSubUnlinked}
+              </p>
+              <div className="w-12 h-1 bg-[#FF6B00] rounded-full pt-0.5" />
+            </div>
+
+            {hasConnections && selectedConnection && (
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleDownloadConsumptionReportPdf}
+                  className="px-3.5 py-2 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/50 hover:bg-blue-100 text-blue-700 dark:text-blue-300 font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadConsumptionReportCsv}
+                  className="px-3.5 py-2 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/50 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 font-bold text-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>CSV</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {!hasConnections ? (
+            <div className="p-10 text-center rounded-2xl bg-white dark:bg-[#101C35] border border-dashed border-slate-200 dark:border-slate-700 space-y-3">
+              <BarChart3 className="w-10 h-10 text-slate-300 mx-auto" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                {tc.consumptionTrendSubUnlinked}
+              </p>
+              <div className="flex items-center justify-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => initializeServiceRequestWizard('NEW_CONNECTION')}
+                  className="px-4 py-2 rounded-xl bg-[#FF6B00] text-white text-xs font-bold cursor-pointer"
+                >
+                  {tc.applyForConnectionBtn}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsLinkModalOpen(true)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold cursor-pointer"
+                >
+                  {tc.linkExistingBtn}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* 4 KPI Summary Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[11px] font-semibold text-slate-500 block">
+                    {language === 'gu' ? 'વર્તમાન સાયકલ વપરાશ' : language === 'hi' ? 'वर्तमान चक्र खपत' : language === 'mr' ? 'सध्याचा वापर' : 'Current Cycle Usage'}
+                  </span>
+                  <div className="text-xl sm:text-2xl font-black text-[#0A2540] dark:text-white tabular-nums mt-1">
+                    {currentBill ? `${currentBill.unitsConsumed.toLocaleString()} kWh` : '0 kWh'}
+                  </div>
+                </div>
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[11px] font-semibold text-slate-500 block">
+                    {tc.sixMonthAverage}
+                  </span>
+                  <div className="text-xl sm:text-2xl font-black text-blue-700 dark:text-cyan-400 tabular-nums mt-1">
+                    {consumerCanonicalAnalytics.averageMonthlyKwh.toLocaleString()} kWh
+                  </div>
+                </div>
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[11px] font-semibold text-slate-500 block">
+                    {language === 'gu' ? 'મહત્તમ માસિક વપરાશ' : language === 'hi' ? 'अधिकतम मासिक खपत' : language === 'mr' ? 'कमाल मासिक वापर' : 'Peak Monthly Usage'}
+                  </span>
+                  <div className="text-xl sm:text-2xl font-black text-amber-700 dark:text-amber-300 tabular-nums mt-1">
+                    {consumerCanonicalAnalytics.peakMonthlyKwh.toLocaleString()} kWh
+                  </div>
+                </div>
+                <div className="p-4 rounded-2xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs">
+                  <span className="text-[11px] font-semibold text-slate-500 block">
+                    {language === 'gu' ? 'સરેરાશ માસિક બિલ' : language === 'hi' ? 'औसत मासिक बिल' : language === 'mr' ? 'सरासरी मासिक बिल' : 'Average Monthly Bill'}
+                  </span>
+                  <div className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-400 tabular-nums mt-1">
+                    ₹{consumerCanonicalAnalytics.averageMonthlyBillInr.toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              {/* Consumption Chart */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#101C35] border border-slate-200/90 dark:border-slate-800 shadow-2xs space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-[#0A2540] dark:text-white">
+                    {tc.chartConsumedEnergy} (kWh)
+                  </span>
+                  <span className="text-[11px] font-medium text-slate-500">
+                    {consumerConsumptionSource.badgeLabel}
+                  </span>
+                </div>
+                <div className="h-64 w-full min-w-0">
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
+                    <AreaChart data={localizedConsumptionHistory} margin={{ top: 10, right: 16, left: 0, bottom: 4 }}>
+                      <defs>
+                        <linearGradient id="colorUnitsAnalytics" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#2563EB" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#2563EB" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.18} />
+                      <XAxis dataKey="displayMonth" stroke="#64748b" fontSize={11} tickLine={false} dy={6} />
+                      <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} width={62} tickFormatter={(val: number) => `${val} kWh`} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#0F172A',
+                          border: '1px solid #1E293B',
+                          borderRadius: '10px',
+                          fontSize: '12px',
+                          color: '#F8FAFC',
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="units"
+                        stroke="#2563EB"
+                        strokeWidth={2.5}
+                        dot={{ r: 4, strokeWidth: 2, stroke: '#2563EB', fill: '#ffffff' }}
+                        activeDot={{ r: 6, strokeWidth: 2, stroke: '#ffffff', fill: '#2563EB' }}
+                        fillOpacity={1}
+                        fill="url(#colorUnitsAnalytics)"
+                        name={tc.chartConsumedEnergy}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Period Breakdown Table */}
+                {localizedConsumptionHistory.length > 0 && (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-600 dark:text-slate-300 text-[11px] font-bold border-b border-slate-200 dark:border-slate-800">
+                        <tr>
+                          <th className="px-3.5 py-2.5">Period</th>
+                          <th className="px-3.5 py-2.5 text-right">Units (kWh)</th>
+                          <th className="px-3.5 py-2.5 text-right">Billed Amount (₹)</th>
+                          <th className="px-3.5 py-2.5">Type</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 tabular-nums">
+                        {localizedConsumptionHistory.map((row, idx) => (
+                          <tr key={`${row.displayMonth}-${idx}`} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                            <td className="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">{row.displayMonth}</td>
+                            <td className="px-3.5 py-2.5 text-right font-bold text-[#0A2540] dark:text-white">{row.units.toLocaleString()} kWh</td>
+                            <td className="px-3.5 py-2.5 text-right font-semibold text-slate-700 dark:text-slate-300">₹{(row.amount || 0).toLocaleString()}</td>
+                            <td className="px-3.5 py-2.5">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${row.isEstimated ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                {row.isEstimated ? 'Estimated' : 'Actual'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {activeTab === 'outage-map' && <LazyOutageMapSection />}
 

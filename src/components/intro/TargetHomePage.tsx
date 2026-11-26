@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useApp, isValidDemoSession } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { LanguageCode } from '../../i18n/types';
 import { HOME_PAGE_COPY } from './homePageTranslations';
+import { ContactUsPage } from './ContactUsPage';
+import { PolicyPage } from './PolicyPage';
 import {
   Phone,
   Mail,
@@ -33,7 +35,8 @@ import {
   CheckCircle2,
   Calendar,
   HelpCircle,
-  Search
+  Search,
+  Menu
 } from 'lucide-react';
 
 interface TargetHomePageProps {
@@ -52,15 +55,26 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
   const { language, setLanguage } = useLanguage();
   const copy = HOME_PAGE_COPY[language] || HOME_PAGE_COPY.en;
 
-  // Accessibility Font Scaling: 'sm' | 'normal' | 'lg'
-  const [fontSizeScale, setFontSizeScale] = useState<'sm' | 'normal' | 'lg'>('normal');
+  // Accessibility Font Scaling: step -2..+3 (scales root 1rem so all typography scales)
+  const [fontStep, setFontStep] = useState<number>(0);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    root.style.fontSize = `${16 + fontStep * 1.5}px`;
+    return () => {
+      root.style.fontSize = '';
+    };
+  }, [fontStep]);
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
   const [isServicesMenuOpen, setIsServicesMenuOpen] = useState(false);
   const [isAboutMenuOpen, setIsAboutMenuOpen] = useState(false);
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUpdatesModalOpen, setIsUpdatesModalOpen] = useState(false);
   const [isCommitmentModalOpen, setIsCommitmentModalOpen] = useState(false);
   const [isQaModalOpen, setIsQaModalOpen] = useState(false);
+  const [activePage, setActivePage] = useState<'home' | 'contact' | 'privacy' | 'terms'>('home');
   const [qaSearch, setQaSearch] = useState('');
   const [qaCategory, setQaCategory] = useState<'All' | 'New Connection' | 'Billing & UPI' | 'Meter Reading' | 'Outages & Support'>('All');
   const [openQaIndex, setOpenQaIndex] = useState<number | null>(0);
@@ -103,7 +117,15 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
     }
   };
 
+  const isSignedIn = Boolean(demoSession && isValidDemoSession(demoSession));
+
   const openSignInModal = () => {
+    if (demoSession && isValidDemoSession(demoSession)) {
+      setRole(demoSession.role);
+      setActiveTab('dashboard');
+      setHasEnteredPlatform(true);
+      return;
+    }
     setIsRoleSwitcherModalOpen(true);
   };
 
@@ -117,26 +139,22 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
   const currentLangLabel = languages.find(l => l.code === language)?.native || 'English';
 
   return (
-    <div
-      className={`min-h-screen bg-[#F4F7FB] text-slate-800 flex flex-col antialiased selection:bg-[#FF6B00] selection:text-white ${
-        fontSizeScale === 'sm' ? 'text-[13px]' : fontSizeScale === 'lg' ? 'text-[15px]' : 'text-sm'
-      }`}
-    >
+    <div className="min-h-screen bg-[#F4F7FB] text-slate-800 flex flex-col antialiased selection:bg-[#FF6B00] selection:text-white text-sm">
       {/* =========================================================================
           1. TOP UTILITY BAR (Deep Navy)
          ========================================================================= */}
-      <div className="bg-[#07162C] text-slate-300 text-xs px-4 sm:px-6 lg:px-10 py-1.5 border-b border-blue-950/60">
-        <div className="max-w-[1580px] mx-auto flex items-center justify-between gap-4 flex-wrap">
+      <div className="bg-[#07162C] text-slate-300 text-xs px-3 sm:px-6 lg:px-10 py-1.5 border-b border-blue-950/60">
+        <div className="max-w-[1580px] mx-auto flex items-center justify-between gap-2 sm:gap-4">
           {/* Left contact & identity info */}
-          <div className="flex items-center gap-3 text-[11px] sm:text-xs">
-            <span className="flex items-center gap-1.5 font-medium text-slate-200">
+          <div className="flex items-center gap-2 sm:gap-3 text-[0.6875rem] sm:text-xs min-w-0">
+            <span className="flex items-center gap-1.5 font-medium text-slate-200 min-w-0">
               <Zap className="w-3.5 h-3.5 text-cyan-400 shrink-0 fill-cyan-400" />
-              <span>{copy.topUtilityOrg}</span>
+              <span className="truncate">{copy.topUtilityOrg}</span>
             </span>
             <span className="text-slate-600 hidden sm:inline">|</span>
             <a
               href="tel:19124"
-              className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors"
+              className="hidden sm:flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors shrink-0"
             >
               <Phone className="w-3 h-3 text-slate-400 shrink-0" />
               <span>{copy.helplineTop}</span>
@@ -152,38 +170,40 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
           </div>
 
           {/* Right dynamic time & font controls */}
-          <div className="flex items-center gap-3 text-[11px] sm:text-xs shrink-0">
+          <div className="flex items-center gap-3 text-[0.6875rem] sm:text-xs shrink-0">
             <span className="text-slate-300 font-medium tabular-nums hidden sm:inline">
               {timeString}
             </span>
             <span className="text-slate-600 hidden sm:inline">|</span>
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-300" aria-label="Font Resizing">
+            <div className="flex items-center gap-1.5 text-[0.6875rem] font-semibold text-slate-300" aria-label="Font Resizing">
               <button
                 type="button"
-                onClick={() => setFontSizeScale('lg')}
+                onClick={() => setFontStep(s => Math.min(3, s + 1))}
+                disabled={fontStep >= 3}
                 title="Increase font size"
-                className={`px-1 rounded hover:text-white hover:bg-slate-800 transition-colors cursor-pointer ${
-                  fontSizeScale === 'lg' ? 'text-amber-400 font-bold' : ''
+                className={`px-1 rounded hover:text-white hover:bg-slate-800 disabled:opacity-40 transition-colors cursor-pointer ${
+                  fontStep > 0 ? 'text-amber-400 font-bold' : ''
                 }`}
               >
                 A+
               </button>
               <button
                 type="button"
-                onClick={() => setFontSizeScale('normal')}
+                onClick={() => setFontStep(0)}
                 title="Reset font size"
                 className={`px-1 rounded hover:text-white hover:bg-slate-800 transition-colors cursor-pointer ${
-                  fontSizeScale === 'normal' ? 'text-white font-bold' : ''
+                  fontStep === 0 ? 'text-white font-bold' : ''
                 }`}
               >
                 A
               </button>
               <button
                 type="button"
-                onClick={() => setFontSizeScale('sm')}
+                onClick={() => setFontStep(s => Math.max(-2, s - 1))}
+                disabled={fontStep <= -2}
                 title="Decrease font size"
-                className={`px-1 rounded hover:text-white hover:bg-slate-800 transition-colors cursor-pointer ${
-                  fontSizeScale === 'sm' ? 'text-amber-400 font-bold' : ''
+                className={`px-1 rounded hover:text-white hover:bg-slate-800 disabled:opacity-40 transition-colors cursor-pointer ${
+                  fontStep < 0 ? 'text-amber-400 font-bold' : ''
                 }`}
               >
                 A-
@@ -197,17 +217,21 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
           2. MAIN HEADER & NAVBAR (White background)
          ========================================================================= */}
       <header className="bg-white border-b border-slate-200/90 shadow-[0_2px_8px_rgba(0,0,0,0.03)] sticky top-0 z-40">
-        <div className="max-w-[1580px] mx-auto px-4 sm:px-6 lg:px-10 py-2.5 flex items-center justify-between gap-4">
+        <div className="max-w-[1580px] mx-auto px-3 sm:px-6 lg:px-10 py-2 sm:py-2.5 flex items-center justify-between gap-2 sm:gap-4">
           {/* Logo Tab: Exact VidyutFlow + UGVCL branding block */}
           <button
             type="button"
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            onClick={() => {
+              setActivePage('home');
+              setIsMobileMenuOpen(false);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             className="flex items-center text-left cursor-pointer group shrink-0"
           >
-            <div className="flex items-center gap-3 bg-white border border-slate-200/90 rounded-xl px-3.5 py-1.5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:border-slate-300 transition-all">
+            <div className="flex items-center gap-2 sm:gap-3 bg-white border border-slate-200/90 rounded-xl px-2.5 sm:px-3.5 py-1 sm:py-1.5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:border-slate-300 transition-all">
               {/* UGVCL Pylon Logo */}
               <div className="flex flex-col items-center justify-center shrink-0">
-                <svg className="w-8 h-8 text-[#0B2545]" viewBox="0 0 48 48" fill="none" stroke="currentColor">
+                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-[#0B2545]" viewBox="0 0 48 48" fill="none" stroke="currentColor">
                   {/* Transmission Pylon */}
                   <path d="M24 4 L14 44 M24 4 L34 44" strokeWidth="2.5" strokeLinecap="round" />
                   <path d="M12 16 L36 16 M10 26 L38 26 M7 36 L41 36" strokeWidth="2" />
@@ -216,20 +240,20 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   {/* Lightning Bolt Spark in Orange */}
                   <path d="M26 12 L20 22 L27 22 L21 34" stroke="#FF6B00" strokeWidth="2.5" fill="#FF6B00" strokeLinejoin="round" />
                 </svg>
-                <span className="text-[10px] font-black tracking-widest text-[#0B2545] leading-none mt-0.5">
+                <span className="text-[0.55rem] sm:text-[0.625rem] font-black tracking-widest text-[#0B2545] leading-none mt-0.5">
                   UGVCL
                 </span>
               </div>
 
               {/* Vertical divider */}
-              <div className="h-9 w-px bg-slate-200" />
+              <div className="h-7 sm:h-9 w-px bg-slate-200" />
 
               {/* Wordmark: UGVCL */}
               <div className="leading-tight">
-                <div className="text-xl sm:text-2xl font-black tracking-tight text-[#0A2540]">
+                <div className="text-base sm:text-2xl font-black tracking-tight text-[#0A2540]">
                   <span>UGVCL</span>
                 </div>
-                <div className="text-[10px] text-slate-500 font-medium tracking-wide">
+                <div className="hidden sm:block text-[0.625rem] text-slate-500 font-medium tracking-wide">
                   {copy.brandTagline}
                 </div>
               </div>
@@ -237,12 +261,19 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
           </button>
 
           {/* Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
+          <nav className="hidden lg:flex items-center gap-1.5 text-[0.8125rem] font-semibold text-slate-700">
             {/* Active Home Pill */}
             <button
               type="button"
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#0A1C3E] text-white shadow-xs font-semibold hover:bg-[#07162C] transition-colors cursor-pointer"
+              onClick={() => {
+                setActivePage('home');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-colors cursor-pointer ${
+                activePage === 'home'
+                  ? 'bg-[#0A1C3E] text-white shadow-xs font-semibold hover:bg-[#07162C]'
+                  : 'hover:bg-slate-100 hover:text-slate-900'
+              }`}
             >
               <Home className="w-4 h-4" />
               <span>{copy.navHome}</span>
@@ -388,26 +419,34 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
             </button>
 
             {/* Contact Us */}
-            <a
-              href="#contact"
-              className="px-3.5 py-2 rounded-lg hover:bg-slate-100 hover:text-slate-900 transition-colors"
+            <button
+              type="button"
+              onClick={() => {
+                setActivePage('contact');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`px-3.5 py-2 rounded-lg transition-colors cursor-pointer ${
+                activePage === 'contact'
+                  ? 'bg-[#0A1C3E] text-white shadow-xs font-semibold'
+                  : 'hover:bg-slate-100 hover:text-slate-900'
+              }`}
             >
               {copy.navContactUs}
-            </a>
+            </button>
           </nav>
 
-          {/* Right Action: Language Selector & Sign In Button */}
-          <div className="flex items-center gap-3">
+          {/* Right Action: Language Selector, Sign In & Mobile Menu Toggle */}
+          <div className="flex items-center gap-1.5 sm:gap-3">
             {/* Language Selector */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 min-h-[38px] sm:min-h-0 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
               >
-                <Globe className="w-3.5 h-3.5 text-slate-500" />
-                <span>{currentLangLabel}</span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
+                <Globe className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <span className="max-w-[56px] sm:max-w-none truncate">{currentLangLabel}</span>
+                <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
               </button>
 
               {isLangMenuOpen && (
@@ -439,40 +478,183 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
             <button
               type="button"
               onClick={openSignInModal}
-              className="px-5 py-2 rounded-full bg-gradient-to-r from-[#FF7A00] via-[#FF6B00] to-[#EA580C] hover:from-[#FF6B00] hover:to-[#D94F04] text-white text-xs sm:text-sm font-bold shadow-md shadow-orange-500/25 flex items-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              className="px-3.5 sm:px-5 py-2 min-h-[38px] sm:min-h-0 rounded-full bg-gradient-to-r from-[#FF7A00] via-[#FF6B00] to-[#EA580C] hover:from-[#FF6B00] hover:to-[#D94F04] text-white text-xs sm:text-sm font-bold shadow-md shadow-orange-500/25 flex items-center gap-1.5 sm:gap-2 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer whitespace-nowrap"
             >
-              <User className="w-4 h-4 fill-white" />
-              <span>{copy.signIn}</span>
+              <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-white shrink-0" />
+              <span>
+                {isSignedIn
+                  ? language === 'gu'
+                    ? 'પોર્ટલમાં પ્રવેશ'
+                    : language === 'hi'
+                    ? 'पोर्टल में प्रवेश'
+                    : language === 'mr'
+                    ? 'पोर्टल प्रवेश'
+                    : 'Enter Portal'
+                  : copy.signIn}
+              </span>
+            </button>
+
+            {/* Mobile Hamburger Menu Button */}
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={isMobileMenuOpen}
+              className="lg:hidden p-2 min-h-[38px] min-w-[38px] rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
+
+        {/* Mobile Navigation Drawer (< lg) */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden border-t border-slate-100 bg-white px-4 py-3 space-y-2 shadow-lg animate-in fade-in slide-in-from-top-1">
+            <button
+              type="button"
+              onClick={() => {
+                setActivePage('home');
+                setIsMobileMenuOpen(false);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2.5 cursor-pointer ${
+                activePage === 'home' ? 'bg-[#0A1C3E] text-white' : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <Home className="w-4 h-4 shrink-0" />
+              <span>{copy.navHome}</span>
+            </button>
+
+            <div className="rounded-xl bg-slate-50/80 border border-slate-100 p-2.5 space-y-1">
+              <div className="px-1.5 pb-1 text-[0.6875rem] font-extrabold uppercase tracking-wider text-slate-400">
+                {copy.navServices}
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => { setIsMobileMenuOpen(false); goToConsumer('new-connection'); }}
+                  className="text-left px-2.5 py-2 rounded-lg bg-white border border-slate-200/70 text-xs font-semibold text-slate-700 hover:text-[#FF6B00] flex items-center gap-2 cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-[#FF6B00] shrink-0" />
+                  <span className="truncate">{copy.navNewConnection}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsMobileMenuOpen(false); goToConsumer('bills'); }}
+                  className="text-left px-2.5 py-2 rounded-lg bg-white border border-slate-200/70 text-xs font-semibold text-slate-700 hover:text-[#FF6B00] flex items-center gap-2 cursor-pointer"
+                >
+                  <CreditCard className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                  <span className="truncate">{copy.navPayBill}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsMobileMenuOpen(false); goToConsumer('complaints'); }}
+                  className="text-left px-2.5 py-2 rounded-lg bg-white border border-slate-200/70 text-xs font-semibold text-slate-700 hover:text-[#FF6B00] flex items-center gap-2 cursor-pointer"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span className="truncate">{copy.navRegisterComplaint}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsMobileMenuOpen(false); goToConsumer('requests'); }}
+                  className="text-left px-2.5 py-2 rounded-lg bg-white border border-slate-200/70 text-xs font-semibold text-slate-700 hover:text-[#FF6B00] flex items-center gap-2 cursor-pointer"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-[#0B2545] shrink-0" />
+                  <span className="truncate">{copy.navTrackApplication}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => { setIsMobileMenuOpen(false); onOpenAboutModal('overview'); }}
+                className="text-left px-3 py-2.5 rounded-xl bg-slate-50 text-xs font-semibold text-slate-700 hover:bg-slate-100 flex items-center gap-2 cursor-pointer"
+              >
+                <Building className="w-4 h-4 text-[#0B2545] shrink-0" />
+                <span className="truncate">{copy.navAboutUgvcl}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsMobileMenuOpen(false); setIsQaModalOpen(true); }}
+                className="text-left px-3 py-2.5 rounded-xl bg-slate-50 text-xs font-semibold text-slate-700 hover:bg-slate-100 flex items-center gap-2 cursor-pointer"
+              >
+                <HelpCircle className="w-4 h-4 text-[#FF6B00] shrink-0" />
+                <span className="truncate">{copy.navQaShort}</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActivePage('contact');
+                  setIsMobileMenuOpen(false);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className={`flex-1 text-left px-3.5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2.5 cursor-pointer ${
+                  activePage === 'contact' ? 'bg-[#0A1C3E] text-white' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <Phone className="w-4 h-4 shrink-0" />
+                <span>{copy.navContactUs}</span>
+              </button>
+              <a
+                href="tel:19124"
+                className="px-3.5 py-2.5 rounded-xl bg-[#082444] text-white text-xs font-bold flex items-center gap-1.5 shrink-0"
+              >
+                <Phone className="w-3.5 h-3.5 text-[#FF6B00]" />
+                <span>19124</span>
+              </a>
+            </div>
+          </div>
+        )}
       </header>
 
+      {activePage === 'contact' ? (
+        <ContactUsPage
+          onBackHome={() => {
+            setActivePage('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      ) : activePage === 'privacy' || activePage === 'terms' ? (
+        <PolicyPage
+          kind={activePage}
+          onSwitchKind={(nextKind) => {
+            setActivePage(nextKind);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      ) : (
+        <>
       {/* =========================================================================
           3. HERO BANNER (Panoramic UGVCL Building & Sweeping Energy Curve)
          ========================================================================= */}
       <section className="relative w-full overflow-hidden bg-gradient-to-r from-[#C2DCF9] via-[#D5E7FA] to-[#E9F2FC]">
         {/* Banner container with aspect ratio preserving the full panoramic building & curve */}
-        <div className="relative w-full min-h-[250px] sm:min-h-[290px] md:min-h-[330px] lg:min-h-[380px] xl:min-h-[400px] flex items-start">
+        <div className="relative w-full min-h-[260px] sm:min-h-[300px] md:min-h-[330px] lg:min-h-[380px] xl:min-h-[400px] flex items-start">
           <img
             src="/assets/ugvcl/home_hero_bg.png?v=6"
             alt="UGVCL Headquarters - Smart Electricity Services"
             className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none select-none"
           />
+          {/* Subtle mobile readability scrim so hero copy stays crisp over building on narrow screens */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#DCEBFB]/90 via-[#E7F2FD]/75 to-[#D5E7FA]/45 md:bg-none pointer-events-none" />
 
           {/* Left Text & Badges Overlay - Positioned cleanly in the upper sky region with zero overlap */}
-          <div className="relative z-10 max-w-[1580px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-7 sm:pt-9 lg:pt-11 pb-8">
+          <div className="relative z-10 max-w-[1580px] w-full mx-auto px-4 sm:px-6 lg:px-10 pt-6 sm:pt-9 lg:pt-11 pb-10 sm:pb-12">
             <div className="max-w-md sm:max-w-lg lg:max-w-xl">
               {/* Main Headline */}
-              <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-[38px] font-black tracking-tight text-[#0A2540] leading-tight">
+              <h1 className="text-[1.4rem] sm:text-3xl md:text-4xl lg:text-[2.375rem] font-black tracking-tight text-[#0A2540] leading-tight">
                 {copy.heroTitleLine1} <br />
                 <span className="text-[#0A2540]">{copy.heroTitlePrefix}</span>
                 <span className="text-[#FF6B00]">{copy.heroTitleHighlight}</span>
               </h1>
 
               {/* Subtitle Description */}
-              <p className="mt-2.5 sm:mt-3 text-xs sm:text-sm lg:text-[14px] font-bold text-[#0C2B4E] leading-relaxed">
-                {copy.heroSubtitleLine1} <br />
+              <p className="mt-2 sm:mt-3 text-xs sm:text-sm lg:text-[0.875rem] font-bold text-[#0C2B4E] leading-relaxed">
+                {copy.heroSubtitleLine1} <br className="hidden sm:inline" />{' '}
                 {copy.heroSubtitleLine2}
               </p>
 
@@ -480,13 +662,13 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
               <div className="w-12 h-0.5 bg-[#FF6B00] rounded-full my-3 sm:my-3.5" />
 
               {/* 3 Feature Indicators Row */}
-              <div className="mt-3 sm:mt-4 flex flex-wrap items-center gap-3 sm:gap-5">
+              <div className="mt-3 sm:mt-4 grid grid-cols-3 sm:flex sm:flex-wrap items-start sm:items-center gap-2 sm:gap-5">
                 {/* Indicator 1: Reliable Power */}
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] flex items-center justify-center shrink-0 border border-slate-100">
-                    <Zap className="w-5 h-5 text-[#FF6B00] fill-[#FF6B00]" />
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-2.5">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] flex items-center justify-center shrink-0 border border-slate-100">
+                    <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-[#FF6B00] fill-[#FF6B00]" />
                   </div>
-                  <div className="text-[11px] sm:text-xs font-bold text-[#0A2540] leading-tight">
+                  <div className="text-[0.6875rem] sm:text-xs font-bold text-[#0A2540] leading-tight">
                     <div>{copy.indReliable1}</div>
                     <div>{copy.indReliable2}</div>
                   </div>
@@ -496,13 +678,13 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 <div className="h-7 w-px bg-slate-300/80 hidden sm:block" />
 
                 {/* Indicator 2: Secure Services */}
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] flex items-center justify-center shrink-0 border border-slate-100">
-                    <svg className="w-5 h-5 text-[#0B3A75]" viewBox="0 0 24 24" fill="currentColor">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-2.5">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] flex items-center justify-center shrink-0 border border-slate-100">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5 text-[#0B3A75]" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 15l-4-4 1.41-1.41L10 13.17l6.59-6.59L18 8l-8 8z" />
                     </svg>
                   </div>
-                  <div className="text-[11px] sm:text-xs font-bold text-[#0A2540] leading-tight">
+                  <div className="text-[0.6875rem] sm:text-xs font-bold text-[#0A2540] leading-tight">
                     <div>{copy.indSecure1}</div>
                     <div>{copy.indSecure2}</div>
                   </div>
@@ -512,11 +694,11 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 <div className="h-7 w-px bg-slate-300/80 hidden sm:block" />
 
                 {/* Indicator 3: 24x7 Support */}
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] flex items-center justify-center shrink-0 border border-slate-100">
-                    <Clock className="w-5 h-5 text-[#0B3A75]" />
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-2.5">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.08)] flex items-center justify-center shrink-0 border border-slate-100">
+                    <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-[#0B3A75]" />
                   </div>
-                  <div className="text-[11px] sm:text-xs font-bold text-[#0A2540] leading-tight">
+                  <div className="text-[0.6875rem] sm:text-xs font-bold text-[#0A2540] leading-tight">
                     <div>{copy.indSupport1}</div>
                     <div>{copy.indSupport2}</div>
                   </div>
@@ -530,15 +712,15 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
       {/* =========================================================================
           4. FLOATING QUICK SERVICES BAR (Anchored cleanly at bottom seam, not middle)
          ========================================================================= */}
-      <section className="relative z-20 max-w-[1580px] mx-auto px-4 sm:px-6 lg:px-10 -mt-6 sm:-mt-7 lg:-mt-8 mb-6">
+      <section className="relative z-20 max-w-[1580px] mx-auto px-3 sm:px-6 lg:px-10 -mt-5 sm:-mt-7 lg:-mt-8 mb-6">
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_8px_30px_rgba(0,0,0,0.06)] p-3 sm:p-4">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-3">
             {/* Quick Services Title Column */}
-            <div className="px-3 sm:px-4 text-center lg:text-left shrink-0">
+            <div className="px-2 sm:px-4 text-center lg:text-left shrink-0">
               <h2 className="text-base sm:text-lg font-black text-[#0A2540] tracking-tight">
                 {copy.quickServicesTitle}
               </h2>
-              <p className="text-[11px] text-slate-500 font-medium">
+              <p className="text-[0.6875rem] text-slate-500 font-medium">
                 {copy.quickServicesSubtitle}
               </p>
             </div>
@@ -546,7 +728,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
             <div className="hidden lg:block h-12 w-px bg-slate-200" />
 
             {/* 6 Quick Action Cards with dividers */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 w-full lg:w-auto flex-1 md:divide-x md:divide-slate-200/80">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-0 w-full lg:w-auto flex-1 md:divide-x md:divide-slate-200/80">
               {/* 1. New Connection */}
               <button
                 type="button"
@@ -559,7 +741,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 <span className="text-xs font-bold text-[#0A2540] mt-1.5 leading-tight">
                   {copy.qaNewConn1}
                 </span>
-                <span className="text-[11px] font-semibold text-[#FF6B00]">
+                <span className="text-[0.6875rem] font-semibold text-[#FF6B00]">
                   {copy.qaNewConn2}
                 </span>
               </button>
@@ -576,7 +758,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 <span className="text-xs font-bold text-[#0A2540] mt-1.5 leading-tight">
                   {copy.qaPayBill1}
                 </span>
-                <span className="text-[11px] font-semibold text-[#0284C7]">
+                <span className="text-[0.6875rem] font-semibold text-[#0284C7]">
                   {copy.qaPayBill2}
                 </span>
               </button>
@@ -593,7 +775,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 <span className="text-xs font-bold text-[#0A2540] mt-1.5 leading-tight">
                   {copy.qaMeter1}
                 </span>
-                <span className="text-[11px] font-semibold text-slate-600">
+                <span className="text-[0.6875rem] font-semibold text-slate-600">
                   {copy.qaMeter2}
                 </span>
               </button>
@@ -610,7 +792,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 <span className="text-xs font-bold text-[#0A2540] mt-1.5 leading-tight">
                   {copy.qaComplaint1}
                 </span>
-                <span className="text-[11px] font-semibold text-slate-600">
+                <span className="text-[0.6875rem] font-semibold text-slate-600">
                   {copy.qaComplaint2}
                 </span>
               </button>
@@ -627,7 +809,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 <span className="text-xs font-bold text-[#0A2540] mt-1.5 leading-tight">
                   {copy.qaTrack1}
                 </span>
-                <span className="text-[11px] font-semibold text-slate-600">
+                <span className="text-[0.6875rem] font-semibold text-slate-600">
                   {copy.qaTrack2}
                 </span>
               </button>
@@ -636,9 +818,8 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
               <button
                 type="button"
                 onClick={() => {
-                  const el = document.getElementById('contact');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  else goToConsumer('contact');
+                  setActivePage('contact');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 className="group flex flex-col items-center justify-center p-2 rounded-xl hover:bg-blue-50/70 border border-transparent hover:border-blue-200 transition-all cursor-pointer text-center"
               >
@@ -648,7 +829,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 <span className="text-xs font-bold text-[#0A2540] mt-1.5 leading-tight">
                   {copy.qaHelp1}
                 </span>
-                <span className="text-[11px] font-semibold text-slate-600">
+                <span className="text-[0.6875rem] font-semibold text-slate-600">
                   {copy.qaHelp2}
                 </span>
               </button>
@@ -669,7 +850,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   <div className="text-xl font-extrabold tracking-wide font-mono text-white">
                     19124
                   </div>
-                  <div className="text-[11px] text-slate-300 font-medium">
+                  <div className="text-[0.6875rem] text-slate-300 font-medium">
                     {copy.tollFree}
                   </div>
                 </div>
@@ -716,7 +897,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                       {copy.update1}
                     </span>
                   </div>
-                  <span className="text-[11px] font-medium text-slate-400 shrink-0 tabular-nums">
+                  <span className="text-[0.6875rem] font-medium text-slate-400 shrink-0 tabular-nums">
                     27 Oct 2025
                   </span>
                 </li>
@@ -728,7 +909,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                       {copy.update2}
                     </span>
                   </div>
-                  <span className="text-[11px] font-medium text-slate-400 shrink-0 tabular-nums">
+                  <span className="text-[0.6875rem] font-medium text-slate-400 shrink-0 tabular-nums">
                     25 Oct 2025
                   </span>
                 </li>
@@ -740,7 +921,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                       {copy.update3}
                     </span>
                   </div>
-                  <span className="text-[11px] font-medium text-slate-400 shrink-0 tabular-nums">
+                  <span className="text-[0.6875rem] font-medium text-slate-400 shrink-0 tabular-nums">
                     20 Oct 2025
                   </span>
                 </li>
@@ -749,19 +930,19 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
           </div>
 
           {/* CARD 2: OUR COMMITMENT (With glowing bulb & plant visual) */}
-          <div className="relative rounded-2xl border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.03)] overflow-hidden bg-gradient-to-r from-[#F4F7FB] via-[#EFF4FA] to-[#E6EEF6] p-5 flex flex-col justify-between min-h-[168px]">
+          <div className="relative rounded-2xl border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.03)] overflow-hidden bg-gradient-to-r from-[#F4F7FB] via-[#EFF4FA] to-[#E6EEF6] p-4 sm:p-5 flex flex-col justify-between min-h-[168px]">
             {/* Left Content */}
-            <div className="relative z-20 max-w-[58%] flex flex-col justify-between h-full space-y-3">
+            <div className="relative z-20 max-w-[78%] sm:max-w-[58%] flex flex-col justify-between h-full space-y-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <Handshake className="w-5 h-5 text-[#0A2540]" />
-                  <h3 className="text-base sm:text-[17px] font-black text-[#0A2540] tracking-tight">
+                  <Handshake className="w-5 h-5 text-[#0A2540] shrink-0" />
+                  <h3 className="text-base sm:text-[1.0625rem] font-black text-[#0A2540] tracking-tight">
                     {copy.commitmentTitle}
                   </h3>
                 </div>
 
                 <p className="text-xs text-[#0A2540]/85 font-medium leading-relaxed pt-2">
-                  {copy.commitmentDesc1} <br />
+                  {copy.commitmentDesc1} <br className="hidden sm:inline" />{' '}
                   {copy.commitmentDesc2}
                 </p>
               </div>
@@ -770,7 +951,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                 <button
                   type="button"
                   onClick={() => setIsCommitmentModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-[#042147] hover:bg-[#0A2E58] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+                  className="inline-flex items-center gap-2 px-5 py-2 min-h-[38px] rounded-full bg-[#042147] hover:bg-[#0A2E58] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
                 >
                   <span>{copy.knowMore}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -779,26 +960,26 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
             </div>
 
             {/* Glowing Lightbulb & Sprout Visual with seamless left fade */}
-            <div className="absolute right-0 top-0 bottom-0 w-[56%] pointer-events-none select-none">
+            <div className="absolute right-0 top-0 bottom-0 w-[48%] sm:w-[56%] pointer-events-none select-none opacity-35 sm:opacity-100">
               <img
                 src="/assets/ugvcl/bulb_card_bg.png?v=2"
                 alt="Our Commitment to Green Energy"
                 className="w-full h-full object-cover object-center rounded-r-2xl"
               />
-              <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-[#EFF4FA] via-[#EFF4FA]/75 to-transparent" />
+              <div className="absolute inset-y-0 left-0 w-24 sm:w-16 bg-gradient-to-r from-[#EFF4FA] via-[#EFF4FA]/85 to-transparent" />
             </div>
           </div>
 
           {/* CARD 3: UGVCL COVERAGE (With Gujarat Map) */}
-          <div id="coverage" className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.03)] p-5 flex flex-col justify-between">
+          <div id="coverage" className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.03)] p-4 sm:p-5 flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 border-b border-slate-100 pb-2 mb-3">
-                <MapPin className="w-4 h-4 text-[#0A2540]" />
+                <MapPin className="w-4 h-4 text-[#0A2540] shrink-0" />
                 <div>
                   <h3 className="text-sm font-bold text-[#0A2540] tracking-tight leading-tight">
                     {copy.coverageTitle}
                   </h3>
-                  <p className="text-[11px] text-slate-500 font-medium">
+                  <p className="text-[0.6875rem] text-slate-500 font-medium">
                     {copy.coverageSubtitle}
                   </p>
                 </div>
@@ -806,34 +987,34 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
 
               <div className="flex items-center justify-between gap-2 pt-2">
                 {/* 3 Metric Points horizontally aligned */}
-                <div className="flex items-center gap-3 sm:gap-4 flex-1">
-                  <div className="flex items-center gap-2">
-                    <Home className="w-4 h-4 text-[#0A2540] shrink-0" />
-                    <div className="leading-tight">
-                      <div className="font-extrabold text-[#0A2540] text-sm">4</div>
-                      <div className="text-slate-500 text-[10px] font-medium">{copy.discomsLabel}</div>
+                <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:gap-4 flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <Home className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0A2540] shrink-0" />
+                    <div className="leading-tight min-w-0">
+                      <div className="font-extrabold text-[#0A2540] text-xs sm:text-sm">4</div>
+                      <div className="text-slate-500 text-[0.625rem] font-medium truncate">{copy.discomsLabel}</div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-[#0A2540] shrink-0" />
-                    <div className="leading-tight">
-                      <div className="font-extrabold text-[#0A2540] text-sm">89L+</div>
-                      <div className="text-slate-500 text-[10px] font-medium">{copy.consumersLabel}</div>
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0A2540] shrink-0" />
+                    <div className="leading-tight min-w-0">
+                      <div className="font-extrabold text-[#0A2540] text-xs sm:text-sm">89L+</div>
+                      <div className="text-slate-500 text-[0.625rem] font-medium truncate">{copy.consumersLabel}</div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-[#0A2540] shrink-0" />
-                    <div className="leading-tight">
-                      <div className="font-extrabold text-[#0A2540] text-sm">24x7</div>
-                      <div className="text-slate-500 text-[10px] font-medium">{copy.serviceLabel}</div>
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                    <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0A2540] shrink-0" />
+                    <div className="leading-tight min-w-0">
+                      <div className="font-extrabold text-[#0A2540] text-xs sm:text-sm">24x7</div>
+                      <div className="text-slate-500 text-[0.625rem] font-medium truncate">{copy.serviceLabel}</div>
                     </div>
                   </div>
                 </div>
 
                 {/* Gujarat State Map Silhouette */}
-                <div className="w-[95px] sm:w-[105px] shrink-0 flex items-center justify-center">
+                <div className="w-[74px] sm:w-[105px] shrink-0 flex items-center justify-center">
                   <img
                     src="/assets/ugvcl/gujarat_map_exact.png"
                     alt="Gujarat State Coverage Map"
@@ -845,6 +1026,8 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
           </div>
         </div>
       </section>
+        </>
+      )}
 
       {/* =========================================================================
           6. FOOTER BAR (Deep Navy - Pure Code & Scalable Vector Artwork)
@@ -900,10 +1083,13 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
           </div>
 
           {/* Center Legal / Statutory Navigation Links */}
-          <div className="flex items-center flex-wrap justify-center gap-2 text-[11px] text-slate-300">
+          <div className="flex items-center flex-wrap justify-center gap-2 text-[0.6875rem] text-slate-300">
             <button
               type="button"
-              onClick={() => onOpenAboutModal('overview')}
+              onClick={() => {
+                setActivePage('privacy');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               className="hover:text-white transition-colors cursor-pointer"
             >
               {copy.privacyPolicy}
@@ -911,31 +1097,18 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
             <span className="text-slate-600">|</span>
             <button
               type="button"
-              onClick={() => onOpenAboutModal('overview')}
+              onClick={() => {
+                setActivePage('terms');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               className="hover:text-white transition-colors cursor-pointer"
             >
               {copy.termsConditions}
             </button>
-            <span className="text-slate-600">|</span>
-            <button
-              type="button"
-              onClick={() => onOpenAboutModal('overview')}
-              className="hover:text-white transition-colors cursor-pointer"
-            >
-              {copy.sitemap}
-            </button>
-            <span className="text-slate-600">|</span>
-            <button
-              type="button"
-              onClick={() => onOpenAboutModal('overview')}
-              className="hover:text-white transition-colors cursor-pointer"
-            >
-              {copy.accessibility}
-            </button>
           </div>
 
           {/* Right Social Media & Copyright */}
-          <div className="flex items-center gap-4 text-[11px]">
+          <div className="flex items-center gap-4 text-[0.6875rem]">
             <span className="text-slate-400 font-medium">{copy.followUs}</span>
             <div className="flex items-center gap-2 text-white">
               <a
@@ -1004,7 +1177,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   <h3 id="ugvcl-latest-updates-title" className="text-base font-extrabold tracking-tight">
                     UGVCL Latest Updates &amp; Public Notices
                   </h3>
-                  <p className="text-[11px] text-slate-300">
+                  <p className="text-[0.6875rem] text-slate-300">
                     Uttar Gujarat Vij Company Limited · Official Consumer Announcements
                   </p>
                 </div>
@@ -1057,10 +1230,10 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-white transition-colors space-y-1.5"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="px-2 py-0.5 rounded-md bg-orange-100 text-[#FF6B00] text-[10px] font-bold uppercase tracking-wider">
+                    <span className="px-2 py-0.5 rounded-md bg-orange-100 text-[#FF6B00] text-[0.625rem] font-bold uppercase tracking-wider">
                       {item.tag}
                     </span>
-                    <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1 tabular-nums">
+                    <span className="text-[0.6875rem] font-semibold text-slate-500 flex items-center gap-1 tabular-nums">
                       <Calendar className="w-3 h-3" />
                       {item.date}
                     </span>
@@ -1102,7 +1275,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   <h3 id="ugvcl-commitment-title" className="text-base font-extrabold tracking-tight">
                     Our Commitment to Gujarat
                   </h3>
-                  <p className="text-[11px] text-slate-300">
+                  <p className="text-[0.6875rem] text-slate-300">
                     Reliable, Customer-Centric &amp; Technology-Driven Power Distribution
                   </p>
                 </div>
@@ -1148,7 +1321,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span>{pillar.title}</span>
                     </div>
-                    <p className="text-[11px] text-slate-600 leading-relaxed">{pillar.desc}</p>
+                    <p className="text-[0.6875rem] text-slate-600 leading-relaxed">{pillar.desc}</p>
                   </div>
                 ))}
               </div>
@@ -1243,7 +1416,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                     <h3 id="ugvcl-qa-modal-title" className="text-base font-extrabold tracking-tight">
                       UGVCL Consumer Q&amp;A Center
                     </h3>
-                    <p className="text-[11px] text-slate-300">
+                    <p className="text-[0.6875rem] text-slate-300">
                       Frequently Asked Questions on Connections, UPI QR Billing, Metering &amp; Support
                     </p>
                   </div>
@@ -1281,7 +1454,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                         setQaCategory(cat);
                         setOpenQaIndex(0);
                       }}
-                      className={`px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-full text-[0.6875rem] font-bold transition-colors cursor-pointer ${
                         qaCategory === cat
                           ? 'bg-[#0A2540] text-white'
                           : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
@@ -1303,7 +1476,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                           className="w-full px-4 py-3 text-left flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors cursor-pointer"
                         >
                           <div className="min-w-0">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#FF6B00] block">
+                            <span className="text-[0.625rem] font-bold uppercase tracking-wider text-[#FF6B00] block">
                               {item.category}
                             </span>
                             <span className="text-xs font-bold text-[#0A2540]">{item.q}</span>
@@ -1327,7 +1500,7 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
               </div>
 
               <div className="px-6 py-3.5 bg-white border-t border-slate-200 flex items-center justify-between">
-                <span className="text-[11px] text-slate-500">
+                <span className="text-[0.6875rem] text-slate-500">
                   24×7 Toll-Free Helpline: <strong>1912 / 1800 233 155335</strong>
                 </span>
                 <button
@@ -1342,6 +1515,6 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
           </div>
         );
       })()}
-    </div>
+      </div>
   );
 };

@@ -59,35 +59,35 @@ export const OverdueBillBreakdownCard: React.FC<OverdueBillBreakdownCardProps> =
   return (
     <div
       data-testid={`overdue-breakdown-${breakdown.billNo}`}
-      className={`rounded-xl border border-rose-200/90 dark:border-rose-900/70 bg-linear-to-b from-rose-50/70 via-white to-amber-50/40 dark:from-rose-950/20 dark:via-slate-900 dark:to-amber-950/10 p-4 sm:p-5 shadow-2xs space-y-4 ${className}`}
+      className={`rounded-2xl border border-slate-200/90 dark:border-rose-900/70 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-sm space-y-4 ${className}`}
     >
       {/* Header bar with Days Overdue Badge (8), Original Due Date (7), and Last Calculation Date (9) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-rose-100 dark:border-rose-900/40">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-100 dark:border-rose-900/40">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-rose-600 text-white shadow-2xs">
-            <AlertCircle className="w-3.5 h-3.5" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-600 text-white shadow-2xs">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             <span data-testid="overdue-days-badge">
-              {fnT.nineFields.daysOverdue}: {breakdown.daysOverdue} ({t.daysOverdue(breakdown.daysOverdue)})
+              {t.daysOverdue(breakdown.daysOverdue)}
             </span>
           </span>
           <span
             data-testid="overdue-original-due-date"
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-100 dark:bg-rose-900/50 text-rose-800 dark:text-rose-200"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-50 dark:bg-rose-900/50 text-rose-700 dark:text-rose-200 border border-rose-200/70 dark:border-rose-800/60"
           >
-            <Clock className="w-3 h-3" />
+            <Clock className="w-3.5 h-3.5 shrink-0" />
             <span>
               {fnT.nineFields.originalDueDate}: {breakdown.dueDate}
             </span>
           </span>
           <span
             data-testid="overdue-last-calculation-date"
-            className="text-xs text-slate-500 dark:text-slate-400 font-mono"
+            className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 tabular-nums"
           >
             {fnT.nineFields.lastCalculationDate}: {breakdown.referenceDate}
           </span>
         </div>
 
-        <div className="text-xs font-medium text-rose-700 dark:text-rose-300 flex items-center gap-1">
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50/70 dark:bg-rose-950/40 text-xs font-semibold text-rose-700 dark:text-rose-300 self-start sm:self-auto">
           <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
           <span>
             {t.overdue} · {breakdown.policyVersion}
@@ -96,75 +96,77 @@ export const OverdueBillBreakdownCard: React.FC<OverdueBillBreakdownCardProps> =
       </div>
 
       {/* Canonical 9-Field Financial Metrics Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 items-stretch">
         {/* Field 1: Original Bill Amount */}
-        <div className="p-3 rounded-lg bg-white/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block mb-1">
+        <div className="p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 flex flex-col justify-between h-full">
+          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-1.5 leading-snug">
             1. {fnT.nineFields.originalBillAmount}
           </span>
           <span
             data-testid="overdue-original-amount"
-            className="text-base sm:text-lg font-bold font-mono text-slate-900 dark:text-white"
+            className="text-lg sm:text-xl font-extrabold tabular-nums text-slate-900 dark:text-white tracking-tight"
           >
             {formatCurrency(breakdown.originalBillAmount)}
           </span>
         </div>
 
         {/* Field 2: Payments Successfully Settled */}
-        <div className="p-3 rounded-lg bg-white/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block mb-1">
+        <div className="p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 flex flex-col justify-between h-full">
+          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-1.5 leading-snug">
             2. {fnT.nineFields.paymentsSuccessfullySettled}
           </span>
           <span
             data-testid="overdue-payment-received"
-            className="text-base sm:text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400"
+            className="text-lg sm:text-xl font-extrabold tabular-nums text-emerald-600 dark:text-emerald-400 tracking-tight"
           >
             {formatCurrency(breakdown.successfulPayments)}
           </span>
         </div>
 
         {/* Field 3: Remaining Principal */}
-        <div className="p-3 rounded-lg bg-white/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60">
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block mb-1">
+        <div className="p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 flex flex-col justify-between h-full">
+          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-1.5 leading-snug">
             3. {fnT.nineFields.remainingPrincipal}
           </span>
           <span
             data-testid="overdue-remaining-principal"
-            className="text-base sm:text-lg font-bold font-mono text-amber-700 dark:text-amber-300"
+            className="text-lg sm:text-xl font-extrabold tabular-nums text-amber-700 dark:text-amber-300 tracking-tight"
           >
             {formatCurrency(breakdown.remainingPrincipal)}
           </span>
         </div>
 
         {/* Field 4: Accrued Late-Payment Charges (DPS) */}
-        <div className="p-3 rounded-lg bg-rose-50/90 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60">
-          <div className="flex items-center justify-between gap-1 mb-1">
-            <span className="text-[11px] font-semibold text-rose-800 dark:text-rose-300">
+        <div className="p-3.5 rounded-xl bg-rose-50/80 dark:bg-rose-950/40 border border-rose-200/90 dark:border-rose-900/60 flex flex-col justify-between h-full">
+          <div className="flex items-start justify-between gap-1.5 mb-1.5">
+            <span className="text-[11px] font-semibold text-rose-800 dark:text-rose-300 leading-snug">
               4. {t.lateCharges}
             </span>
-            <span className="text-[10px] font-mono text-rose-600 dark:text-rose-400">
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 shrink-0 tabular-nums">
               {breakdown.effectiveAnnualRatePercent}% p.a.
             </span>
           </div>
-          <span
-            data-testid="overdue-late-charges"
-            className="text-base sm:text-lg font-extrabold font-mono text-rose-700 dark:text-rose-300"
-          >
-            +{formatCurrency(breakdown.netLateChargesPayable)}
-          </span>
-          <span className="text-[10px] text-rose-600/80 dark:text-rose-400/80 block mt-0.5">
-            ≈ ₹{breakdown.dailyChargeRate.toFixed(3)}/day ({breakdown.chargeableDays}d accrued)
-          </span>
+          <div>
+            <span
+              data-testid="overdue-late-charges"
+              className="text-lg sm:text-xl font-extrabold tabular-nums text-rose-700 dark:text-rose-300 tracking-tight block"
+            >
+              +{formatCurrency(breakdown.netLateChargesPayable)}
+            </span>
+            <span className="text-[11px] font-medium text-rose-600/90 dark:text-rose-400/80 block mt-0.5 tabular-nums">
+              ≈ ₹{breakdown.dailyChargeRate.toFixed(3)}/day ({breakdown.chargeableDays}d)
+            </span>
+          </div>
         </div>
 
         {/* Field 5: Charges Already Paid or Waived */}
-        <div className="p-3 rounded-lg bg-white/80 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 col-span-2 lg:col-span-1">
-          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block mb-1">
+        <div className="p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 col-span-2 lg:col-span-1 flex flex-col justify-between h-full">
+          <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-1.5 leading-snug">
             5. {fnT.nineFields.chargesAlreadyPaidOrWaived}
           </span>
           <span
             data-testid="overdue-waived-or-settled-charges"
-            className="text-base sm:text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300"
+            className="text-lg sm:text-xl font-extrabold tabular-nums text-emerald-700 dark:text-emerald-300 tracking-tight"
           >
             {formatCurrency(waivedOrSettledCharges)}
           </span>
@@ -175,71 +177,81 @@ export const OverdueBillBreakdownCard: React.FC<OverdueBillBreakdownCardProps> =
       {formalNotice && formalNotice.status !== 'NOT_REQUIRED' && (
         <div
           data-testid={`formal-notice-banner-${formalNotice.noticeId}`}
-          className={`p-3.5 rounded-xl border ${
+          className={`p-4 rounded-xl border ${
             formalNotice.status === 'RESOLVED' || formalNotice.status === 'WITHDRAWN'
-              ? 'bg-emerald-50/80 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60'
+              ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60'
               : formalNotice.status === 'ON_HOLD'
-              ? 'bg-blue-50/80 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/60'
-              : 'bg-amber-50/90 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800/70'
-          } space-y-2`}
+              ? 'bg-blue-50/70 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/60'
+              : 'bg-amber-50/75 dark:bg-amber-950/30 border-amber-200/90 dark:border-amber-800/70'
+          } space-y-3`}
         >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-amber-200/60 dark:border-amber-800/40">
+            <div className="flex items-center gap-2 min-w-0">
               <Scale className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" />
-              <span className="text-xs font-bold text-slate-900 dark:text-white">
-                {fnT.sectionTitle} · <span className="font-mono">{formalNotice.noticeId}</span>
+              <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                {fnT.sectionTitle}
+                <span className="ml-2 inline-block px-2 py-0.5 rounded bg-white/80 dark:bg-slate-800 border border-amber-200/80 dark:border-amber-700 font-mono text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+                  {formalNotice.noticeId}
+                </span>
               </span>
             </div>
             <span
               data-testid="formal-notice-status-badge"
-              className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-600 text-white"
+              className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-600 text-white shadow-2xs shrink-0"
             >
               {fnT.statuses[formalNotice.status]}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-slate-700 dark:text-slate-300 pt-1">
-            <div>
-              <span className="text-slate-500 dark:text-slate-400 block text-[11px]">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-700 dark:text-slate-300">
+            <div className="min-w-0">
+              <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium mb-0.5">
                 {fnT.issueDateLabel} / {fnT.serviceDateLabel}
               </span>
-              <span className="font-mono font-semibold">
-                {formalNotice.issueDate || 'Pending'} ({formalNotice.serviceEvidenceRef || 'DEMO'})
+              <span className="font-bold text-slate-900 dark:text-white tabular-nums block">
+                {formalNotice.issueDate || 'Pending'}
+              </span>
+              <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 block truncate mt-0.5">
+                {formalNotice.serviceEvidenceRef || 'DEMO'}
               </span>
             </div>
-            <div>
-              <span className="text-slate-500 dark:text-slate-400 block text-[11px]">
+            <div className="min-w-0">
+              <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium mb-0.5">
                 {fnT.paymentDeadlineLabel}
               </span>
-              <span
+              <div
                 data-testid="formal-notice-deadline"
-                className="font-mono font-bold text-rose-700 dark:text-rose-300"
+                className="flex flex-wrap items-center gap-1.5"
               >
-                {formalNotice.paymentDeadlineDate || 'N/A'}
+                <span className="font-bold text-rose-700 dark:text-rose-300 tabular-nums">
+                  {formalNotice.paymentDeadlineDate || 'N/A'}
+                </span>
                 {formalNotice.daysRemainingUntilDeadline !== null && (
-                  <span className="ml-1.5 text-[11px] text-amber-800 dark:text-amber-300">
-                    ({fnT.daysRemainingLabel(formalNotice.daysRemainingUntilDeadline)})
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-rose-100/80 dark:bg-rose-900/50 text-[11px] font-semibold text-rose-800 dark:text-rose-200">
+                    {fnT.daysRemainingLabel(formalNotice.daysRemainingUntilDeadline)}
                   </span>
                 )}
-              </span>
+              </div>
             </div>
-            <div>
-              <span className="text-slate-500 dark:text-slate-400 block text-[11px]">
+            <div className="min-w-0">
+              <span className="text-slate-500 dark:text-slate-400 block text-[11px] font-medium mb-0.5">
                 {fnT.snapshotAtIssuanceTitle}
               </span>
-              <span className="font-mono font-semibold">
-                {formatCurrency(formalNotice.snapshotAtIssuance.totalOutstandingAtIssuance)} (as of{' '}
-                {formalNotice.snapshotAtIssuance.snapshotReferenceDate})
+              <span className="font-bold text-slate-900 dark:text-white tabular-nums block">
+                {formatCurrency(formalNotice.snapshotAtIssuance.totalOutstandingAtIssuance)}
+              </span>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                as of {formalNotice.snapshotAtIssuance.snapshotReferenceDate}
               </span>
             </div>
           </div>
 
-          <div className="text-[11px] text-slate-600 dark:text-slate-400 pt-1 border-t border-amber-200/60 dark:border-amber-800/40 flex items-center justify-between flex-wrap gap-2">
+          <div className="text-[11px] text-slate-600 dark:text-slate-400 pt-2.5 border-t border-amber-200/60 dark:border-amber-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
             <span>
-              <strong>{fnT.disconnectionReviewLabel}:</strong>{' '}
+              <strong className="text-slate-700 dark:text-slate-200">{fnT.disconnectionReviewLabel}:</strong>{' '}
               {fnT.disconnectionReviewStatuses[formalNotice.disconnectionReviewStatus]}
             </span>
-            <span className="font-mono text-[10px] text-amber-800 dark:text-amber-300">
+            <span className="text-[11px] font-medium text-amber-800 dark:text-amber-300">
               {formalNotice.statutoryCitation}
             </span>
           </div>
@@ -247,19 +259,19 @@ export const OverdueBillBreakdownCard: React.FC<OverdueBillBreakdownCardProps> =
       )}
 
       {/* Field 6: Total Current Outstanding Payable Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-xl bg-slate-900 dark:bg-slate-950 text-white shadow-xs">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 p-4 sm:p-5 rounded-xl bg-[#0A2540] dark:bg-slate-950 text-white shadow-sm">
         <div>
           <span className="text-xs text-slate-300 block font-medium">
             6. {fnT.nineFields.totalCurrentOutstanding} ({t.remainingPrincipal} + {t.lateCharges})
           </span>
-          <div className="flex items-baseline gap-2 mt-0.5">
+          <div className="flex flex-wrap items-baseline gap-2.5 mt-1">
             <span
               data-testid="overdue-total-outstanding"
-              className="text-2xl sm:text-3xl font-extrabold font-mono text-white tracking-tight"
+              className="text-2xl sm:text-3xl font-extrabold tabular-nums text-white tracking-tight"
             >
               {formatCurrency(breakdown.totalOutstandingPayable)}
             </span>
-            <span className="text-xs text-amber-300 font-medium">
+            <span className="text-xs text-amber-300 font-semibold">
               ({breakdown.chargeableDays}{' '}
               {language === 'gu'
                 ? 'દિવસ ચાર્જ'

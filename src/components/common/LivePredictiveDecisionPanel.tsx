@@ -196,6 +196,8 @@ function buildFallbackForecast(zone: string, tempC: number): LoadForecastResult 
 }
 
 export const LivePredictiveDecisionPanel: React.FC = () => {
+  const showServerPanel = false as boolean;
+  if (!showServerPanel) return null;
   const { language } = useLanguage();
   const t = PREDICTIVE_PANEL_TRANSLATIONS[language] || PREDICTIVE_PANEL_TRANSLATIONS.en;
 

@@ -57,7 +57,7 @@ export const EXECUTIVE_ANALYTICS_TRANSLATIONS: Record<
 > = {
   en: {
     title: 'Real-Data Executive Command Analytics',
-    liveBadge: 'LIVE FASTAPI DATABASE',
+    liveBadge: 'OPERATIONAL ANALYTICS',
     reactiveBadge: 'LIVE REACTIVE WORKSPACE STATE',
     provenanceNote:
       'Request queues, zone SLA compliance, contracted kW load, ERP sync rate, field syncs, and audit counts below are computed dynamically from real records.',
@@ -95,7 +95,7 @@ export const EXECUTIVE_ANALYTICS_TRANSLATIONS: Record<
   },
   gu: {
     title: 'રિયલ-ડેટા એક્ઝિક્યુટિવ કમાન્ડ એનાલિટિક્સ',
-    liveBadge: 'લાઈવ FASTAPI ડેટાબેઝ',
+    liveBadge: 'ઓપરેશનલ એનાલિટિક્સ',
     reactiveBadge: 'લાઈવ રિએક્ટિવ વર્કસ્પેસ ડેટા',
     provenanceNote:
       'નીચેના રિકવેસ્ટ કતાર, ઝોન SLA પાલન, kW લોડ, ERP સિંક દર, ફીલ્ડ સિંક અને ઓડિટ આંકડા વાસ્તવિક રેકોર્ડ્સમાંથી ગણવામાં આવે છે.',
@@ -132,7 +132,7 @@ export const EXECUTIVE_ANALYTICS_TRANSLATIONS: Record<
   },
   hi: {
     title: 'रियल-डेटा एग्ज़ीक्यूटिव कमांड एनालिटिक्स',
-    liveBadge: 'लाइव FASTAPI डेटाबेस',
+    liveBadge: 'परिचालन एनालिटिक्स',
     reactiveBadge: 'लाइव रिएक्टिव वर्कस्पेस डेटा',
     provenanceNote:
       'नीचे दिखाए गए अनुरोध कतार, ज़ोन SLA अनुपालन, kW लोड, ERP सिंक दर, फ़ील्ड सिंक और ऑडिट आँकड़े वास्तविक रिकॉर्ड से लाइव गणना किए गए हैं।',
@@ -169,7 +169,7 @@ export const EXECUTIVE_ANALYTICS_TRANSLATIONS: Record<
   },
   mr: {
     title: 'रिअल-डेटा एक्झिक्युटिव्ह कमांड अॅनालिटिक्स',
-    liveBadge: 'लाइव्ह FASTAPI डेटाबेस',
+    liveBadge: 'ऑपरेशनल अॅनालिटिक्स',
     reactiveBadge: 'लाइव्ह रिअॅक्टिव्ह वर्कस्पेस डेटा',
     provenanceNote:
       'खालील विनंती रांग, झोन SLA पालन, kW लोड, ERP सिंक दर, फील्ड सिंक आणि ऑडिट आकडे प्रत्यक्ष रेकॉर्डमधून मोजले जातात.',
@@ -331,7 +331,7 @@ export const LiveExecutiveAnalyticsSection: React.FC<Props> = ({ mode }) => {
 
   if (mode === 'reports') {
     return (
-      <div className="p-4 sm:p-5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
             <Database className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -358,7 +358,7 @@ export const LiveExecutiveAnalyticsSection: React.FC<Props> = ({ mode }) => {
 
   if (mode === 'sla') {
     return (
-      <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
+      <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -433,7 +433,7 @@ export const LiveExecutiveAnalyticsSection: React.FC<Props> = ({ mode }) => {
 
   return (
     <div className="space-y-4">
-      <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
+      <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -495,8 +495,8 @@ export const LiveExecutiveAnalyticsSection: React.FC<Props> = ({ mode }) => {
           <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/40">
             <h4 className="text-xs font-bold text-slate-900 dark:text-white">{t.chartZoneTitle}</h4>
             <p className="text-[11px] text-slate-500 mb-3">{t.chartZoneSubtitle}</p>
-            <div className="h-52 w-full">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-64 w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
                 <BarChart data={effective.by_zone_matrix}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.2} />
                   <XAxis dataKey="zone" fontSize={11} stroke="#94a3b8" />
@@ -514,8 +514,8 @@ export const LiveExecutiveAnalyticsSection: React.FC<Props> = ({ mode }) => {
               {t.chartCategoryTitle}
             </h4>
             <p className="text-[11px] text-slate-500 mb-3">{t.chartCategorySubtitle}</p>
-            <div className="h-52 w-full">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-64 w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={240}>
                 <BarChart data={effective.by_category_chart}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b8" strokeOpacity={0.2} />
                   <XAxis dataKey="category" fontSize={10} stroke="#94a3b8" />

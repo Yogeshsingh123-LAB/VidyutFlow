@@ -37,7 +37,9 @@ import {
   ClipboardCheck,
   HardHat,
   WifiOff,
-  History
+  History,
+  LogOut,
+  Activity
 } from 'lucide-react';
 import { PresentationAboutModal } from '../common/PresentationAboutModal';
 import { LanguageSelector } from '../common/LanguageSelector';
@@ -57,6 +59,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
     setIsCommandPaletteOpen,
     replayIntro,
     exitToWelcomeScreen,
+    logoutDemoSession,
     resetDemoData,
     activeUser,
     unreadIncidentsCount,
@@ -178,9 +181,9 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
   }, []);
 
   // =========================================================================
-  // CONSUMER, EMPLOYEE, ADMIN & FIELD DEDICATED HEADER (1:1 with reference design)
+  // CONSUMER, EMPLOYEE, ADMIN, MANAGEMENT & FIELD DEDICATED HEADER (1:1 with reference design)
   // =========================================================================
-  if (currentRole === 'consumer' || currentRole === 'employee' || currentRole === 'admin' || currentRole === 'field') {
+  if (currentRole === 'consumer' || currentRole === 'employee' || currentRole === 'admin' || currentRole === 'field' || currentRole === 'management') {
     return (
       <header className="h-16 bg-white border-b border-slate-200/90 px-4 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-30 select-none">
         <PresentationAboutModal
@@ -229,6 +232,8 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
               <div className="text-[9.5px] text-slate-500 font-semibold tracking-wider uppercase mt-0.5">
                 {currentRole === 'admin'
                   ? 'Admin Portal'
+                  : currentRole === 'management'
+                  ? 'Management Cockpit'
                   : currentRole === 'employee'
                   ? 'Employee Portal'
                   : currentRole === 'field'
@@ -250,10 +255,10 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
                   : 'text-slate-700 hover:text-blue-700 hover:bg-slate-100'
               }`}
             >
-              {currentRole === 'field' ? 'Console' : currentRole === 'admin' ? 'Overview' : 'Home'}
+              {currentRole === 'field' ? 'Console' : currentRole === 'admin' || currentRole === 'management' ? 'Overview' : 'Home'}
             </button>
 
-            {/* Dropdown 1: System (Admin) / Field Ops (Field) / Services (Consumer & Employee) */}
+            {/* Dropdown 1: System (Admin) / Executive (Management) / Field Ops (Field) / Services (Consumer & Employee) */}
             <div className="relative" ref={servicesMenuRef}>
               <button
                 type="button"
@@ -264,7 +269,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
                 }}
                 className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-slate-100 flex items-center gap-1 transition-colors cursor-pointer"
               >
-                <span>{currentRole === 'admin' ? 'System' : currentRole === 'field' ? 'Field Ops' : 'Services'}</span>
+                <span>{currentRole === 'admin' ? 'System' : currentRole === 'management' ? 'Executive' : currentRole === 'field' ? 'Field Ops' : 'Services'}</span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
 
@@ -411,6 +416,53 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
                         <span>Live Outage Map</span>
                       </button>
                     </>
+                  ) : currentRole === 'management' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('analytics');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <BarChart3 className="w-4 h-4 text-blue-600" />
+                        <span>Revenue & Demand</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('feeders');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Zap className="w-4 h-4 text-amber-600" />
+                        <span>Feeder Overloads</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('ai-insights');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Activity className="w-4 h-4 text-emerald-600" />
+                        <span>AI Executive Insights</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('outage-map');
+                          setIsServicesMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <MapPin className="w-4 h-4 text-purple-600" />
+                        <span>Live Outage Map</span>
+                      </button>
+                    </>
                   ) : (
                     <>
                       <button
@@ -474,7 +526,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
                 }}
                 className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:text-blue-700 hover:bg-slate-100 flex items-center gap-1 transition-colors cursor-pointer"
               >
-                <span>{currentRole === 'admin' ? 'Operations' : currentRole === 'field' ? 'Grid Assets' : 'Support'}</span>
+                <span>{currentRole === 'admin' ? 'Operations' : currentRole === 'management' ? 'Governance' : currentRole === 'field' ? 'Grid Assets' : 'Support'}</span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
 
@@ -621,6 +673,42 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
                         <span>Revenue Reports</span>
                       </button>
                     </>
+                  ) : currentRole === 'management' ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('sla');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <ShieldCheck className="w-4 h-4 text-blue-600" />
+                        <span>SLA & Redressal</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('transformers');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Cpu className="w-4 h-4 text-emerald-600" />
+                        <span>Transformer Fleet Health</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('reports');
+                          setIsSupportMenuOpen(false);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
+                      >
+                        <BarChart3 className="w-4 h-4 text-amber-600" />
+                        <span>Executive Reports</span>
+                      </button>
+                    </>
                   ) : (
                     <>
                       <a
@@ -670,6 +758,8 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
             placeholder={
               currentRole === 'admin'
                 ? 'Search users, logs, or system records...'
+                : currentRole === 'management'
+                ? 'Search executive metrics, feeders, or SLA...'
                 : currentRole === 'field'
                 ? 'Search work orders, poles, or feeders...'
                 : currentRole === 'employee'
@@ -721,10 +811,10 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
               className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
             >
               <div className="w-8 h-8 rounded-full bg-[#0A2540] text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
-                {activeUser.initials || (currentRole === 'field' ? 'VS' : currentRole === 'admin' ? 'AP' : currentRole === 'employee' ? 'PR' : 'MP')}
+                {activeUser.initials || (currentRole === 'field' ? 'VS' : currentRole === 'admin' ? 'AP' : currentRole === 'management' ? 'RS' : currentRole === 'employee' ? 'PR' : 'MP')}
               </div>
               <span className="text-xs font-bold text-slate-800 hidden sm:inline max-w-[150px] truncate">
-                {activeUser.name || (currentRole === 'field' ? 'Vikramaditya Solanki' : currentRole === 'admin' ? 'Anand Patel' : currentRole === 'employee' ? 'Priya Rathod' : 'Smt. Meenaben Patel')}
+                {activeUser.name || (currentRole === 'field' ? 'Vikramaditya Solanki' : currentRole === 'admin' ? 'Anand Patel' : currentRole === 'management' ? 'Rajesh Solanki' : currentRole === 'employee' ? 'Priya Rathod' : 'Smt. Meenaben Patel')}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
@@ -733,33 +823,35 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
               <div className="absolute right-0 mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in">
                 <div className="px-3.5 py-2 border-b border-slate-100">
                   <div className="font-bold text-xs text-slate-900 truncate">
-                    {activeUser.name || (currentRole === 'field' ? 'Vikramaditya Solanki' : currentRole === 'admin' ? 'Anand Patel' : currentRole === 'employee' ? 'Priya Rathod' : 'Smt. Meenaben Patel')}
+                    {activeUser.name || (currentRole === 'field' ? 'Vikramaditya Solanki' : currentRole === 'admin' ? 'Anand Patel' : currentRole === 'management' ? 'Rajesh Solanki' : currentRole === 'employee' ? 'Priya Rathod' : 'Smt. Meenaben Patel')}
                   </div>
                   <div className="text-[11px] text-slate-500 font-mono">
                     {activeUser.id}
                   </div>
                 </div>
+                {currentRole !== 'employee' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(currentRole === 'admin' ? 'settings' : currentRole === 'field' || currentRole === 'management' ? 'dashboard' : 'profile');
+                      setIsConsumerUserMenuOpen(false);
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                  >
+                    <User className="w-4 h-4 text-slate-500" />
+                    <span>{currentRole === 'admin' ? 'System Settings' : currentRole === 'management' ? 'Management Cockpit' : currentRole === 'field' ? 'Field Console' : 'Account Profile'}</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
-                    setActiveTab(currentRole === 'admin' ? 'settings' : currentRole === 'field' ? 'dashboard' : 'profile');
-                    setIsConsumerUserMenuOpen(false);
-                  }}
-                  className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-                >
-                  <User className="w-4 h-4 text-slate-500" />
-                  <span>{currentRole === 'admin' ? 'System Settings' : currentRole === 'field' ? 'Field Console' : 'Account Profile'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    exitToWelcomeScreen();
+                    void logoutDemoSession();
                     setIsConsumerUserMenuOpen(false);
                   }}
                   className="w-full px-3.5 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer border-t border-slate-100"
                 >
-                  <Home className="w-4 h-4 text-rose-500" />
-                  <span>Return to Homepage</span>
+                  <LogOut className="w-4 h-4 text-rose-500" />
+                  <span>Logout</span>
                 </button>
               </div>
             )}

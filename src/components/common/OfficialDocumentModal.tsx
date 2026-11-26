@@ -255,7 +255,7 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
               {/* Official UGVCL Corporate Masthead */}
               <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 print:border-slate-300">
             <div className="bg-slate-900 text-white px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b-4 border-amber-500">
-              <div className="flex items-start sm:items-center gap-3.5">
+              <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
                 <div className="w-14 h-14 rounded-xl bg-white p-1.5 border border-slate-200 flex items-center justify-center shrink-0 shadow-sm">
                   {!logoFailed ? (
                     <img
@@ -289,17 +289,17 @@ export const OfficialDocumentModal: React.FC<OfficialDocumentModalProps> = ({
                 </div>
               </div>
 
-              <div className="flex flex-col sm:items-end gap-1.5 shrink-0">
+              <div className="flex flex-col sm:items-end gap-1.5 min-w-0 sm:max-w-[46%]">
                 <h2
                   id="official-document-title"
-                  className="text-sm sm:text-base font-extrabold text-white tracking-tight sm:text-right"
+                  className="text-sm sm:text-base font-extrabold text-white tracking-tight sm:text-right break-words"
                   data-testid="official-document-heading"
                 >
                   {document.title}
                 </h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center sm:justify-end gap-2 max-w-full">
                   <span
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold border ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold border text-left sm:text-right break-words whitespace-normal max-w-full ${
                       toneBadgeClasses[document.statusTone]
                     }`}
                     data-testid="official-document-status-badge"
