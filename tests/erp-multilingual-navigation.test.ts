@@ -71,8 +71,8 @@ const readSrc = (relPath: string) =>
     'TopNav.tsx must render <LanguageSelector variant="erp" /> in the shared ERP header across all 5 portals'
   );
   assert.ok(
-    mobileNavSource.includes('<LanguageSelector variant="mobile" />'),
-    'MobileNav.tsx must render <LanguageSelector variant="mobile" /> inside the mobile navigation drawer'
+    !mobileNavSource.includes('<LanguageSelector variant="mobile" />'),
+    'MobileNav.tsx should not duplicate clipped LanguageSelector inside the mobile drawer (TopNav renders it on mobile & desktop)'
   );
   assert.ok(
     selectorSource.includes("variant?: 'header' | 'mobile' | 'compact' | 'erp'"),

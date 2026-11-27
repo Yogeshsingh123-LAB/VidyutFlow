@@ -573,70 +573,82 @@ export const ApplicationInspectFileWorkspace: React.FC<ApplicationInspectFileWor
       )}
 
       {/* TAB 2: DOCUMENTS */}
-      {activeTab === 'documents' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              {language === 'gu' ? 'સબમિટ કરેલ દસ્તાવેજોની ચકાસણી' : language === 'hi' ? 'प्रस्तुत दस्तावेजों का सत्यापन' : language === 'mr' ? 'सादर केलेल्या कागदपत्रांची पडताळणी' : 'Registered Application Dossier'}
-            </span>
-            <span className="text-[11px] font-semibold text-slate-500 font-mono">
-              {submittedDocs.length} {language === 'gu' ? 'દસ્તાવેજો' : language === 'hi' ? 'दस्तावेज़' : language === 'mr' ? 'कागदपत्रे' : 'Files'}
-            </span>
-          </div>
+      {activeTab === 'documents' && (() => {
+        const isVerified = currentStep >= 2 && !application.clarificationRequested && !isRejected;
+        return (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                {language === 'gu' ? 'સબમિટ કરેલ દસ્તાવેજોની ચકાસણી' : language === 'hi' ? 'प्रस्तुत दस्तावेजों का सत्यापन' : language === 'mr' ? 'सादर केलेल्या कागदपत्रांची पडताळणी' : 'Registered Application Dossier'}
+              </span>
+              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full font-mono">
+                {submittedDocs.length} {language === 'gu' ? 'દસ્તાવેજો' : language === 'hi' ? 'दस्तावेज़' : language === 'mr' ? 'कागदपत्रे' : 'Files'}
+              </span>
+            </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {submittedDocs.map((docName: string, idx: number) => {
-              const isVerified = currentStep >= 2 && !application.clarificationRequested && !isRejected;
-              return (
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#101C35] divide-y divide-slate-100 dark:divide-slate-800/80 overflow-hidden shadow-2xs">
+              {submittedDocs.map((docName: string, idx: number) => (
                 <div
                   key={idx}
-                  className="p-4 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 space-y-2.5 shadow-2xs"
+                  className="px-3.5 py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                        <FileText className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h5 className="font-bold text-xs text-slate-900 dark:text-white leading-snug">
-                          {localizeDocumentName(docName, language)}
-                        </h5>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          PDF • {language === 'gu' ? 'અપલોડ તારીખ:' : language === 'hi' ? 'अपलोड तिथि:' : language === 'mr' ? 'अपलोड तारीख:' : 'Uploaded on'} {application.appliedDate}
-                        </span>
-                      </div>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                      <FileText className="w-4 h-4" />
                     </div>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1 ${
-                        isVerified
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
-                          : 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
-                      }`}
-                    >
-                      {isVerified ? (
-                        <>
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          <span>{language === 'gu' ? 'ચકાસાયેલ' : language === 'hi' ? 'सत्यापित' : language === 'mr' ? 'पडताळलेले' : 'Verified'}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Clock className="w-3 h-3 text-amber-600" />
-                          <span>{language === 'gu' ? 'તપાસણી હેઠળ' : language === 'hi' ? 'जांच जारी' : language === 'mr' ? 'छाननी सुरू' : 'Pending Verification'}</span>
-                        </>
-                      )}
-                    </span>
+                    <div className="min-w-0">
+                      <h5 className="font-semibold text-[13px] text-slate-900 dark:text-white leading-snug truncate" title={localizeDocumentName(docName, language)}>
+                        {localizeDocumentName(docName, language)}
+                      </h5>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono block">
+                        PDF · {language === 'gu' ? 'અપલોડ:' : language === 'hi' ? 'अपलोड:' : language === 'mr' ? 'अपलोड:' : 'Uploaded'} {application.appliedDate}
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800/80 pt-1.5">
-                    {isVerified
-                      ? (language === 'gu' ? 'UGVCL સબ-ડિવિઝનલ કચેરી દ્વારા ડિજિટલ ચકાસણી કરી માન્ય રાખવામાં આવેલ છે.' : language === 'hi' ? 'UGVCL सब-डिवीजनल जांच डेस्क द्वारा डिजिटल रूप से सत्यापित और स्वीकृत।' : language === 'mr' ? 'UGVCL सब-डिव्हिजन छाननी कक्षाद्वारे डिजिटलरीत्या तपासले आणि स्वीकारले.' : 'Digitally scrutinized and accepted by the UGVCL Sub-Divisional Scrutiny Desk.')
-                      : (language === 'gu' ? 'સબ-ડિવિઝનલ ક્લાર્ક દ્વારા સમીક્ષા હેઠળ. સ્થળ મુલાકાત વખતે મૂળ દસ્તાવેજ ચકાસાશે.' : language === 'hi' ? 'सब-डिवीजनल क्लर्क द्वारा समीक्षाधीन। स्थल निरीक्षण के दौरान मूल प्रति की जांच की जाएगी।' : language === 'mr' ? 'सब-डिव्हिजन लिपिकाकडून छाननी सुरू. स्थळ भेटीदरम्यान मूळ प्रती तपासल्या जाऊ शकतात.' : 'Under review by Sub-Divisional Clerk. Physical originals may be inspected during site visit.')}
-                  </p>
+                  <span
+                    className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border shrink-0 whitespace-nowrap inline-flex items-center gap-1 ${
+                      isVerified
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                        : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                    }`}
+                  >
+                    {isVerified ? (
+                      <>
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span>{language === 'gu' ? 'ચકાસાયેલ' : language === 'hi' ? 'सत्यापित' : language === 'mr' ? 'पडताळलेले' : 'Verified'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                        <span>{language === 'gu' ? 'તપાસણી હેઠળ' : language === 'hi' ? 'जांच जारी' : language === 'mr' ? 'छाननी सुरू' : 'Pending Verification'}</span>
+                      </>
+                    )}
+                  </span>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+
+            <div
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] ${
+                isVerified
+                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-200'
+                  : 'bg-amber-50/70 border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-200'
+              }`}
+            >
+              {isVerified ? (
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+              ) : (
+                <Clock className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+              )}
+              <span>
+                {isVerified
+                  ? (language === 'gu' ? 'UGVCL સબ-ડિવિઝનલ કચેરી દ્વારા ડિજિટલ ચકાસણી કરી માન્ય રાખવામાં આવેલ છે.' : language === 'hi' ? 'UGVCL सब-डिवीजनल जांच डेस्क द्वारा डिजिटल रूप से सत्यापित और स्वीकृत।' : language === 'mr' ? 'UGVCL सब-डिव्हिजन छाननी कक्षाद्वारे डिजिटलरीत्या तपासले आणि स्वीकारले.' : 'Digitally scrutinized and accepted by the UGVCL Sub-Divisional Scrutiny Desk.')
+                  : (language === 'gu' ? 'સબ-ડિવિઝનલ ક્લાર્ક દ્વારા સમીક્ષા હેઠળ. સ્થળ મુલાકાત વખતે મૂળ દસ્તાવેજ ચકાસાશે.' : language === 'hi' ? 'सब-डिवीजनल क्लर्क द्वारा समीक्षाधीन। स्थल निरीक्षण के दौरान मूल प्रति की जांच की जाएगी।' : language === 'mr' ? 'सब-डिव्हिजन लिपिकाकडून छाननी सुरू. स्थळ भेटीदरम्यान मूळ प्रती तपासल्या जाऊ शकतात.' : 'Under review by Sub-Divisional Clerk. Physical originals may be inspected during site visit.')}
+              </span>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* TAB 3: ACTIVITY TIMELINE */}
       {activeTab === 'timeline' && (

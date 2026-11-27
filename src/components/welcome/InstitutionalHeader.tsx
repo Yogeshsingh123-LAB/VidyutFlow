@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
 import {
@@ -6,8 +6,6 @@ import {
   FileText,
   Sun,
   Moon,
-  Menu,
-  X,
   LogIn
 } from 'lucide-react';
 import { UgvclBrandIdentity } from '../common/UgvclBrandIdentity';
@@ -24,7 +22,6 @@ export const InstitutionalHeader: React.FC<InstitutionalHeaderProps> = ({
 }) => {
   const { theme, toggleTheme, setIsRoleSwitcherModalOpen } = useApp();
   const { dict } = useLanguage();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLaunchERP = () => {
     setIsRoleSwitcherModalOpen(true);
@@ -126,17 +123,6 @@ export const InstitutionalHeader: React.FC<InstitutionalHeaderProps> = ({
               </p>
             </div>
           </div>
-
-          {/* Mobile Menu Hamburger Toggle */}
-          <div className="flex lg:hidden items-center gap-2 shrink-0">
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              aria-label="Toggle Navigation Menu"
-            >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
         </div>
       </div>
 
@@ -177,76 +163,40 @@ export const InstitutionalHeader: React.FC<InstitutionalHeaderProps> = ({
           </div>
         </div>
 
-        {/* Responsive Mobile Drawer Navigation */}
-        {mobileMenuOpen && (
-          <div className="lg:hidden bg-[#0A1C3E] border-t border-blue-900 px-4 py-4 space-y-2 text-sm animate-in slide-in-from-top-2 duration-200 text-left">
-            {/* Language Selector embedded directly in mobile menu */}
-            <LanguageSelector variant="mobile" />
-
-            <div className="pt-2 border-t border-blue-900/60 space-y-1">
-              {navLinks.map((link) => (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block px-3 py-2 rounded-md text-slate-200 hover:bg-blue-800/60 hover:text-cyan-300 transition-colors font-medium"
-                >
-                  {link.label}
-                </a>
-              ))}
-            </div>
-
-            <div className="pt-3 border-t border-blue-900/60 flex flex-col gap-2.5">
-              <a
-                href="#consumer-services"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 text-xs text-amber-300 hover:text-amber-200 flex items-center gap-2"
-              >
-                <FileText className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>{dict.common.tariffPdf}</span>
-              </a>
-
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleLaunchERP();
-                }}
-                className="w-full py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md"
-              >
-                <LogIn className="w-4 h-4 stroke-[2.5]" />
-                <span>{dict.common.erpLogin}</span>
-              </button>
-
-              <div className="pt-2 flex items-center justify-between px-3 text-xs text-slate-300">
-                <button
-                  onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenAboutModal();
-                }}
-                className="hover:text-white transition-colors cursor-pointer"
-              >
-                {dict.header.platformOverview}
-              </button>
-              <span className="text-slate-600">·</span>
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  onOpenManifestModal();
-                }}
-                className="hover:text-white transition-colors cursor-pointer"
-              >
-                {dict.header.assetManifest}
-              </button>
-            </div>
-
-            <div className="px-3 pt-2 text-[11px] text-slate-400 border-t border-blue-900/40">
-              <p>{dict.header.platformDemo}</p>
-              <p className="text-[10px] text-slate-500 mt-0.5">{dict.header.independentDisclaimer}</p>
-            </div>
-          </div>
+        {/* Mobile Top Navigation Strip (< lg) — All links visible in top bar, no hamburger or side drawer */}
+        <div className="lg:hidden bg-[#081734] border-t border-blue-900/70 px-3 py-1.5 flex items-center gap-1.5 overflow-x-auto text-xs font-semibold">
+          {navLinks.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              className="px-2.5 py-1.5 rounded-md text-slate-200 hover:bg-blue-800/60 hover:text-cyan-300 whitespace-nowrap shrink-0 transition-colors"
+            >
+              {link.label}
+            </a>
+          ))}
+          <a
+            href="#consumer-services"
+            className="px-2.5 py-1.5 rounded-md text-amber-300 hover:bg-blue-800/60 flex items-center gap-1 whitespace-nowrap shrink-0"
+          >
+            <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>{dict.common.tariffPdf}</span>
+          </a>
+          <button
+            type="button"
+            onClick={onOpenAboutModal}
+            className="px-2.5 py-1.5 rounded-md text-slate-200 hover:bg-blue-800/60 whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            {dict.header.platformOverview}
+          </button>
+          <button
+            type="button"
+            onClick={onOpenManifestModal}
+            className="px-2.5 py-1.5 rounded-md text-slate-200 hover:bg-blue-800/60 whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            {dict.header.assetManifest}
+          </button>
         </div>
-      )}
-    </nav>
-  </header>
-);
+      </nav>
+    </header>
+  );
 };

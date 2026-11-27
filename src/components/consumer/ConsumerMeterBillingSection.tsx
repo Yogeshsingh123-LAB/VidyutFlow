@@ -291,26 +291,6 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
     <div className="space-y-6" aria-live="polite">
       {/* SECTION HEADER ACTIONS */}
       <div className="flex flex-wrap items-center justify-end gap-2">
-          {onRequestSelfReading && (
-            <button
-              type="button"
-              onClick={onRequestSelfReading}
-              className="px-3.5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-            >
-              <Camera className="w-3.5 h-3.5" />
-              <span>{mp.cnsTabSubmitReading}</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setIsNewReviewModalOpen(true)}
-            className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span>{mp.cnsRequestBillingReviewTitle}</span>
-          </button>
-
           <button
             type="button"
             onClick={() => void fetchData()}
@@ -494,13 +474,6 @@ export const ConsumerMeterBillingSection: React.FC<Props> = ({
                 {mp.cnsMyBillingReviewsTitle} ({reviews.length})
               </h3>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsNewReviewModalOpen(true)}
-              className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline flex items-center gap-1"
-            >
-              <span>+ {mp.cnsRequestBillingReviewTitle}</span>
-            </button>
           </div>
 
           {reviews.length > 0 ? (

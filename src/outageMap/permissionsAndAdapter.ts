@@ -425,7 +425,7 @@ export function buildAuthorizedOutageRecords(
   //    - Employee: subdivision-scoped complaints
   //    - Field: ONLY complaints linked to work orders assigned to this field engineer
   //    - Admin: all outage complaints (with consumer personal address/phone stripped)
-  //    - Management: ONLY complaints that have been escalated via authorized incidents above
+  //    - Management: confirmed/active/resolved grid outages + escalated incidents (never unconfirmed triage reports or un-escalated critical dossiers)
   const consumerSubdivisions = new Set(
     userConnections.map((c) => c.subdivision.toLowerCase()),
   );
@@ -450,8 +450,11 @@ export function buildAuthorizedOutageRecords(
       status !== 'CANCELLED_FALSE_ALARM';
 
     if (role === 'management') {
-      // Management sees aggregate summaries + escalated incidents only (Section E)
-      continue;
+      // Management sees confirmed/active/resolved grid outages on the map & timeline;
+      // unconfirmed initial consumer reports remain on Employee Desk until confirmed.
+      if (!isConfirmed && status !== 'CANCELLED_FALSE_ALARM') {
+        continue;
+      }
     }
 
     if (role === 'field') {
@@ -831,7 +834,7 @@ export function buildAuthorizedTimelineEvents(
 
   // 3. Offline field engineer queue updates (retaining original offline `occurredAt`
   //    separately from `receivedAt` synchronization timestamp, deduplicated by `client_uuid`)
-  if (role === 'field' || role === 'employee' || role === 'admin') {
+  if (role === 'field' || role === 'employee' || role === 'management' || role === 'admin') {
     for (const item of offlineQueue) {
       const parent =
         visibleById.get(`OUT-${item.request_id}`) ||

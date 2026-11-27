@@ -168,11 +168,11 @@ const headerSource = fs.readFileSync(
 assert.ok(headerSource.includes('LanguageSelector'), 'InstitutionalHeader must import and render LanguageSelector');
 assert.ok(
   headerSource.includes('<LanguageSelector variant="header" />'),
-  'InstitutionalHeader must render LanguageSelector variant="header"'
+  'InstitutionalHeader must render LanguageSelector variant="header" in top bar'
 );
 assert.ok(
-  headerSource.includes('<LanguageSelector variant="mobile" />'),
-  'InstitutionalHeader must render LanguageSelector variant="mobile" in drawer'
+  !headerSource.includes('Toggle Navigation Menu'),
+  'InstitutionalHeader must not render a three-line mobile hamburger drawer'
 );
 assert.ok(
   headerSource.includes('handleLaunchERP'),

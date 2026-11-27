@@ -25,18 +25,13 @@ import {
   Handshake,
   Users,
   Building,
-  Facebook,
-  Twitter,
-  Linkedin,
-  Youtube,
   Globe,
   Check,
   X,
   CheckCircle2,
   Calendar,
   HelpCircle,
-  Search,
-  Menu
+  Search
 } from 'lucide-react';
 
 interface TargetHomePageProps {
@@ -70,7 +65,6 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
   const [isServicesMenuOpen, setIsServicesMenuOpen] = useState(false);
   const [isAboutMenuOpen, setIsAboutMenuOpen] = useState(false);
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUpdatesModalOpen, setIsUpdatesModalOpen] = useState(false);
   const [isCommitmentModalOpen, setIsCommitmentModalOpen] = useState(false);
   const [isQaModalOpen, setIsQaModalOpen] = useState(false);
@@ -223,7 +217,6 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
             type="button"
             onClick={() => {
               setActivePage('home');
-              setIsMobileMenuOpen(false);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             className="flex items-center text-left cursor-pointer group shrink-0"
@@ -493,122 +486,96 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
                   : copy.signIn}
               </span>
             </button>
-
-            {/* Mobile Hamburger Menu Button */}
-            <button
-              type="button"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-              aria-expanded={isMobileMenuOpen}
-              className="lg:hidden p-2 min-h-[38px] min-w-[38px] rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
-            >
-              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
           </div>
         </div>
 
-        {/* Mobile Navigation Drawer (< lg) */}
-        {isMobileMenuOpen && (
-          <div className="lg:hidden border-t border-slate-100 bg-white px-4 py-3 space-y-2 shadow-lg animate-in fade-in slide-in-from-top-1">
-            <button
-              type="button"
-              onClick={() => {
-                setActivePage('home');
-                setIsMobileMenuOpen(false);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2.5 cursor-pointer ${
-                activePage === 'home' ? 'bg-[#0A1C3E] text-white' : 'text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <Home className="w-4 h-4 shrink-0" />
-              <span>{copy.navHome}</span>
-            </button>
-
-            <div className="rounded-xl bg-slate-50/80 border border-slate-100 p-2.5 space-y-1">
-              <div className="px-1.5 pb-1 text-[0.6875rem] font-extrabold uppercase tracking-wider text-slate-400">
-                {copy.navServices}
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => { setIsMobileMenuOpen(false); goToConsumer('new-connection'); }}
-                  className="text-left px-2.5 py-2 rounded-lg bg-white border border-slate-200/70 text-xs font-semibold text-slate-700 hover:text-[#FF6B00] flex items-center gap-2 cursor-pointer"
-                >
-                  <FileText className="w-3.5 h-3.5 text-[#FF6B00] shrink-0" />
-                  <span className="truncate">{copy.navNewConnection}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setIsMobileMenuOpen(false); goToConsumer('bills'); }}
-                  className="text-left px-2.5 py-2 rounded-lg bg-white border border-slate-200/70 text-xs font-semibold text-slate-700 hover:text-[#FF6B00] flex items-center gap-2 cursor-pointer"
-                >
-                  <CreditCard className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                  <span className="truncate">{copy.navPayBill}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setIsMobileMenuOpen(false); goToConsumer('complaints'); }}
-                  className="text-left px-2.5 py-2 rounded-lg bg-white border border-slate-200/70 text-xs font-semibold text-slate-700 hover:text-[#FF6B00] flex items-center gap-2 cursor-pointer"
-                >
-                  <MessageSquare className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                  <span className="truncate">{copy.navRegisterComplaint}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setIsMobileMenuOpen(false); goToConsumer('requests'); }}
-                  className="text-left px-2.5 py-2 rounded-lg bg-white border border-slate-200/70 text-xs font-semibold text-slate-700 hover:text-[#FF6B00] flex items-center gap-2 cursor-pointer"
-                >
-                  <MapPin className="w-3.5 h-3.5 text-[#0B2545] shrink-0" />
-                  <span className="truncate">{copy.navTrackApplication}</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => { setIsMobileMenuOpen(false); onOpenAboutModal('overview'); }}
-                className="text-left px-3 py-2.5 rounded-xl bg-slate-50 text-xs font-semibold text-slate-700 hover:bg-slate-100 flex items-center gap-2 cursor-pointer"
-              >
-                <Building className="w-4 h-4 text-[#0B2545] shrink-0" />
-                <span className="truncate">{copy.navAboutUgvcl}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => { setIsMobileMenuOpen(false); setIsQaModalOpen(true); }}
-                className="text-left px-3 py-2.5 rounded-xl bg-slate-50 text-xs font-semibold text-slate-700 hover:bg-slate-100 flex items-center gap-2 cursor-pointer"
-              >
-                <HelpCircle className="w-4 h-4 text-[#FF6B00] shrink-0" />
-                <span className="truncate">{copy.navQaShort}</span>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setActivePage('contact');
-                  setIsMobileMenuOpen(false);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className={`flex-1 text-left px-3.5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2.5 cursor-pointer ${
-                  activePage === 'contact' ? 'bg-[#0A1C3E] text-white' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <Phone className="w-4 h-4 shrink-0" />
-                <span>{copy.navContactUs}</span>
-              </button>
-              <a
-                href="tel:19124"
-                className="px-3.5 py-2.5 rounded-xl bg-[#082444] text-white text-xs font-bold flex items-center gap-1.5 shrink-0"
-              >
-                <Phone className="w-3.5 h-3.5 text-[#FF6B00]" />
-                <span>19124</span>
-              </a>
-            </div>
-          </div>
-        )}
+        {/* Mobile Top Navigation Bar (< lg) — All navigation in top bar, zero hamburger/side panel */}
+        <nav
+          aria-label="Mobile Primary Navigation"
+          className="lg:hidden border-t border-slate-100 bg-slate-50/80 px-3 py-1.5 flex items-center gap-1.5 overflow-x-auto select-none"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setActivePage('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={`h-8 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+              activePage === 'home' ? 'bg-[#0A1C3E] text-white' : 'bg-white border border-slate-200 text-slate-700'
+            }`}
+          >
+            <Home className="w-3.5 h-3.5 shrink-0" />
+            <span>{copy.navHome}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => goToConsumer('new-connection')}
+            className="h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:text-[#FF6B00] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <FileText className="w-3.5 h-3.5 text-[#FF6B00] shrink-0" />
+            <span>{copy.navNewConnection}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => goToConsumer('bills')}
+            className="h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:text-[#FF6B00] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <CreditCard className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+            <span>{copy.navPayBill}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => goToConsumer('complaints')}
+            className="h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:text-[#FF6B00] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+            <span>{copy.navRegisterComplaint}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => goToConsumer('requests')}
+            className="h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:text-[#FF6B00] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <MapPin className="w-3.5 h-3.5 text-[#0B2545] shrink-0" />
+            <span>{copy.navTrackApplication}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenAboutModal('overview')}
+            className="h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <Building className="w-3.5 h-3.5 text-[#0B2545] shrink-0" />
+            <span>{copy.navAboutUgvcl}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsQaModalOpen(true)}
+            className="h-8 px-2.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-[#FF6B00] shrink-0" />
+            <span>{copy.navQaShort}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActivePage('contact');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={`h-8 px-2.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+              activePage === 'contact' ? 'bg-[#0A1C3E] text-white' : 'bg-white border border-slate-200 text-slate-700'
+            }`}
+          >
+            <Phone className="w-3.5 h-3.5 shrink-0" />
+            <span>{copy.navContactUs}</span>
+          </button>
+          <a
+            href="tel:19124"
+            className="h-8 px-2.5 rounded-lg bg-[#082444] text-white text-xs font-bold flex items-center gap-1.5 whitespace-nowrap shrink-0"
+          >
+            <Phone className="w-3.5 h-3.5 text-[#FF6B00]" />
+            <span>19124</span>
+          </a>
+        </nav>
       </header>
 
       {activePage === 'contact' ? (
@@ -870,63 +837,61 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
       <section className="max-w-[1580px] mx-auto px-4 sm:px-6 lg:px-10 pb-12 w-full flex-1">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
           {/* CARD 1: LATEST UPDATES */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.03)] p-5 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3.5">
-                <div className="flex items-center gap-2">
-                  <Megaphone className="w-4 h-4 text-[#0A2540]" />
-                  <h3 className="text-sm font-bold text-[#0A2540] tracking-tight">
-                    {copy.latestUpdatesTitle}
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsUpdatesModalOpen(true)}
-                  className="text-xs font-bold text-[#0A2540] hover:text-[#FF6B00] flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <span>{copy.viewAll}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_28px_rgba(10,37,64,0.06)] p-6 flex flex-col justify-center">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <Megaphone className="w-5 h-5 text-[#0A2540] fill-[#0A2540] shrink-0" />
+                <h3 className="text-[17px] font-extrabold text-[#0A2540] tracking-tight">
+                  {copy.latestUpdatesTitle}
+                </h3>
               </div>
-
-              <ul className="space-y-3">
-                <li className="flex items-start justify-between gap-3 text-xs">
-                  <div className="flex items-start gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-[#FF6B00] mt-1.5 shrink-0" />
-                    <span className="text-slate-700 leading-snug">
-                      {copy.update1}
-                    </span>
-                  </div>
-                  <span className="text-[0.6875rem] font-medium text-slate-400 shrink-0 tabular-nums">
-                    27 Oct 2025
-                  </span>
-                </li>
-
-                <li className="flex items-start justify-between gap-3 text-xs">
-                  <div className="flex items-start gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-[#FF6B00] mt-1.5 shrink-0" />
-                    <span className="text-slate-700 leading-snug">
-                      {copy.update2}
-                    </span>
-                  </div>
-                  <span className="text-[0.6875rem] font-medium text-slate-400 shrink-0 tabular-nums">
-                    25 Oct 2025
-                  </span>
-                </li>
-
-                <li className="flex items-start justify-between gap-3 text-xs">
-                  <div className="flex items-start gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-[#FF6B00] mt-1.5 shrink-0" />
-                    <span className="text-slate-700 leading-snug">
-                      {copy.update3}
-                    </span>
-                  </div>
-                  <span className="text-[0.6875rem] font-medium text-slate-400 shrink-0 tabular-nums">
-                    20 Oct 2025
-                  </span>
-                </li>
-              </ul>
+              <button
+                type="button"
+                onClick={() => setIsUpdatesModalOpen(true)}
+                className="text-xs font-bold text-[#0A2540] hover:text-[#FF6B00] flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <span>{copy.viewAll}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
+
+            <ul className="space-y-2.5">
+              <li className="flex items-start justify-between gap-3 text-[13px]">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-[#FF7A00] mt-1.5 shrink-0" />
+                  <span className="text-[#0A2540] font-medium leading-snug">
+                    {copy.update1}
+                  </span>
+                </div>
+                <span className="text-xs font-medium text-slate-400 shrink-0 tabular-nums">
+                  27 Oct 2025
+                </span>
+              </li>
+
+              <li className="flex items-start justify-between gap-3 text-[13px]">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-[#FF7A00] mt-1.5 shrink-0" />
+                  <span className="text-[#0A2540] font-medium leading-snug">
+                    {copy.update2}
+                  </span>
+                </div>
+                <span className="text-xs font-medium text-slate-400 shrink-0 tabular-nums">
+                  25 Oct 2025
+                </span>
+              </li>
+
+              <li className="flex items-start justify-between gap-3 text-[13px]">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-[#FF7A00] mt-1.5 shrink-0" />
+                  <span className="text-[#0A2540] font-medium leading-snug">
+                    {copy.update3}
+                  </span>
+                </div>
+                <span className="text-xs font-medium text-slate-400 shrink-0 tabular-nums">
+                  20 Oct 2025
+                </span>
+              </li>
+            </ul>
           </div>
 
           {/* CARD 2: OUR COMMITMENT (With glowing bulb & plant visual) */}
@@ -971,57 +936,54 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
           </div>
 
           {/* CARD 3: UGVCL COVERAGE (With Gujarat Map) */}
-          <div id="coverage" className="bg-white rounded-2xl border border-slate-200/90 shadow-[0_2px_10px_rgba(0,0,0,0.03)] p-4 sm:p-5 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 border-b border-slate-100 pb-2 mb-3">
-                <MapPin className="w-4 h-4 text-[#0A2540] shrink-0" />
+          <div id="coverage" className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_28px_rgba(10,37,64,0.06)] p-6 flex items-center justify-between gap-4">
+            <div className="min-w-0 flex-1 space-y-4">
+              <div className="flex items-start gap-2.5">
+                <MapPin className="w-5 h-5 text-[#0A2540] fill-[#0A2540] stroke-white shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="text-sm font-bold text-[#0A2540] tracking-tight leading-tight">
+                  <h3 className="text-[17px] font-extrabold text-[#0A2540] tracking-tight leading-tight">
                     {copy.coverageTitle}
                   </h3>
-                  <p className="text-[0.6875rem] text-slate-500 font-medium">
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
                     {copy.coverageSubtitle}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2 pt-2">
-                {/* 3 Metric Points horizontally aligned */}
-                <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:gap-4 flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                    <Home className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0A2540] shrink-0" />
-                    <div className="leading-tight min-w-0">
-                      <div className="font-extrabold text-[#0A2540] text-xs sm:text-sm">4</div>
-                      <div className="text-slate-500 text-[0.625rem] font-medium truncate">{copy.discomsLabel}</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                    <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0A2540] shrink-0" />
-                    <div className="leading-tight min-w-0">
-                      <div className="font-extrabold text-[#0A2540] text-xs sm:text-sm">89L+</div>
-                      <div className="text-slate-500 text-[0.625rem] font-medium truncate">{copy.consumersLabel}</div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                    <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0A2540] shrink-0" />
-                    <div className="leading-tight min-w-0">
-                      <div className="font-extrabold text-[#0A2540] text-xs sm:text-sm">24x7</div>
-                      <div className="text-slate-500 text-[0.625rem] font-medium truncate">{copy.serviceLabel}</div>
-                    </div>
+              <div className="flex items-stretch divide-x divide-slate-200 pt-1">
+                <div className="flex items-start gap-2 pr-3 sm:pr-4 min-w-0">
+                  <Home className="w-4 h-4 text-[#0A2540] fill-[#0A2540] shrink-0 mt-0.5" />
+                  <div className="leading-tight min-w-0">
+                    <div className="font-extrabold text-[#0A2540] text-sm sm:text-base">4</div>
+                    <div className="text-slate-500 text-[11px] font-medium mt-0.5 truncate">{copy.discomsLabel}</div>
                   </div>
                 </div>
 
-                {/* Gujarat State Map Silhouette */}
-                <div className="w-[74px] sm:w-[105px] shrink-0 flex items-center justify-center">
-                  <img
-                    src="/assets/ugvcl/gujarat_map_exact.png"
-                    alt="Gujarat State Coverage Map"
-                    className="w-full h-auto object-contain"
-                  />
+                <div className="flex items-start gap-2 px-3 sm:px-4 min-w-0">
+                  <Users className="w-4 h-4 text-[#0A2540] fill-[#0A2540] shrink-0 mt-0.5" />
+                  <div className="leading-tight min-w-0">
+                    <div className="font-extrabold text-[#0A2540] text-sm sm:text-base">89L+</div>
+                    <div className="text-slate-500 text-[11px] font-medium mt-0.5 truncate">{copy.consumersLabel}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2 pl-3 sm:pl-4 min-w-0">
+                  <Zap className="w-4 h-4 text-[#0A2540] fill-[#0A2540] shrink-0 mt-0.5" />
+                  <div className="leading-tight min-w-0">
+                    <div className="font-extrabold text-[#0A2540] text-sm sm:text-base">24x7</div>
+                    <div className="text-slate-500 text-[11px] font-medium mt-0.5 truncate">{copy.serviceLabel}</div>
+                  </div>
                 </div>
               </div>
+            </div>
+
+            {/* Gujarat State Map Silhouette */}
+            <div className="w-[92px] sm:w-[125px] shrink-0 flex items-center justify-center">
+              <img
+                src="/assets/ugvcl/gujarat_map_exact.png"
+                alt="Gujarat State Coverage Map"
+                className="w-full h-auto object-contain"
+              />
             </div>
           </div>
         </div>
@@ -1110,45 +1072,64 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
           {/* Right Social Media & Copyright */}
           <div className="flex items-center gap-4 text-[0.6875rem]">
             <span className="text-slate-400 font-medium">{copy.followUs}</span>
-            <div className="flex items-center gap-2 text-white">
+            <div className="flex items-center gap-2.5">
+              {/* YouTube Official Logo */}
               <a
                 href="https://youtube.com"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="YouTube"
-                className="w-6 h-6 rounded-full bg-slate-800 hover:bg-red-600 flex items-center justify-center transition-colors"
+                className="w-7 h-7 rounded-full bg-[#FF0000] hover:opacity-90 flex items-center justify-center transition-transform hover:scale-105 shadow-xs"
               >
-                <Youtube className="w-3.5 h-3.5 fill-current" />
+                <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z"
+                  />
+                  <path fill="#FF0000" d="M9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                </svg>
               </a>
+
+              {/* Facebook Official Logo */}
               <a
                 href="https://facebook.com"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Facebook"
-                className="w-6 h-6 rounded-full bg-slate-800 hover:bg-blue-600 flex items-center justify-center transition-colors"
+                className="w-7 h-7 rounded-full bg-[#1877F2] hover:opacity-90 flex items-center justify-center transition-transform hover:scale-105 shadow-xs"
               >
-                <Facebook className="w-3.5 h-3.5 fill-current" />
+                <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M15.12 5.32H17V2.14A26.11 26.11 0 0 0 14.26 2c-2.72 0-4.58 1.66-4.58 4.7v2.62H6.61v3.56h3.07V22h3.68v-9.12h3.06l.46-3.56h-3.52V7.05c0-1.05.28-1.73 1.76-1.73z"
+                  />
+                </svg>
               </a>
+
+              {/* X / Twitter Official Logo */}
               <a
-                href="https://twitter.com"
+                href="https://x.com"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Twitter / X"
-                className="w-6 h-6 rounded-full bg-slate-800 hover:bg-black flex items-center justify-center transition-colors"
+                className="w-7 h-7 rounded-full bg-black border border-slate-700 hover:opacity-90 flex items-center justify-center transition-transform hover:scale-105 shadow-xs text-white"
               >
-                {/* Modern X vector icon */}
-                <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                 </svg>
               </a>
+
+              {/* LinkedIn Official Logo */}
               <a
                 href="https://linkedin.com"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="LinkedIn"
-                className="w-6 h-6 rounded-full bg-slate-800 hover:bg-blue-700 flex items-center justify-center transition-colors"
+                className="w-7 h-7 rounded-full bg-[#0A66C2] hover:opacity-90 flex items-center justify-center transition-transform hover:scale-105 shadow-xs text-white"
               >
-                <Linkedin className="w-3.5 h-3.5 fill-current" />
+                <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                </svg>
               </a>
             </div>
 

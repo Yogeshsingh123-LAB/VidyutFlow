@@ -1,10 +1,7 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { ROLE_PROFILES } from '../../data/mockData';
-import { LanguageSelector } from '../common/LanguageSelector';
 import {
-  X,
   AlertTriangle,
   LayoutDashboard,
   Plug,
@@ -36,17 +33,8 @@ import {
   Server,
   ShieldCheck,
   Settings,
-  Home,
-  RotateCcw,
-  LogOut,
-  Search,
   MapPin
 } from 'lucide-react';
-
-interface MobileNavProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
 
 export interface MobileNavItem {
   id: string;
@@ -55,7 +43,7 @@ export interface MobileNavItem {
   badge?: number | string;
 }
 
-export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
+export const MobileNav: React.FC = () => {
   const {
     currentRole,
     activeTab,
@@ -70,39 +58,9 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
     userBills,
     userComplaints,
     userNotifications,
-    setIsNotificationDrawerOpen,
-    setIsAIAssistantOpen,
-    setIsCommandPaletteOpen,
-    exitToWelcomeScreen,
-    replayIntro,
-    logoutDemoSession,
-    activeUser,
-    unreadIncidentsCount,
-    criticalIncidentsCount
+    setIsAIAssistantOpen
   } = useApp();
   const { language, t } = useLanguage();
-
-  // Close drawer on Escape key press
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  const profile = ROLE_PROFILES[currentRole];
-  const roleLabelMap: Record<string, string> = {
-    consumer: t.erp.roleConsumer,
-    employee: t.erp.roleEmployee,
-    field: t.erp.roleField,
-    management: t.erp.roleManagement,
-    admin: t.erp.roleAdmin
-  };
-  const localizedRoleLabel = roleLabelMap[currentRole] || profile.label;
 
   // Global counts for staff/admin roles
   const pendingApps = applications.filter(a => a.status !== 'Meter Installed' && a.status !== 'Rejected').length;
@@ -223,8 +181,6 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
   const links = getNavLinks();
 
   return (
-    <>
-      {/* Mobile In-Page Section Strip (md:hidden) — Makes all role sections immediately discoverable */}
       <nav
         aria-label="Mobile Section Navigation"
         className="md:hidden bg-white border-b border-slate-200 px-3 min-[375px]:px-4 py-1.5 flex items-center gap-1.5 overflow-x-auto select-none shrink-0"
@@ -271,212 +227,6 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
           </button>
         )}
       </nav>
-
-      {/* Slide-Over Mobile Navigation Drawer */}
-      {isOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Mobile Portal Navigation Drawer"
-          className="fixed inset-0 z-50 md:hidden bg-slate-900/60 backdrop-blur-xs flex"
-          onClick={onClose}
-        >
-          <div
-            className="w-72 max-w-[85vw] bg-[#0E1A32] text-slate-300 h-full flex flex-col p-4 shadow-2xl border-r border-slate-800"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Brand Header & Accessible Close Button */}
-            <div className="flex items-center justify-between pb-3.5 border-b border-slate-800">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-white p-0.5 border border-slate-700 flex items-center justify-center shrink-0">
-                  <img src="/assets/ugvcl-logo.png" alt="UGVCL Logo" className="w-full h-full object-contain" />
-                </div>
-                <div className="min-w-0">
-                  <span className="text-sm font-bold text-white block truncate">UGVCL VidyutFlow</span>
-                  <span className="text-[10px] text-slate-300 font-gujarati block truncate">ઉત્તર ગુજરાત વીજ કંપની</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-9 h-9 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer shrink-0"
-                aria-label="Close navigation menu"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Active Portal & Officer Identity */}
-            <div className="my-3 p-3 rounded-xl bg-[#132240]/90 border border-slate-800/90">
-              <div className="flex items-center justify-between text-[11px] mb-1">
-                <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">
-                  {t.erp.activePortal}
-                </span>
-                <span className="text-[10px] font-mono font-semibold uppercase px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/25">
-                  {currentRole}
-                </span>
-              </div>
-              <div className="text-xs font-bold text-white leading-snug">{localizedRoleLabel}</div>
-              <div className="flex items-center gap-2.5 mt-2.5 pt-2.5 border-t border-slate-800/80 min-w-0">
-                <div className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-[11px] flex items-center justify-center shrink-0">
-                  {activeUser.initials}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs text-slate-100 font-semibold break-words leading-snug">
-                    {activeUser.name}
-                  </div>
-                  <div className="text-[10px] text-slate-400 break-words leading-tight mt-0.5">
-                    {activeUser.designation}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Role Navigation Links */}
-            <div className="px-1 pb-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                {currentRole === 'consumer' ? t.erp.consumerServices : t.erp.workspaceModules}
-              </span>
-            </div>
-
-            <nav aria-label="Drawer Portal Navigation" className="flex-1 overflow-y-auto space-y-1 py-1">
-              {links.map(item => {
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveTab(item.id);
-                      onClose();
-                    }}
-                    aria-current={isActive ? 'page' : undefined}
-                    className={`w-full min-h-[42px] flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-xs font-medium text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer ${
-                      isActive
-                        ? 'bg-blue-600 text-white font-semibold shadow-xs'
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className={isActive ? 'text-white shrink-0' : 'text-slate-400 shrink-0'}>
-                        {item.icon}
-                      </span>
-                      <span className="leading-snug break-words">{item.label}</span>
-                    </div>
-                    {item.badge !== undefined && (
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold shrink-0 ${
-                          isActive
-                            ? 'bg-white/20 text-white'
-                            : 'bg-slate-800 text-slate-300 border border-slate-700'
-                        }`}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-
-              {/* Mobile Drawer Language Switcher */}
-              <div className="pt-2 mt-2 border-t border-slate-800/80">
-                <LanguageSelector variant="mobile" />
-              </div>
-            </nav>
-
-            {/* Quick Tools & Session Footer */}
-            <div className="pt-3 border-t border-slate-800 space-y-2">
-              {currentRole === 'consumer' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    setIsAIAssistantOpen(true);
-                  }}
-                  className="w-full min-h-[40px] px-3 py-2 rounded-lg text-xs font-semibold text-teal-200 hover:text-white bg-teal-950/50 hover:bg-teal-900/50 border border-teal-800/50 flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 cursor-pointer"
-                >
-                  <Cpu className="w-4 h-4 text-teal-400 shrink-0" />
-                  <span>{t.erp.vidyutMitraAiAssistant}</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  setIsNotificationDrawerOpen(true);
-                }}
-                className={`w-full min-h-[38px] px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer ${
-                  criticalIncidentsCount > 0
-                    ? 'bg-rose-950/80 text-rose-200 border border-rose-600/80 animate-pulse'
-                    : 'bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700'
-                }`}
-              >
-                <Bell className={`w-4 h-4 ${criticalIncidentsCount > 0 ? 'text-rose-400' : 'text-slate-400'}`} />
-                <span>
-                  {criticalIncidentsCount > 0
-                    ? `⚠️ ${criticalIncidentsCount} ${t.erp.criticalIncidentsAlert}`
-                    : t.erp.notificationCenter}
-                </span>
-                {unreadIncidentsCount > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-bold">
-                    {unreadIncidentsCount}
-                  </span>
-                )}
-              </button>
-
-              <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    setIsCommandPaletteOpen(true);
-                  }}
-                  className="p-2 rounded-lg bg-slate-800/90 text-slate-200 hover:bg-slate-700 flex items-center justify-center gap-1 font-medium cursor-pointer"
-                >
-                  <Search className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span>{t.erp.search}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    exitToWelcomeScreen();
-                    onClose();
-                  }}
-                  className="p-2 rounded-lg bg-slate-800/90 text-slate-200 hover:bg-slate-700 flex items-center justify-center gap-1 font-medium cursor-pointer"
-                >
-                  <Home className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span>{t.erp.home}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    replayIntro();
-                    onClose();
-                  }}
-                  className="p-2 rounded-lg bg-blue-950/60 border border-blue-800/40 text-blue-200 hover:bg-blue-900 flex items-center justify-center gap-1 font-medium cursor-pointer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span>{t.erp.introShort}</span>
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  logoutDemoSession();
-                }}
-                className="w-full min-h-[40px] py-2 px-3 rounded-lg bg-rose-950/40 border border-rose-800/50 text-rose-300 hover:bg-rose-900/60 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                <span>{t.erp.signOutSwitchRole}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
   );
 };
 

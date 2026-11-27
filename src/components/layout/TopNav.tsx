@@ -5,7 +5,6 @@ import { ROLE_PROFILES } from '../../data/mockData';
 import {
   Search,
   Bell,
-  Menu,
   RotateCcw,
   RefreshCw,
   Home,
@@ -46,10 +45,10 @@ import { LanguageSelector } from '../common/LanguageSelector';
 import { EnterpriseAccountMenu, getAccountMenuLabels } from '../common/EnterpriseAccountMenu';
 
 interface TopNavProps {
-  onToggleMobileNav: () => void;
+  onToggleMobileNav?: () => void;
 }
 
-export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
+export const TopNav: React.FC<TopNavProps> = () => {
   const {
     currentRole,
     activeTab,
@@ -65,7 +64,8 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
     unreadIncidentsCount,
     criticalIncidentsCount,
     isSidebarCollapsed,
-    setIsSidebarCollapsed
+    setIsSidebarCollapsed,
+    setIsAIAssistantOpen
   } = useApp();
   const { t, language } = useLanguage();
   const accountLabels = getAccountMenuLabels(language);
@@ -190,27 +190,6 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
           isOpen={isAboutModalOpen}
           onClose={() => setIsAboutModalOpen(false)}
         />
-
-        {/* Mobile Hamburger (< md) */}
-        <button
-          type="button"
-          onClick={onToggleMobileNav}
-          className="md:hidden p-2 text-slate-700 hover:text-blue-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-          aria-label="Open navigation menu"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-
-        {/* Desktop Three-Line Sliding Sidebar Toggle (md+) */}
-        <button
-          type="button"
-          onClick={() => setIsSidebarCollapsed(prev => !prev)}
-          className="hidden md:inline-flex p-2 text-slate-700 hover:text-[#0A2540] hover:bg-slate-100 rounded-lg transition-colors cursor-pointer shrink-0"
-          aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={isSidebarCollapsed ? 'Slide sidebar open' : 'Slide sidebar closed'}
-        >
-          <Menu className="w-5 h-5" />
-        </button>
 
         {/* Left: UGVCL | VidyutFlow Brand + Home / Services / Support Tabs */}
         <div className="flex items-center gap-3 sm:gap-5 min-w-0">
@@ -770,8 +749,29 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
           />
         </div>
 
-        {/* Right Actions: LanguageSelector + Bell + User Profile */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {/* Right Actions: Mobile Search + Vidyut Mitra (Consumer Only) + LanguageSelector + Bell + User Profile */}
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsCommandPaletteOpen(true)}
+            className="sm:hidden p-2 rounded-full hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+            title="Search utility records, bills & complaints"
+            aria-label="Search records"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+          {currentRole === 'consumer' && (
+            <button
+              type="button"
+              onClick={() => setIsAIAssistantOpen(true)}
+              data-testid="consumer-vidyut-mitra-btn"
+              className="hidden sm:inline-flex items-center gap-1.5 h-9 px-3 rounded-full bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-semibold transition-colors cursor-pointer"
+              title={t.erp.vidyutMitraAiAssistant}
+            >
+              <Cpu className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+              <span>{t.erp.vidyutMitraAi}</span>
+            </button>
+          )}
           {/* Shared Language Selector */}
           <LanguageSelector variant="erp" />
 
@@ -868,20 +868,9 @@ export const TopNav: React.FC<TopNavProps> = ({ onToggleMobileNav }) => {
         onClose={() => setIsAboutModalOpen(false)}
       />
 
-      {/* Left: Prominent Mobile Menu Button, Mobile Portal Title & Desktop Breadcrumbs */}
+      {/* Left: Mobile Portal Title & Desktop Breadcrumbs */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-        <button
-          type="button"
-          onClick={onToggleMobileNav}
-          className="md:hidden h-9 px-2.5 text-slate-800 hover:text-blue-700 bg-slate-50 hover:bg-blue-50/70 border border-slate-200/90 rounded-lg flex items-center gap-1.5 shrink-0 shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-colors cursor-pointer"
-          aria-label="Open navigation menu"
-          title="Open portal navigation menu"
-        >
-          <Menu className="w-4 h-4 text-blue-600 shrink-0" />
-          <span className="text-xs font-bold tracking-tight text-slate-800">{t.erp.menu}</span>
-        </button>
-
-        {/* Concise Mobile Portal Identity (< 640px) — Single clean line to avoid duplicating section switcher below */}
+        {/* Concise Mobile Portal Identity (< 640px) */}
         <div className="sm:hidden flex items-center gap-1.5 min-w-0 flex-1">
           <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
           <span className="text-xs font-bold text-slate-900 truncate">

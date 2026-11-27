@@ -778,7 +778,9 @@ export const SmartOutageMapWorkspace: React.FC<SmartOutageMapWorkspaceProps> = (
                   </div>
 
                   {/* Canonical Deep-Link Action (reuses existing Portal Modals/Drawers) */}
-                  {!isConsumerView && selectedRecord.incidentId && (
+                  {!isConsumerView &&
+                  selectedRecord.incidentId &&
+                  incidents.some((inc) => inc.id === selectedRecord.incidentId) ? (
                     <button
                       type="button"
                       data-testid="open-canonical-incident-btn"
@@ -788,11 +790,9 @@ export const SmartOutageMapWorkspace: React.FC<SmartOutageMapWorkspaceProps> = (
                       <span>{t.btnOpenIncidentRecord}</span>
                       <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
                     </button>
-                  )}
-
-                  {isConsumerView &&
-                    selectedRecord.isConsumerOwnReport &&
-                    selectedRecord.complaintId && (
+                  ) : (
+                    selectedRecord.complaintId &&
+                    (!isConsumerView || selectedRecord.isConsumerOwnReport) && (
                       <button
                         type="button"
                         data-testid="open-own-complaint-btn"
@@ -804,7 +804,8 @@ export const SmartOutageMapWorkspace: React.FC<SmartOutageMapWorkspaceProps> = (
                         <span>{t.btnOpenOwnComplaint}</span>
                         <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
-                    )}
+                    )
+                  )}
                 </div>
 
                 <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs pt-2 border-t border-slate-100 dark:border-slate-800">

@@ -38,8 +38,7 @@ import {
   ChevronRight,
   Home,
   MapPin,
-  Bot,
-  Menu
+  Bot
 } from 'lucide-react';
 import { UgvclBrandIdentity } from '../common/UgvclBrandIdentity';
 
@@ -297,7 +296,7 @@ export const Sidebar: React.FC = () => {
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={isCollapsed ? 'Slide sidebar open' : 'Slide sidebar closed'}
           >
-            <Menu className="w-4 h-4" />
+            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         </div>
         <nav aria-label="Consumer Portal Navigation" className="flex-1 space-y-1">
@@ -425,7 +424,7 @@ export const Sidebar: React.FC = () => {
               aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               title={isCollapsed ? 'Slide sidebar open' : 'Slide sidebar closed'}
             >
-              <Menu className="w-4 h-4" />
+              {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
             </button>
           </div>
           <nav aria-label="Employee Portal Navigation" className="space-y-1">
@@ -561,7 +560,7 @@ export const Sidebar: React.FC = () => {
               aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               title={isCollapsed ? 'Slide sidebar open' : 'Slide sidebar closed'}
             >
-              <Menu className="w-4 h-4" />
+              {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
             </button>
           </div>
           <nav aria-label="Admin Portal Navigation" className="space-y-1">
@@ -634,7 +633,7 @@ export const Sidebar: React.FC = () => {
               aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               title={isCollapsed ? 'Slide sidebar open' : 'Slide sidebar closed'}
             >
-              <Menu className="w-4 h-4" />
+              {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
             </button>
           </div>
           <nav aria-label="Management Portal Navigation" className="space-y-1">
@@ -759,7 +758,7 @@ export const Sidebar: React.FC = () => {
               aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               title={isCollapsed ? 'Slide sidebar open' : 'Slide sidebar closed'}
             >
-              <Menu className="w-4 h-4" />
+              {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
             </button>
           </div>
           <nav aria-label="Field Engineer Portal Navigation" className="space-y-1">
@@ -940,17 +939,19 @@ export const Sidebar: React.FC = () => {
           {!isCollapsed && <span className="truncate font-medium">{t.erp.welcomeHub}</span>}
         </button>
 
-        <button
-          type="button"
-          onClick={() => setIsAIAssistantOpen(true)}
-          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-teal-300 hover:text-white bg-teal-950/40 hover:bg-teal-900/40 border border-teal-800/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer ${
-            isCollapsed ? 'justify-center px-0' : ''
-          }`}
-          title={t.erp.vidyutMitraAiAssistant}
-        >
-          <Cpu className="w-4 h-4 text-teal-400 shrink-0" />
-          {!isCollapsed && <span className="truncate font-medium">{t.erp.vidyutMitraAi}</span>}
-        </button>
+        {currentRole === 'consumer' && (
+          <button
+            type="button"
+            onClick={() => setIsAIAssistantOpen(true)}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-teal-300 hover:text-white bg-teal-950/40 hover:bg-teal-900/40 border border-teal-800/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 cursor-pointer ${
+              isCollapsed ? 'justify-center px-0' : ''
+            }`}
+            title={t.erp.vidyutMitraAiAssistant}
+          >
+            <Cpu className="w-4 h-4 text-teal-400 shrink-0" />
+            {!isCollapsed && <span className="truncate font-medium">{t.erp.vidyutMitraAi}</span>}
+          </button>
+        )}
       </div>
     </aside>
   );

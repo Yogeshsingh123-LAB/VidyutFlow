@@ -1262,7 +1262,7 @@ export const ConsumerPortal: React.FC = () => {
               <div className="text-slate-500 text-sm font-semibold">
                 {getTimeOfDayGreeting(language)}
               </div>
-              <h1 className="text-2xl sm:text-[28px] font-black text-[#0A2540] tracking-tight leading-tight mt-0.5">
+              <h1 className="text-2xl sm:text-[28px] font-black text-[#0A2540] tracking-tight leading-snug break-words mt-0.5">
                 {currentUserName || 'Smt. Meenaben Patel'}
               </h1>
               <p className="text-xs sm:text-[13px] text-slate-500 font-medium mt-1">
@@ -2154,10 +2154,6 @@ export const ConsumerPortal: React.FC = () => {
             <ConsumerMeterBillingSection
               selectedConnection={selectedConnection}
               consumerBills={consumerBills}
-              onRequestSelfReading={() => {
-                setActiveTab('outage-map');
-                showToast('Open the top-bar Meter Reading & Bill Review workspace to perform optical scan.', 'info');
-              }}
             />
 
           {/* Independent Demonstration Disclosure Bar */}

@@ -1784,7 +1784,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isRoleSwitcherModalOpen, setIsRoleSwitcherModalOpenState] = useState(false);
   const pendingConsumerTabRef = React.useRef<string | null>(null);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
-  const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
+  const [isAIAssistantOpen, setIsAIAssistantOpenState] = useState(false);
+  const setIsAIAssistantOpen = (v: boolean) => {
+    setIsAIAssistantOpenState(v && currentRole === 'consumer');
+  };
+  useEffect(() => {
+    if (currentRole !== 'consumer') {
+      setIsAIAssistantOpenState(false);
+    }
+  }, [currentRole]);
   const [isWorkflowVisualizerOpen, setIsWorkflowVisualizerOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeCaseDrawer, setActiveCaseDrawer] = useState<{ type: 'application' | 'complaint' | 'workorder'; id: string } | null>(null);

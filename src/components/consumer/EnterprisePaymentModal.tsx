@@ -616,11 +616,11 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
       data-lifecycle-state={lifecycleState}
       style={{ fontFamily: FONT_STACKS[language] }}
     >
-      <div className="relative w-full max-w-2xl my-auto bg-white dark:bg-[#0F1B33] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
-        {/* Official UGVCL Corporate Header */}
-        <div className="bg-slate-900 text-white px-5 py-4 border-b-4 border-amber-500 flex items-start justify-between gap-3">
+      <div className="relative w-full max-w-2xl my-auto bg-white rounded-2xl border border-slate-200/90 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+        {/* Modern Light Fintech Header (Aligned with Unified Portal Design) */}
+        <div className="bg-white px-5 py-4 border-b border-slate-200/90 flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-xl bg-white p-1.5 border border-slate-200 flex items-center justify-center shrink-0 shadow-sm">
+            <div className="w-11 h-11 rounded-xl bg-white p-1.5 border border-slate-200 flex items-center justify-center shrink-0 shadow-xs">
               {!logoFailed ? (
                 <img
                   src={UGVCL_LOGO_ASSET_PATH}
@@ -636,22 +636,19 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
               <div className="flex flex-wrap items-center gap-2">
                 <h2
                   id="enterprise-payment-modal-title"
-                  className="text-sm sm:text-base font-extrabold text-white tracking-tight"
+                  className="text-base font-bold text-slate-900 tracking-tight"
                 >
                   {pm.modalTitle}
                 </h2>
                 <span
-                  className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded bg-amber-500/20 text-amber-300 border border-amber-400/40"
+                  className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-amber-50 text-amber-800 border border-amber-200"
                   data-testid="payment-modal-demo-badge"
                 >
                   {pm.demoPaymentBadge}
                 </span>
               </div>
-              <p className="text-xs font-bold text-slate-200 truncate mt-0.5">
-                {UGVCL_COMPANY_NAME_EN} ({UGVCL_COMPANY_NAME_GU})
-              </p>
-              <p className="text-[11px] text-amber-300/90 font-medium truncate">
-                {UGVCL_TAGLINE_EN}
+              <p className="text-xs font-medium text-slate-500 truncate mt-0.5">
+                {UGVCL_COMPANY_NAME_EN} · {UGVCL_TAGLINE_EN}
               </p>
             </div>
           </div>
@@ -662,103 +659,50 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
             disabled={lifecycleState === 'PROCESSING'}
             aria-label={pm.closeBtn}
             data-testid="payment-modal-header-close-btn"
-            className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-40 cursor-pointer shrink-0"
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors disabled:opacity-40 cursor-pointer shrink-0"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="overflow-y-auto p-5 sm:p-6 space-y-5">
+        <div className="overflow-y-auto p-5 sm:p-6 space-y-5 bg-[#F8FAFC]">
           {/* STATE 1: READY */}
           {lifecycleState === 'READY' && (
             <>
-              {/* Comprehensive 11-Field Payment Summary Panel */}
+              {/* Modern Bill & Connection Payment Summary Card */}
               <div
-                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 overflow-hidden"
+                className="rounded-2xl border border-slate-200/90 bg-white shadow-2xs overflow-hidden"
                 data-testid="payment-summary-panel"
               >
-                <div className="px-4 py-2.5 bg-slate-100 dark:bg-slate-800/90 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
                     {pm.paymentSummaryTitle}
                   </span>
                   <span
-                    className="text-xs font-mono font-bold text-blue-700 dark:text-blue-400"
+                    className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200"
                     data-testid="summary-bill-number"
                   >
                     {activeBill.billNo}
                   </span>
                 </div>
 
-                {/* Primary Financial Highlight Strip (Canonical 9-Field Breakdown) */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                  <div className="p-3">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
-                      1. {pm.billTotalLabel}
+                {/* Highlighted Payable Strip */}
+                <div className="px-4 py-3.5 bg-gradient-to-r from-blue-50/80 via-white to-emerald-50/50 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-700 block">
+                      {pm.currentOutstandingLabel}
                     </span>
                     <span
-                      className="text-sm font-extrabold font-mono text-slate-800 dark:text-slate-100"
-                      data-testid="summary-total-bill-amount"
-                    >
-                      ₹{amountValidation.billTotalAmount.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                  <div className="p-3">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
-                      2. {pm.previouslyPaidLabel}
-                    </span>
-                    <span
-                      className="text-sm font-extrabold font-mono text-emerald-700 dark:text-emerald-400"
-                      data-testid="summary-previously-paid-amount"
-                    >
-                      ₹{amountValidation.previouslyPaidAmount.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                  <div className="p-3">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
-                      3. Remaining Principal
-                    </span>
-                    <span
-                      className="text-sm font-extrabold font-mono text-amber-700 dark:text-amber-400"
-                      data-testid="summary-remaining-principal"
-                    >
-                      ₹{amountValidation.remainingPrincipal.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                  <div className="p-3">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-rose-500 block">
-                      4. Accrued Late Charges (DPS)
-                    </span>
-                    <span
-                      className="text-sm font-extrabold font-mono text-rose-600 dark:text-rose-400"
-                      data-testid="summary-accrued-late-charges"
-                    >
-                      +₹{amountValidation.accruedLateCharges.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="p-3">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
-                      5. Waived / Settled Charges
-                    </span>
-                    <span
-                      className="text-sm font-extrabold font-mono text-slate-700 dark:text-slate-300"
-                      data-testid="summary-waived-charges"
-                    >
-                      ₹{amountValidation.waivedOrSettledCharges.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="p-3 bg-blue-50/60 dark:bg-blue-950/30">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 block">
-                      6. {pm.currentOutstandingLabel}
-                    </span>
-                    <span
-                      className="text-base font-extrabold font-mono text-blue-700 dark:text-blue-400"
+                      className="text-2xl font-black font-mono text-slate-900 tabular-nums"
                       data-testid="summary-outstanding-balance"
                     >
                       ₹{amountValidation.totalOutstandingWithCharges.toLocaleString('en-IN')}
                     </span>
+                  </div>
+                  <div className="sm:text-right">
                     <span
-                      className="text-[11px] font-mono text-blue-600 dark:text-blue-300 block"
+                      className="inline-flex items-center px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-mono font-bold shadow-2xs"
                       data-testid="summary-selected-payment-amount"
                     >
                       {pm.selectedPaymentAmountLabel}: ₹{amountValidation.selectedPaymentAmount.toLocaleString('en-IN')}
@@ -766,14 +710,73 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
                   </div>
                 </div>
 
-                {/* Consumer & Connection Metadata Grid + Fields 7, 8, 9 */}
-                <div className="p-3.5 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                {/* Clean 5-Metric Breakdown Strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 bg-white border-b border-slate-100">
+                  <div className="p-3">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
+                      {pm.billTotalLabel}
+                    </span>
+                    <span
+                      className="text-xs sm:text-sm font-bold font-mono text-slate-800 mt-0.5 block"
+                      data-testid="summary-total-bill-amount"
+                    >
+                      ₹{amountValidation.billTotalAmount.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <div className="p-3">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
+                      {pm.previouslyPaidLabel}
+                    </span>
+                    <span
+                      className="text-xs sm:text-sm font-bold font-mono text-emerald-700 mt-0.5 block"
+                      data-testid="summary-previously-paid-amount"
+                    >
+                      ₹{amountValidation.previouslyPaidAmount.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <div className="p-3">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
+                      Remaining Principal
+                    </span>
+                    <span
+                      className="text-xs sm:text-sm font-bold font-mono text-amber-700 mt-0.5 block"
+                      data-testid="summary-remaining-principal"
+                    >
+                      ₹{amountValidation.remainingPrincipal.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <div className="p-3">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-rose-500 block">
+                      Late Charges (DPS)
+                    </span>
+                    <span
+                      className="text-xs sm:text-sm font-bold font-mono text-rose-600 mt-0.5 block"
+                      data-testid="summary-accrued-late-charges"
+                    >
+                      +₹{amountValidation.accruedLateCharges.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="p-3 col-span-2 sm:col-span-1">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">
+                      Waived Charges
+                    </span>
+                    <span
+                      className="text-xs sm:text-sm font-bold font-mono text-slate-700 mt-0.5 block"
+                      data-testid="summary-waived-charges"
+                    >
+                      ₹{amountValidation.waivedOrSettledCharges.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Consumer & Connection Metadata Grid */}
+                <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs bg-slate-50/50">
                   <div>
                     <span className="text-[11px] text-slate-400 block">
                       {pm.consumerNameLabel}
                     </span>
                     <span
-                      className="font-semibold text-slate-800 dark:text-slate-200 break-words"
+                      className="font-semibold text-slate-800 break-words"
                       data-testid="summary-consumer-name"
                     >
                       {consumerName}
@@ -784,7 +787,7 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
                       {pm.consumerNumberLabel}
                     </span>
                     <span
-                      className="font-mono font-semibold text-slate-800 dark:text-slate-200"
+                      className="font-mono font-semibold text-slate-800"
                       data-testid="summary-consumer-number"
                     >
                       {consumerNo}
@@ -795,7 +798,7 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
                       {pm.connectionIdLabel}
                     </span>
                     <span
-                      className="font-mono font-semibold text-slate-800 dark:text-slate-200"
+                      className="font-mono font-semibold text-slate-800"
                       data-testid="summary-connection-id"
                     >
                       {connectionId}
@@ -806,7 +809,7 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
                       {pm.billingPeriodLabel} · {pm.subdivisionLabel}
                     </span>
                     <span
-                      className="font-semibold text-slate-800 dark:text-slate-200"
+                      className="font-semibold text-slate-800"
                       data-testid="summary-billing-period"
                     >
                       {billingPeriodDisplay} (<span data-testid="summary-subdivision">{subdivisionDisplay}</span>)
@@ -814,10 +817,10 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-400 block">
-                      7. {pm.dueDateLabel} & 8. Days Overdue
+                      {pm.dueDateLabel}
                     </span>
                     <span
-                      className="font-mono font-semibold text-slate-800 dark:text-slate-200"
+                      className="font-mono font-semibold text-slate-800"
                       data-testid="summary-due-date"
                     >
                       {activeBill.dueDate} ({amountValidation.daysOverdue}d overdue)
@@ -825,10 +828,10 @@ export const EnterprisePaymentModal: React.FC<EnterprisePaymentModalProps> = ({
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-400 block">
-                      9. Last Calculation Date
+                      Last Calculation Date
                     </span>
                     <span
-                      className="font-mono font-semibold text-slate-800 dark:text-slate-200"
+                      className="font-mono font-semibold text-slate-800"
                       data-testid="summary-calculation-date"
                     >
                       {amountValidation.calculationReferenceDate}

@@ -200,6 +200,42 @@ async function main() {
       'Field engineer with zero assigned work orders or incidents sees 0 non-emergency outages',
     );
 
+    const managementRecords = buildAuthorizedOutageRecords({
+      role: 'management',
+      actor: { id: 'usr_mgmt_01', name: 'Rajesh Solanki', subdivision: 'All' },
+      incidents: baseIncidents,
+      complaints: INITIAL_COMPLAINTS,
+      workOrders: INITIAL_WORK_ORDERS,
+      feeders: FEEDER_METRICS,
+    });
+    assert.ok(
+      managementRecords.length >= 1,
+      'Management sees confirmed/active grid outages on the Outage Map',
+    );
+    assert.ok(
+      managementRecords.every(
+        (r) =>
+          r.isConfirmedOutage ||
+          r.status === 'RESOLVED_CLOSED' ||
+          r.status === 'CANCELLED_FALSE_ALARM',
+      ),
+      'Management Outage Map excludes unconfirmed initial triage reports',
+    );
+    const managementEvents = buildAuthorizedTimelineEvents(
+      {
+        role: 'management',
+        actor: { id: 'usr_mgmt_01', name: 'Rajesh Solanki', subdivision: 'All' },
+        incidents: baseIncidents,
+        complaints: INITIAL_COMPLAINTS,
+        workOrders: INITIAL_WORK_ORDERS,
+      },
+      managementRecords,
+    );
+    assert.ok(
+      managementEvents.length >= 1,
+      'Management Operations Timeline populates chronological events for visible outages',
+    );
+
     const adminRecords = buildAuthorizedOutageRecords({
       role: 'admin',
       actor: { id: 'ADM-01', name: 'Vikramsinhjadeja' },

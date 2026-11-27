@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopNav } from './TopNav';
 import { MobileNav } from './MobileNav';
@@ -38,7 +38,6 @@ const IncidentActionModal = lazy(() =>
 );
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const {
     currentRole,
     activeApprovalRecommendation,
@@ -69,7 +68,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         </div>
 
         {/* Full-width Portal Header */}
-        <TopNav onToggleMobileNav={() => setIsMobileNavOpen(true)} />
+        <TopNav />
 
         <div className="flex-1 flex min-w-0 overflow-hidden">
           {/* Light Theme Sidebar */}
@@ -77,7 +76,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
           {/* Main Content Workspace */}
           <div className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden">
-            <MobileNav isOpen={isMobileNavOpen} onClose={() => setIsMobileNavOpen(false)} />
+            <MobileNav />
 
             <main
               id="main-workspace-content"
@@ -137,9 +136,9 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
         {/* Main Content Workspace */}
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-hidden">
-          <TopNav onToggleMobileNav={() => setIsMobileNavOpen(true)} />
-          {/* Mobile Section Switcher & Slide-Over Navigation Drawer */}
-          <MobileNav isOpen={isMobileNavOpen} onClose={() => setIsMobileNavOpen(false)} />
+          <TopNav />
+          {/* Mobile Top Navigation Strip */}
+          <MobileNav />
 
           <main
             id="main-workspace-content"
@@ -162,7 +161,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           <CaseDetailDrawer />
           <WorkflowVisualizerModal />
           <RoleWelcomeModal />
-          <AIAssistantDrawer />
+          {currentRole === 'consumer' && <AIAssistantDrawer />}
           <CriticalIncidentModal />
           <HumanApprovalModal
             recommendation={activeApprovalRecommendation}

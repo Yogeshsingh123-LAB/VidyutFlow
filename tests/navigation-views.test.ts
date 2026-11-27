@@ -302,17 +302,17 @@ runTest('6. AppShell, TopNav, and MobileNav enforce consistent mobile spacing an
     'TopNav.tsx uses compact h-12 mobile header height while preserving sm:h-16 on desktop'
   );
   assert(
-    topNav.includes('aria-label="Open navigation menu"'),
-    'TopNav.tsx renders accessible mobile hamburger menu button'
+    !topNav.includes('aria-label="Open navigation menu"'),
+    'TopNav.tsx removes the three-line mobile hamburger button'
   );
   assert(
     mobileNav.includes('aria-label="Mobile Section Navigation"') &&
-      mobileNav.includes('aria-label="Mobile Portal Navigation Drawer"'),
-    'MobileNav.tsx preserves both horizontal section switcher and slide-over navigation drawer'
+      !mobileNav.includes('aria-label="Mobile Portal Navigation Drawer"'),
+    'MobileNav.tsx renders all portal navigation in the top bar without a slide-over side panel'
   );
   assert(
     !mobileNav.includes('<span className="truncate">{item.label}</span>'),
-    'MobileNav.tsx drawer items allow full section titles without truncation'
+    'MobileNav.tsx navigation items allow full section titles without truncation'
   );
 });
 
