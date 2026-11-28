@@ -229,6 +229,189 @@ function getTimeOfDayGreeting(lang: string, now: Date = new Date()): string {
   return labels[slot][lang] || labels[slot].en;
 }
 
+const DASHBOARD_UI_COPY = {
+  en: {
+    currentBill: 'Current Bill',
+    overdue: 'Overdue',
+    partiallyPaid: 'Partially Paid',
+    totalOutstanding: 'Total Outstanding',
+    dueBillsSuffix: 'due bill(s)',
+    allBillsSettled: 'All bills settled',
+    thisMonthUsage: 'This Month Usage',
+    currentCycleUsage: 'Current cycle usage',
+    dueDate: 'Due Date',
+    payBill: 'Pay Bill',
+    apply: 'Apply',
+    noConsumptionTitle: 'No consumption history yet',
+    noConsumptionDesc: 'Apply for or link an electricity connection to view monthly kWh usage.',
+    connectionDetails: 'Connection Details',
+    consumerNo: 'Consumer No.',
+    copiedToast: 'Consumer number copied to clipboard',
+    copyTitle: 'Copy consumer number',
+    meterNo: 'Meter No.',
+    connectionType: 'Connection Type',
+    feeder: 'Feeder',
+    voltage: 'Voltage',
+    voltageStable: '232 V (Stable)',
+    status: 'Status',
+    quickServices: 'Quick Services',
+    applyNewConnLine1: 'Apply New',
+    applyNewConnLine2: 'Connection',
+    reportOutageLine1: 'Report',
+    reportOutageLine2: 'Power Outage',
+    solarNetLine1: 'Solar',
+    solarNetLine2: 'Net-Metering',
+    serviceReqLine1: 'Service',
+    serviceReqLine2: 'Request',
+    noticesUpdates: 'Notices & Updates',
+    viewAll: 'View All',
+    noNotices: 'No active notices or alerts for your account yet.',
+    recentActivity: 'Recent Activity',
+    noActivity: 'No recent activity yet. Apply for a new connection or link a consumer number to get started.',
+    paymentOf: 'Payment of',
+    applicationWord: 'Application',
+    newConnectionWord: 'New Connection',
+    complaintWord: 'Complaint',
+    billWord: 'Bill',
+    generatedWord: 'Generated',
+  },
+  gu: {
+    currentBill: 'ચાલુ બિલ',
+    overdue: 'મુદતવીતી',
+    partiallyPaid: 'આંશિક ચૂકવેલ',
+    totalOutstanding: 'કુલ બાકી રકમ',
+    dueBillsSuffix: 'બાકી બિલ',
+    allBillsSettled: 'બધા બિલ ચૂકવાઈ ગયા છે',
+    thisMonthUsage: 'આ મહિનાનો વપરાશ',
+    currentCycleUsage: 'ચાલુ ચક્ર વપરાશ',
+    dueDate: 'છેલ્લી તારીખ',
+    payBill: 'બિલ ભરો',
+    apply: 'અરજી કરો',
+    noConsumptionTitle: 'હજુ સુધી વપરાશનો ઇતિહાસ નથી',
+    noConsumptionDesc: 'માસિક kWh વપરાશ જોવા માટે નવા જોડાણ માટે અરજી કરો અથવા જોડાણ લિંક કરો.',
+    connectionDetails: 'જોડાણની વિગતો',
+    consumerNo: 'ગ્રાહક નં.',
+    copiedToast: 'ગ્રાહક નંબર ક્લિપબોર્ડ પર કોપી થયો',
+    copyTitle: 'ગ્રાહક નંબર કોપી કરો',
+    meterNo: 'મીટર નં.',
+    connectionType: 'જોડાણનો પ્રકાર',
+    feeder: 'ફીડર',
+    voltage: 'વોલ્ટેજ',
+    voltageStable: '232 V (સ્થિર)',
+    status: 'સ્થિતિ',
+    quickServices: 'ઝડપી સેવાઓ',
+    applyNewConnLine1: 'નવું જોડાણ',
+    applyNewConnLine2: 'અરજી કરો',
+    reportOutageLine1: 'વીજ કાપ',
+    reportOutageLine2: 'ફરિયાદ નોંધાવો',
+    solarNetLine1: 'સોલાર',
+    solarNetLine2: 'નેટ-મીટરિંગ',
+    serviceReqLine1: 'સેવા',
+    serviceReqLine2: 'વિનંતી',
+    noticesUpdates: 'સૂચનાઓ અને અપડેટ્સ',
+    viewAll: 'બધું જુઓ',
+    noNotices: 'તમારા ખાતા માટે હજુ સુધી કોઈ સક્રિય સૂચના નથી.',
+    recentActivity: 'તાજેતરની પ્રવૃત્તિ',
+    noActivity: 'હજુ સુધી કોઈ તાજેતરની પ્રવૃત્તિ નથી. શરૂ કરવા માટે નવું જોડાણ અરજી કરો અથવા ગ્રાહક નંબર લિંક કરો.',
+    paymentOf: 'ચુકવણી',
+    applicationWord: 'અરજી',
+    newConnectionWord: 'નવું જોડાણ',
+    complaintWord: 'ફરિયાદ',
+    billWord: 'બિલ',
+    generatedWord: 'જનરેટ થયું',
+  },
+  hi: {
+    currentBill: 'वर्तमान बिल',
+    overdue: 'अतिदेय',
+    partiallyPaid: 'आंशिक भुगतान',
+    totalOutstanding: 'कुल बकाया राशि',
+    dueBillsSuffix: 'बकाया बिल',
+    allBillsSettled: 'सभी बिल चुकता हो गए हैं',
+    thisMonthUsage: 'इस माह की खपत',
+    currentCycleUsage: 'वर्तमान चक्र खपत',
+    dueDate: 'नियत तिथि',
+    payBill: 'बिल भरें',
+    apply: 'आवेदन करें',
+    noConsumptionTitle: 'अभी तक कोई खपत इतिहास नहीं',
+    noConsumptionDesc: 'मासिक kWh खपत देखने के लिए नए कनेक्शन का आवेदन करें या कनेक्शन लिंक करें।',
+    connectionDetails: 'कनेक्शन विवरण',
+    consumerNo: 'उपभोक्ता क्र.',
+    copiedToast: 'उपभोक्ता नंबर क्लिपबोर्ड पर कॉपी हो गया',
+    copyTitle: 'उपभोक्ता नंबर कॉपी करें',
+    meterNo: 'मीटर क्र.',
+    connectionType: 'कनेक्शन प्रकार',
+    feeder: 'फीडर',
+    voltage: 'वोल्टेज',
+    voltageStable: '232 V (स्थिर)',
+    status: 'स्थिति',
+    quickServices: 'त्वरित सेवाएं',
+    applyNewConnLine1: 'नया कनेक्शन',
+    applyNewConnLine2: 'आवेदन करें',
+    reportOutageLine1: 'बिजली गुल',
+    reportOutageLine2: 'शिकायत दर्ज करें',
+    solarNetLine1: 'सोलर',
+    solarNetLine2: 'नेट-मीटरिंग',
+    serviceReqLine1: 'सेवा',
+    serviceReqLine2: 'अनुरोध',
+    noticesUpdates: 'सूचनाएं एवं अपडेट',
+    viewAll: 'सभी देखें',
+    noNotices: 'आपके खाते के लिए अभी कोई सक्रिय सूचना नहीं है।',
+    recentActivity: 'हाल की गतिविधि',
+    noActivity: 'अभी कोई हालिया गतिविधि नहीं है। शुरू करने के लिए नया कनेक्शन आवेदन करें या उपभोक्ता नंबर लिंक करें।',
+    paymentOf: 'भुगतान',
+    applicationWord: 'आवेदन',
+    newConnectionWord: 'नया कनेक्शन',
+    complaintWord: 'शिकायत',
+    billWord: 'बिल',
+    generatedWord: 'जारी हुआ',
+  },
+  mr: {
+    currentBill: 'चालू बिल',
+    overdue: 'थकीत',
+    partiallyPaid: 'अंशतः भरलेले',
+    totalOutstanding: 'एकूण थकबाकी',
+    dueBillsSuffix: 'थकीत बिल',
+    allBillsSettled: 'सर्व बिले भरलेली आहेत',
+    thisMonthUsage: 'या महिन्याचा वापर',
+    currentCycleUsage: 'चालू चक्र वापर',
+    dueDate: 'देय तारीख',
+    payBill: 'बिल भरा',
+    apply: 'अर्ज करा',
+    noConsumptionTitle: 'अद्याप वापर इतिहास नाही',
+    noConsumptionDesc: 'मासिक kWh वापर पाहण्यासाठी नवीन जोडणीसाठी अर्ज करा किंवा ग्राहक क्रमांक लिंक करा.',
+    connectionDetails: 'जोडणी तपशील',
+    consumerNo: 'ग्राहक क्र.',
+    copiedToast: 'ग्राहक क्रमांक क्लिपबोर्डवर कॉपी केला',
+    copyTitle: 'ग्राहक क्रमांक कॉपी करा',
+    meterNo: 'मीटर क्र.',
+    connectionType: 'जोडणी प्रकार',
+    feeder: 'फीडर',
+    voltage: 'व्होल्टेज',
+    voltageStable: '232 V (स्थिर)',
+    status: 'स्थिती',
+    quickServices: 'त्वरित सेवा',
+    applyNewConnLine1: 'नवीन जोडणी',
+    applyNewConnLine2: 'अर्ज करा',
+    reportOutageLine1: 'वीज खंडित',
+    reportOutageLine2: 'तक्रार नोंदवा',
+    solarNetLine1: 'सोलर',
+    solarNetLine2: 'नेट-मीटरिंग',
+    serviceReqLine1: 'सेवा',
+    serviceReqLine2: 'विनंती',
+    noticesUpdates: 'सूचना आणि अद्यतने',
+    viewAll: 'सर्व पहा',
+    noNotices: 'तुमच्या खात्यासाठी अद्याप कोणतीही सक्रिय सूचना नाही.',
+    recentActivity: 'अलीकडील हालचाल',
+    noActivity: 'अद्याप कोणतीही अलीकडील हालचाल नाही. सुरू करण्यासाठी नवीन जोडणी अर्ज करा किंवा ग्राहक क्रमांक लिंक करा.',
+    paymentOf: 'पेमेंट',
+    applicationWord: 'अर्ज',
+    newConnectionWord: 'नवीन जोडणी',
+    complaintWord: 'तक्रार',
+    billWord: 'बिल',
+    generatedWord: 'तयार झाले',
+  },
+} as const;
+
 export const ConsumerPortal: React.FC = () => {
   const {
     activeTab,
@@ -276,6 +459,7 @@ export const ConsumerPortal: React.FC = () => {
 
   const { language, t } = useLanguage();
   const tc = t.consumer;
+  const dashUi = DASHBOARD_UI_COPY[language as keyof typeof DASHBOARD_UI_COPY] || DASHBOARD_UI_COPY.en;
   const docUi = getDocumentUiTranslations(language);
   const bUi = getBillingUiTranslations(language);
   const srUi = getServiceRequestUiStrings(language);
@@ -1340,7 +1524,7 @@ export const ConsumerPortal: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                   <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    Current Bill
+                    {dashUi.currentBill}
                   </div>
                   <div className="text-xl sm:text-[22px] font-black text-[#0A2540] tracking-tight tabular-nums">
                     {hasConnections && currentBill
@@ -1362,9 +1546,9 @@ export const ConsumerPortal: React.FC = () => {
                       : dashboardBadgeState === 'NO_BILL_GENERATED'
                       ? bUi.statusNoBill
                       : dashboardBadgeState === 'OVERDUE'
-                      ? 'Overdue'
+                      ? dashUi.overdue
                       : dashboardBadgeState === 'PARTIALLY_PAID'
-                      ? 'Partially Paid'
+                      ? dashUi.partiallyPaid
                       : dashboardBadgeState === 'UNPAID'
                       ? tc.paymentDue
                       : tc.paid}
@@ -1385,7 +1569,7 @@ export const ConsumerPortal: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                   <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    Total Outstanding
+                    {dashUi.totalOutstanding}
                   </div>
                   <div className="text-xl sm:text-[22px] font-black text-[#0A2540] tracking-tight tabular-nums">
                     {(() => {
@@ -1402,8 +1586,8 @@ export const ConsumerPortal: React.FC = () => {
                     {!hasConnections
                       ? tc.noActiveConnection
                       : (consumerBillingSummary?.accountTotalOutstandingWithCharges ?? 0) > 0
-                      ? `${consumerBillingSummary?.accountDueBillCount ?? 0} due bill(s)`
-                      : 'All bills settled'}
+                      ? `${consumerBillingSummary?.accountDueBillCount ?? 0} ${dashUi.dueBillsSuffix}`
+                      : dashUi.allBillsSettled}
                   </div>
                 </div>
               </div>
@@ -1421,7 +1605,7 @@ export const ConsumerPortal: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                   <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    This Month Usage
+                    {dashUi.thisMonthUsage}
                   </div>
                   <div className="text-xl sm:text-[22px] font-black text-[#0A2540] tracking-tight tabular-nums">
                     {hasConnections && currentBill ? `${currentBill.unitsConsumed} kWh` : '0 kWh'}
@@ -1433,7 +1617,7 @@ export const ConsumerPortal: React.FC = () => {
                         : 'bg-slate-200/80 text-slate-600'
                     }`}
                   >
-                    <span>{hasConnections && currentBill ? 'Current cycle usage' : tc.noActiveConnection}</span>
+                    <span>{hasConnections && currentBill ? dashUi.currentCycleUsage : tc.noActiveConnection}</span>
                   </span>
                 </div>
               </div>
@@ -1448,7 +1632,7 @@ export const ConsumerPortal: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                   <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    Due Date
+                    {dashUi.dueDate}
                   </div>
                   <div className="text-base sm:text-lg font-black text-[#0A2540] tracking-tight tabular-nums flex items-center gap-1">
                     <span>{hasConnections && currentBill?.dueDate ? currentBill.dueDate : '—'}</span>
@@ -1462,7 +1646,7 @@ export const ConsumerPortal: React.FC = () => {
                   onClick={() => handlePayClick(currentBill.billNo)}
                   className="px-4 py-2.5 rounded-xl bg-[#0A2540] hover:bg-[#12365c] text-white font-bold text-xs shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 cursor-pointer shrink-0 ml-2"
                 >
-                  <span>Pay Bill</span>
+                  <span>{dashUi.payBill}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               ) : !hasConnections ? (
@@ -1471,7 +1655,7 @@ export const ConsumerPortal: React.FC = () => {
                   onClick={() => initializeServiceRequestWizard('NEW_CONNECTION')}
                   className="px-3.5 py-2.5 rounded-xl bg-[#0A2540] hover:bg-[#12365c] text-white font-bold text-xs shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5 cursor-pointer shrink-0 ml-2"
                 >
-                  <span>Apply</span>
+                  <span>{dashUi.apply}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               ) : null}
@@ -1572,9 +1756,9 @@ export const ConsumerPortal: React.FC = () => {
               </div>
 
               {/* Bar Chart */}
-              <div className="pt-2">
+              <div className="pt-2 overflow-hidden">
                 {hasConnections && localizedConsumptionHistory.length > 0 ? (
-                  <div className="flex items-end gap-2.5 sm:gap-3 justify-between h-44 px-2 pt-6 pb-2 border-b border-slate-100 relative">
+                  <div className="flex items-end gap-1 sm:gap-3 justify-between h-44 px-0.5 sm:px-2 pt-6 pb-2 border-b border-slate-100 relative w-full">
                     <div className="absolute top-0 left-0 text-[10px] font-bold text-slate-400">kWh</div>
                     <div className="absolute left-6 right-0 top-6 border-b border-dashed border-slate-100 pointer-events-none" />
                     <div className="absolute left-6 right-0 top-18 border-b border-dashed border-slate-100 pointer-events-none" />
@@ -1586,8 +1770,10 @@ export const ConsumerPortal: React.FC = () => {
                       return slice.map((item, idx) => {
                         const pct = Math.max(12, Math.round(((item.units || 0) / maxUnits) * 85));
                         const isLatest = idx === slice.length - 1;
+                        const fullLabel = item.displayMonth || item.month || '';
+                        const compactLabel = fullLabel.replace(/\s*\([^)]*\)\s*$/, '').trim();
                         return (
-                          <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end z-10">
+                          <div key={idx} className="min-w-0 flex-1 flex flex-col items-center gap-1.5 h-full justify-end z-10">
                             <span className="text-[10px] font-bold text-slate-700 leading-none">
                               {item.units}
                             </span>
@@ -1599,8 +1785,11 @@ export const ConsumerPortal: React.FC = () => {
                               }`}
                               style={{ height: `${pct}%` }}
                             />
-                            <span className="text-[9.5px] font-semibold text-slate-500 whitespace-nowrap mt-1">
-                              {item.displayMonth || item.month}
+                            <span
+                              title={fullLabel}
+                              className="w-full text-center text-[8.5px] sm:text-[9.5px] font-semibold text-slate-500 truncate mt-1"
+                            >
+                              {compactLabel}
                             </span>
                           </div>
                         );
@@ -1610,9 +1799,9 @@ export const ConsumerPortal: React.FC = () => {
                 ) : (
                   <div className="h-44 flex flex-col items-center justify-center text-center px-4 rounded-xl bg-slate-50/70 border border-dashed border-slate-200">
                     <BarChart3 className="w-7 h-7 text-slate-300 mb-2" />
-                    <p className="text-xs font-bold text-slate-700">No consumption history yet</p>
+                    <p className="text-xs font-bold text-slate-700">{dashUi.noConsumptionTitle}</p>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      Apply for or link an electricity connection to view monthly kWh usage.
+                      {dashUi.noConsumptionDesc}
                     </p>
                   </div>
                 )}
@@ -1623,12 +1812,12 @@ export const ConsumerPortal: React.FC = () => {
             <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center gap-2 font-black text-sm text-[#0A2540] mb-3">
                 <Plug className="w-4 h-4 text-emerald-600" />
-                <span>Connection Details</span>
+                <span>{dashUi.connectionDetails}</span>
               </div>
 
               <div className="space-y-2.5 text-xs">
                 <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500 font-medium">Consumer No.</span>
+                  <span className="text-slate-500 font-medium">{dashUi.consumerNo}</span>
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono font-bold text-slate-900">
                       {hasConnections && selectedConnection ? selectedConnection.consumerNo : '—'}
@@ -1638,10 +1827,10 @@ export const ConsumerPortal: React.FC = () => {
                         type="button"
                         onClick={() => {
                           navigator.clipboard?.writeText(selectedConnection.consumerNo);
-                          showToast('Consumer number copied to clipboard', 'info');
+                          showToast(dashUi.copiedToast, 'info');
                         }}
                         className="text-slate-400 hover:text-blue-600 p-0.5 cursor-pointer"
-                        title="Copy consumer number"
+                        title={dashUi.copyTitle}
                       >
                         <Copy className="w-3.5 h-3.5" />
                       </button>
@@ -1650,38 +1839,38 @@ export const ConsumerPortal: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500 font-medium">Meter No.</span>
+                  <span className="text-slate-500 font-medium">{dashUi.meterNo}</span>
                   <span className="font-mono font-bold text-slate-900">
                     {hasConnections && selectedConnection ? selectedConnection.meterNo : '—'}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500 font-medium">Connection Type</span>
+                  <span className="text-slate-500 font-medium">{dashUi.connectionType}</span>
                   <span className="font-semibold text-slate-800">
-                    {hasConnections && selectedConnection ? selectedConnection.tariffCategory : '—'}
+                    {hasConnections && selectedConnection ? localizeTariffCategory(selectedConnection.tariffCategory, language) : '—'}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500 font-medium">Feeder</span>
+                  <span className="text-slate-500 font-medium">{dashUi.feeder}</span>
                   <span
                     className="font-semibold text-slate-800 truncate max-w-[170px]"
-                    title={hasConnections && selectedConnection ? selectedConnection.feederName : undefined}
+                    title={hasConnections && selectedConnection ? localizeFeederName(selectedConnection.feederName, language) : undefined}
                   >
-                    {hasConnections && selectedConnection ? selectedConnection.feederName : '—'}
+                    {hasConnections && selectedConnection ? localizeFeederName(selectedConnection.feederName, language) : '—'}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500 font-medium">Voltage</span>
+                  <span className="text-slate-500 font-medium">{dashUi.voltage}</span>
                   <span className="font-semibold text-slate-800">
-                    {hasConnections && selectedConnection ? '232 V (Stable)' : '—'}
+                    {hasConnections && selectedConnection ? dashUi.voltageStable : '—'}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between py-1">
-                  <span className="text-slate-500 font-medium">Status</span>
+                  <span className="text-slate-500 font-medium">{dashUi.status}</span>
                   {hasConnections && selectedConnection ? (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200/60">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -1699,7 +1888,7 @@ export const ConsumerPortal: React.FC = () => {
             {/* Right: Quick Services 2x2 Grid (3 cols) */}
             <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs flex flex-col justify-between">
               <div className="font-black text-sm text-[#0A2540] mb-3">
-                Quick Services
+                {dashUi.quickServices}
               </div>
 
               <div className="grid grid-cols-2 gap-2.5 flex-1">
@@ -1711,7 +1900,7 @@ export const ConsumerPortal: React.FC = () => {
                 >
                   <PlusCircle className="w-5 h-5 text-blue-600 mb-1" />
                   <span className="text-[11px] font-bold text-[#0A2540] leading-tight">
-                    Apply New<br />Connection
+                    {dashUi.applyNewConnLine1}<br />{dashUi.applyNewConnLine2}
                   </span>
                 </button>
 
@@ -1723,7 +1912,7 @@ export const ConsumerPortal: React.FC = () => {
                 >
                   <AlertTriangle className="w-5 h-5 text-amber-600 mb-1" />
                   <span className="text-[11px] font-bold text-[#0A2540] leading-tight">
-                    Report<br />Power Outage
+                    {dashUi.reportOutageLine1}<br />{dashUi.reportOutageLine2}
                   </span>
                 </button>
 
@@ -1735,7 +1924,7 @@ export const ConsumerPortal: React.FC = () => {
                 >
                   <Sun className="w-5 h-5 text-emerald-600 mb-1" />
                   <span className="text-[11px] font-bold text-[#0A2540] leading-tight">
-                    Solar<br />Net-Metering
+                    {dashUi.solarNetLine1}<br />{dashUi.solarNetLine2}
                   </span>
                 </button>
 
@@ -1747,7 +1936,7 @@ export const ConsumerPortal: React.FC = () => {
                 >
                   <FileText className="w-5 h-5 text-purple-600 mb-1" />
                   <span className="text-[11px] font-bold text-[#0A2540] leading-tight">
-                    Service<br />Request
+                    {dashUi.serviceReqLine1}<br />{dashUi.serviceReqLine2}
                   </span>
                 </button>
               </div>
@@ -1763,21 +1952,23 @@ export const ConsumerPortal: React.FC = () => {
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2 font-black text-sm text-[#0A2540]">
                   <Megaphone className="w-4 h-4 text-blue-600" />
-                  <span>Notices & Updates</span>
+                  <span>{dashUi.noticesUpdates}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setActiveTab('notifications')}
                   className="text-xs font-bold text-[#0A2540] hover:text-[#FF6B00] transition-colors flex items-center gap-1 cursor-pointer"
                 >
-                  <span>View All</span>
+                  <span>{dashUi.viewAll}</span>
                   <ArrowRight className="w-3.5 h-3.5 text-[#FF6B00]" />
                 </button>
               </div>
 
               <div className="space-y-3">
                 {consumerNotifications.length > 0 ? (
-                  consumerNotifications.slice(0, 3).map((notif) => (
+                  consumerNotifications.slice(0, 3).map((notif) => {
+                    const locNotif = localizeConsumerNotification(notif, language);
+                    return (
                     <div
                       key={notif.id}
                       onClick={() => setActiveTab('notifications')}
@@ -1786,17 +1977,17 @@ export const ConsumerPortal: React.FC = () => {
                       <div className="flex items-start gap-2 min-w-0">
                         <span className="w-2 h-2 rounded-full bg-[#FF7A00] shrink-0 mt-1.5" />
                         <span className="font-semibold text-slate-800 group-hover:text-blue-700 transition-colors leading-snug line-clamp-2">
-                          {notif.title || notif.message}
+                          {locNotif.title || locNotif.message}
                         </span>
                       </div>
                       <span className="text-[11px] text-slate-400 shrink-0 font-medium">
-                        {notif.time || ''}
+                        {locNotif.time || ''}
                       </span>
                     </div>
-                  ))
+                  );})
                 ) : (
                   <div className="py-6 text-center text-xs text-slate-500">
-                    No active notices or alerts for your account yet.
+                    {dashUi.noNotices}
                   </div>
                 )}
               </div>
@@ -1807,14 +1998,14 @@ export const ConsumerPortal: React.FC = () => {
               <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2 font-black text-sm text-[#0A2540]">
                   <Clock className="w-4 h-4 text-blue-600" />
-                  <span>Recent Activity</span>
+                  <span>{dashUi.recentActivity}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setActiveTab(consumerPayments.length > 0 ? 'payments' : 'requests')}
                   className="text-xs font-bold text-[#0A2540] hover:text-[#FF6B00] transition-colors flex items-center gap-1 cursor-pointer"
                 >
-                  <span>View All</span>
+                  <span>{dashUi.viewAll}</span>
                   <ArrowRight className="w-3.5 h-3.5 text-[#FF6B00]" />
                 </button>
               </div>
@@ -1830,21 +2021,21 @@ export const ConsumerPortal: React.FC = () => {
                   ...consumerPayments.slice(0, 3).map(p => ({
                     id: `pay-${p.txId}`,
                     kind: 'payment' as const,
-                    label: `Payment of ₹${(p.amount ?? 0).toLocaleString('en-IN')} – ${p.status || 'Successful'}`,
+                    label: `${dashUi.paymentOf} ₹${(p.amount ?? 0).toLocaleString('en-IN')} – ${localizePaymentStatus(p.status || 'Successful', language)}`,
                     dateLabel: p.date || '',
                     targetTab: 'payments' as const,
                   })),
                   ...consumerApplications.slice(0, 3).map(a => ({
                     id: `app-${a.id}`,
                     kind: 'request' as const,
-                    label: `Application #${a.id} (${a.category || 'New Connection'}) – ${a.status}`,
+                    label: `${dashUi.applicationWord} #${a.id} (${a.category ? localizeTariffCategory(a.category, language) : dashUi.newConnectionWord}) – ${localizeApplicationStatus(a.status, language)}`,
                     dateLabel: a.appliedDate || '',
                     targetTab: 'requests' as const,
                   })),
                   ...consumerComplaints.slice(0, 3).map(c => ({
                     id: `cmp-${c.id}`,
                     kind: 'complaint' as const,
-                    label: `Complaint #${c.id} (${c.category}) – ${c.status}`,
+                    label: `${dashUi.complaintWord} #${c.id} (${localizeComplaintCategory(c.category, language)}) – ${localizeComplaintStatus(c.status, language)}`,
                     dateLabel: c.filedAt || '',
                     targetTab: 'complaints' as const,
                   })),
@@ -1852,7 +2043,7 @@ export const ConsumerPortal: React.FC = () => {
                     ? consumerBills.slice(0, 2).map(b => ({
                         id: `bill-${b.billNo}`,
                         kind: 'bill' as const,
-                        label: `Bill ${b.billNo} Generated – ₹${(b.totalAmount ?? 0).toLocaleString('en-IN')}`,
+                        label: `${dashUi.billWord} ${b.billNo} ${dashUi.generatedWord} – ₹${(b.totalAmount ?? 0).toLocaleString('en-IN')}`,
                         dateLabel: b.billDate || '',
                         targetTab: 'bills' as const,
                       }))
@@ -1862,7 +2053,7 @@ export const ConsumerPortal: React.FC = () => {
                 if (activityItems.length === 0) {
                   return (
                     <div className="py-6 text-center text-xs text-slate-500">
-                      No recent activity yet. Apply for a new connection or link a consumer number to get started.
+                      {dashUi.noActivity}
                     </div>
                   );
                 }

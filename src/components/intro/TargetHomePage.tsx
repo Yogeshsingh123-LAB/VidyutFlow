@@ -221,32 +221,16 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
             }}
             className="flex items-center text-left cursor-pointer group shrink-0"
           >
-            <div className="flex items-center gap-2 sm:gap-3 bg-white border border-slate-200/90 rounded-xl px-2.5 sm:px-3.5 py-1 sm:py-1.5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:border-slate-300 transition-all">
-              {/* UGVCL Pylon Logo */}
-              <div className="flex flex-col items-center justify-center shrink-0">
-                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-[#0B2545]" viewBox="0 0 48 48" fill="none" stroke="currentColor">
-                  {/* Transmission Pylon */}
-                  <path d="M24 4 L14 44 M24 4 L34 44" strokeWidth="2.5" strokeLinecap="round" />
-                  <path d="M12 16 L36 16 M10 26 L38 26 M7 36 L41 36" strokeWidth="2" />
-                  <path d="M16 16 L32 26 M32 16 L16 26" strokeWidth="1.5" />
-                  <path d="M14 26 L34 36 M34 26 L14 36" strokeWidth="1.5" />
-                  {/* Lightning Bolt Spark in Orange */}
-                  <path d="M26 12 L20 22 L27 22 L21 34" stroke="#FF6B00" strokeWidth="2.5" fill="#FF6B00" strokeLinejoin="round" />
-                </svg>
-                <span className="text-[0.55rem] sm:text-[0.625rem] font-black tracking-widest text-[#0B2545] leading-none mt-0.5">
-                  UGVCL
-                </span>
-              </div>
-
-              {/* Vertical divider */}
-              <div className="h-7 sm:h-9 w-px bg-slate-200" />
-
-              {/* Wordmark: UGVCL */}
-              <div className="leading-tight">
-                <div className="text-base sm:text-2xl font-black tracking-tight text-[#0A2540]">
-                  <span>UGVCL</span>
-                </div>
-                <div className="hidden sm:block text-[0.625rem] text-slate-500 font-medium tracking-wide">
+            <div className="flex items-center gap-2.5 bg-white border border-slate-200/90 rounded-xl px-2.5 sm:px-3 py-1 shadow-[0_1px_4px_rgba(0,0,0,0.04)] hover:border-slate-300 transition-all">
+              <img
+                src="/assets/vidyutflow-logo.png"
+                alt="VidyutFlow — Powering a Smarter Gujarat"
+                className="h-8 sm:h-10 w-auto object-contain shrink-0"
+              />
+              <div className="hidden sm:block h-7 w-px bg-slate-200" />
+              <div className="hidden sm:block leading-tight">
+                <div className="text-xs font-black tracking-wide text-[#0A2540]">UGVCL</div>
+                <div className="text-[0.625rem] text-slate-500 font-medium tracking-wide">
                   {copy.brandTagline}
                 </div>
               </div>
@@ -936,49 +920,60 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
           </div>
 
           {/* CARD 3: UGVCL COVERAGE (With Gujarat Map) */}
-          <div id="coverage" className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_28px_rgba(10,37,64,0.06)] p-6 flex items-center justify-between gap-4">
-            <div className="min-w-0 flex-1 space-y-4">
-              <div className="flex items-start gap-2.5">
-                <MapPin className="w-5 h-5 text-[#0A2540] fill-[#0A2540] stroke-white shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="text-[17px] font-extrabold text-[#0A2540] tracking-tight leading-tight">
-                    {copy.coverageTitle}
-                  </h3>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    {copy.coverageSubtitle}
-                  </p>
+          <div id="coverage" className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_28px_rgba(10,37,64,0.06)] p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="min-w-0 flex-1 space-y-3.5 sm:space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <MapPin className="w-5 h-5 text-[#0A2540] fill-[#0A2540] stroke-white shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <h3 className="text-base sm:text-[17px] font-extrabold text-[#0A2540] tracking-tight leading-tight">
+                      {copy.coverageTitle}
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5 leading-snug">
+                      {copy.coverageSubtitle}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Compact Gujarat Map on Mobile (< sm) so KPIs below get full width */}
+                <div className="w-16 shrink-0 flex items-center justify-center sm:hidden">
+                  <img
+                    src="/assets/ugvcl/gujarat_map_exact.png"
+                    alt="Gujarat State Coverage Map"
+                    className="w-full h-auto object-contain"
+                  />
                 </div>
               </div>
 
-              <div className="flex items-stretch divide-x divide-slate-200 pt-1">
-                <div className="flex items-start gap-2 pr-3 sm:pr-4 min-w-0">
-                  <Home className="w-4 h-4 text-[#0A2540] fill-[#0A2540] shrink-0 mt-0.5" />
+              <div className="grid grid-cols-3 divide-x divide-slate-200 pt-1">
+                <div className="flex items-start gap-1.5 sm:gap-2 pr-2 sm:pr-4 min-w-0">
+                  <Home className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0A2540] fill-[#0A2540] shrink-0 mt-0.5" />
                   <div className="leading-tight min-w-0">
                     <div className="font-extrabold text-[#0A2540] text-sm sm:text-base">4</div>
-                    <div className="text-slate-500 text-[11px] font-medium mt-0.5 truncate">{copy.discomsLabel}</div>
+                    <div className="text-slate-500 text-[10px] sm:text-[11px] font-medium mt-0.5 leading-tight break-words">{copy.discomsLabel}</div>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2 px-3 sm:px-4 min-w-0">
-                  <Users className="w-4 h-4 text-[#0A2540] fill-[#0A2540] shrink-0 mt-0.5" />
+                <div className="flex items-start gap-1.5 sm:gap-2 px-2 sm:px-4 min-w-0">
+                  <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0A2540] fill-[#0A2540] shrink-0 mt-0.5" />
                   <div className="leading-tight min-w-0">
                     <div className="font-extrabold text-[#0A2540] text-sm sm:text-base">89L+</div>
-                    <div className="text-slate-500 text-[11px] font-medium mt-0.5 truncate">{copy.consumersLabel}</div>
+                    <div className="text-slate-500 text-[10px] sm:text-[11px] font-medium mt-0.5 leading-tight break-words">{copy.consumersLabel}</div>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2 pl-3 sm:pl-4 min-w-0">
-                  <Zap className="w-4 h-4 text-[#0A2540] fill-[#0A2540] shrink-0 mt-0.5" />
+                <div className="flex items-start gap-1.5 sm:gap-2 pl-2 sm:pl-4 min-w-0">
+                  <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0A2540] fill-[#0A2540] shrink-0 mt-0.5" />
                   <div className="leading-tight min-w-0">
                     <div className="font-extrabold text-[#0A2540] text-sm sm:text-base">24x7</div>
-                    <div className="text-slate-500 text-[11px] font-medium mt-0.5 truncate">{copy.serviceLabel}</div>
+                    <div className="text-slate-500 text-[10px] sm:text-[11px] font-medium mt-0.5 leading-tight break-words">{copy.serviceLabel}</div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Gujarat State Map Silhouette */}
-            <div className="w-[92px] sm:w-[125px] shrink-0 flex items-center justify-center">
+            {/* Gujarat State Map Silhouette (Desktop/Tablet sm+) */}
+            <div className="hidden sm:flex w-[125px] shrink-0 items-center justify-center">
               <img
                 src="/assets/ugvcl/gujarat_map_exact.png"
                 alt="Gujarat State Coverage Map"
@@ -1032,14 +1027,16 @@ export const TargetHomePage: React.FC<TargetHomePageProps> = ({ onOpenAboutModal
         </svg>
 
         <div className="relative z-10 max-w-[1580px] mx-auto px-4 sm:px-6 lg:px-10 py-4 flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
-          {/* Left UGVCL Transmission Pylon & Logo */}
+          {/* Left VidyutFlow & UGVCL Logo */}
           <div className="flex items-center gap-2.5">
-            <svg className="w-6 h-6 text-white" viewBox="0 0 48 48" fill="none" stroke="currentColor">
-              <path d="M24 4 L14 44 M24 4 L34 44" strokeWidth="2.5" strokeLinecap="round" />
-              <path d="M12 16 L36 16 M10 26 L38 26 M7 36 L41 36" strokeWidth="2" />
-              <path d="M26 12 L20 22 L27 22 L21 34" stroke="#FF6B00" strokeWidth="2.5" fill="#FF6B00" strokeLinejoin="round" />
-            </svg>
-            <span className="text-base font-black tracking-wider text-white">
+            <div className="bg-white rounded-lg px-2 py-1 shadow-xs">
+              <img
+                src="/assets/vidyutflow-logo.png"
+                alt="VidyutFlow — Powering a Smarter Gujarat"
+                className="h-6 sm:h-7 w-auto object-contain"
+              />
+            </div>
+            <span className="text-sm font-black tracking-wider text-white">
               UGVCL
             </span>
           </div>

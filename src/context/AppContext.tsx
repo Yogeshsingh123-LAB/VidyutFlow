@@ -5627,6 +5627,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Logged out of demo session. Returned to public homepage.', 'info');
   };
 
+  // Idle Session Timeout (default 30 minutes; configurable via Admin Settings)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !hasEnteredPlatform || !demoSession) return;
+
+    const readTimeoutMinutes = (): number => {
+      try {
+        const raw = localStorage.getItem('vidyutflow_idle_timeout_minutes');
+        if (raw === null) return 30;
+        const parsed = Number(raw);
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : 30;
+      } catch {
+        return 30;
+      }
+    };
+
+    let warnTimer: number | null = null;
+    let logoutTimer: number | null = null;
+    let lastActivityReset = 0;
+
+    const clearTimers = () => {
+      if (warnTimer !== null) window.clearTimeout(warnTimer);
+      if (logoutTimer !== null) window.clearTimeout(logoutTimer);
+      warnTimer = null;
+      logoutTimer = null;
+    };
+
+    const scheduleTimers = () => {
+      clearTimers();
+      const mins = readTimeoutMinutes();
+      if (mins <= 0) return;
+      const timeoutMs = mins * 60_000;
+      if (timeoutMs >= 120_000) {
+        warnTimer = window.setTimeout(() => {
+          showToast('Session will time out in 1 minute due to inactivity.', 'warning');
+        }, timeoutMs - 60_000);
+      }
+      logoutTimer = window.setTimeout(() => {
+        showToast(`Session timed out after ${mins} minute(s) of inactivity. Please sign in again.`, 'warning');
+        void logoutDemoSession();
+      }, timeoutMs);
+    };
+
+    const handleActivity = () => {
+      const now = Date.now();
+      if (now - lastActivityReset < 5_000) return;
+      lastActivityReset = now;
+      scheduleTimers();
+    };
+
+    const handleTimeoutConfigUpdate = () => {
+      lastActivityReset = Date.now();
+      scheduleTimers();
+    };
+
+    scheduleTimers();
+
+    const events: Array<keyof WindowEventMap> = [
+      'mousemove',
+      'mousedown',
+      'keydown',
+      'scroll',
+      'touchstart',
+      'click',
+    ];
+    events.forEach(ev => window.addEventListener(ev, handleActivity, { passive: true }));
+    window.addEventListener('vidyutflow:idle-timeout-updated', handleTimeoutConfigUpdate);
+
+    return () => {
+      clearTimers();
+      events.forEach(ev => window.removeEventListener(ev, handleActivity));
+      window.removeEventListener('vidyutflow:idle-timeout-updated', handleTimeoutConfigUpdate);
+    };
+  }, [hasEnteredPlatform, demoSession]);
+
   const openCaseDrawer = (type: 'application' | 'complaint' | 'workorder', id: string) => {
     if (effectiveRole === 'consumer') {
       if (type === 'workorder') {

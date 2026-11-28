@@ -25,7 +25,6 @@ export const ROLE_ALLOWED_TABS: Record<string, string[]> = {
     'complaints',
     'approvals',
     'coordination',
-    'reports',
     'incidents',
     'outage-map',
   ],

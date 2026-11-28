@@ -411,9 +411,8 @@ export const EmployeePortal: React.FC = () => {
       <div className="relative overflow-hidden p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         {/* Left: UGVCL Icon Box, Title, Badge & Subtitle */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3.5 min-w-0 z-10">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white p-1 border border-slate-200 shadow-xs flex flex-col items-center justify-center shrink-0">
-            <Zap className="w-5 h-5 text-red-600 fill-red-600" />
-            <span className="text-[7.5px] font-black text-red-600 tracking-tight leading-none mt-0.5">UGVCL</span>
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white p-1 border border-slate-200 shadow-xs flex items-center justify-center shrink-0">
+            <img src="/assets/ugvcl-logo.png" alt="UGVCL Official Logo" className="w-full h-full object-contain" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
@@ -1835,128 +1834,6 @@ export const EmployeePortal: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* VIEW 6: REVENUE REPORTS */}
-      {activeTab === 'reports' && (() => {
-        const latestMonthly = EXECUTIVE_MONTHLY_METRICS[EXECUTIVE_MONTHLY_METRICS.length - 1];
-        const ledger = employeeCanonicalMetrics.liveBillingLedger;
-        const paidLabel = language === 'gu' ? 'ચૂકવેલ' : language === 'hi' ? 'भुगतान' : language === 'mr' ? 'भरलेले' : 'Paid';
-        const dueLabel = language === 'gu' ? 'બાકી' : language === 'hi' ? 'बकाया' : language === 'mr' ? 'थकीत' : 'Due';
-
-        return (
-          <div className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#101C35] border border-slate-200 dark:border-slate-800 shadow-2xs space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white leading-snug">
-                  {te.revenueReportTitle}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {te.revenueReportSubtitle}
-                </p>
-              </div>
-              <ExportMenu
-                datasetKey="revenue_report"
-                filteredRecords={EXECUTIVE_MONTHLY_METRICS}
-                labelOverride={te.exportCsvBtn}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-                <span className="text-slate-500 block mb-0.5">{te.revTotalEnergyBilled}</span>
-                <span className="text-xl font-bold tabular-nums text-slate-900 dark:text-white">
-                  {latestMonthly ? `${latestMonthly.billedMUs.toFixed(1)} MU` : '161.9 MU'}
-                </span>
-              </div>
-              <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-                <span className="text-slate-500 block mb-0.5">{te.revCollectedTitle}</span>
-                <span className="text-xl font-bold tabular-nums text-emerald-600">
-                  {latestMonthly ? `₹${latestMonthly.collectedCr.toFixed(1)} Cr` : te.revCollectedValue}
-                </span>
-              </div>
-              <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-                <span className="text-slate-500 block mb-0.5">{te.revEfficiencyTitle}</span>
-                <span className="text-xl font-bold tabular-nums text-blue-600">
-                  {ledger.totalBillsCount > 0 ? `${ledger.liveCollectionEfficiencyPct}%` : '98.4%'}
-                </span>
-              </div>
-            </div>
-
-            {/* Canonical Live ERP Billing & Collection Ledger Strip */}
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  {caTranslations.liveErpCollectionLedgerTitle}
-                </span>
-                <span className="text-[10.5px] font-semibold tabular-nums px-2.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                  {ledger.paidBillsCount}/{ledger.totalBillsCount} {paidLabel} · {ledger.unpaidBillsCount} {dueLabel}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
-                  <span className="text-slate-500 block text-[10.5px] mb-0.5">{caTranslations.liveErpBilledLabel}</span>
-                  <span data-testid="employee-live-billed-inr" className="text-sm font-bold tabular-nums text-slate-900 dark:text-white">
-                    ₹{ledger.totalBilledAmountInr.toLocaleString('en-IN')}
-                  </span>
-                </div>
-                <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
-                  <span className="text-slate-500 block text-[10.5px] mb-0.5">{caTranslations.liveErpCollectedLabel}</span>
-                  <span data-testid="employee-live-collected-inr" className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-                    ₹{ledger.totalCollectedAmountInr.toLocaleString('en-IN')}
-                  </span>
-                </div>
-                <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
-                  <span className="text-slate-500 block text-[10.5px] mb-0.5">{caTranslations.liveErpOutstandingLabel}</span>
-                  <span data-testid="employee-live-outstanding-inr" className="text-sm font-bold tabular-nums text-amber-600 dark:text-amber-400">
-                    ₹{ledger.totalOutstandingAmountInr.toLocaleString('en-IN')}
-                  </span>
-                </div>
-                <div className="p-3 rounded-lg bg-slate-50/80 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800">
-                  <span className="text-slate-500 block text-[10.5px] mb-0.5">{caTranslations.liveErpCollectionEfficiencyLabel}</span>
-                  <span data-testid="employee-live-collection-rate" className="text-sm font-bold tabular-nums text-blue-600 dark:text-blue-400">
-                    {ledger.liveCollectionEfficiencyPct}%
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Monthly Energy & Revenue Breakdown Table */}
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                {language === 'gu'
-                  ? 'માસિક ઊર્જા અને મહેસૂલ પત્રક'
-                  : language === 'hi'
-                  ? 'मासिक ऊर्जा और राजस्व विवरण'
-                  : language === 'mr'
-                  ? 'मासिक ऊर्जा आणि महसूल तक्ता'
-                  : 'Monthly Energy & Revenue Ledger'}
-              </div>
-              <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-600 dark:text-slate-300 text-[11px] font-bold border-b border-slate-200 dark:border-slate-800">
-                    <tr>
-                      <th className="px-3.5 py-2.5">Month</th>
-                      <th className="px-3.5 py-2.5 text-right">Energy Billed (MU)</th>
-                      <th className="px-3.5 py-2.5 text-right">Collected (₹ Cr)</th>
-                      <th className="px-3.5 py-2.5 text-right">AT&amp;C Loss (%)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 tabular-nums">
-                    {EXECUTIVE_MONTHLY_METRICS.map((row) => (
-                      <tr key={row.month} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                        <td className="px-3.5 py-2.5 font-semibold text-slate-800 dark:text-slate-200">{row.month}</td>
-                        <td className="px-3.5 py-2.5 text-right font-bold text-slate-900 dark:text-white">{row.billedMUs.toFixed(1)} MU</td>
-                        <td className="px-3.5 py-2.5 text-right font-semibold text-emerald-700 dark:text-emerald-400">₹{row.collectedCr.toFixed(1)} Cr</td>
-                        <td className="px-3.5 py-2.5 text-right font-semibold text-amber-700 dark:text-amber-300">{row.atcLossPct.toFixed(1)}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* VIEW: INCIDENT CONTROL DESK */}
       {activeTab === 'incidents' && (

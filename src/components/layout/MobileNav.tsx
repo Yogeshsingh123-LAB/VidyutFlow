@@ -137,8 +137,7 @@ export const MobileNav: React.FC = () => {
           { id: 'consumers', label: t.erp.navConsumerLedger, icon: <Database className="w-4 h-4" /> },
           { id: 'complaints', label: t.erp.navComplaintQueue, icon: <MessageSquareWarning className="w-4 h-4" />, badge: activeCmps > 0 ? activeCmps : undefined },
           { id: 'approvals', label: t.erp.navApprovalCenter, icon: <CheckSquare className="w-4 h-4" />, badge: pendingApps > 0 ? pendingApps : undefined },
-          { id: 'coordination', label: t.erp.navDeptCoordination, icon: <Network className="w-4 h-4" /> },
-          { id: 'reports', label: t.erp.navRevenueReports, icon: <BarChart3 className="w-4 h-4" /> }
+          { id: 'coordination', label: t.erp.navDeptCoordination, icon: <Network className="w-4 h-4" /> }
         ];
       case 'field':
         return [

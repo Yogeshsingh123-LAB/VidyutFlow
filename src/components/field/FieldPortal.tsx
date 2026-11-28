@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LazyOutageMapSection } from '../outageMap/LazyOutageMapSection';
 const FieldTransformerInspectionsView = React.lazy(() =>
   import('../transformers/FieldTransformerInspectionsView').then(m => ({ default: m.FieldTransformerInspectionsView }))
@@ -94,6 +94,8 @@ import {
   Flame,
   X,
   ChevronRight,
+  Upload,
+  Trash2,
 } from 'lucide-react';
 
 const DEFAULT_TECH_REMARKS_SET = new Set(
@@ -279,6 +281,89 @@ export const FieldPortal: React.FC = () => {
   const [voltageB, setVoltageB] = useState('235');
   const [technicianRemarks, setTechnicianRemarks] = useState(tf.defaultTechnicianRemarks);
   const [gpsLocation] = useState('23.5880° N, 72.3693° E (Mehsana North)');
+  const [capturedSitePhoto, setCapturedSitePhoto] = useState<string | null>(null);
+  const [sitePhotoCapturedAt, setSitePhotoCapturedAt] = useState<string | null>(null);
+  const [isSiteCameraOpen, setIsSiteCameraOpen] = useState(false);
+  const [siteCameraError, setSiteCameraError] = useState<string | null>(null);
+  const siteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const siteStreamRef = useRef<MediaStream | null>(null);
+  const siteFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const stopSiteCamera = () => {
+    if (siteStreamRef.current) {
+      siteStreamRef.current.getTracks().forEach((t) => t.stop());
+      siteStreamRef.current = null;
+    }
+    if (siteVideoRef.current) {
+      siteVideoRef.current.srcObject = null;
+    }
+    setIsSiteCameraOpen(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (siteStreamRef.current) {
+        siteStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+    };
+  }, []);
+
+  const handleOpenSiteCamera = async () => {
+    setSiteCameraError(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setSiteCameraError('Live browser camera requires HTTPS or localhost. Use "Take / Upload Photo" below on HTTP Wi-Fi.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
+      siteStreamRef.current = stream;
+      setIsSiteCameraOpen(true);
+      requestAnimationFrame(() => {
+        if (siteVideoRef.current) {
+          siteVideoRef.current.srcObject = stream;
+          void siteVideoRef.current.play();
+        }
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unable to access camera.';
+      setSiteCameraError(`${msg} You can use "Take / Upload Photo" instead.`);
+      stopSiteCamera();
+    }
+  };
+
+  const handleCaptureSitePhoto = () => {
+    const video = siteVideoRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+    setCapturedSitePhoto(dataUrl);
+    setSitePhotoCapturedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    setSiteCameraError(null);
+    stopSiteCamera();
+  };
+
+  const handleUploadSitePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setCapturedSitePhoto(reader.result);
+        setSitePhotoCapturedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        setSiteCameraError(null);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   // Emergency Hazard Reporting Modal
   const [showHazardModal, setShowHazardModal] = useState(false);
@@ -342,7 +427,7 @@ export const FieldPortal: React.FC = () => {
       voltageY: Number(voltageY) || 230,
       voltageB: Number(voltageB) || 230,
       gpsLocation,
-      photoAttached: true,
+      photoAttached: Boolean(capturedSitePhoto),
       technicianRemarks: canonicalRemarks,
       submittedBy: `${activeUser.name} (${activeUser.id})`,
     });
@@ -1362,21 +1447,111 @@ export const FieldPortal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <Camera className="w-4 h-4 text-blue-600" />
-                  <div>
-                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                      {tf.labelSitePhotoEvidence}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      {tf.labelGpsGeotag} {gpsLocation}
-                    </p>
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5 border border-slate-200 dark:border-slate-700/60 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <Camera className="w-4 h-4 text-blue-600 shrink-0" />
+                    <div>
+                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        {tf.labelSitePhotoEvidence}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        {tf.labelGpsGeotag} {gpsLocation}
+                        {sitePhotoCapturedAt ? ` • Captured ${sitePhotoCapturedAt}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 text-[11px] font-semibold">
+                      {tf.badgeGeotagVerified}
+                    </span>
+                    {!isSiteCameraOpen && (
+                      <button
+                        type="button"
+                        onClick={handleOpenSiteCamera}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs cursor-pointer transition-colors"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>{capturedSitePhoto ? 'Retake Live Photo' : 'Live Camera'}</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => siteFileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold cursor-pointer transition-colors"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Take / Upload Photo</span>
+                    </button>
+                    <input
+                      ref={siteFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleUploadSitePhoto}
+                      className="hidden"
+                    />
                   </div>
                 </div>
-                <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 text-[11px] font-semibold">
-                  {tf.badgeGeotagVerified}
-                </span>
+
+                {siteCameraError && (
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                    {siteCameraError}
+                  </p>
+                )}
+
+                {isSiteCameraOpen && (
+                  <div className="space-y-2.5">
+                    <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-300 dark:border-slate-700">
+                      <video
+                        ref={siteVideoRef}
+                        playsInline
+                        muted
+                        autoPlay
+                        className="w-full max-h-64 object-cover"
+                      />
+                    </div>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={stopSiteCamera}
+                        className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCaptureSitePhoto}
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Capture Photo</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {capturedSitePhoto && !isSiteCameraOpen && (
+                  <div className="relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                    <img
+                      src={capturedSitePhoto}
+                      alt="Captured Site Inspection Photo"
+                      className="w-full max-h-64 object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCapturedSitePhoto(null);
+                        setSitePhotoCapturedAt(null);
+                      }}
+                      className="absolute top-2 right-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900/80 hover:bg-rose-600 text-white text-[11px] font-semibold cursor-pointer transition-colors"
+                      aria-label="Remove captured photo"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Remove</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>

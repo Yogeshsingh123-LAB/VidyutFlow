@@ -1407,12 +1407,28 @@ export const AdminPortal: React.FC = () => {
               <label className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">
                 {ad.idleTimeoutLabel}
               </label>
-              <input
+              <select
                 key={`timeout-${language}`}
-                type="text"
-                defaultValue={ad.idleTimeoutDefaultValue}
+                defaultValue={(() => {
+                  try {
+                    return localStorage.getItem('vidyutflow_idle_timeout_minutes') || '30';
+                  } catch {
+                    return '30';
+                  }
+                })()}
+                onChange={(e) => {
+                  try {
+                    localStorage.setItem('vidyutflow_idle_timeout_minutes', e.target.value);
+                    window.dispatchEvent(new CustomEvent('vidyutflow:idle-timeout-updated'));
+                  } catch {}
+                }}
                 className="w-full min-h-11 sm:min-h-9 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-              />
+              >
+                <option value="15">15 Minutes (Auto-lock)</option>
+                <option value="30">{ad.idleTimeoutDefaultValue}</option>
+                <option value="60">60 Minutes (Auto-lock)</option>
+                <option value="0">Off (Disabled)</option>
+              </select>
             </div>
             <div>
               <label className="text-slate-700 dark:text-slate-300 font-semibold block mb-1">

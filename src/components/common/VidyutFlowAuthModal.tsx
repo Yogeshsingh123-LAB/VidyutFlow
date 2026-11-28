@@ -490,11 +490,12 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
 
         {/* Mobile Top Bar: Branding on left + Return to Home on right */}
         <div className="relative z-30 w-full flex items-center justify-between px-4 pt-3.5 pb-1 lg:hidden">
-          <div className="flex items-center gap-2 bg-white/85 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm border border-white/80">
-            <Zap className="w-3.5 h-3.5 text-[#FF7A00] fill-[#FF7A00]" />
-            <span className="text-xs font-black tracking-tight text-[#0A2540]">
-              UGVCL <span className="text-[#FF6B00]">VidyutFlow</span>
-            </span>
+          <div className="flex items-center bg-white/95 backdrop-blur-md px-3 py-1 rounded-full shadow-sm border border-white/80">
+            <img
+              src="/assets/vidyutflow-logo.png"
+              alt="UGVCL VidyutFlow"
+              className="h-6 w-auto object-contain"
+            />
           </div>
           <button
             type="button"
@@ -528,29 +529,17 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
 
             {/* Top Section: Branding + Headline + Feature Badges (Anchored to upper sky area exactly as in reference) */}
             <div className="space-y-4 sm:space-y-6 lg:space-y-7">
-              {/* Top Branding Section (Desktop — mobile uses compact top bar + card header) */}
-              <div className="hidden lg:flex items-center gap-3">
-                <div className="flex flex-col items-center justify-center shrink-0">
-                  <svg className="w-8 h-8 text-[#0B2545]" viewBox="0 0 48 48" fill="none" stroke="currentColor">
-                    <path d="M24 4 L14 44 M24 4 L34 44" strokeWidth="2.5" strokeLinecap="round" />
-                    <path d="M12 16 L36 16 M10 26 L38 26 M7 36 L41 36" strokeWidth="2" />
-                    <path d="M16 16 L32 26 M32 16 L16 26" strokeWidth="1.5" />
-                    <path d="M14 26 L34 36 M34 26 L14 36" strokeWidth="1.5" />
-                    <path d="M26 12 L20 22 L27 22 L21 34" stroke="#FF6B00" strokeWidth="2.5" fill="#FF6B00" strokeLinejoin="round" />
-                  </svg>
-                  <span className="text-[10px] font-black tracking-widest text-[#0B2545] leading-none mt-0.5">
-                    UGVCL
-                  </span>
-                </div>
-                <div className="h-8 w-px bg-slate-300/80" />
-                <div>
-                  <div className="text-[22px] font-black tracking-tight leading-none text-[#0A2540]">
-                    Vidyut<span className="text-[#FF6B00]">Flow</span>
-                  </div>
-                  <div className="text-[11px] text-[#0A2540]/80 font-bold tracking-wide mt-1">
-                    {authCopy.tagline}
-                  </div>
-                </div>
+              {/* Top Branding Section (Desktop — transparent logo directly over sky background) */}
+              <div className="hidden lg:inline-flex items-center gap-3 w-fit">
+                <img
+                  src="/assets/vidyutflow-logo.png"
+                  alt="UGVCL VidyutFlow — Powering a Smarter Gujarat"
+                  className="h-12 w-auto object-contain drop-shadow-[0_1px_4px_rgba(255,255,255,0.65)]"
+                />
+                <div className="h-7 w-px bg-[#0B2545]/25" />
+                <span className="text-xs font-black tracking-widest text-[#0B2545] uppercase">
+                  UGVCL
+                </span>
               </div>
 
               {/* Main Headline & Feature Indicators */}
@@ -698,28 +687,12 @@ export const VidyutFlowAuthModal: React.FC<VidyutFlowAuthModalProps> = ({
 
               {/* Top Center Logo Header */}
               <div className="flex flex-col items-center justify-center text-center mb-4">
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="flex flex-col items-center justify-center shrink-0">
-                    <svg className="w-7 h-7 text-[#0B2545]" viewBox="0 0 48 48" fill="none" stroke="currentColor">
-                      <path d="M24 4 L14 44 M24 4 L34 44" strokeWidth="2.5" strokeLinecap="round" />
-                      <path d="M12 16 L36 16 M10 26 L38 26 M7 36 L41 36" strokeWidth="2" />
-                      <path d="M16 16 L32 26 M32 16 L16 26" strokeWidth="1.5" />
-                      <path d="M14 26 L34 36 M34 26 L14 36" strokeWidth="1.5" />
-                      <path d="M26 12 L20 22 L27 22 L21 34" stroke="#FF6B00" strokeWidth="2.5" fill="#FF6B00" strokeLinejoin="round" />
-                    </svg>
-                    <span className="text-[9px] font-black tracking-widest text-[#0B2545] leading-none mt-0.5">
-                      UGVCL
-                    </span>
-                  </div>
-                  <div className="h-7 w-px bg-slate-200" />
-                  <div className="text-left">
-                    <div className="text-[18px] font-black tracking-tight leading-none text-[#0A2540]">
-                      Vidyut<span className="text-[#FF6B00]">Flow</span>
-                    </div>
-                    <div className="text-[10px] text-slate-500 font-semibold tracking-wide mt-0.5">
-                      {authCopy.tagline}
-                    </div>
-                  </div>
+                <div className="flex items-center justify-center mb-1.5">
+                  <img
+                    src="/assets/vidyutflow-logo.png"
+                    alt="UGVCL VidyutFlow — Powering a Smarter Gujarat"
+                    className="h-11 sm:h-12 w-auto object-contain"
+                  />
                 </div>
 
                 <h2

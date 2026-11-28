@@ -17,6 +17,7 @@ export const PWA_CORE_PRECACHE_URLS: readonly string[] = [
   '/manifest.webmanifest',
   '/assets/ugvcl-logo.png',
   '/assets/ugvcl-logo.svg',
+  '/assets/vidyutflow-logo.png',
 ];
 
 /**

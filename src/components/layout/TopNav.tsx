@@ -198,17 +198,14 @@ export const TopNav: React.FC<TopNavProps> = () => {
             className="flex items-center gap-2.5 cursor-pointer group shrink-0"
             title="Return to VidyutFlow Homepage"
           >
-            {/* Orange Lightning Bolt */}
-            <Zap className="w-5 h-5 text-[#FF6B00] fill-[#FF6B00] shrink-0" />
-            <span className="text-lg sm:text-xl font-black text-[#0A2540] tracking-tight leading-none">
-              UGVCL
-            </span>
-            <div className="h-5 w-px bg-slate-300 mx-1 hidden sm:block" />
+            <img
+              src="/assets/vidyutflow-logo.png"
+              alt="UGVCL VidyutFlow"
+              className="h-8 sm:h-9 w-auto object-contain shrink-0"
+            />
+            <div className="h-5 w-px bg-slate-300 hidden sm:block" />
             <div className="hidden sm:block leading-tight">
-              <div className="text-[17px] font-black tracking-tight leading-none text-[#0A2540]">
-                Vidyut<span className="text-[#FF6B00]">Flow</span>
-              </div>
-              <div className="text-[9.5px] text-slate-500 font-semibold tracking-wider uppercase mt-0.5">
+              <div className="text-[10px] text-slate-600 font-bold tracking-wider uppercase">
                 {currentRole === 'admin'
                   ? 'Admin Portal'
                   : currentRole === 'management'
@@ -639,17 +636,6 @@ export const TopNav: React.FC<TopNavProps> = () => {
                       >
                         <Database className="w-4 h-4 text-emerald-600" />
                         <span>Consumer Ledger</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveTab('reports');
-                          setIsSupportMenuOpen(false);
-                        }}
-                        className="w-full px-3.5 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2 cursor-pointer"
-                      >
-                        <BarChart3 className="w-4 h-4 text-amber-600" />
-                        <span>Revenue Reports</span>
                       </button>
                     </>
                   ) : currentRole === 'management' ? (
